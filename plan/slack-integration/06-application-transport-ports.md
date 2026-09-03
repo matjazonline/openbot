@@ -2,9 +2,10 @@
 
 ## Outcome
 
-Define the protocol-neutral commands and ports where they are consumed. Remove the current
-dependency inversion in which application use cases import `adapters::protocols`, and stop
-projecting `NormalizedInboundMessage` back into `ParsedEmail`.
+Define the protocol-neutral commands and ports where they are consumed, and stop projecting
+`NormalizedInboundMessage` back into `ParsedEmail`. This step introduces the boundary and freezes
+the pre-existing dependency violations in a shrinking-only test; steps 8 and 9 remove their named
+exceptions, and step 11 is the zero-exception gate.
 
 ## New application contracts
 
@@ -59,22 +60,27 @@ pass a row ID plus worker ID as adjacent UUIDs.
 ## Durable task payload
 
 Stop serializing `Company`, `Channel`, parsed email, and normalized protocol messages into
-`background_tasks.payload`. Add a versioned payload containing stable IDs only:
+`background_tasks.payload`. Add a versioned payload centered on stable IDs:
 
 ```text
 InboundTaskPayloadV1 {
-  version, company_id, channel_id, thread_id, source_message_id, correlation_id
+  version, company_id, channel_id, thread_id, source_message_id, correlation_id,
+  hop_count, trace_channels, is_forwarded, reply_delivery
 }
 ```
 
 The worker reloads current entities with tenant-scoped queries and accepts only this canonical
 version. Do not add a decoder for the pre-reset broad payload. Versioning remains so future schema
-changes can be handled deliberately, and raw provider content stays out of task JSON.
+changes can be handled deliberately, and raw provider content stays out of task JSON. The four
+small delivery directives are a deliberate extension to the IDs-only sketch: no stored row can
+reconstruct them, and dropping them would break loop protection, trust handling, or an explicit
+in-app-only reply. `trace_channels` is a `BoundedVec` capped by the ingress hop limit.
 
 ## Contract tests
 
-- Compile-time dependency check (or `rg` CI assertion) proves `src/application` imports no adapter,
-  SQLx, Axum, Lettre, or Slack client types.
+- A shrinking-only dependency check enumerates every pre-existing upward import and refuses both a
+  new violation and a stale exception. Steps 8/9 remove each exception assigned to them; step 11
+  changes this into a zero-exception proof for adapters, SQLx, Axum, Lettre, and Slack client types.
 - Table-driven tests cover delivery fan-out: source excluded, disabled binding excluded, explicit
   destination retained, and multiple different bindings allowed.
 - Serialization tests reject unknown payload versions and over-limit strings without panicking.

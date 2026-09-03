@@ -1,8 +1,9 @@
 //! The email protocol extension of a canonical message.
 //!
 //! One row per canonical message that mail carried, holding the RFC threading headers and the raw
-//! bodies. `UNIQUE (company_id, rfc_message_id)` is the dedup key mail has always had, and it is
-//! kept here rather than on `messages` so that a message no mail carried needs none of it.
+//! bodies. RFC Message-ID is deliberately non-unique here; provider deduplication belongs to the
+//! binding-scoped `(binding_id, external_message_key)` map. The extension stays separate from
+//! `messages` so that a message no mail carried needs none of it.
 
 use uuid::Uuid;
 

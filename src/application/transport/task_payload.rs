@@ -1,10 +1,10 @@
 //! What a durable background task carries about the message that created it.
 //!
-//! Nothing but identifiers. The previous payload serialized whole `Company`, `Channel`, `Thread`,
-//! `Message`, parsed-email and normalized-protocol values into `background_tasks.payload`, which
-//! made every queued row a snapshot of the domain model at the moment it was written: a field
-//! rename broke rows already in flight, stale configuration was replayed hours later, and raw
-//! provider content sat inside the task protocol.
+//! Stable identifiers plus four small delivery directives. The previous payload serialized whole
+//! `Company`, `Channel`, `Thread`, `Message`, parsed-email and normalized-protocol values into
+//! `background_tasks.payload`, which made every queued row a snapshot of the domain model at the
+//! moment it was written: a field rename broke rows already in flight, stale configuration was
+//! replayed hours later, and raw provider content sat inside the task protocol.
 //!
 //! The worker reloads the current entities with tenant-scoped queries instead. Versioning stays,
 //! so a future shape change is a deliberate decision rather than a silent reinterpretation -- but

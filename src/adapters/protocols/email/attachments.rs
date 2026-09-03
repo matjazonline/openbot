@@ -1,8 +1,9 @@
 //! Keeping what arrived in the mail.
 //!
-//! Attachments are stored the moment they are parsed, which is the only point in the pipeline that
-//! still has the bytes: everything downstream carries [`AttachmentMetadata`], and the durable task
-//! payload the ingest is queued through is JSONB in Postgres — no place for a file.
+//! Attachments are stored only after application preflight accepts the message. The email boundary
+//! holds their bounded bytes until guards, routing and ACL checks have produced an accepted commit
+//! plan; everything downstream carries [`AttachmentMetadata`], and the durable task payload the
+//! ingest is queued through is JSONB in Postgres — no place for a file.
 //!
 //! That timing decides the object key. The company and the thread are not resolved yet, so the key
 //! cannot name them; it is the content hash the parser computes anyway. Two copies of the same

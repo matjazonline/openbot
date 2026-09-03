@@ -16,7 +16,6 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         delivery::{DeliveryEntry, DeliveryFilter, DeliveryPartEntry},
-        message::CanonicalMessageId,
         transport::{DeliveryId, DeliveryPartId},
     },
     use_cases::delivery::DeliveryReader,
@@ -217,11 +216,17 @@ fn entry(row: DeliveryViewDb, parts: Vec<DeliveryPartEntry>) -> AppResult<Delive
         subject,
         destination_label,
     } = row;
+    let attribution = delivery.record()?.attribution.ok_or_else(|| {
+        AppError::Internal(format!(
+            "Standalone delivery {} appeared in the tenant delivery view",
+            delivery.id
+        ))
+    })?;
     Ok(DeliveryEntry {
         id: DeliveryId::new(delivery.id),
-        company_id: delivery.company_id,
-        channel_id: delivery.channel_id,
-        message_id: CanonicalMessageId::new(delivery.message_id),
+        company_id: attribution.company_id,
+        channel_id: attribution.channel_id,
+        message_id: attribution.message_id,
         task_id: delivery.task_id,
         correlation_id: CorrelationId::from(delivery.correlation_id),
         transport: delivery.transport()?,

@@ -184,6 +184,12 @@ impl InMemoryParticipantDirectory {
         self
     }
 
+    /// Number of identities actually observed by a write. Policy tests use this to prove a
+    /// rejected ingress performed only lookups.
+    pub fn identity_count(&self) -> usize {
+        self.state.lock().unwrap().identities.len()
+    }
+
     async fn membership_for_subject(
         &self,
         company_id: Uuid,
@@ -316,15 +322,25 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
             .identities
             .get(&(company_id, identity.clone()))
             .cloned();
-        // An unobserved or disabled handle is nobody, exactly as the SQL directory answers.
-        let Some(known) = known.filter(|known| known.status != IdentityStatus::Disabled) else {
+        if known
+            .as_ref()
+            .is_some_and(|known| known.status == IdentityStatus::Disabled)
+        {
             return Ok(PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::None,
             });
-        };
+        }
+        // Test fixtures state ACL principals and team membership without running the database
+        // bootstrap that would have inserted their identity rows. Derive the same stable principal
+        // for a read, but do not put it in `state`: a policy lookup must remain observable as
+        // read-only, and accepted-message tests still resolve the same actor their grants name.
         Ok(PrincipalAccessContext {
-            principal_id: Some(known.principal_id),
+            principal_id: Some(
+                known
+                    .map(|known| known.principal_id)
+                    .unwrap_or_else(|| principal_for_identity(company_id, identity)),
+            ),
             membership: self.membership_for_subject(company_id, identity).await?,
         })
     }

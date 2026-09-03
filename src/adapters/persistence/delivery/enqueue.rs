@@ -13,7 +13,7 @@ use super::PART_COLUMNS;
 use crate::{
     app_error::{AppError, AppResult},
     entities::transport::{DeliveryId, DeliveryPartId},
-    transport::{DeliveryCreation, NewDelivery, RenderedPart},
+    transport::{DeliveryCreation, NewDelivery, NewStandaloneDelivery, RenderedPart},
 };
 
 /// Write one delivery and its frozen parts, or recognise the one that is already queued.
@@ -111,13 +111,81 @@ async fn insert_part_on(
     delivery: &NewDelivery,
     part: &RenderedPart,
 ) -> AppResult<()> {
-    if part.payload.transport() != delivery.transport {
+    insert_part_values(
+        tx,
+        delivery.id,
+        Some(delivery.company_id),
+        delivery.transport,
+        part,
+    )
+    .await
+}
+
+/// Write one unattributed notification and its frozen parts on the generic queue.
+pub async fn insert_standalone_delivery_on(
+    tx: &mut Transaction<'_, Postgres>,
+    delivery: &NewStandaloneDelivery,
+) -> AppResult<DeliveryCreation> {
+    let inserted: Option<Uuid> = sqlx::query_scalar(
+        r#"INSERT INTO message_deliveries (
+                id, external_destination, correlation_id, transport, purpose,
+                idempotency_key, max_attempts
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT DO NOTHING
+           RETURNING id"#,
+    )
+    .bind(delivery.id.as_uuid())
+    .bind(delivery.external_destination.as_str())
+    .bind(delivery.correlation_id.as_uuid())
+    .bind(delivery.transport.as_str())
+    .bind(delivery.purpose.as_str())
+    .bind(delivery.idempotency_key.as_str())
+    .bind(delivery.max_attempts)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+
+    let Some(id) = inserted else {
+        let existing: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT id FROM message_deliveries
+                WHERE destination_binding_id IS NULL
+                  AND transport = $1 AND idempotency_key = $2"#,
+        )
+        .bind(delivery.transport.as_str())
+        .bind(delivery.idempotency_key.as_str())
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(AppError::from)?;
+        return existing
+            .map(|id| DeliveryCreation::Absorbed(DeliveryId::new(id)))
+            .ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Standalone delivery '{}' conflicted but no such delivery is visible",
+                    delivery.idempotency_key
+                ))
+            });
+    };
+
+    for part in delivery.parts.iter() {
+        insert_part_values(tx, delivery.id, None, delivery.transport, part).await?;
+    }
+    Ok(DeliveryCreation::Created(DeliveryId::new(id)))
+}
+
+async fn insert_part_values(
+    tx: &mut Transaction<'_, Postgres>,
+    delivery_id: DeliveryId,
+    company_id: Option<Uuid>,
+    transport: crate::entities::transport::TransportKind,
+    part: &RenderedPart,
+) -> AppResult<()> {
+    if part.payload.transport() != transport {
         // The renderer and the row disagree about which provider will be called. Refused here
         // rather than at claim time, because a payload that cannot be decoded by the adapter the
         // transport column names is a delivery that can only ever dead-letter.
         return Err(AppError::Internal(format!(
             "A {} delivery cannot carry a {} part payload",
-            delivery.transport,
+            transport,
             part.payload.transport()
         )));
     }
@@ -131,8 +199,8 @@ async fn insert_part_on(
            ) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
     )
     .bind(DeliveryPartId::random().as_uuid())
-    .bind(delivery.company_id)
-    .bind(delivery.id.as_uuid())
+    .bind(company_id)
+    .bind(delivery_id.as_uuid())
     .bind(i32::from(part.index.get()))
     .bind(part.key.as_str())
     .bind(payload)

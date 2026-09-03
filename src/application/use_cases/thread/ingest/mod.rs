@@ -69,8 +69,8 @@ pub struct InboundMessage {
 /// The result of every read-only ingress decision. Only the accepted arm may proceed to uploads
 /// and the atomic commit.
 pub enum InboundPreflight {
-    Rejected(InboundIngestResult),
-    Accepted(PreparedInbound),
+    Rejected(Box<InboundIngestResult>),
+    Accepted(Box<PreparedInbound>),
 }
 
 /// An accepted, still-uncommitted message. Attachment bytes remain outside this type; the email
@@ -124,9 +124,9 @@ impl ThreadUseCases {
         // Box the two-phase seam so callers without attachment bytes keep this already-deep
         // ingress future small, while SMTP and webhooks can pause between policy and persistence.
         match Box::pin(self.preflight_inbound(message)).await? {
-            InboundPreflight::Rejected(result) => Ok(result),
+            InboundPreflight::Rejected(result) => Ok(*result),
             InboundPreflight::Accepted(prepared) => {
-                Box::pin(self.commit_prepared_inbound(prepared)).await
+                Box::pin(self.commit_prepared_inbound(*prepared)).await
             }
         }
     }
@@ -144,8 +144,8 @@ impl ThreadUseCases {
         self.record_unusable_hints(&unusable_hints);
         if let Err(rejection) = policy::guard_ingress(&draft, origin) {
             warn!(%rejection, "Refusing an inbound message at the ingress guard");
-            return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
-                rejection,
+            return Ok(InboundPreflight::Rejected(Box::new(
+                InboundIngestResult::rejected(rejection),
             )));
         }
 
@@ -163,13 +163,13 @@ impl ThreadUseCases {
         {
             Ok(resolved) => resolved,
             Err(IngestRejection::UnknownRecipient) if answered_system => {
-                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
-                    IngestRejection::SystemAddressAnswered,
+                return Ok(InboundPreflight::Rejected(Box::new(
+                    InboundIngestResult::rejected(IngestRejection::SystemAddressAnswered),
                 )));
             }
             Err(rejection) => {
-                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
-                    rejection,
+                return Ok(InboundPreflight::Rejected(Box::new(
+                    InboundIngestResult::rejected(rejection),
                 )));
             }
         };
@@ -180,18 +180,18 @@ impl ThreadUseCases {
         {
             Ok(prepared) => prepared,
             Err(rejection) => {
-                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
-                    rejection,
+                return Ok(InboundPreflight::Rejected(Box::new(
+                    InboundIngestResult::rejected(rejection),
                 )));
             }
         };
 
         let plan = CommitPlan::build(&draft, &resolved, prepared, reply_delivery)?;
-        Ok(InboundPreflight::Accepted(PreparedInbound {
+        Ok(InboundPreflight::Accepted(Box::new(PreparedInbound {
             plan,
             stored_attachment_count: 0,
             failed_attachment_count: 0,
-        }))
+        })))
     }
 
     /// Persist a preflighted message. Object-storage failures are already reflected in its

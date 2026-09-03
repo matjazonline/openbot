@@ -28,14 +28,16 @@ pub use crate::entities::transport::{
 };
 pub use bounded::{BoundedVec, BoundsError};
 pub use compose::{
-    ComposedDelivery, DeliveryComposer, DeliveryRequest, delivery_key, email_context,
+    ComposedDelivery, DeliveryComposer, DeliveryRequest, StandaloneDeliveryRequest, delivery_key,
+    email_context,
 };
 pub use delivery::{
     CanonicalContentV1, ContentDigest, ContextMismatch, DELIVERY_ENVELOPE_VERSION,
     DeliveryCandidate, DeliveryContext, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
     DeliveryKey, DeliveryPlanRequest, EmailDeliveryContext, EmailRelayTrace, FailureDetail,
     MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES, PartIndex, PartKey, PartTransition, PayloadError,
-    ProviderSendOutcome, RenderedPart, TransportPayload, plan_deliveries,
+    ProviderSendOutcome, RenderedPart, StandaloneDeliveryEnvelope, TransportPayload,
+    plan_deliveries,
 };
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
@@ -49,15 +51,16 @@ pub use ingress::{
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
-    DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, InternalMailRelay,
-    InternalRelayMail, PolicyDeliveryPlanner, RegisteredTransport, RelayDisposition,
-    TransportRegistrationError, TransportRegistry, TransportRenderer, TransportRenderers,
-    TransportSender,
+    DeliveryPlanner, ExternalCorrelationStore, ExternalDestinationClassification,
+    InboundMessageCommitter, InternalMailRelay, InternalRelayMail, PolicyDeliveryPlanner,
+    RegisteredTransport, RelayDisposition, TransportRegistrationError, TransportRegistry,
+    TransportRenderer, TransportRenderers, TransportSender,
 };
 pub use queue::{
-    ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryBackoff,
-    DeliveryCreation, DeliveryFailure, DeliveryOutcome, DeliveryQueue, DeliveryReaping,
-    DeliveryRecord, Disposition, MAX_DELIVERY_ATTEMPTS, NewDelivery, PartResult, StoredPart,
+    ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryAttribution,
+    DeliveryBackoff, DeliveryCreation, DeliveryFailure, DeliveryOutcome, DeliveryQueue,
+    DeliveryReaping, DeliveryRecord, Disposition, MAX_DELIVERY_ATTEMPTS, NewDelivery,
+    NewStandaloneDelivery, PartResult, StandaloneDeliveryEnqueuer, StoredPart,
 };
 pub use task_payload::{InboundTaskPayload, InboundTaskPayloadV1};
 

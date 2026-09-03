@@ -127,6 +127,23 @@ pub struct NewDelivery {
     pub parts: BoundedVec<RenderedPart, MAX_DELIVERY_PARTS>,
 }
 
+/// A durable notification with no canonical-message attribution.
+///
+/// The frozen payload is still bounded and the destination is still explicit. Only the tenant,
+/// channel, message and binding tuple is absent, which is the honest state for a bounce caused by
+/// an address that resolved to no company.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewStandaloneDelivery {
+    pub id: DeliveryId,
+    pub external_destination: ExternalDestination,
+    pub correlation_id: CorrelationId,
+    pub transport: TransportKind,
+    pub purpose: DeliveryPurpose,
+    pub idempotency_key: DeliveryKey,
+    pub max_attempts: i32,
+    pub parts: BoundedVec<RenderedPart, MAX_DELIVERY_PARTS>,
+}
+
 impl NewDelivery {
     /// Refuses a delivery that renders nothing.
     ///
@@ -173,11 +190,7 @@ impl DeliveryCreation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeliveryRecord {
     pub id: DeliveryId,
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub message_id: CanonicalMessageId,
-    pub source_binding_id: ChannelBindingId,
-    pub destination_binding_id: ChannelBindingId,
+    pub attribution: Option<DeliveryAttribution>,
     pub external_destination: Option<ExternalDestination>,
     pub task_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
@@ -186,6 +199,19 @@ pub struct DeliveryRecord {
     pub idempotency_key: DeliveryKey,
     pub attempt_count: i32,
     pub max_attempts: i32,
+}
+
+/// The canonical rows an ordinary delivery is attributed to.
+///
+/// One option around one struct mirrors the database's all-or-none check and prevents Rust from
+/// representing a half-attributed delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeliveryAttribution {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub message_id: CanonicalMessageId,
+    pub source_binding_id: ChannelBindingId,
+    pub destination_binding_id: ChannelBindingId,
 }
 
 impl DeliveryRecord {
@@ -359,6 +385,18 @@ pub trait DeliveryQueue: Send + Sync {
     async fn reap_expired_deliveries(&self) -> AppResult<DeliveryReaping>;
 }
 
+/// Producer-side creation of a standalone notification on the generic delivery queue.
+///
+/// Separate from [`DeliveryQueue`] because producers may enqueue but must never claim, fence, or
+/// settle work. The Postgres adapter implements both views over the same tables.
+#[async_trait]
+pub trait StandaloneDeliveryEnqueuer: Send + Sync {
+    async fn enqueue_standalone_delivery(
+        &self,
+        delivery: NewStandaloneDelivery,
+    ) -> AppResult<DeliveryCreation>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,11 +443,13 @@ mod tests {
     fn record() -> DeliveryRecord {
         DeliveryRecord {
             id: DeliveryId::random(),
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-            message_id: CanonicalMessageId::random(),
-            source_binding_id: ChannelBindingId::random(),
-            destination_binding_id: ChannelBindingId::random(),
+            attribution: Some(DeliveryAttribution {
+                company_id: Uuid::new_v4(),
+                channel_id: Uuid::new_v4(),
+                message_id: CanonicalMessageId::random(),
+                source_binding_id: ChannelBindingId::random(),
+                destination_binding_id: ChannelBindingId::random(),
+            }),
             external_destination: None,
             task_id: None,
             correlation_id: CorrelationId::new(),

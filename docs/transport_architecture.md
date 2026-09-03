@@ -303,7 +303,7 @@ an email address as the identity or internal routing mechanism for another chann
 | Email extension | `email_message_metadata` | RFC/envelope/authentication fields and retained raw email representation | Canonical authorization or cross-transport correlation |
 | Provider correlation | `external_threads`, `external_messages` | Binding-qualified opaque keys mapped to canonical rows and delivery parts | Provider keys embedded in canonical rows |
 | Durable inbound adapter boundary | `inbound_events` | Bounded authenticated raw event, safe header facts, lease/fence, classification | Credentials, signature headers, long-term canonical history |
-| Generic delivery queue | `message_deliveries`, `message_delivery_parts` | Destination intent, frozen provider payload, lease/fence, per-part result | Secret credentials; a single result field for multipart delivery |
+| Generic delivery queue | `message_deliveries`, `message_delivery_parts` | Canonical destination intent or explicitly unattributed notification, frozen provider payload, lease/fence, per-part result | Secret credentials; partial canonical attribution; a single result field for multipart delivery |
 
 `email_outbox` is gone: the generic delivery queue replaced it outright on the clean-reset premise,
 so there is no email-shaped queue left to be an exception to this model. Legacy `email_messages` and
@@ -509,17 +509,19 @@ backoff on `available_at`, rather than being reset to `pending`. The two are one
 test are both derived from -- but they are distinct rows to a reader and to the stuck-work census:
 "queued and never tried" and "tried and failed" are different things for a human to look at.
 
-**Three notices deliberately stay off the queue.** A delivery row names a company, a channel, an
-interface and a canonical message, and all four are `NOT NULL` so the composite foreign keys can
-prove tenancy. A bounce, a reply from a reserved `_` address, and an account confirmation code have
-none of them: the first two answer a message this deployment *refused* -- nothing was stored and no
-channel was matched, which is what a bounce is -- and all three go out from the deployment's own
-mailbox rather than any channel's interface. They stay on the direct `OutboundDispatcher` path,
-which is fire-and-forget by design: a relay that is down must not turn an undeliverable message
-into retried work. Making four columns nullable to accommodate them would weaken every invariant
-the table exists to hold, for three messages that have no channel to be attributed to.
+**Rejection bounces are standalone notifications on the same queue.** A bounce answers a message
+the application deliberately refused to store, and an unknown company address has no tenant,
+channel, canonical message, or binding to borrow. The attribution columns are nullable only as one
+all-or-none group: a database check permits either a complete tenant-scoped tuple or no tuple plus
+an explicit external destination and `notification` purpose. A separate partial unique index
+deduplicates standalone `(transport, idempotency_key)` rows. Their frozen parts use the same claim,
+lease, retry, ambiguity, and worker path as canonical deliveries; no detached SMTP task remains.
 
-Everything with a channel behind it *is* on the queue, including the notices that used to be
+Reserved `_` address replies and account confirmation codes remain direct system-mail operations:
+the former is generated during address preflight, and the latter must stay atomic with registration
+before it can move to this queue.
+
+Everything else with a channel behind it *is* on the queue, including the notices that used to be
 fire-and-forget: an approval request and a stop notice are now written as system-authored canonical
 messages in the thread they concern, in the transaction that queues their delivery. A task parked
 on an approval nobody was told about is not a state this can reach any more, and the conversation

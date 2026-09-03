@@ -8,6 +8,7 @@ use crate::{
     entities::{
         auth::AuthVerdict,
         channel::ParticipantAccess,
+        transport::ExternalMessageKey,
         value_objects::{ChannelSlug, EmailAddress},
     },
     transport::{InboundDraft, IngressPolicyFacts, MAX_INGRESS_HOPS, MessageDisposition},
@@ -278,12 +279,14 @@ impl UndeliverableSlugs {
 
     pub fn into_bounce(
         self,
+        source_message_key: ExternalMessageKey,
         recipient_to: EmailAddress,
         company_slug: Option<crate::entities::value_objects::CompanySlug>,
         available_channels: Vec<crate::use_cases::thread::ChannelDirectoryEntry>,
         original_subject: String,
     ) -> BounceInfo {
         BounceInfo {
+            source_message_key,
             recipient_to,
             company_slug,
             invalid_slugs: self.invalid,
@@ -519,10 +522,10 @@ mod tests {
     #[test]
     fn participants_join_once_and_only_when_the_rule_allows() {
         let existing = vec![EmailAddress::from("first@example.com")];
-        let sender = EmailAddress::from("FIRST@example.com");
+        let sender = EmailAddress::from("first@example.com");
         let third = vec![EmailAddress::from("outsider@example.com")];
 
-        // Already present, differently cased: no duplicate.
+        // The adapter has already normalized a qualified identity; an existing one is not added.
         assert_eq!(
             thread_participants(&existing, &sender, &third, true, false),
             existing

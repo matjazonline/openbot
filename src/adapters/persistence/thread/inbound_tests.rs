@@ -6,23 +6,27 @@
 
 use super::test_support::*;
 use super::*;
+use crate::adapters::persistence::task::TaskPersistence;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
-    participant::ThreadPrincipalRole,
+    outreach::OutreachReplyMatch,
+    participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
+    task::NewTask,
     transport::{
-        ChannelBindingId, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
-        IdentitySubject, InboundSource, QualifiedIdentity, TransportKind,
+        ChannelBindingId, ExternalEventKey, ExternalMessageKey, ExternalThreadKey,
+        IdentityNamespace, IdentitySubject, InboundSource, QualifiedIdentity, TransportKind,
     },
     value_objects::MessageId,
 };
 use crate::transport::{
     AddressedIdentity, BoundedVec, CanonicalContent, CommitDisposition, ExternalCorrelationStore,
     InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundMessageCommitter,
-    InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep,
-    ProtocolExtension, RecipientRole, ReplyDelivery, ThreadAssociation, ThreadPrincipalIntent,
-    ThreadTarget,
+    InboundOutreachTransition, InboundTaskRequest, InboundTaskTarget, IngressDirectives,
+    IngressPolicyFacts, PipelineStep, ProtocolExtension, RecipientRole, ReplyDelivery,
+    ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
 };
+use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
 
 /// The one task type inbound mail produces.
 const AGENT_DISPATCH: &str = "email_agent_dispatch";
@@ -32,6 +36,14 @@ fn identity(address: &str) -> QualifiedIdentity {
         TransportKind::Email,
         IdentityNamespace::parse("email").unwrap(),
         IdentitySubject::parse(address).unwrap(),
+    )
+}
+
+fn slack_identity(namespace: &str, subject: &str) -> QualifiedIdentity {
+    QualifiedIdentity::new(
+        TransportKind::Slack,
+        IdentityNamespace::parse(namespace).unwrap(),
+        IdentitySubject::parse(subject).unwrap(),
     )
 }
 
@@ -114,6 +126,42 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
     }
 }
 
+async fn request_on(
+    fixture: &Fixture,
+    channel_id: Uuid,
+    binding_id: ChannelBindingId,
+    message_key: &str,
+    thread_key: &str,
+    body: &str,
+) -> InboundCommitRequest {
+    let mut request = request(fixture, message_key, body).await;
+    request.envelope.source.binding_id = binding_id;
+    request.envelope.source.message_key = ExternalMessageKey::parse(message_key).unwrap();
+    request.envelope.source.thread_key = ExternalThreadKey::parse(thread_key).unwrap();
+    request.associations = BoundedVec::parse(
+        "thread associations",
+        vec![ThreadAssociation {
+            channel_id,
+            binding_id,
+            target: ThreadTarget::Create {
+                subject: "Quick question".to_string(),
+            },
+            role: RecipientRole::To,
+            step: PipelineStep::only(),
+            principals: sender_principals(),
+        }],
+    )
+    .unwrap();
+    request.task = Some(InboundTaskRequest {
+        task_type: AGENT_DISPATCH.to_string(),
+        targets: vec![InboundTaskTarget {
+            channel_id,
+            role: RecipientRole::To,
+        }],
+    });
+    request
+}
+
 async fn count(fixture: &Fixture, sql: &str) -> i64 {
     sqlx::query_scalar(sql)
         .bind(fixture.company_id)
@@ -136,6 +184,58 @@ async fn task_count(fixture: &Fixture) -> i64 {
         "SELECT count(*) FROM background_tasks WHERE company_id = $1",
     )
     .await
+}
+
+async fn durable_counts(fixture: &Fixture) -> [i64; 11] {
+    [
+        count(
+            fixture,
+            "SELECT count(*) FROM principals WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM participant_identities WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM threads WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM thread_principals WHERE company_id = $1",
+        )
+        .await,
+        message_count(fixture).await,
+        count(
+            fixture,
+            "SELECT count(*) FROM message_participants WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM thread_messages WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM external_threads WHERE company_id = $1",
+        )
+        .await,
+        count(
+            fixture,
+            "SELECT count(*) FROM external_messages WHERE company_id = $1",
+        )
+        .await,
+        task_count(fixture).await,
+        count(
+            fixture,
+            "SELECT count(*) FROM message_deliveries WHERE company_id = $1",
+        )
+        .await,
+    ]
 }
 
 /// The whole point of the commit: the message, its mapping and its task exist together.
@@ -316,6 +416,386 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
     fixture.cleanup().await;
 }
 
+/// Different posts in one newly-seen provider conversation serialize on the thread key, not only
+/// their distinct message keys. Both therefore join the one conversation whichever claimant wins.
+#[tokio::test]
+async fn concurrent_different_messages_sharing_a_new_thread_key_open_one_thread() {
+    let Some(fixture) = Fixture::new("inbound_thread_race").await else {
+        return;
+    };
+    let binding = fixture.email_binding_of(fixture.channel_id).await;
+    let root = format!("<thread-{}@example.com>", fixture.suffix);
+    let first_key = format!("<first-{}@example.com>", fixture.suffix);
+    let second_key = format!("<second-{}@example.com>", fixture.suffix);
+    let first = request_on(
+        &fixture,
+        fixture.channel_id,
+        binding,
+        &first_key,
+        &root,
+        "First",
+    )
+    .await;
+    let second = request_on(
+        &fixture,
+        fixture.channel_id,
+        binding,
+        &second_key,
+        &root,
+        "Second",
+    )
+    .await;
+
+    let one = PostgresPersistence::new(fixture.pool.clone());
+    let two = PostgresPersistence::new(fixture.pool.clone());
+    let (left, right) = tokio::join!(one.commit_inbound(first), two.commit_inbound(second));
+    let left = left.unwrap();
+    let right = right.unwrap();
+
+    assert_eq!(left.thread_ids, right.thread_ids);
+    assert_ne!(left.message_id, right.message_id);
+    assert_eq!(message_count(&fixture).await, 2);
+    assert_eq!(task_count(&fixture).await, 2);
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM external_threads WHERE company_id = $1"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM thread_messages WHERE company_id = $1"
+        )
+        .await,
+        2
+    );
+
+    fixture.cleanup().await;
+}
+
+/// A reply can be the first event observed for a provider conversation. A later root carrying the
+/// same thread key must join the conversation the reply opened rather than create a rival thread.
+#[tokio::test]
+async fn a_reply_observed_before_its_root_wins_the_provider_thread_mapping() {
+    let Some(fixture) = Fixture::new("inbound_reply_before_root").await else {
+        return;
+    };
+    let binding = fixture.email_binding_of(fixture.channel_id).await;
+    let root_key = format!("<root-{}@example.com>", fixture.suffix);
+    let reply_key = format!("<reply-{}@example.com>", fixture.suffix);
+
+    let reply = fixture
+        .persistence
+        .commit_inbound(
+            request_on(
+                &fixture,
+                fixture.channel_id,
+                binding,
+                &reply_key,
+                &root_key,
+                "Reply arrived first",
+            )
+            .await,
+        )
+        .await
+        .unwrap();
+    let root = fixture
+        .persistence
+        .commit_inbound(
+            request_on(
+                &fixture,
+                fixture.channel_id,
+                binding,
+                &root_key,
+                &root_key,
+                "Root arrived later",
+            )
+            .await,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(reply.thread_ids, root.thread_ids);
+    assert_ne!(reply.message_id, root.message_id);
+    assert_eq!(message_count(&fixture).await, 2);
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM external_threads WHERE company_id = $1"
+        )
+        .await,
+        1
+    );
+
+    fixture.cleanup().await;
+}
+
+/// A provider key already mapped on two interfaces must not be treated as a redelivery when those
+/// interfaces disagree about which canonical message it names.
+#[tokio::test]
+async fn inconsistent_multi_binding_message_mappings_are_a_typed_collision() {
+    let Some(fixture) = Fixture::new("inbound_binding_collision").await else {
+        return;
+    };
+    let second_channel = fixture.extra_channel("billing").await;
+    let first_binding = fixture.email_binding_of(fixture.channel_id).await;
+    let second_binding = fixture.email_binding_of(second_channel).await;
+    let key = format!("<shared-{}@example.com>", fixture.suffix);
+
+    fixture
+        .persistence
+        .commit_inbound(
+            request_on(
+                &fixture,
+                fixture.channel_id,
+                first_binding,
+                &key,
+                &format!("<first-thread-{}>", fixture.suffix),
+                "Same provider body",
+            )
+            .await,
+        )
+        .await
+        .unwrap();
+    fixture
+        .persistence
+        .commit_inbound(
+            request_on(
+                &fixture,
+                second_channel,
+                second_binding,
+                &key,
+                &format!("<second-thread-{}>", fixture.suffix),
+                "Same provider body",
+            )
+            .await,
+        )
+        .await
+        .unwrap();
+
+    let mut combined = request_on(
+        &fixture,
+        fixture.channel_id,
+        first_binding,
+        &key,
+        &format!("<combined-thread-{}>", fixture.suffix),
+        "Same provider body",
+    )
+    .await;
+    combined.associations = BoundedVec::parse(
+        "thread associations",
+        vec![
+            combined.associations[0].clone(),
+            ThreadAssociation {
+                channel_id: second_channel,
+                binding_id: second_binding,
+                target: ThreadTarget::Create {
+                    subject: "Quick question".into(),
+                },
+                role: RecipientRole::Cc,
+                step: PipelineStep { index: 1, total: 2 },
+                principals: sender_principals(),
+            },
+        ],
+    )
+    .unwrap();
+
+    let error = fixture
+        .persistence
+        .commit_inbound(combined)
+        .await
+        .expect_err("two canonical mappings cannot be one redelivery");
+    assert!(error.to_string().contains("different content"), "{error}");
+    assert_eq!(message_count(&fixture).await, 2);
+    assert_eq!(task_count(&fixture).await, 2);
+
+    fixture.cleanup().await;
+}
+
+/// A non-email adapter supplies the same participant intent without inventing an email address.
+#[tokio::test]
+async fn slack_participant_intents_persist_with_explicit_roles_and_no_email_projection() {
+    let Some(fixture) = Fixture::new("inbound_slack_principals").await else {
+        return;
+    };
+    let binding = fixture.slack_binding("C123").await;
+    let namespace = format!("T{}", fixture.suffix);
+    let author = slack_identity(&namespace, "U123");
+    let event_key = ExternalEventKey::parse(format!("Ev{}", fixture.suffix)).unwrap();
+    let message_key = format!("1712345.{}", &fixture.suffix[..8]);
+    let thread_key = format!("1712345.{}", &fixture.suffix[8..16]);
+    let mut request = request_on(
+        &fixture,
+        fixture.channel_id,
+        binding,
+        &message_key,
+        &thread_key,
+        "Slack body",
+    )
+    .await;
+    request.envelope.source.event_key = Some(event_key.clone());
+    request.envelope.author = author.clone();
+    request.envelope.addressed = BoundedVec::empty();
+    request.envelope.policy = IngressPolicyFacts::InstalledConversation;
+    request.envelope.extension = ProtocolExtension::stored_event(binding, event_key);
+    request.associations = BoundedVec::parse(
+        "thread associations",
+        vec![ThreadAssociation {
+            channel_id: fixture.channel_id,
+            binding_id: binding,
+            target: ThreadTarget::Create {
+                subject: "Slack thread".into(),
+            },
+            role: RecipientRole::To,
+            step: PipelineStep::only(),
+            principals: BoundedVec::parse(
+                "thread principals",
+                vec![
+                    ThreadPrincipalIntent::new(author.clone(), ThreadPrincipalRole::Author),
+                    ThreadPrincipalIntent::new(author.clone(), ThreadPrincipalRole::Participant),
+                ],
+            )
+            .unwrap(),
+        }],
+    )
+    .unwrap();
+
+    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
+    let roles: Vec<String> = sqlx::query_scalar(
+        r#"SELECT thread_principal.role
+           FROM thread_principals AS thread_principal
+           JOIN participant_identities AS identity
+             ON (identity.company_id, identity.principal_id) =
+                (thread_principal.company_id, thread_principal.principal_id)
+           WHERE thread_principal.company_id = $1 AND thread_principal.thread_id = $2
+             AND identity.transport = 'slack' AND identity.namespace = $3
+             AND identity.subject = 'U123'
+           ORDER BY thread_principal.role"#,
+    )
+    .bind(fixture.company_id)
+    .bind(outcome.thread_ids[0])
+    .bind(&namespace)
+    .fetch_all(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(roles, vec!["author", "participant"]);
+    let email_projection: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM participant_identities
+           WHERE company_id = $1 AND principal_id IN (
+               SELECT principal_id FROM thread_principals
+               WHERE company_id = $1 AND thread_id = $2
+           ) AND transport = 'email'"#,
+    )
+    .bind(fixture.company_id)
+    .bind(outcome.thread_ids[0])
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(email_projection, 0);
+
+    fixture.cleanup().await;
+}
+
+/// Stored events have no raw-email representation, so their canonical body participates in
+/// collision detection.
+#[tokio::test]
+async fn a_stored_event_key_reused_with_a_different_body_is_a_collision() {
+    let Some(fixture) = Fixture::new("inbound_event_hash").await else {
+        return;
+    };
+    let binding = fixture.slack_binding("C456").await;
+    let event_key = ExternalEventKey::parse(format!("Ev{}", fixture.suffix)).unwrap();
+    let message_key = format!("event-message-{}", fixture.suffix);
+    let thread_key = format!("event-thread-{}", fixture.suffix);
+    let mut first = request_on(
+        &fixture,
+        fixture.channel_id,
+        binding,
+        &message_key,
+        &thread_key,
+        "Original event body",
+    )
+    .await;
+    first.envelope.extension = ProtocolExtension::stored_event(binding, event_key.clone());
+    first.envelope.policy = IngressPolicyFacts::InstalledConversation;
+    let mut changed = first.clone();
+    changed.envelope.content =
+        CanonicalContent::parse("Quick question", "Edited event body").unwrap();
+
+    fixture.persistence.commit_inbound(first).await.unwrap();
+    let error = fixture
+        .persistence
+        .commit_inbound(changed)
+        .await
+        .expect_err("changed event content is not a redelivery");
+    assert!(error.to_string().contains("different content"), "{error}");
+    assert_eq!(message_count(&fixture).await, 1);
+
+    fixture.cleanup().await;
+}
+
+/// The database independently enforces that an authored handle belongs to the stated principal.
+#[tokio::test]
+async fn authored_identity_cannot_belong_to_a_different_author_principal() {
+    let Some(fixture) = Fixture::new("message_author_identity_fk").await else {
+        return;
+    };
+    let first = fixture
+        .persistence
+        .resolve_or_create_external_identity(
+            fixture.company_id,
+            IdentityObservation {
+                identity: identity("first@example.com"),
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::EmailIngress,
+            },
+        )
+        .await
+        .unwrap();
+    let second = fixture
+        .persistence
+        .resolve_or_create_external_identity(
+            fixture.company_id,
+            IdentityObservation {
+                identity: identity("second@example.com"),
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::EmailIngress,
+            },
+        )
+        .await
+        .unwrap();
+
+    let error = sqlx::query(
+        r#"INSERT INTO messages (
+                id, company_id, author_principal_id, authored_identity_id, subject,
+                clean_text_body, direction, role, correlation_id, content_hash
+           ) VALUES ($1, $2, $3, $4, '', '', 'inbound', 'human', $5, $6)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.company_id)
+    .bind(first.principal.id.as_uuid())
+    .bind(second.identity.id.as_uuid())
+    .bind(Uuid::new_v4())
+    .bind(vec![0_u8; 32])
+    .execute(&fixture.pool)
+    .await
+    .expect_err("a handle owned by another principal must be rejected");
+    assert!(
+        error
+            .as_database_error()
+            .and_then(|error| error.constraint())
+            .is_some_and(|name| name == "messages_authored_identity_author_fk"),
+        "{error}"
+    );
+
+    fixture.cleanup().await;
+}
+
 /// A commit that cannot finish leaves nothing behind -- including the thread it had already
 /// created, which is the row the pre-canonical path committed separately and stranded.
 #[tokio::test]
@@ -366,6 +846,165 @@ async fn a_commit_that_fails_at_the_task_leaves_no_thread_message_or_mapping() {
         .await,
         1
     );
+
+    fixture.cleanup().await;
+}
+
+/// Outreach association is not follow-up work: if it cannot be recorded, every message-side row
+/// written before it rolls back, and the unchanged request succeeds once the bad transition is
+/// removed.
+#[tokio::test]
+async fn an_outreach_transition_failure_rolls_back_every_inbound_row_and_retry_succeeds() {
+    let Some(fixture) = Fixture::new("inbound_outreach_rollback").await else {
+        return;
+    };
+    let key = format!("<outreach-rollback-{}@example.com>", fixture.suffix);
+    let before = durable_counts(&fixture).await;
+    let mut request = request(&fixture, &key, "Reply").await;
+    request.outreach_transitions = BoundedVec::parse(
+        "outreach transitions",
+        vec![InboundOutreachTransition {
+            channel_id: fixture.channel_id,
+            matched: OutreachReplyMatch {
+                outreach_id: Uuid::new_v4(),
+                task_id: Uuid::new_v4(),
+                target_email: "vendor@example.com".into(),
+            },
+        }],
+    )
+    .unwrap();
+    let mut retry = request.clone();
+    retry.outreach_transitions = BoundedVec::empty();
+
+    assert!(fixture.persistence.commit_inbound(request).await.is_err());
+    assert_eq!(durable_counts(&fixture).await, before);
+
+    let outcome = fixture.persistence.commit_inbound(retry).await.unwrap();
+    assert_eq!(outcome.disposition, CommitDisposition::Created);
+    assert_eq!(message_count(&fixture).await, before[4] + 1);
+
+    fixture.cleanup().await;
+}
+
+/// A response association and the waiting-task transition become visible in the same commit as
+/// the inbound message. There is no post-commit window in which one exists without the other.
+#[tokio::test]
+async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message() {
+    let Some(fixture) = Fixture::new("inbound_outreach_atomic").await else {
+        return;
+    };
+    let task = fixture
+        .persistence
+        .enqueue_task(NewTask::starting_new_chain(
+            fixture.company_id,
+            fixture.channel_id,
+            Some(fixture.thread.id),
+            "outreach-test",
+            serde_json::json!({}),
+        ))
+        .await
+        .unwrap();
+    sqlx::query(
+        r#"UPDATE background_tasks
+           SET status = 'waiting_for_third_party_reply',
+               wait_expires_at = CURRENT_TIMESTAMP + interval '1 day'
+           WHERE id = $1"#,
+    )
+    .bind(task.id)
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+    let outreach_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO task_outreaches (
+                id, task_id, status, required_threshold_percent, expires_at,
+                outreach_key, subject, body
+           ) VALUES ($1, $2, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
+                     'atomic-reply', 'Question', 'Please reply')"#,
+    )
+    .bind(outreach_id)
+    .bind(task.id)
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO task_outreach_targets (outreach_id, email) VALUES ($1, $2)")
+        .bind(outreach_id)
+        .bind("vendor@example.com")
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+
+    let key = format!("<outreach-response-{}@example.com>", fixture.suffix);
+    let binding = fixture.email_binding_of(fixture.channel_id).await;
+    let mut request = request_on(
+        &fixture,
+        fixture.channel_id,
+        binding,
+        &key,
+        &key,
+        "The answer",
+    )
+    .await;
+    request.associations = BoundedVec::parse(
+        "thread associations",
+        vec![ThreadAssociation {
+            channel_id: fixture.channel_id,
+            binding_id: binding,
+            target: ThreadTarget::Existing(fixture.thread.id),
+            role: RecipientRole::To,
+            step: PipelineStep::only(),
+            principals: sender_principals(),
+        }],
+    )
+    .unwrap();
+    request.task = None;
+    request.outreach_transitions = BoundedVec::parse(
+        "outreach transitions",
+        vec![InboundOutreachTransition {
+            channel_id: fixture.channel_id,
+            matched: OutreachReplyMatch {
+                outreach_id,
+                task_id: task.id,
+                target_email: "vendor@example.com".into(),
+            },
+        }],
+    )
+    .unwrap();
+
+    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
+    let association_id: Uuid = sqlx::query_scalar(
+        r#"SELECT id FROM thread_messages
+           WHERE company_id = $1 AND channel_id = $2 AND message_id = $3"#,
+    )
+    .bind(fixture.company_id)
+    .bind(fixture.channel_id)
+    .bind(outcome.message_id.as_uuid())
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    let (responded, response_id): (bool, Option<Uuid>) = sqlx::query_as(
+        r#"SELECT responded_at IS NOT NULL, response_message_id
+           FROM task_outreach_targets WHERE outreach_id = $1 AND email = $2"#,
+    )
+    .bind(outreach_id)
+    .bind("vendor@example.com")
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert!(responded);
+    assert_eq!(response_id, Some(association_id));
+    let (outreach_status, task_status): (String, String) = sqlx::query_as(
+        r#"SELECT outreach.status, task.status
+           FROM task_outreaches AS outreach
+           JOIN background_tasks AS task ON task.id = outreach.task_id
+           WHERE outreach.id = $1"#,
+    )
+    .bind(outreach_id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(outreach_status, "threshold_met");
+    assert_eq!(task_status, "pending");
 
     fixture.cleanup().await;
 }

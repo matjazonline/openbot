@@ -158,28 +158,21 @@ fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
         .collect()
 }
 
-async fn insert_thread_email_principals(
+async fn insert_thread_email_participants(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     channel_id: Uuid,
     thread_id: Uuid,
     participant_emails: &[EmailAddress],
-    first_is_author: bool,
 ) -> AppResult<()> {
     let participants = normalized_participants(participant_emails);
-    let mut intents = Vec::with_capacity(participants.len() + usize::from(first_is_author));
-    for (index, email) in participants.into_iter().enumerate() {
+    let mut intents = Vec::with_capacity(participants.len());
+    for email in participants {
         let identity = EmailIdentity::parse(EmailAddress::from(email))
             .map(EmailIdentity::qualify_default)
             .map_err(|error| {
                 AppError::BadRequest(format!("Invalid thread participant: {error}"))
             })?;
-        if first_is_author && index == 0 {
-            intents.push(ThreadPrincipalIntent::new(
-                identity.clone(),
-                ThreadPrincipalRole::Author,
-            ));
-        }
         intents.push(ThreadPrincipalIntent::new(
             identity,
             ThreadPrincipalRole::Participant,
@@ -260,15 +253,8 @@ impl ThreadPersistence for PostgresPersistence {
             return Err(AppError::Internal("Channel not found".into()));
         };
 
-        insert_thread_email_principals(
-            &mut tx,
-            company_id,
-            channel_id,
-            id,
-            participant_emails,
-            true,
-        )
-        .await?;
+        insert_thread_email_participants(&mut tx, company_id, channel_id, id, participant_emails)
+            .await?;
 
         tx.commit().await.map_err(AppError::from)?;
         load_thread(&self.pool, id)
@@ -315,15 +301,8 @@ impl ThreadPersistence for PostgresPersistence {
         let Some((company_id, channel_id)) = scope else {
             return Err(AppError::Internal("Channel not found".into()));
         };
-        insert_thread_email_principals(
-            &mut tx,
-            company_id,
-            channel_id,
-            id,
-            participant_emails,
-            true,
-        )
-        .await?;
+        insert_thread_email_participants(&mut tx, company_id, channel_id, id, participant_emails)
+            .await?;
         sqlx::query(
             "UPDATE schedule_runs SET thread_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
         )
@@ -459,15 +438,8 @@ impl ThreadPersistence for PostgresPersistence {
         let Some((company_id, channel_id)) = scope else {
             return Err(AppError::Internal("Thread not found".into()));
         };
-        insert_thread_email_principals(
-            &mut tx,
-            company_id,
-            channel_id,
-            id,
-            participant_emails,
-            false,
-        )
-        .await?;
+        insert_thread_email_participants(&mut tx, company_id, channel_id, id, participant_emails)
+            .await?;
 
         let updated =
             sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")

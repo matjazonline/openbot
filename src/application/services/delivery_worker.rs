@@ -364,10 +364,13 @@ enum PartProgress {
 /// this is what keeps it fair *within* a batch, where a hundred rows from one company would
 /// otherwise be sent before the first row of anybody else's.
 fn fair_order(claimed: Vec<ClaimedDelivery>) -> Vec<ClaimedDelivery> {
-    let mut by_company: Vec<(uuid::Uuid, Vec<ClaimedDelivery>)> = Vec::new();
-    let mut index: HashMap<uuid::Uuid, usize> = HashMap::new();
+    let mut by_company: Vec<(Option<uuid::Uuid>, Vec<ClaimedDelivery>)> = Vec::new();
+    let mut index: HashMap<Option<uuid::Uuid>, usize> = HashMap::new();
     for delivery in claimed {
-        let company_id = delivery.record.company_id;
+        let company_id = delivery
+            .record
+            .attribution
+            .map(|attribution| attribution.company_id);
         match index.get(&company_id) {
             // Insertion order is due order, because the claim returned them that way.
             Some(position) => by_company[*position].1.push(delivery),

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::services::agent_channel_tool::AgentChannelProvisioning;
@@ -47,7 +48,7 @@ use crate::{
         ExternalCorrelationStore, InboundDraft, InboundEnvelope, InboundMessageCommitter,
         InboundRouting, IngressDirectives, IngressPolicyFacts, InternalMailRelay,
         InternalRelayMail, MessageDisposition, NewDelivery, ProtocolExtension, RelayDisposition,
-        ports::TransportRenderers,
+        StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest, ports::TransportRenderers,
     },
     use_cases::{
         agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
@@ -157,6 +158,7 @@ pub struct InboundIngestPorts {
     pub committer: Arc<dyn InboundMessageCommitter>,
     pub correlation: Arc<dyn ExternalCorrelationStore>,
     pub bindings: Arc<dyn ChannelBindingPersistence>,
+    pub standalone_deliveries: Arc<dyn StandaloneDeliveryEnqueuer>,
 }
 
 #[async_trait]
@@ -340,6 +342,7 @@ pub struct ThreadUseCases {
     committer: Arc<dyn InboundMessageCommitter>,
     correlation_store: Arc<dyn ExternalCorrelationStore>,
     binding_persistence: Arc<dyn ChannelBindingPersistence>,
+    standalone_deliveries: Arc<dyn StandaloneDeliveryEnqueuer>,
     /// Resolves an interface and freezes what will be sent, so a reply is queued in the same
     /// transaction that records it. Required rather than optional: a deployment that forgot to
     /// wire it would answer every customer in the thread and mail nobody.
@@ -348,10 +351,8 @@ pub struct ThreadUseCases {
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
-    /// The direct SMTP path, for the three notices that deliberately stay off the delivery queue:
-    /// a bounce, a reply from a reserved `_` address, and an account confirmation code. Each
-    /// answers something that has no channel, no interface and no stored message -- see
-    /// `handle_bounce_dispatch`.
+    /// The direct SMTP path still used by reserved `_` address replies. Rejection bounces use the
+    /// durable standalone-notification arm of the generic queue.
     mail_dispatcher: Arc<OutboundDispatcher>,
     memory: Option<Arc<MemoryCoordinator>>,
     config: Arc<AppConfig>,
@@ -390,6 +391,7 @@ impl ThreadUseCases {
             task_persistence: stores.tasks,
             committer: ingest.committer,
             correlation_store: ingest.correlation,
+            standalone_deliveries: ingest.standalone_deliveries,
             binding_persistence: ingest.bindings,
             deliveries,
             agent_persistence: None,
@@ -749,30 +751,55 @@ impl ThreadUseCases {
 
     /// Tell a sender their message could not be routed.
     ///
-    /// Fire and forget, deliberately: a relay that is down must not turn an undeliverable message
-    /// into retried work.
-    ///
-    /// One of the three notices that deliberately stay off the delivery queue, and for the same
-    /// reason: a queue row names a company, a channel, an interface and a canonical message, and a
-    /// bounce has none of them. It answers a message this deployment *refused* -- nothing was
-    /// stored, no channel was matched (that is what a bounce is), and it goes out from the
-    /// deployment's own mailer-daemon address rather than any channel's. The others are the `_`
-    /// system reply and the confirmation code; see `docs/transport_architecture.md`.
-    pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
+    /// The HTTP request task that calls this method is supervised; this method makes the work
+    /// durable before that task returns. The generic delivery worker owns every provider attempt,
+    /// including retry and ambiguous-outcome handling.
+    pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) -> AppResult<()> {
         let Some(bounce) = ingest.bounce_info() else {
-            return;
+            return Ok(());
         };
         let body = format_bounce_email_body(bounce, &self.config.app_domain_name);
-        if let Err(error) = self
-            .mail_dispatcher
-            .send_bounce(&bounce.recipient_to, &bounce.original_subject, &body)
-            .await
+        let subject = if bounce
+            .original_subject
+            .to_ascii_lowercase()
+            .starts_with("[undeliverable]")
         {
-            tracing::warn!(
-                "Could not deliver a bounce to '{}': {error}",
-                bounce.recipient_to
-            );
-        }
+            bounce.original_subject.clone()
+        } else {
+            format!("[Undeliverable] {}", bounce.original_subject)
+        };
+        let content = CanonicalContent::parse(subject, body)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        let serialized = serde_json::to_vec(bounce).map_err(|error| {
+            AppError::Internal(format!("Could not key a rejection bounce: {error}"))
+        })?;
+        let source_key = format!("bounce:{:x}", Sha256::digest(serialized));
+        let delivery = self
+            .deliveries
+            .compose_standalone(StandaloneDeliveryRequest {
+                correlation_id: CorrelationId::new(),
+                purpose: crate::entities::transport::DeliveryPurpose::Notification,
+                source_key,
+                content: &content,
+                context: crate::transport::DeliveryContext::Email(
+                    crate::transport::EmailDeliveryContext {
+                        from: EmailAddress::from(format!(
+                            "mailer-daemon@{}",
+                            self.config.app_domain_name
+                        )),
+                        from_name: Some("Mail Agents Server".to_string()),
+                        recipient_to: bounce.recipient_to.clone(),
+                        recipients_cc: Vec::new(),
+                        in_reply_to: None,
+                        references: Vec::new(),
+                        relay: None,
+                    },
+                ),
+            })?;
+        self.standalone_deliveries
+            .enqueue_standalone_delivery(delivery)
+            .await?;
+        Ok(())
     }
 
     pub async fn get_thread(&self, thread_id: Uuid) -> AppResult<Option<Thread>> {
@@ -1129,6 +1156,10 @@ pub struct ChannelDirectoryEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BounceInfo {
+    /// The provider message this notification answers. Included in the delivery key so a webhook
+    /// redelivery is absorbed without merging two distinct rejected messages with the same
+    /// subject.
+    pub source_message_key: ExternalMessageKey,
     pub recipient_to: EmailAddress,
     pub company_slug: Option<CompanySlug>,
     pub invalid_slugs: Vec<ChannelSlug>,

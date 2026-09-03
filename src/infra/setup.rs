@@ -179,6 +179,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
                 committer: postgres_arc.clone(),
                 correlation: postgres_arc.clone(),
                 bindings: postgres_arc.clone(),
+                standalone_deliveries: postgres_arc.clone(),
             },
             renderers.clone(),
             config.clone(),

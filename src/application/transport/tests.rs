@@ -24,10 +24,11 @@ use crate::{
         value_objects::EmailAddress,
     },
     transport::{
-        DeliveryCandidate, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
-        DeliveryPlanRequest, DeliveryPlanner, DeliveryPurpose, DeliveryRecord, FailureClass,
-        FailureDetail, MAX_DELIVERY_ATTEMPTS, PartIndex, PartKey, PolicyDeliveryPlanner,
-        ProviderSendOutcome, RenderedPart, TransportPayload, TransportRegistrationError,
+        DeliveryAttribution, DeliveryCandidate, DeliveryDestination, DeliveryEnvelope,
+        DeliveryIntent, DeliveryPlanRequest, DeliveryPlanner, DeliveryPurpose, DeliveryRecord,
+        ExternalDestinationClassification, FailureClass, FailureDetail, MAX_DELIVERY_ATTEMPTS,
+        PartIndex, PartKey, PolicyDeliveryPlanner, ProviderSendOutcome, RenderedPart,
+        StandaloneDeliveryEnvelope, TransportPayload, TransportRegistrationError,
         TransportRegistry, TransportRenderer, TransportSender, delivery::ContentDigest,
     },
 };
@@ -299,11 +300,13 @@ fn record(transport: TransportKind) -> DeliveryRecord {
     let message_id = CanonicalMessageId::random();
     DeliveryRecord {
         id: DeliveryId::random(),
-        company_id: uuid::Uuid::new_v4(),
-        channel_id: uuid::Uuid::new_v4(),
-        message_id,
-        source_binding_id: ChannelBindingId::random(),
-        destination_binding_id: ChannelBindingId::random(),
+        attribution: Some(DeliveryAttribution {
+            company_id: uuid::Uuid::new_v4(),
+            channel_id: uuid::Uuid::new_v4(),
+            message_id,
+            source_binding_id: ChannelBindingId::random(),
+            destination_binding_id: ChannelBindingId::random(),
+        }),
         external_destination: None,
         task_id: None,
         correlation_id: CorrelationId::new(),
@@ -346,7 +349,18 @@ impl TransportRenderer for EchoRenderer {
         self.transport
     }
 
+    fn classify_external_destination(&self, _value: &str) -> ExternalDestinationClassification {
+        ExternalDestinationClassification::InvalidSyntax
+    }
+
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>> {
+        Ok(vec![part(envelope.transport)])
+    }
+
+    fn render_standalone(
+        &self,
+        envelope: &StandaloneDeliveryEnvelope,
+    ) -> AppResult<Vec<RenderedPart>> {
         Ok(vec![part(envelope.transport)])
     }
 

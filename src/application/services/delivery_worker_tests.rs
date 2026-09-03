@@ -17,19 +17,21 @@ use crate::{
         transport::{ChannelBindingId, DeliveryId, DeliveryPartId, DeliveryPartStatus},
     },
     transport::{
-        ContentDigest, DeliveryCreation, DeliveryKey, MAX_DELIVERY_ATTEMPTS, PartIndex, PartKey,
-        RenderedPart, TransportPayload, TransportRenderer, TransportSender,
+        ContentDigest, DeliveryAttribution, DeliveryCreation, DeliveryKey, MAX_DELIVERY_ATTEMPTS,
+        PartIndex, PartKey, RenderedPart, TransportPayload, TransportRenderer, TransportSender,
     },
 };
 
 fn record(company_id: uuid::Uuid) -> DeliveryRecord {
     DeliveryRecord {
         id: DeliveryId::random(),
-        company_id,
-        channel_id: uuid::Uuid::new_v4(),
-        message_id: CanonicalMessageId::random(),
-        source_binding_id: ChannelBindingId::random(),
-        destination_binding_id: ChannelBindingId::random(),
+        attribution: Some(DeliveryAttribution {
+            company_id,
+            channel_id: uuid::Uuid::new_v4(),
+            message_id: CanonicalMessageId::random(),
+            source_binding_id: ChannelBindingId::random(),
+            destination_binding_id: ChannelBindingId::random(),
+        }),
         external_destination: None,
         task_id: None,
         correlation_id: CorrelationId::new(),
@@ -95,7 +97,12 @@ fn a_batch_is_interleaved_so_one_tenant_cannot_monopolise_it() {
 
     let quiet_at = ordered
         .iter()
-        .position(|delivery| delivery.record.company_id == quiet)
+        .position(|delivery| {
+            delivery
+                .record
+                .attribution
+                .is_some_and(|attribution| attribution.company_id == quiet)
+        })
         .expect("the quiet tenant is still in the batch");
     assert!(
         quiet_at <= PER_COMPANY_BATCH_SHARE,
@@ -105,7 +112,12 @@ fn a_batch_is_interleaved_so_one_tenant_cannot_monopolise_it() {
     // And within a company the claim's order survives, which is what keeps it fair over time.
     let busy_order: Vec<DeliveryId> = ordered
         .iter()
-        .filter(|delivery| delivery.record.company_id == busy)
+        .filter(|delivery| {
+            delivery
+                .record
+                .attribution
+                .is_some_and(|attribution| attribution.company_id == busy)
+        })
         .map(|delivery| delivery.record.id)
         .collect();
     assert_eq!(busy_order.len(), 10);
@@ -361,9 +373,23 @@ impl TransportRenderer for NoopRenderer {
         TransportKind::Email
     }
 
+    fn classify_external_destination(
+        &self,
+        _value: &str,
+    ) -> crate::transport::ExternalDestinationClassification {
+        crate::transport::ExternalDestinationClassification::InvalidSyntax
+    }
+
     fn render(
         &self,
         _envelope: &crate::transport::DeliveryEnvelope,
+    ) -> AppResult<Vec<RenderedPart>> {
+        Ok(vec![stored_part(0, DeliveryPartStatus::Prepared).rendered])
+    }
+
+    fn render_standalone(
+        &self,
+        _envelope: &crate::transport::StandaloneDeliveryEnvelope,
     ) -> AppResult<Vec<RenderedPart>> {
         Ok(vec![stored_part(0, DeliveryPartStatus::Prepared).rendered])
     }

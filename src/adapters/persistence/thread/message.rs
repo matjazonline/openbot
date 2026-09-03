@@ -743,6 +743,14 @@ mod tests {
     use super::*;
     use crate::entities::value_objects::{MessageId, ObjectKey};
 
+    fn slack_identity(namespace: &str, subject: &str) -> QualifiedIdentity {
+        QualifiedIdentity::new(
+            TransportKind::Slack,
+            IdentityNamespace::parse(namespace).unwrap(),
+            IdentitySubject::parse(subject).unwrap(),
+        )
+    }
+
     fn write_with(correlation: MessageCorrelation) -> MessageWrite {
         MessageWrite::internal(
             Uuid::new_v4(),
@@ -802,6 +810,29 @@ mod tests {
         assert_ne!(
             canonical_message_hash(&first, &author(), &[], None),
             canonical_message_hash(&resubjected, &author(), &[], None),
+        );
+    }
+
+    #[test]
+    fn equal_provider_subjects_in_different_namespaces_hash_differently() {
+        let write = write_with(MessageCorrelation::Internal);
+        let identity_id = ParticipantIdentityId::random();
+        let first = ResolvedParticipant {
+            kind: MessageParticipantKind::Sender,
+            position: 0,
+            identity_id,
+            identity: slack_identity("workspace-a", "U123"),
+        };
+        let second = ResolvedParticipant {
+            kind: MessageParticipantKind::Sender,
+            position: 0,
+            identity_id,
+            identity: slack_identity("workspace-b", "U123"),
+        };
+
+        assert_ne!(
+            canonical_message_hash(&write, &author(), &[first], None),
+            canonical_message_hash(&write, &author(), &[second], None),
         );
     }
 

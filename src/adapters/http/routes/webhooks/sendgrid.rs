@@ -206,7 +206,7 @@ async fn sendgrid_inbound_webhook(
             warn!(%error, "Could not preflight an inbound message");
             StatusCode::INTERNAL_SERVER_ERROR
         })? {
-        InboundPreflight::Rejected(result) => result,
+        InboundPreflight::Rejected(result) => *result,
         InboundPreflight::Accepted(mut prepared) => {
             let persisted = attachments
                 .persist(config, file_storage.as_deref())
@@ -221,7 +221,7 @@ async fn sendgrid_inbound_webhook(
                 persisted.failed_count,
             );
             thread_use_cases
-                .commit_prepared_inbound(prepared)
+                .commit_prepared_inbound(*prepared)
                 .await
                 .map_err(|error| {
                     warn!(%error, "Could not ingest an inbound message");
@@ -233,7 +233,13 @@ async fn sendgrid_inbound_webhook(
     if !ingest.accepted {
         // The HTTP server supervises this request task. Awaiting avoids a detached task whose
         // delivery can be silently cancelled when the runtime shuts down.
-        thread_use_cases.handle_bounce_dispatch(&ingest).await;
+        thread_use_cases
+            .handle_bounce_dispatch(&ingest)
+            .await
+            .map_err(|error| {
+                warn!(%error, "Could not queue an inbound rejection bounce");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
     }
 
     let result = serde_json::json!({

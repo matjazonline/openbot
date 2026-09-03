@@ -17,7 +17,8 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    DeliveryDb, attempt_failed_set, claimable_statuses_sql, enqueue::load_parts_on,
+    DeliveryDb, attempt_failed_set, claimable_statuses_sql,
+    enqueue::{insert_standalone_delivery_on, load_parts_on},
     qualified_delivery_columns, retry_delay_sql, sql_status_list,
 };
 use crate::{
@@ -28,10 +29,24 @@ use crate::{
         aggregate_parent_status,
     },
     transport::{
-        ClaimedDelivery, DeliveryFailure, DeliveryOutcome, DeliveryQueue, DeliveryReaping,
-        Disposition, ExecutionLease, PartResult, PartTransition, WorkerId,
+        ClaimedDelivery, DeliveryCreation, DeliveryFailure, DeliveryOutcome, DeliveryQueue,
+        DeliveryReaping, Disposition, ExecutionLease, NewStandaloneDelivery, PartResult,
+        PartTransition, StandaloneDeliveryEnqueuer, WorkerId,
     },
 };
+
+#[async_trait]
+impl StandaloneDeliveryEnqueuer for PostgresPersistence {
+    async fn enqueue_standalone_delivery(
+        &self,
+        delivery: NewStandaloneDelivery,
+    ) -> AppResult<DeliveryCreation> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let created = insert_standalone_delivery_on(&mut tx, &delivery).await?;
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(created)
+    }
+}
 
 #[async_trait]
 impl DeliveryQueue for PostgresPersistence {

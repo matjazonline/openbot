@@ -74,7 +74,7 @@ pub struct OutboundEmail {
     pub correlation_id: CorrelationId,
 }
 
-/// One server-generated message: a bounce, or a reply from a reserved `_` address.
+/// One server-generated reply from a reserved `_` address.
 ///
 /// A struct rather than positional arguments because `from_name`, `subject` and `body` are three
 /// adjacent strings, and a transposed pair would compile and mail the wrong thing.
@@ -400,35 +400,6 @@ impl OutboundDispatcher {
         Ok(prepared)
     }
 
-    pub async fn send_bounce(
-        &self,
-        recipient_to: &EmailAddress,
-        subject: &str,
-        bounce_body: &str,
-    ) -> AppResult<SentEmailResult> {
-        let formatted_subject = if subject.to_lowercase().starts_with("[undeliverable]") {
-            subject.to_string()
-        } else {
-            format!("[Undeliverable] {}", subject)
-        };
-
-        self.send_system_mail(SystemMail {
-            message_id: format!(
-                "<bounce-{}@{}>",
-                Uuid::new_v4(),
-                self.config.app_domain_name
-            )
-            .into(),
-            from: format!("mailer-daemon@{}", self.config.app_domain_name).into(),
-            from_name: "Mail Agents Server",
-            to: recipient_to,
-            subject: formatted_subject,
-            body: bounce_body,
-            in_reply_to: None,
-        })
-        .await
-    }
-
     /// The answer a reserved `_`-prefixed address sends back.
     ///
     /// Unlike a channel reply this carries no `X-MailAgents-*` headers and never joins the
@@ -476,9 +447,9 @@ impl OutboundDispatcher {
 
     /// Build and post one server-generated message.
     ///
-    /// Shared by the bounce and the system reply so the headers that make an auto-message safe --
-    /// `Auto-Submitted: auto-replied`, which `check_inbound_guards` refuses on the way back in --
-    /// are set in exactly one place.
+    /// The headers that make an automatic system reply safe -- `Auto-Submitted: auto-replied`,
+    /// which `check_inbound_guards` refuses on the way back in -- are set here rather than at each
+    /// caller.
     async fn send_system_mail(&self, mail: SystemMail<'_>) -> AppResult<SentEmailResult> {
         self.transport
             .send(MailMessage {
@@ -511,8 +482,8 @@ impl OutboundDispatcher {
             source_channel_id: None,
             hop_count: 0,
             trace_channels: Vec::new(),
-            // A bounce or a `_` address reply answers a message we refused to process, so there
-            // is no task chain to join: this notice is its own event.
+            // A `_` address reply answers a message we refused to process, so there is no task
+            // chain to join: this notice is its own event.
             correlation_id: CorrelationId::new(),
         })
     }

@@ -397,8 +397,9 @@ async fn a_rolled_back_message_is_not_announced() {
     fixture.cleanup().await;
 }
 
-/// A thread's parties are principals with a role, and the address list the UI and email delivery
-/// render is a projection over their email identities -- not the stored key.
+/// A thread's parties are principals with explicit roles, and an ordered legacy address list does
+/// not silently promote its first entry to author. The UI/email address list is a projection over
+/// identities, not the stored key.
 #[tokio::test]
 async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses() {
     let Some(fixture) = Fixture::new("thread_principals").await else {
@@ -424,9 +425,9 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
             .fetch_all(&fixture.pool)
             .await
             .unwrap();
-    assert_eq!(roles, vec!["author".to_string(), "participant".to_string()]);
+    assert_eq!(roles, vec!["participant".to_string()]);
 
-    // A later CC joins as a participant only, and re-adding the author changes nothing.
+    // A later CC joins as a participant only, and re-adding the original address changes nothing.
     let joined = fixture
         .persistence
         .update_thread_participants(
@@ -451,8 +452,8 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
     .await
     .unwrap();
     assert_eq!(
-        authors, 1,
-        "joining a thread never promotes anyone to author"
+        authors, 0,
+        "an ordered address list does not imply authorship"
     );
 
     fixture.cleanup().await;

@@ -132,15 +132,18 @@ async fn one_thread_is_reachable_through_several_bindings() {
     // The other half of the invariant: within one binding a conversation key names exactly one
     // thread, so a second thread cannot claim it.
     let rival = fixture.extra_thread(fixture.channel_id, "Rival").await;
-    external::upsert_external_thread(
+    let collision = external::upsert_external_thread(
         &mut connection,
         fixture.company_id,
         slack,
         &slack_key,
         rival.id,
     )
-    .await
-    .unwrap();
+    .await;
+    assert!(
+        matches!(collision, Err(AppError::Conflict(_))),
+        "a second thread claimant must receive the typed collision: {collision:?}"
+    );
     let bound: Uuid = sqlx::query_scalar(
         "SELECT thread_id FROM external_threads WHERE binding_id = $1 AND external_thread_key = $2",
     )

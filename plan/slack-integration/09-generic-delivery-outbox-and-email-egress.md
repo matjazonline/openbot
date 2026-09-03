@@ -3,8 +3,9 @@
 ## Outcome
 
 Create one crash-aware delivery state machine for email, Slack, and future transports, and implement
-email on it before writing Slack egress. A delivery is a durable attempt to expose one canonical
-message through one destination binding; parts record provider-side results.
+email on it before writing Slack egress. A delivery is normally a durable attempt to expose one
+canonical message through one destination binding; a standalone notification arm covers rejected
+input that intentionally has no canonical attribution. Parts record provider-side results.
 
 ## Migration
 
@@ -23,6 +24,9 @@ times, delivered/created/updated times.
 - Claim SQL excludes a row until its dependency is delivered; a terminal dependency moves its
   descendants to dead letter with a typed causal reason rather than leaving them pending forever.
 - Composite FKs prove message, channel, binding, and optional task belong to the company.
+- Attribution is all-or-none. A standalone row has no company/channel/message/binding/task or
+  dependency, must be a `notification` with an explicit external destination, and deduplicates on
+  `(transport, idempotency_key)`. It does not weaken the composite FKs on canonical deliveries.
 - Purpose is checked (`reply`, `mirror`, `outreach`, `notification`); transport is carried from the
   binding, never reasserted from a string literal in later queries.
 
@@ -77,6 +81,8 @@ status, provider message key, content digest, attempt metadata, and timestamps.
 - Atomic agent reply + canonical task payload + delivery tests pass with `message_deliveries`.
 - Shutdown during send cancels/awaits work and leaves either a short recoverable lease or an
   explicit unknown result.
+- Competing creation of the same standalone bounce produces one row and one frozen part; the row is
+  claimed by the generic worker with no fabricated tenant attribution.
 
 ## Acceptance criteria
 

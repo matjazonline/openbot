@@ -29,8 +29,7 @@ struct KnownException {
 /// sender implement application ports rather than declaring them.
 ///
 /// What is left is the `TaskPersistence` trait -- the other queue, which step 11 moves the same
-/// way -- and the address classification the internal relay and the outreach tool still ask an
-/// email parser for.
+/// way -- and the address classification the internal relay still asks an email parser for.
 const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "use_cases/thread/mod.rs",
@@ -68,11 +67,6 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
         removed_by: "step 11: the task queue port moves next to the worker that claims it",
     },
     KnownException {
-        file: "services/agent_runner.rs",
-        fragment: "adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination}",
-        removed_by: "step 8: channel selection stops being an email-address decision",
-    },
-    KnownException {
         file: "services/task_worker.rs",
         fragment: "adapters::persistence::task::{",
         removed_by: "step 11: the task queue port moves next to this worker",
@@ -81,16 +75,6 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
         file: "services/outreach_tool.rs",
         fragment: "adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence}",
         removed_by: "step 11: the task queue port moves next to the worker that claims it",
-    },
-    KnownException {
-        file: "services/outreach_tool.rs",
-        fragment: "adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination}",
-        removed_by: "step 8: outreach addresses a channel selector, not an email address",
-    },
-    KnownException {
-        file: "services/outreach_tool.rs",
-        fragment: "use lettre::message::Mailbox;",
-        removed_by: "step 8: mailbox validation belongs to the email adapter",
     },
 ];
 

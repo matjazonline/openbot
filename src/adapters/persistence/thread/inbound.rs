@@ -521,8 +521,8 @@ async fn associate_threads(
 /// Record the provider key under every interface the message arrived on.
 ///
 /// One mapping per binding, deduplicated because a channel addressed twice in one pipeline shares
-/// an interface. `ON CONFLICT DO NOTHING` covers the case where the same channel already carried
-/// this key on another association.
+/// an interface. Every insert verifies an existing row still names this canonical message and
+/// content hash, so a secondary binding cannot silently hide a conflicting mapping.
 async fn map_provider_message(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
@@ -574,7 +574,7 @@ async fn apply_outreach_transitions(
             ))
         })?;
         Box::pin(record_outreach_reply_on(
-            &mut **tx,
+            tx,
             &transition.matched,
             association_id,
         ))
@@ -766,10 +766,14 @@ fn correlation_of(envelope: &InboundEnvelope) -> MessageCorrelation {
 /// A sighting of a handle on an arriving message. It confers no grant; it only fixes which
 /// principal every later decision about that handle will name.
 fn observation(identity: QualifiedIdentity) -> IdentityObservation {
+    let provenance = match identity.transport() {
+        crate::entities::transport::TransportKind::Email => IdentityProvenance::EmailIngress,
+        crate::entities::transport::TransportKind::Slack => IdentityProvenance::SlackEvent,
+    };
     IdentityObservation {
         identity,
         display_label: None,
         claim_metadata: IdentityClaimMetadata::observation(),
-        provenance: IdentityProvenance::EmailIngress,
+        provenance,
     }
 }

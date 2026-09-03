@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use lettre::message::Mailbox;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::warn;
@@ -29,11 +30,14 @@ use crate::{
     },
     services::outbound_dispatcher::{MailHeader, MailMessage, MailTransport},
     transport::{
-        ContentDigest, DeliveryEnvelope, DeliveryRecord, EmailDeliveryContext, FailureDetail,
-        InternalMailRelay, InternalRelayMail, PartIndex, PartKey, ProviderSendOutcome,
-        RelayDisposition, RenderedPart, TransportPayload, TransportRenderer, TransportSender,
+        CanonicalContentV1, ContentDigest, DeliveryEnvelope, DeliveryRecord, EmailDeliveryContext,
+        ExternalDestinationClassification, FailureDetail, InternalMailRelay, InternalRelayMail,
+        PartIndex, PartKey, ProviderSendOutcome, RelayDisposition, RenderedPart,
+        StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer, TransportSender,
     },
 };
+
+use super::{EmailChannelSelectorParser, EmailRecipientDestination};
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
 /// decode loudly instead of being read as a shape it is not.
@@ -227,6 +231,24 @@ impl TransportRenderer for EmailRenderer {
         TransportKind::Email
     }
 
+    fn classify_external_destination(&self, value: &str) -> ExternalDestinationClassification {
+        let Ok(mailbox) = value.trim().parse::<Mailbox>() else {
+            return ExternalDestinationClassification::InvalidSyntax;
+        };
+        let email = EmailAddress::from(mailbox.email.to_string().to_lowercase());
+        match EmailChannelSelectorParser::new(&self.app_domain_name).classify(email) {
+            EmailRecipientDestination::External(destination) => {
+                ExternalDestinationClassification::External(destination)
+            }
+            EmailRecipientDestination::Channel(_) => {
+                ExternalDestinationClassification::InternalEndpoint
+            }
+            EmailRecipientDestination::InvalidPlatformAddress => {
+                ExternalDestinationClassification::InvalidInternalEndpoint
+            }
+        }
+    }
+
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>> {
         let context = envelope.context.email().ok_or_else(|| {
             AppError::Internal(format!(
@@ -235,20 +257,68 @@ impl TransportRenderer for EmailRenderer {
             ))
         })?;
 
-        let key = Self::part_key(envelope.intent.key.as_str())?;
+        self.render_email(
+            envelope.intent.key.as_str(),
+            envelope.correlation_id,
+            &envelope.content,
+            context,
+            true,
+        )
+    }
+
+    fn render_standalone(
+        &self,
+        envelope: &StandaloneDeliveryEnvelope,
+    ) -> AppResult<Vec<RenderedPart>> {
+        let context = envelope.context.email().ok_or_else(|| {
+            AppError::Internal(format!(
+                "The email renderer was handed a {} standalone context",
+                envelope.context.transport()
+            ))
+        })?;
+        self.render_email(
+            envelope.key.as_str(),
+            envelope.correlation_id,
+            &envelope.content,
+            context,
+            false,
+        )
+    }
+
+    /// Mail's provider key is the `Message-ID` this renderer chose, so it is known before the
+    /// relay is ever called.
+    fn predicted_provider_key(&self, part: &RenderedPart) -> Option<ExternalMessageKey> {
+        ExternalMessageKey::parse(self.message_id_for(&part.key).as_str()).ok()
+    }
+}
+
+impl EmailRenderer {
+    fn render_email(
+        &self,
+        delivery_key: &str,
+        correlation_id: CorrelationId,
+        content: &CanonicalContentV1,
+        context: &EmailDeliveryContext,
+        prefix_as_reply: bool,
+    ) -> AppResult<Vec<RenderedPart>> {
+        let key = Self::part_key(delivery_key)?;
         let message_id = self.message_id_for(&key);
-        let body_text = envelope.content.body_text.clone();
+        let body_text = content.body_text.clone();
         let email = OutboundEmailV1 {
             from: context.from.clone(),
             from_name: context.from_name.clone(),
             recipients_to: vec![context.recipient_to.clone()],
             recipients_cc: self.copied_addresses(context),
-            subject: reply_subject(&envelope.content.subject),
+            subject: if prefix_as_reply {
+                reply_subject(&content.subject)
+            } else {
+                content.subject.clone()
+            },
             body_text: body_text.clone(),
             message_id: message_id.clone(),
             in_reply_to: context.in_reply_to.clone(),
             references: thread_references(context),
-            correlation_id: envelope.correlation_id,
+            correlation_id,
             relay: context.relay.as_ref().map(|relay| OutboundRelayV1 {
                 source_channel_id: relay.source_channel_id,
                 hop_count: relay.hop_count,
@@ -268,15 +338,6 @@ impl TransportRenderer for EmailRenderer {
             digest: ContentDigest::sha256_of(body_text.as_bytes()),
         }])
     }
-
-    /// Mail's provider key is the `Message-ID` this renderer chose, so it is known before the
-    /// relay is ever called.
-    fn predicted_provider_key(&self, part: &RenderedPart) -> Option<ExternalMessageKey> {
-        ExternalMessageKey::parse(self.message_id_for(&part.key).as_str()).ok()
-    }
-}
-
-impl EmailRenderer {
     /// Who the mail is copied to, minus the addresses that must not appear on a `Cc` line.
     ///
     /// The recipient and the sender are removed because naming them twice is how a mail client

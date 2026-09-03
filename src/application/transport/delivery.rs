@@ -395,6 +395,13 @@ impl DeliveryContext {
             Self::Email(context) => Some(context),
         }
     }
+
+    /// The explicitly addressed destination carried by a standalone notification.
+    pub fn external_destination(&self) -> ExternalDestination {
+        match self {
+            Self::Email(context) => ExternalDestination::Email(context.recipient_to.clone()),
+        }
+    }
 }
 
 /// Everything mail addressing needs that a canonical message does not carry.
@@ -449,6 +456,46 @@ pub struct DeliveryEnvelope {
     pub correlation_id: CorrelationId,
     pub content: CanonicalContentV1,
     pub context: DeliveryContext,
+}
+
+/// A queueable provider notification that has no canonical message or channel attribution.
+///
+/// A rejection bounce is the motivating case: it answers bytes the application deliberately did
+/// not store, and an unknown company address has no tenant or binding to borrow. It still uses the
+/// same renderer, frozen-part bounds, lease, retry and ambiguity protocol as every attributed
+/// delivery.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StandaloneDeliveryEnvelope {
+    pub version: u8,
+    pub delivery_id: DeliveryId,
+    pub key: DeliveryKey,
+    pub transport: TransportKind,
+    pub purpose: DeliveryPurpose,
+    pub correlation_id: CorrelationId,
+    pub content: CanonicalContentV1,
+    pub context: DeliveryContext,
+}
+
+impl StandaloneDeliveryEnvelope {
+    pub fn new(
+        delivery_id: DeliveryId,
+        key: DeliveryKey,
+        purpose: DeliveryPurpose,
+        correlation_id: CorrelationId,
+        content: &CanonicalContent,
+        context: DeliveryContext,
+    ) -> Self {
+        Self {
+            version: DELIVERY_ENVELOPE_VERSION,
+            delivery_id,
+            key,
+            transport: context.transport(),
+            purpose,
+            correlation_id,
+            content: CanonicalContentV1::from(content),
+            context,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

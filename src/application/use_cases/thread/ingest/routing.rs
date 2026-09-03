@@ -616,6 +616,7 @@ impl ThreadUseCases {
         );
         Ok(Err(IngestRejection::ThreadInjection(Box::new(
             BounceInfo {
+                source_message_key: draft.message_key.clone(),
                 recipient_to: EmailAddress::from(sender.address()),
                 company_slug: Some(candidate.company.slug.clone()),
                 invalid_slugs: vec![ChannelSlug::from(format!(
@@ -690,6 +691,7 @@ impl ThreadUseCases {
             UndeliverableReason {
                 kind,
                 bounce: undeliverable.into_bounce(
+                    draft.message_key.clone(),
                     sender_address(draft),
                     company_slug,
                     available_channels,
@@ -800,8 +802,8 @@ impl ThreadUseCases {
         Ok(answered)
     }
 
-    /// Fire and forget, like the bounce path: a relay that is down must not turn a help request
-    /// into a retried task.
+    /// A reserved-address reply remains a direct best-effort system-mail operation: it is produced
+    /// during preflight and has no canonical message to make atomic with a delivery row.
     async fn send_system_reply(
         &self,
         draft: &InboundDraft,
@@ -837,8 +839,7 @@ impl ThreadUseCases {
     }
 }
 
-/// The sender's mailbox, for the two paths that still answer in email: the bounce and the reserved
-/// address reply. Both become canonical deliveries in step 9.
+/// The sender's mailbox, for rejection bounces and reserved-address replies.
 pub(crate) fn sender_address(draft: &InboundDraft) -> EmailAddress {
     EmailAddress::from(draft.author.subject().as_str())
 }

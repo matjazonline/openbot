@@ -11,8 +11,8 @@ use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageDirection;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-use crate::transport::MAX_INGRESS_HOPS;
 use crate::transport::{DeliveryCreation, NewDelivery};
+use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
@@ -1971,6 +1971,25 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     assert!(bounce_body.contains("suppport@acme.mailagents.com"));
     assert!(bounce_body.contains("support@acme.mailagents.com"));
 
+    thread_use_cases
+        .handle_bounce_dispatch(&ingest_single)
+        .await
+        .unwrap();
+    thread_use_cases
+        .handle_bounce_dispatch(&ingest_single)
+        .await
+        .unwrap();
+    let queued = thread_persistence.queued_standalone_deliveries();
+    assert_eq!(
+        queued.len(),
+        1,
+        "a webhook retry must not queue a second bounce"
+    );
+    assert_eq!(
+        queued[0].external_destination.as_str(),
+        "customer@client.com"
+    );
+
     // 2. Strict pipeline validation with misspelled step 'biling'
     let raw_payload_pipeline = RawInboundPayload {
         to: "support+biling@acme.mailagents.com".to_string(),
@@ -3338,6 +3357,37 @@ fn use_cases_with_channel_aliases(alias_slugs: Vec<ChannelSlug>) -> (ThreadUseCa
 }
 
 fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
+    let fixture = channel_fixture(spec);
+    (fixture.use_cases, fixture.channel_id)
+}
+
+struct ChannelFixture {
+    use_cases: ThreadUseCases,
+    company_id: Uuid,
+    channel_id: Uuid,
+    threads: Arc<InMemoryThreads>,
+    participants: Arc<InMemoryParticipantDirectory>,
+    tasks: Arc<MockTaskPersistence>,
+}
+
+impl ChannelFixture {
+    fn durable_counts(&self) -> [usize; 6] {
+        [
+            self.threads.threads().len(),
+            self.threads.messages().len(),
+            self.participants.identity_count(),
+            self.tasks.tasks.lock().unwrap().len(),
+            self.tasks.deliveries.lock().unwrap().len(),
+            self.tasks.committed_replies.lock().unwrap().len(),
+        ]
+    }
+}
+
+fn channel_fixture(spec: TestChannel) -> ChannelFixture {
+    channel_fixture_with_config(spec, internal_test_config())
+}
+
+fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> ChannelFixture {
     let TestChannel {
         enabled,
         add_3rd_party,
@@ -3391,16 +3441,224 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
         }]),
     });
 
-    let thread_use_cases = ThreadUseCases::for_test(
-        Arc::new(InMemoryThreads::for_company(company_id)),
+    let threads = Arc::new(InMemoryThreads::for_company(company_id));
+    let participants =
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence.clone()));
+    let tasks = Arc::new(MockTaskPersistence::default());
+    let use_cases = ThreadUseCases::for_test(
+        threads.clone(),
         channel_persistence,
-        company_persistence.clone(),
-        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        Arc::new(MockTaskPersistence::default()),
-        internal_test_config(),
+        company_persistence,
+        participants.clone(),
+        tasks.clone(),
+        config,
     );
 
-    (thread_use_cases, channel_id)
+    ChannelFixture {
+        use_cases,
+        company_id,
+        channel_id,
+        threads,
+        participants,
+        tasks,
+    }
+}
+
+fn rejection_message(message_id: &str) -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some(format!("Message-ID: <{message_id}@example.com>\n")),
+        to: "support@acme.mailagents.com".into(),
+        from: "team@acme.com".into(),
+        subject: Some("Question".into()),
+        text: Some("Body".into()),
+        ..Default::default()
+    }
+}
+
+async fn assert_rejected_without_writes(
+    fixture: &ChannelFixture,
+    payload: RawInboundPayload,
+    origin: IngressOrigin,
+    expected_reason: &str,
+) {
+    let before = fixture.durable_counts();
+    let result = fixture
+        .use_cases
+        .ingest_test_email_as(payload, origin)
+        .await
+        .unwrap();
+    assert!(!result.accepted);
+    assert_eq!(result.reason(), Some(expected_reason));
+    assert_eq!(fixture.durable_counts(), before);
+}
+
+/// Every pre-commit refusal is read-only. Attachment count and canonical validation fail even
+/// earlier, at the email boundary, and likewise leave every in-memory persistence surface alone.
+#[tokio::test]
+async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_attachment_state() {
+    let authentication = channel_fixture(TestChannel::default());
+    let mut payload = rejection_message("reject-auth");
+    payload.dmarc = crate::entities::auth::AuthVerdict::Fail;
+    assert_rejected_without_writes(
+        &authentication,
+        payload,
+        IngressOrigin::ExternalTransport,
+        "DMARC authentication did not pass",
+    )
+    .await;
+
+    let acl = channel_fixture(TestChannel::default());
+    let mut payload = rejection_message("reject-acl");
+    payload.from = "unauthorized@example.net".into();
+    assert_rejected_without_writes(
+        &acl,
+        payload,
+        IngressOrigin::ExternalTransport,
+        "Sender unauthorized for channel",
+    )
+    .await;
+
+    let unknown = channel_fixture(TestChannel::default());
+    let mut payload = rejection_message("reject-unknown");
+    payload.to = "support@missing.mailagents.com".into();
+    assert_rejected_without_writes(
+        &unknown,
+        payload,
+        IngressOrigin::ExternalTransport,
+        "Company or Channel not found",
+    )
+    .await;
+
+    let spam = channel_fixture(TestChannel {
+        participant_emails: Some(vec![EmailAddress::from("@public")]),
+        ..TestChannel::default()
+    });
+    let mut payload = rejection_message("reject-spam");
+    payload.from = "spammer@example.net".into();
+    payload.spam_score = Some(5.0);
+    assert_rejected_without_writes(
+        &spam,
+        payload,
+        IngressOrigin::ExternalTransport,
+        "Spam score threshold exceeded",
+    )
+    .await;
+
+    let hop = channel_fixture(TestChannel::default());
+    let mut payload = rejection_message("reject-hop");
+    payload.headers = Some(format!(
+        "Message-ID: <reject-hop@example.com>\nX-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: {MAX_INGRESS_HOPS}\n",
+        hop.channel_id
+    ));
+    assert_rejected_without_writes(
+        &hop,
+        payload,
+        IngressOrigin::InternalChannel {
+            company_id: hop.company_id,
+            channel_id: hop.channel_id,
+        },
+        "Max inter-channel hop count reached",
+    )
+    .await;
+
+    let cycle = channel_fixture(TestChannel::default());
+    let mut payload = rejection_message("reject-cycle");
+    payload.headers = Some(format!(
+        "Message-ID: <reject-cycle@example.com>\nX-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: 1\nX-MailAgents-Trace: {}\n",
+        cycle.channel_id, cycle.channel_id
+    ));
+    assert_rejected_without_writes(
+        &cycle,
+        payload,
+        IngressOrigin::InternalChannel {
+            company_id: cycle.company_id,
+            channel_id: cycle.channel_id,
+        },
+        "Inter-channel loop cycle detected",
+    )
+    .await;
+
+    let adapter_failures = channel_fixture(TestChannel::default());
+    let before = adapter_failures.durable_counts();
+    let mut too_many = rejection_message("reject-attachments");
+    too_many.attachments_data = (0..=MAX_ATTACHMENTS)
+        .map(
+            |index| crate::adapters::protocols::email::parser::RawAttachmentData {
+                filename: format!("{index}.txt"),
+                content_type: "text/plain".into(),
+                content: Vec::new(),
+                stored_key: None,
+            },
+        )
+        .collect();
+    assert!(
+        adapter_failures
+            .use_cases
+            .ingest_test_email(too_many)
+            .await
+            .is_err()
+    );
+    assert_eq!(adapter_failures.durable_counts(), before);
+
+    let mut invalid = rejection_message("reject-validation");
+    invalid.text = Some("x".repeat(MAX_BODY_BYTES + 1));
+    assert!(
+        adapter_failures
+            .use_cases
+            .ingest_test_email(invalid)
+            .await
+            .is_err()
+    );
+    assert_eq!(adapter_failures.durable_counts(), before);
+
+    let mut storage_config = internal_test_config();
+    Arc::get_mut(&mut storage_config).unwrap().gcs = Some(crate::infra::config::GcsConfig {
+        bucket: "public".into(),
+        service_account_json_base64: "unused-by-fake".into(),
+        public_base_url_override: None,
+        avatar_folder: "avatars".into(),
+        attachments_bucket: Some("private".into()),
+        attachments_folder: "attachments".into(),
+    });
+    let storage_fixture = channel_fixture_with_config(TestChannel::default(), storage_config);
+    let storage = crate::adapters::storage::test_support::FakeStorage::new();
+    let mut rejected_attachment = rejection_message("reject-before-upload");
+    rejected_attachment.from = "unauthorized@example.net".into();
+    rejected_attachment.attachments_data = vec![
+        crate::adapters::protocols::email::parser::RawAttachmentData {
+            filename: "evidence.txt".into(),
+            content_type: "text/plain".into(),
+            content: b"must not be uploaded".to_vec(),
+            stored_key: None,
+        },
+    ];
+    let accepted = crate::adapters::protocols::email::EmailIngressAdapter::for_config(
+        storage_fixture.use_cases.config(),
+    )
+    .accept(
+        rejected_attachment,
+        crate::adapters::protocols::email::EmailIngressTrust::Verified(
+            crate::adapters::protocols::email::VerifiedEmailAuth {
+                spf: crate::entities::auth::AuthVerdict::Pass,
+                dkim: crate::entities::auth::AuthVerdict::Pass,
+                dmarc: crate::entities::auth::AuthVerdict::Pass,
+                spam_score: None,
+            },
+        ),
+    )
+    .unwrap();
+    let (inbound, _pending_bytes) =
+        accepted.into_preflight_parts(IngressOrigin::ExternalTransport, ReplyDelivery::Send);
+    assert!(storage.objects().is_empty());
+    assert!(matches!(
+        storage_fixture
+            .use_cases
+            .preflight_inbound(inbound)
+            .await
+            .unwrap(),
+        InboundPreflight::Rejected(_)
+    ));
+    assert!(storage.objects().is_empty());
 }
 
 #[tokio::test]
@@ -4272,6 +4530,7 @@ async fn a_channel_without_its_own_description_borrows_its_agent_s() {
 #[test]
 fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
     let bounce = BounceInfo {
+        source_message_key: ExternalMessageKey::parse("<missing@example.com>").unwrap(),
         recipient_to: EmailAddress::from("team@acme.com"),
         company_slug: Some(CompanySlug::from("acme")),
         invalid_slugs: vec![ChannelSlug::from("suport")],

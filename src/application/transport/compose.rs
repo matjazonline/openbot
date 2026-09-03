@@ -25,8 +25,10 @@ use crate::{
     },
     transport::{
         DeliveryContext, DeliveryDestination, DeliveryEnvelope, DeliveryIntent, DeliveryKey,
-        EmailDeliveryContext, MAX_DELIVERY_ATTEMPTS, NewDelivery, ingress::CanonicalContent,
-        ports::TransportRenderers,
+        EmailDeliveryContext, MAX_DELIVERY_ATTEMPTS, NewDelivery, NewStandaloneDelivery,
+        StandaloneDeliveryEnvelope,
+        ingress::CanonicalContent,
+        ports::{TransportRenderer, TransportRenderers},
     },
     use_cases::integration::ChannelBindingPersistence,
 };
@@ -46,6 +48,16 @@ pub struct DeliveryRequest<'a> {
     /// write the message and the delivery in one transaction.
     pub message_id: CanonicalMessageId,
     pub task_id: Option<Uuid>,
+    pub correlation_id: CorrelationId,
+    pub purpose: DeliveryPurpose,
+    pub source_key: String,
+    pub content: &'a CanonicalContent,
+    pub context: DeliveryContext,
+}
+
+/// One provider notification that has no canonical message, channel, or binding to attribute.
+#[derive(Debug, Clone)]
+pub struct StandaloneDeliveryRequest<'a> {
     pub correlation_id: CorrelationId,
     pub purpose: DeliveryPurpose,
     pub source_key: String,
@@ -101,6 +113,15 @@ impl DeliveryComposer {
         }
     }
 
+    /// The protocol boundary used to validate an explicitly external destination before any
+    /// delivery exists. Callers receive the application-owned port, never the adapter type.
+    pub fn renderer(&self, transport: TransportKind) -> AppResult<&dyn TransportRenderer> {
+        self.renderers
+            .require(transport)
+            .map(|renderer| renderer.as_ref())
+            .map_err(|error| AppError::Internal(error.to_string()))
+    }
+
     /// The delivery `request` is owed, with its parts already frozen.
     ///
     /// Fails rather than silently dropping the message when the channel has no live interface on
@@ -134,10 +155,7 @@ impl DeliveryComposer {
         )
         .map_err(|error| AppError::Internal(error.to_string()))?;
 
-        let renderer = self
-            .renderers
-            .require(transport)
-            .map_err(|error| AppError::Internal(error.to_string()))?;
+        let renderer = self.renderer(transport)?;
         let parts = renderer.render(&envelope)?;
         let provider_key = parts
             .first()
@@ -165,6 +183,40 @@ impl DeliveryComposer {
                 max_attempts: MAX_DELIVERY_ATTEMPTS,
                 parts: NewDelivery::frozen_parts(parts)?,
             },
+        })
+    }
+
+    /// Freeze an unattributed notification for the same durable queue as canonical deliveries.
+    pub fn compose_standalone(
+        &self,
+        request: StandaloneDeliveryRequest<'_>,
+    ) -> AppResult<NewStandaloneDelivery> {
+        let transport = request.context.transport();
+        let destination = DeliveryDestination::External(request.context.external_destination());
+        let key = delivery_key(request.purpose, &request.source_key, &destination);
+        let id = DeliveryId::random();
+        let renderer = self.renderer(transport)?;
+        let envelope = StandaloneDeliveryEnvelope::new(
+            id,
+            key.clone(),
+            request.purpose,
+            request.correlation_id,
+            request.content,
+            request.context,
+        );
+        let external_destination = match destination {
+            DeliveryDestination::External(destination) => destination,
+            DeliveryDestination::Binding(_) => unreachable!("constructed as external above"),
+        };
+        Ok(NewStandaloneDelivery {
+            id,
+            external_destination,
+            correlation_id: request.correlation_id,
+            transport,
+            purpose: request.purpose,
+            idempotency_key: key,
+            max_attempts: MAX_DELIVERY_ATTEMPTS,
+            parts: NewDelivery::frozen_parts(renderer.render_standalone(&envelope)?)?,
         })
     }
 

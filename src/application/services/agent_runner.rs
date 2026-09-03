@@ -1,5 +1,4 @@
 use crate::adapters::persistence::task::TaskPersistence;
-use crate::adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination};
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
@@ -8,7 +7,7 @@ use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageRole;
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::entities::task::TokenUsage;
-use crate::entities::value_objects::{EmailAddress, ModelName, ModelProvider};
+use crate::entities::value_objects::{ModelName, ModelProvider};
 use crate::services::agent_channel_tool::{
     AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
 };
@@ -534,7 +533,6 @@ fn provider_config_from_agent_config(
 #[derive(Clone)]
 pub struct InternalDelegationPolicy {
     pub channel_persistence: Arc<dyn ChannelPersistence>,
-    pub app_domain_name: String,
     pub company_id: Uuid,
     pub source_channel_id: Uuid,
     /// When false, a call whose recipients are *all* same-company agent channels skips the human.
@@ -581,29 +579,30 @@ impl InternalDelegationPolicy {
         if name != OUTREACH_TOOL_ID {
             return false;
         }
-        let Some(targets) = args.get("target_emails").and_then(|v| v.as_array()) else {
+        let Some(targets) = args.get("target_channels").and_then(|v| v.as_array()) else {
             return false;
         };
+        if args
+            .get("target_emails")
+            .and_then(|value| value.as_array())
+            .is_some_and(|targets| !targets.is_empty())
+        {
+            return false;
+        }
         // An empty list is not "all internal"; it is a malformed call.
         if targets.is_empty() {
             return false;
         }
 
         for target in targets {
-            let Some(email) = target.as_str() else {
+            let Some(value) = target.as_str() else {
                 return false;
             };
-            let EmailRecipientDestination::Channel(selection) =
-                EmailChannelSelectorParser::new(&self.app_domain_name)
-                    .classify(EmailAddress::from(email.trim().to_ascii_lowercase()))
-            else {
+            let Ok(selector) = crate::entities::transport::ChannelSelector::parse(value) else {
                 return false;
             };
-            if selection.delivery().is_context_only() || selection.selectors().len() != 1 {
-                return false;
-            }
             let outcome = resolve_internal_target(
-                selection.primary(),
+                &selector,
                 self.company_id,
                 self.source_channel_id,
                 self.channel_persistence.as_ref(),
@@ -1341,7 +1340,6 @@ impl AgentTask {
                 .as_ref()
                 .map(|outreach| InternalDelegationPolicy {
                     channel_persistence: outreach.channel_persistence.clone(),
-                    app_domain_name: outreach.context.app_domain_name.clone(),
                     company_id: outreach.context.company_id,
                     source_channel_id: outreach.context.channel_id,
                     requires_approval: self.internal_requires_approval,
@@ -2436,17 +2434,19 @@ system_prompt: Hello
     ) -> InternalDelegationPolicy {
         InternalDelegationPolicy {
             channel_persistence: Arc::new(DirectoryStub { channels }),
-            app_domain_name: "mailagents.example".to_string(),
             company_id,
             source_channel_id: Uuid::new_v4(),
             requires_approval,
         }
     }
 
-    fn outreach_trigger(targets: &[&str]) -> ai_agents::hitl::ApprovalTrigger {
+    fn outreach_trigger(channels: &[&str], emails: &[&str]) -> ai_agents::hitl::ApprovalTrigger {
         ai_agents::hitl::ApprovalTrigger::Tool {
             name: OUTREACH_TOOL_ID.to_string(),
-            args: serde_json::json!({ "target_emails": targets }),
+            args: serde_json::json!({
+                "target_channels": channels,
+                "target_emails": emails,
+            }),
         }
     }
 
@@ -2460,7 +2460,7 @@ system_prompt: Hello
         );
         assert!(
             policy
-                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .approves_without_human(&outreach_trigger(&["billing"], &[]))
                 .await
         );
     }
@@ -2475,7 +2475,7 @@ system_prompt: Hello
         );
         assert!(
             !policy
-                .approves_without_human(&outreach_trigger(&["stranger@supplier.example"]))
+                .approves_without_human(&outreach_trigger(&[], &["stranger@supplier.example"]))
                 .await
         );
     }
@@ -2492,10 +2492,10 @@ system_prompt: Hello
         );
         assert!(
             !policy
-                .approves_without_human(&outreach_trigger(&[
-                    "billing@acme.mailagents.example",
-                    "stranger@supplier.example",
-                ]))
+                .approves_without_human(&outreach_trigger(
+                    &["billing"],
+                    &["stranger@supplier.example"],
+                ))
                 .await
         );
     }
@@ -2510,7 +2510,7 @@ system_prompt: Hello
         );
         assert!(
             !policy
-                .approves_without_human(&outreach_trigger(&["ghost@acme.mailagents.example"]))
+                .approves_without_human(&outreach_trigger(&["ghost"], &[]))
                 .await
         );
     }
@@ -2521,7 +2521,7 @@ system_prompt: Hello
         let policy = policy(vec![agent_channel(company_id, "billing")], company_id, true);
         assert!(
             !policy
-                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .approves_without_human(&outreach_trigger(&["billing"], &[]))
                 .await
         );
     }
@@ -2534,7 +2534,11 @@ system_prompt: Hello
             company_id,
             false,
         );
-        assert!(!policy.approves_without_human(&outreach_trigger(&[])).await);
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&[], &[]))
+                .await
+        );
         assert!(
             !policy
                 .approves_without_human(&ai_agents::hitl::ApprovalTrigger::Tool {

@@ -50,7 +50,8 @@ use crate::{
     transport::{
         CommitDisposition, DeliveryCreation, ExternalCorrelationStore, InboundCommitOutcome,
         InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, InboundTaskPayload,
-        InboundTaskPayloadV1, NewDelivery, ThreadTarget,
+        InboundTaskPayloadV1, NewDelivery, NewStandaloneDelivery, StandaloneDeliveryEnqueuer,
+        ThreadTarget,
     },
     use_cases::{
         integration::{
@@ -127,6 +128,7 @@ struct Store {
     /// Deliveries queued alongside a message, so a test can assert that an answer was not only
     /// recorded but actually handed to a transport.
     deliveries: Vec<NewDelivery>,
+    standalone_deliveries: Vec<NewStandaloneDelivery>,
 }
 
 /// An in-memory [`ThreadPersistence`].
@@ -140,6 +142,10 @@ impl InMemoryThreads {
     /// Every delivery queued through [`ThreadPersistence::create_message_with_deliveries`].
     pub fn queued_deliveries(&self) -> Vec<NewDelivery> {
         self.store.lock().unwrap().deliveries.clone()
+    }
+
+    pub fn queued_standalone_deliveries(&self) -> Vec<NewStandaloneDelivery> {
+        self.store.lock().unwrap().standalone_deliveries.clone()
     }
 }
 
@@ -1045,10 +1051,32 @@ impl InMemoryIngress {
         InboundIngestPorts {
             committer: ingress.clone(),
             correlation: ingress.clone(),
-            bindings: ingress,
+            bindings: ingress.clone(),
+            standalone_deliveries: ingress,
         }
     }
+}
 
+#[async_trait]
+impl StandaloneDeliveryEnqueuer for InMemoryIngress {
+    async fn enqueue_standalone_delivery(
+        &self,
+        delivery: NewStandaloneDelivery,
+    ) -> AppResult<DeliveryCreation> {
+        let mut store = self.threads.store.lock().unwrap();
+        if let Some(existing) = store.standalone_deliveries.iter().find(|queued| {
+            queued.transport == delivery.transport
+                && queued.idempotency_key == delivery.idempotency_key
+        }) {
+            return Ok(DeliveryCreation::Absorbed(existing.id));
+        }
+        let id = delivery.id;
+        store.standalone_deliveries.push(delivery);
+        Ok(DeliveryCreation::Created(id))
+    }
+}
+
+impl InMemoryIngress {
     /// The channel a synthetic binding stands for.
     fn channel_of(binding_id: ChannelBindingId) -> Uuid {
         binding_id.as_uuid()
@@ -1345,7 +1373,10 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
             identity: envelope.author.clone(),
             display_label: None,
             claim_metadata: IdentityClaimMetadata::observation(),
-            provenance: IdentityProvenance::EmailIngress,
+            provenance: match envelope.author.transport() {
+                TransportKind::Email => IdentityProvenance::EmailIngress,
+                TransportKind::Slack => IdentityProvenance::SlackEvent,
+            },
         }),
         subject: envelope.content.subject().to_string(),
         clean_text_body: envelope.content.body_text().to_string(),

@@ -1,6 +1,5 @@
 use crate::{
     adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence},
-    adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination},
     app_error::AppResult,
     entities::{
         channel::Channel,
@@ -13,7 +12,8 @@ use crate::{
     },
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
-        EmailDeliveryContext, EmailRelayTrace,
+        EmailDeliveryContext, EmailRelayTrace, ExternalDestinationClassification,
+        TransportRenderer,
     },
     use_cases::{
         channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
@@ -32,7 +32,6 @@ use ai_agents::{
 };
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use lettre::message::Mailbox;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -181,6 +180,13 @@ impl Tool for OutreachAndAwaitQuorumTool {
         };
 
         let limits = OutreachLimits::from_config(&ctx.custom_config);
+        let email_renderer = match self
+            .deliveries
+            .renderer(crate::entities::transport::TransportKind::Email)
+        {
+            Ok(renderer) => renderer,
+            Err(error) => return ToolResult::error(error.to_string()),
+        };
         let resolved = match resolve_targets(
             &input,
             TargetPolicy {
@@ -192,6 +198,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
             },
             &self.context,
             self.channel_persistence.as_ref(),
+            email_renderer,
         )
         .await
         {
@@ -547,6 +554,7 @@ async fn resolve_targets(
     policy: TargetPolicy,
     context: &OutreachToolContext,
     channels: &dyn ChannelPersistence,
+    email_renderer: &dyn TransportRenderer,
 ) -> Result<Vec<NormalizedOutreachTarget>, String> {
     let requested = input.target_channels.len() + input.target_emails.len();
     if requested == 0 || requested > policy.max_targets {
@@ -565,7 +573,7 @@ async fn resolve_targets(
     for value in &input.target_emails {
         push_unique(
             &mut targets,
-            resolve_email_target(value, policy.scope, context)?,
+            resolve_email_target(value, policy.scope, email_renderer)?,
         );
     }
     targets.sort_by_key(NormalizedOutreachTarget::key);
@@ -611,27 +619,25 @@ async fn resolve_channel_target(
 fn resolve_email_target(
     value: &str,
     scope: AllowedTargetScope,
-    context: &OutreachToolContext,
+    email_renderer: &dyn TransportRenderer,
 ) -> Result<NormalizedOutreachTarget, String> {
     if scope == AllowedTargetScope::SameCompanyChannels {
         return Err(format!(
             "Only same-company platform channels are permitted by this tool policy: {value}"
         ));
     }
-    let mailbox: Mailbox = value
-        .trim()
-        .parse()
-        .map_err(|_| format!("Invalid target email address: {value}"))?;
-    let email = EmailAddress::from(mailbox.email.to_string().to_lowercase());
-    match EmailChannelSelectorParser::new(&context.app_domain_name).classify(email.clone()) {
-        EmailRecipientDestination::External(destination) => Ok(NormalizedOutreachTarget {
+    match email_renderer.classify_external_destination(value) {
+        ExternalDestinationClassification::External(destination) => Ok(NormalizedOutreachTarget {
             destination: OutreachDestination::External(destination),
         }),
-        EmailRecipientDestination::Channel(_) => Err(format!(
-            "{email} is a platform channel address; name it in target_channels instead"
+        ExternalDestinationClassification::InternalEndpoint => Err(format!(
+            "{value} is a platform channel address; name it in target_channels instead"
         )),
-        EmailRecipientDestination::InvalidPlatformAddress => {
-            Err(format!("Invalid platform channel address: {email}"))
+        ExternalDestinationClassification::InvalidInternalEndpoint => {
+            Err(format!("Invalid platform channel address: {value}"))
+        }
+        ExternalDestinationClassification::InvalidSyntax => {
+            Err(format!("Invalid target email address: {value}"))
         }
     }
 }
@@ -664,6 +670,7 @@ fn config_u32(config: &Value, key: &str, default: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::{
+        adapters::protocols::email::EmailRenderer,
         app_error::AppResult,
         entities::channel::{Channel, ChannelAccessMode},
         use_cases::channel::{ChannelPersistence, ChannelWrite},
@@ -766,6 +773,7 @@ mod tests {
             },
             &context,
             &MockChannelPersistence { channel },
+            &EmailRenderer::new(&context.app_domain_name),
         )
         .await
     }

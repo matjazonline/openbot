@@ -31,7 +31,9 @@ shape. Decode attachments fallibly as versioned untrusted JSON.
 
 - `email_message_metadata`: canonical message ID, RFC Message-ID, In-Reply-To, References,
   Thread-Index, raw text/html, and email authentication/envelope fields that must be retained.
-  `UNIQUE (company_id, rfc_message_id)` preserves current dedup semantics.
+  RFC Message-ID is deliberately non-unique: the same wire ID can be observed through more than
+  one binding (including an internal relay's outbound and inbound sides). Deduplication is
+  exclusively the binding-scoped `(binding_id, external_message_key)` relationship below.
 - `external_threads`: company, binding, opaque external thread key, canonical thread ID, timestamps;
   unique on `(binding_id, external_thread_key)` and tenant-scoped to both sides.
 - `external_messages`: company, binding, opaque external message key, canonical message ID,
@@ -50,9 +52,11 @@ shape. Decode attachments fallibly as versioned untrusted JSON.
   protocol-neutral.
 - Split `src/adapters/persistence/thread.rs` before it grows: canonical message writes and reads,
   external correlation, and email metadata get focused sibling modules with inline tests.
-- Keep canonical content hashing in one pure function. Dedup first by qualified external-message
-  mapping; if a repeated provider key has a different hash, return a typed collision error rather
-  than silently updating content.
+- Keep canonical content hashing in one pure, protocol-aware function: email hashes the retained
+  raw representation, while stored/non-email events hash canonical body content. Include complete
+  qualified participant identities (transport, namespace, and subject), or their resolved identity
+  IDs. Dedup first by qualified external-message mapping; if a repeated provider key has a
+  different hash, return a typed collision error rather than silently updating content.
 
 ## Reset-only schema rules
 

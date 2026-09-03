@@ -221,6 +221,7 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
                 committer: persistence.clone(),
                 correlation: persistence.clone(),
                 bindings: persistence.clone(),
+                standalone_deliveries: persistence.clone(),
             },
             renderers.clone(),
             config,
@@ -404,11 +405,13 @@ impl Fixture {
     async fn record_of(&self, delivery_id: DeliveryId) -> crate::transport::DeliveryRecord {
         crate::transport::DeliveryRecord {
             id: delivery_id,
-            company_id: self.company.id,
-            channel_id: self.channel_a.id,
-            message_id: CanonicalMessageId::random(),
-            source_binding_id: self.binding_of(self.channel_a.id).await,
-            destination_binding_id: self.binding_of(self.channel_a.id).await,
+            attribution: Some(crate::transport::DeliveryAttribution {
+                company_id: self.company.id,
+                channel_id: self.channel_a.id,
+                message_id: CanonicalMessageId::random(),
+                source_binding_id: self.binding_of(self.channel_a.id).await,
+                destination_binding_id: self.binding_of(self.channel_a.id).await,
+            }),
             external_destination: None,
             task_id: None,
             correlation_id: CorrelationId::new(),

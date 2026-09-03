@@ -404,11 +404,13 @@ async fn an_internal_refusal_is_terminal() {
 fn record() -> DeliveryRecord {
     DeliveryRecord {
         id: crate::entities::transport::DeliveryId::random(),
-        company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-        message_id: CanonicalMessageId::random(),
-        source_binding_id: ChannelBindingId::random(),
-        destination_binding_id: ChannelBindingId::random(),
+        attribution: Some(crate::transport::DeliveryAttribution {
+            company_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+            message_id: CanonicalMessageId::random(),
+            source_binding_id: ChannelBindingId::random(),
+            destination_binding_id: ChannelBindingId::random(),
+        }),
         external_destination: None,
         task_id: None,
         correlation_id: CorrelationId::new(),

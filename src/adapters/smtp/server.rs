@@ -564,7 +564,7 @@ impl SmtpServer {
                 let (inbound, attachments) = accepted
                     .into_preflight_parts(IngressOrigin::ExternalTransport, ReplyDelivery::Send);
                 match self.thread_use_cases.preflight_inbound(inbound).await? {
-                    InboundPreflight::Rejected(result) => Ok(result),
+                    InboundPreflight::Rejected(result) => Ok(*result),
                     InboundPreflight::Accepted(mut prepared) => {
                         let persisted = attachments
                             .persist(&self.config, self.file_storage.as_deref())
@@ -575,7 +575,7 @@ impl SmtpServer {
                             persisted.failed_count,
                         );
                         self.thread_use_cases
-                            .commit_prepared_inbound(prepared)
+                            .commit_prepared_inbound(*prepared)
                             .await
                     }
                 }
@@ -1074,6 +1074,10 @@ mod answer_tests {
 
     fn bounce() -> BounceInfo {
         BounceInfo {
+            source_message_key: crate::entities::transport::ExternalMessageKey::parse(
+                "<rejected@example.com>",
+            )
+            .unwrap(),
             recipient_to: "sender@example.com".into(),
             company_slug: None,
             invalid_slugs: Vec::new(),

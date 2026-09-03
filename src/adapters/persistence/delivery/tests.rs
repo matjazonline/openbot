@@ -23,15 +23,16 @@ use crate::{
     },
     entities::{
         transport::{
-            DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, ExternalMessageKey, FailureClass,
-            TransportKind,
+            DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, ExternalDestination,
+            ExternalMessageKey, FailureClass, TransportKind,
         },
         value_objects::EmailAddress,
     },
     transport::{
-        ClaimedDelivery, DeliveryFailure, DeliveryOutcome, DeliveryQueue, Disposition,
-        ExecutionLease, FailureDetail, MAX_DELIVERY_ATTEMPTS, PartResult, ProviderSendOutcome,
-        WorkerId,
+        ClaimedDelivery, ContentDigest, DeliveryFailure, DeliveryKey, DeliveryOutcome,
+        DeliveryQueue, Disposition, ExecutionLease, FailureDetail, MAX_DELIVERY_ATTEMPTS,
+        NewDelivery, NewStandaloneDelivery, PartIndex, PartKey, PartResult, ProviderSendOutcome,
+        RenderedPart, StandaloneDeliveryEnqueuer, TransportPayload, WorkerId,
     },
     use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -206,6 +207,88 @@ async fn part_statuses(
 
 fn detail(message: &str) -> FailureDetail {
     FailureDetail::parse(message).expect("a short test detail")
+}
+
+fn standalone(key: DeliveryKey) -> NewStandaloneDelivery {
+    NewStandaloneDelivery {
+        id: DeliveryId::random(),
+        external_destination: ExternalDestination::Email(EmailAddress::from(
+            "rejected-sender@example.com",
+        )),
+        correlation_id: crate::entities::correlation::CorrelationId::new(),
+        transport: TransportKind::Email,
+        purpose: DeliveryPurpose::Notification,
+        idempotency_key: key.clone(),
+        max_attempts: MAX_DELIVERY_ATTEMPTS,
+        parts: NewDelivery::frozen_parts(vec![RenderedPart {
+            index: PartIndex::new(0),
+            key: PartKey::parse(format!("email:{key}")).unwrap(),
+            payload: TransportPayload::encode(
+                TransportKind::Email,
+                1,
+                &serde_json::json!({ "body": "bounce" }),
+            )
+            .unwrap(),
+            digest: ContentDigest::sha256_of(b"bounce"),
+        }])
+        .unwrap(),
+    }
+}
+
+/// Standalone notification rows use the same unique-key and claim protocol as attributed rows.
+#[tokio::test]
+async fn competing_standalone_notification_enqueues_create_one_claimable_delivery() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let key = DeliveryKey::parse(format!("notification:bounce:{}", Uuid::new_v4())).unwrap();
+    let first = standalone(key.clone());
+    let second = standalone(key);
+
+    let (first_result, second_result) = tokio::join!(
+        persistence.enqueue_standalone_delivery(first),
+        persistence.enqueue_standalone_delivery(second),
+    );
+    let results = [first_result.unwrap(), second_result.unwrap()];
+    assert_eq!(
+        results.iter().filter(|result| result.was_created()).count(),
+        1
+    );
+    assert_eq!(results[0].delivery_id(), results[1].delivery_id());
+    let delivery_id = results[0].delivery_id();
+
+    let _guard = UNSCOPED_CLAIM.lock().await;
+    sort_first(&persistence, delivery_id).await;
+    let claimed = claim_mine(&persistence, WorkerId::random(), delivery_id)
+        .await
+        .expect("the standalone notification is claimable");
+    assert!(claimed.record.attribution.is_none());
+    assert_eq!(
+        claimed
+            .record
+            .external_destination
+            .as_ref()
+            .map(|value| value.as_str()),
+        Some("rejected-sender@example.com")
+    );
+    assert_eq!(claimed.parts.len(), 1);
+
+    sqlx::query("DELETE FROM message_deliveries WHERE id = $1")
+        .bind(delivery_id.as_uuid())
+        .execute(&persistence.pool)
+        .await
+        .unwrap();
+    let parts: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM message_delivery_parts WHERE delivery_id = $1")
+            .bind(delivery_id.as_uuid())
+            .fetch_one(&persistence.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        parts, 0,
+        "deleting the standalone parent cascades to its parts"
+    );
 }
 
 /// Two logical deliveries of the same thing collapse onto one row; two *different* recipients of
