@@ -36,7 +36,10 @@ use tracing::{info, instrument, warn};
 use crate::{
     app_error::{AppError, AppResult},
     entities::value_objects::ThreadIndexParseError,
-    transport::{InboundCommitOutcome, InboundDraft, InboundRouting, ReplyDelivery},
+    transport::{
+        BoundedVec, InboundCommitOutcome, InboundDraft, InboundRouting, MAX_ATTACHMENTS,
+        ReplyDelivery,
+    },
     use_cases::thread::{
         ChannelMatch, InboundIngestResult, ThreadUseCases, ingest::commit::CommitPlan,
         support::DirectoryCache,
@@ -61,6 +64,34 @@ pub struct InboundMessage {
     pub reply_delivery: ReplyDelivery,
     /// Hints the adapter parsed but could not use, for the counters that watch them.
     pub unusable_hints: Vec<UnusableHint>,
+}
+
+/// The result of every read-only ingress decision. Only the accepted arm may proceed to uploads
+/// and the atomic commit.
+pub enum InboundPreflight {
+    Rejected(InboundIngestResult),
+    Accepted(PreparedInbound),
+}
+
+/// An accepted, still-uncommitted message. Attachment bytes remain outside this type; the email
+/// adapter replaces their metadata after content-addressed storage succeeds or fails.
+pub struct PreparedInbound {
+    plan: CommitPlan,
+    stored_attachment_count: usize,
+    failed_attachment_count: usize,
+}
+
+impl PreparedInbound {
+    pub fn replace_attachments(
+        &mut self,
+        attachments: BoundedVec<crate::entities::message::AttachmentMetadata, MAX_ATTACHMENTS>,
+        stored_count: usize,
+        failed_count: usize,
+    ) {
+        self.plan.replace_attachments(attachments);
+        self.stored_attachment_count = stored_count;
+        self.failed_attachment_count = failed_count;
+    }
 }
 
 impl InboundMessage {
@@ -90,6 +121,18 @@ impl ThreadUseCases {
     /// Take one inbound message all the way from "an adapter parsed it" to "it is durable".
     #[instrument(skip(self, message), fields(origin = ?message.origin))]
     pub async fn ingest(&self, message: InboundMessage) -> AppResult<InboundIngestResult> {
+        // Box the two-phase seam so callers without attachment bytes keep this already-deep
+        // ingress future small, while SMTP and webhooks can pause between policy and persistence.
+        match Box::pin(self.preflight_inbound(message)).await? {
+            InboundPreflight::Rejected(result) => Ok(result),
+            InboundPreflight::Accepted(prepared) => {
+                Box::pin(self.commit_prepared_inbound(prepared)).await
+            }
+        }
+    }
+
+    /// Run guards, routing, ACLs, thread policy and bounds without writing domain rows or objects.
+    pub async fn preflight_inbound(&self, message: InboundMessage) -> AppResult<InboundPreflight> {
         let InboundMessage {
             draft,
             routing,
@@ -101,7 +144,9 @@ impl ThreadUseCases {
         self.record_unusable_hints(&unusable_hints);
         if let Err(rejection) = policy::guard_ingress(&draft, origin) {
             warn!(%rejection, "Refusing an inbound message at the ingress guard");
-            return Ok(InboundIngestResult::rejected(rejection));
+            return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
+                rejection,
+            )));
         }
 
         let mut directory = DirectoryCache::new(self);
@@ -118,11 +163,15 @@ impl ThreadUseCases {
         {
             Ok(resolved) => resolved,
             Err(IngestRejection::UnknownRecipient) if answered_system => {
-                return Ok(InboundIngestResult::rejected(
+                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
                     IngestRejection::SystemAddressAnswered,
-                ));
+                )));
             }
-            Err(rejection) => return Ok(InboundIngestResult::rejected(rejection)),
+            Err(rejection) => {
+                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
+                    rejection,
+                )));
+            }
         };
 
         let prepared = match self
@@ -130,18 +179,64 @@ impl ThreadUseCases {
             .await?
         {
             Ok(prepared) => prepared,
-            Err(rejection) => return Ok(InboundIngestResult::rejected(rejection)),
+            Err(rejection) => {
+                return Ok(InboundPreflight::Rejected(InboundIngestResult::rejected(
+                    rejection,
+                )));
+            }
         };
 
         let plan = CommitPlan::build(&draft, &resolved, prepared, reply_delivery)?;
+        Ok(InboundPreflight::Accepted(PreparedInbound {
+            plan,
+            stored_attachment_count: 0,
+            failed_attachment_count: 0,
+        }))
+    }
+
+    /// Persist a preflighted message. Object-storage failures are already reflected in its
+    /// metadata; a database failure records successfully uploaded objects as reconciliation
+    /// candidates because no message row can reference them.
+    pub async fn commit_prepared_inbound(
+        &self,
+        prepared: PreparedInbound,
+    ) -> AppResult<InboundIngestResult> {
+        let PreparedInbound {
+            plan,
+            stored_attachment_count,
+            failed_attachment_count,
+        } = prepared;
+        if failed_attachment_count > 0
+            && let Some(monitoring) = self.monitoring.as_ref()
+        {
+            monitoring.increment_counter(
+                "inbound_attachment_storage_failures_total",
+                failed_attachment_count as u64,
+                &[],
+            );
+        }
         info!(
-            company_id = %resolved.company.id,
+            company_id = %plan.company_id(),
             channels = plan.channels(),
             disposition = ?plan.disposition(),
             "Committing an inbound message"
         );
 
-        let outcome = self.committer.commit_inbound(plan.request()).await?;
+        let outcome = match self.committer.commit_inbound(plan.request()).await {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                if stored_attachment_count > 0
+                    && let Some(monitoring) = self.monitoring.as_ref()
+                {
+                    monitoring.increment_counter(
+                        "inbound_attachment_orphan_candidates_total",
+                        stored_attachment_count as u64,
+                        &[],
+                    );
+                }
+                return Err(error);
+            }
+        };
         self.assemble_result(plan, outcome).await
     }
 
@@ -232,24 +327,6 @@ impl ThreadUseCases {
                 recipient_role: prepared_channel.candidate.role,
                 step: prepared_channel.candidate.step,
             });
-        }
-
-        // Recording the reply closes the outreach the channel was waiting on.
-        //
-        // Deliberately after the commit and not inside it: an outreach is a *task* fact, and the
-        // worst a crash here can do is leave the outreach open, which the agent's next turn
-        // reconciles. The rows whose disagreement would lose or duplicate a message are the ones
-        // the commit holds together. Step 9 folds this into the delivery state machine.
-        if !outcome.disposition.is_duplicate() {
-            for (prepared_channel, matched_channel) in
-                prepared.channels.iter().zip(&channel_matches)
-            {
-                if let Some(matched) = prepared_channel.outreach.as_ref() {
-                    self.task_persistence
-                        .record_outreach_reply(matched, matched_channel.inbound_message.id)
-                        .await?;
-                }
-            }
         }
 
         let primary = channel_matches

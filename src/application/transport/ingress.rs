@@ -17,12 +17,14 @@ use crate::{
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
         message::{AttachmentMetadata, CanonicalMessageId},
+        outreach::OutreachReplyMatch,
+        participant::ThreadPrincipalRole,
         transport::{
             ChannelBindingId, ChannelSelector, ExternalEventKey, ExternalMessageKey,
             ExternalThreadKey, InboundEventId, InboundSource, QualifiedIdentity, RecipientRole,
             ReplyMessageKeyCandidate, ReplyThreadKeyCandidate,
         },
-        value_objects::{CompanySlug, EmailAddress},
+        value_objects::CompanySlug,
     },
     transport::{
         bounded::{BoundedVec, BoundsError, bounded_text},
@@ -58,6 +60,12 @@ pub const MAX_THREAD_ASSOCIATIONS: usize = 20;
 /// can cycle, so the bound belongs beside the directives that carry the count rather than inside
 /// the mail parser that used to own it.
 pub const MAX_INGRESS_HOPS: u32 = 5;
+
+/// The trace contains at most one channel for every completed relay hop.
+pub const MAX_TRACE_CHANNELS: usize = MAX_INGRESS_HOPS as usize;
+
+/// One sender plus every bounded addressed identity may become a party to a thread.
+pub const MAX_THREAD_PRINCIPALS: usize = MAX_ADDRESSED_IDENTITIES + 1;
 
 /// Inline images below this size are signature decoration rather than content, and are left out of
 /// the agent prompt.
@@ -159,7 +167,7 @@ impl MessageDisposition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngressDirectives {
     pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
+    pub trace_channels: BoundedVec<Uuid, MAX_TRACE_CHANNELS>,
     pub disposition: MessageDisposition,
     /// The channel this message provably came from, when a trusted internal transport carried it.
     pub source_channel_id: Option<Uuid>,
@@ -183,7 +191,7 @@ impl Default for IngressDirectives {
     fn default() -> Self {
         Self {
             hop_count: 0,
-            trace_channels: Vec::new(),
+            trace_channels: BoundedVec::empty(),
             disposition: MessageDisposition::Answer,
             source_channel_id: None,
             is_auto_reply: false,
@@ -580,7 +588,24 @@ pub struct ThreadAssociation {
     /// the outsiders they copied are pulled in, is channel policy -- `add_3rd_party` and the
     /// sender's trust -- and a transaction is not where policy is decided. For a thread this
     /// commit opens, it is the complete starting set.
-    pub participants: Vec<EmailAddress>,
+    pub principals: BoundedVec<ThreadPrincipalIntent, MAX_THREAD_PRINCIPALS>,
+}
+
+/// One transport-qualified actor a message adds to a thread, in an explicit capacity.
+///
+/// The role is stated per identity instead of inferred from list position. A Slack user and an
+/// email mailbox therefore take the same transactional path, and reordering a list cannot silently
+/// turn a participant into the author.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadPrincipalIntent {
+    pub identity: QualifiedIdentity,
+    pub role: ThreadPrincipalRole,
+}
+
+impl ThreadPrincipalIntent {
+    pub const fn new(identity: QualifiedIdentity, role: ThreadPrincipalRole) -> Self {
+        Self { identity, role }
+    }
 }
 
 /// One channel an agent-dispatch run drives.
@@ -607,6 +632,13 @@ pub struct InboundTaskRequest {
     pub targets: Vec<InboundTaskTarget>,
 }
 
+/// An outreach reply whose target and waiting task must advance with the inbound message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InboundOutreachTransition {
+    pub channel_id: Uuid,
+    pub matched: OutreachReplyMatch,
+}
+
 impl InboundTaskRequest {
     pub fn primary(&self) -> Option<InboundTaskTarget> {
         self.targets.first().copied()
@@ -627,6 +659,7 @@ pub struct InboundCommitRequest {
     pub claimed_event: Option<ExecutionLease<InboundEventId>>,
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     pub task: Option<InboundTaskRequest>,
+    pub outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
     /// The fan-out this message is immediately owed, already composed and frozen.
     ///
     /// Composed rather than planned: a delivery names the parts it will send, and freezing them

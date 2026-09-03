@@ -412,7 +412,8 @@ impl ThreadUseCases {
 
             let prompt_text = build_prompt_text(envelope);
             let context = self
-                .observe_ingress_identity(channel_match.company.id, &envelope.author)
+                .participant_persistence
+                .access_context_for_identity(channel_match.company.id, &envelope.author)
                 .await?;
             let membership = context.membership;
             // The actor behind the handle, resolved once here. Memory is scoped to it and nothing
@@ -704,7 +705,7 @@ impl ThreadUseCases {
             trigger_message_id: trigger_message_id(envelope),
             thread_references: outbound_reference_ids(envelope),
             hop_count: envelope.directives.hop_count,
-            trace_channels: envelope.directives.trace_channels.clone(),
+            trace_channels: envelope.directives.trace_channels.to_vec(),
             app_domain_name: self.config.app_domain_name.clone(),
         }
     }
@@ -848,7 +849,7 @@ impl ThreadUseCases {
             relay: Some(EmailRelayTrace {
                 source_channel_id: primary.channel.id,
                 hop_count: envelope.directives.hop_count,
-                trace_channels: envelope.directives.trace_channels.clone(),
+                trace_channels: envelope.directives.trace_channels.to_vec(),
             }),
         };
 

@@ -2634,7 +2634,7 @@ mod tests {
             source_message_id: stored.canonical_id,
             correlation_id: crate::entities::correlation::CorrelationId::new(),
             hop_count: 0,
-            trace_channels: Vec::new(),
+            trace_channels: crate::transport::BoundedVec::empty(),
             is_forwarded: false,
             reply_delivery: crate::use_cases::thread::ReplyDelivery::Send,
         })

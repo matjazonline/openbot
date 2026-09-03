@@ -13,13 +13,10 @@
 //!
 //! Two concurrency rules do the rest of the work:
 //!
-//! * A transaction-scoped advisory lock on `(binding_id, message_key)` serializes two deliveries of
-//!   the same provider message. Without it the "is this already stored?" read and the insert that
-//!   follows are a classic check-then-act, and two simultaneous SMTP sessions would both pass the
-//!   check.
-//! * Threads are bound to their provider conversation key with `ON CONFLICT DO NOTHING`, so a reply
-//!   that arrives before its root creates the binding and the root joins the thread the reply
-//!   started, rather than the two opening two conversations.
+//! * Transaction-scoped advisory locks cover every message and thread key on every association
+//!   binding, in deterministic order. The mappings are re-read only after those locks are held.
+//! * A provider conversation mapping wins over a caller's stale create decision. A reply that
+//!   arrives before its root can therefore create the conversation and the root joins it.
 
 use std::collections::HashMap;
 
@@ -31,7 +28,9 @@ use uuid::Uuid;
 use super::{email_metadata, external, message};
 use crate::{
     adapters::persistence::{
-        PostgresPersistence, delivery::enqueue::insert_delivery_on, task::insert_task,
+        PostgresPersistence,
+        delivery::enqueue::insert_delivery_on,
+        task::{insert_task, record_outreach_reply_on},
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -39,7 +38,7 @@ use crate::{
         message::{CanonicalMessageId, MessageDirection, MessageParticipantKind, MessageRole},
         participant::{IdentityClaimMetadata, IdentityProvenance},
         task::{NewTask, TaskSource},
-        transport::{ChannelBindingId, DeliveryId, ExternalMessageKey, QualifiedIdentity},
+        transport::{ChannelBindingId, DeliveryId, QualifiedIdentity},
     },
     transport::{
         CommitDisposition, InboundCommitOutcome, InboundCommitRequest, InboundEnvelope,
@@ -57,6 +56,11 @@ struct ResolvedThread {
     thread_id: Uuid,
     channel_id: Uuid,
     binding_id: ChannelBindingId,
+}
+
+struct StoredMessage {
+    id: CanonicalMessageId,
+    content_hash: Vec<u8>,
 }
 
 #[async_trait]
@@ -78,15 +82,19 @@ async fn commit_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<InboundCommitOutcome> {
-    let envelope = &request.envelope;
-    let binding_id = envelope.source.binding_id;
-    let message_key = &envelope.source.message_key;
-    lock_provider_message(tx, binding_id, message_key).await?;
+    if request.associations.is_empty() {
+        return Err(AppError::BadRequest(
+            "An inbound commit must name at least one thread association".into(),
+        ));
+    }
+    let binding_ids = verify_association_bindings(tx, request).await?;
+    lock_provider_keys(tx, request, &binding_ids).await?;
 
-    // Asked first, and under the lock. A redelivery must open no thread: the pre-canonical path
+    // Asked first, and under every relevant lock. A redelivery must open no thread: the old path
     // created the thread before it knew whether the message was new, so a provider retry left an
     // empty conversation behind and then failed associating the message it already held.
-    if let Some(existing) = external::find_external_message(tx, binding_id, message_key).await? {
+    let existing = existing_message_mappings(tx, request, &binding_ids).await?;
+    if !existing.is_empty() {
         return recognise_redelivery(tx, request, existing).await;
     }
 
@@ -94,18 +102,19 @@ async fn commit_on(
     bind_conversations(tx, request, &threads).await?;
 
     let write = message_write(request, threads[0].thread_id)?;
-    let message_id = store_canonical(tx, request, &write).await?;
+    let stored = store_canonical(tx, request, &write).await?;
 
-    associate_threads(tx, request, &threads, message_id).await?;
-    map_provider_message(tx, request, &threads, message_id).await?;
+    associate_threads(tx, request, &threads, stored.id).await?;
+    map_provider_message(tx, request, &threads, &stored).await?;
+    apply_outreach_transitions(tx, request, stored.id).await?;
 
-    let task_id = create_task(tx, request, &threads, message_id).await?;
+    let task_id = create_task(tx, request, &threads, stored.id).await?;
     let delivery_ids = create_deliveries(tx, request).await?;
     complete_claimed_event(request)?;
 
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Created,
-        message_id,
+        message_id: stored.id,
         thread_ids: threads.iter().map(|thread| thread.thread_id).collect(),
         task_id,
         delivery_ids,
@@ -123,9 +132,19 @@ async fn commit_on(
 async fn recognise_redelivery(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
-    existing: external::ExistingExternalMessage,
+    existing: Vec<(ChannelBindingId, external::ExistingExternalMessage)>,
 ) -> AppResult<InboundCommitOutcome> {
-    let message_id = existing.message_id;
+    let message_id = existing[0].1.message_id;
+    for (binding_id, mapping) in &existing[1..] {
+        if mapping.message_id != message_id {
+            return Err(crate::entities::message::ExternalMessageCollision {
+                binding_id: *binding_id,
+                external_message_key: request.envelope.source.message_key.clone(),
+                existing_message_id: mapping.message_id,
+            }
+            .into());
+        }
+    }
     let thread_ids = threads_holding(tx, request.company_id, message_id).await?;
     let first_thread = *thread_ids.first().ok_or_else(|| {
         AppError::Internal(format!("Stored message {message_id} belongs to no thread"))
@@ -137,12 +156,14 @@ async fn recognise_redelivery(
     let attachments = message::encode_attachments(&write.attachments)?;
     let content_hash =
         message::canonical_message_hash(&write, &author, &participants, attachments.as_ref());
-    external::reuse_or_reject(
-        existing,
-        request.envelope.source.binding_id,
-        &request.envelope.source.message_key,
-        &content_hash,
-    )?;
+    for (binding_id, mapping) in existing {
+        external::reuse_or_reject(
+            mapping,
+            binding_id,
+            &request.envelope.source.message_key,
+            &content_hash,
+        )?;
+    }
 
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Duplicate,
@@ -189,22 +210,93 @@ async fn task_for_message(
     .map_err(AppError::from)
 }
 
-/// Serialize concurrent deliveries of one provider message on one interface.
-///
-/// Transaction-scoped, so it is released by commit or rollback with nothing to clean up, and keyed
-/// on the pair that identifies the message rather than on a table: the row it protects does not
-/// exist yet, which is exactly why a row lock cannot do this job.
-async fn lock_provider_message(
+/// Verify every association binding belongs to the stated tenant/channel and return each once.
+async fn verify_association_bindings(
     tx: &mut Transaction<'_, Postgres>,
-    binding_id: ChannelBindingId,
-    message_key: &ExternalMessageKey,
-) -> AppResult<()> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-        .bind(format!("{binding_id}:{}", message_key.as_str()))
-        .execute(&mut **tx)
+    request: &InboundCommitRequest,
+) -> AppResult<Vec<ChannelBindingId>> {
+    let mut bindings = Vec::with_capacity(request.associations.len());
+    for association in &request.associations {
+        let valid: bool = sqlx::query_scalar(
+            r#"SELECT EXISTS(
+                   SELECT 1 FROM channel_bindings AS binding
+                   WHERE binding.id = $1 AND binding.company_id = $2
+                     AND binding.channel_id = $3 AND binding.status = 'active'
+               )"#,
+        )
+        .bind(association.binding_id.as_uuid())
+        .bind(request.company_id)
+        .bind(association.channel_id)
+        .fetch_one(&mut **tx)
         .await
         .map_err(AppError::from)?;
+        if !valid {
+            return Err(AppError::NotFound(format!(
+                "Active binding {} does not belong to channel {}",
+                association.binding_id, association.channel_id
+            )));
+        }
+        if !bindings.contains(&association.binding_id) {
+            bindings.push(association.binding_id);
+        }
+    }
+    if !bindings.contains(&request.envelope.source.binding_id) {
+        return Err(AppError::BadRequest(
+            "The source binding has no thread association".into(),
+        ));
+    }
+    bindings.sort_unstable();
+    Ok(bindings)
+}
+
+/// Serialize every provider mapping this transaction may read or create.
+///
+/// Transaction-scoped, so it is released by commit or rollback with nothing to clean up, and keyed
+/// on pairs rather than rows: the rows may not exist yet, which is why a row lock cannot do this
+/// job. Sorting the complete set prevents two multi-binding commits from deadlocking each other.
+async fn lock_provider_keys(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    binding_ids: &[ChannelBindingId],
+) -> AppResult<()> {
+    let mut keys = Vec::with_capacity(binding_ids.len() * 2);
+    for binding_id in binding_ids {
+        keys.push(format!(
+            "message:{binding_id}:{}",
+            request.envelope.source.message_key.as_str()
+        ));
+        keys.push(format!(
+            "thread:{binding_id}:{}",
+            request.envelope.source.thread_key.as_str()
+        ));
+    }
+    keys.sort_unstable();
+    keys.dedup();
+    for key in keys {
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(key)
+            .execute(&mut **tx)
+            .await
+            .map_err(AppError::from)?;
+    }
     Ok(())
+}
+
+async fn existing_message_mappings(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    binding_ids: &[ChannelBindingId],
+) -> AppResult<Vec<(ChannelBindingId, external::ExistingExternalMessage)>> {
+    let mut existing = Vec::new();
+    for binding_id in binding_ids {
+        if let Some(mapping) =
+            external::find_external_message(tx, *binding_id, &request.envelope.source.message_key)
+                .await?
+        {
+            existing.push((*binding_id, mapping));
+        }
+    }
+    Ok(existing)
 }
 
 /// Resolve every association's thread, creating the ones this commit opens.
@@ -216,20 +308,36 @@ async fn resolve_threads(
     request: &InboundCommitRequest,
 ) -> AppResult<Vec<ResolvedThread>> {
     let mut threads = Vec::with_capacity(request.associations.len());
+    let mut resolved_by_binding = HashMap::new();
     for association in &request.associations {
-        let thread_id = match &association.target {
-            ThreadTarget::Existing(thread_id) => {
-                verify_thread_scope(tx, request.company_id, association, *thread_id).await?;
-                add_thread_principals(tx, request, association, *thread_id).await?;
-                *thread_id
-            }
-            ThreadTarget::Create { subject } => {
-                let thread_id =
-                    open_thread(tx, request.company_id, association.channel_id, subject).await?;
-                add_thread_principals(tx, request, association, thread_id).await?;
-                thread_id
+        let mapped = match resolved_by_binding.get(&association.binding_id) {
+            Some(thread_id) => Some(*thread_id),
+            None => {
+                external::find_external_thread(
+                    tx,
+                    association.binding_id,
+                    &request.envelope.source.thread_key,
+                )
+                .await?
             }
         };
+        let thread_id = match mapped {
+            Some(thread_id) => {
+                verify_thread_scope(tx, request.company_id, association, thread_id).await?;
+                thread_id
+            }
+            None => match &association.target {
+                ThreadTarget::Existing(thread_id) => {
+                    verify_thread_scope(tx, request.company_id, association, *thread_id).await?;
+                    *thread_id
+                }
+                ThreadTarget::Create { subject } => {
+                    open_thread(tx, request.company_id, association.channel_id, subject).await?
+                }
+            },
+        };
+        add_thread_principals(tx, request, association, thread_id).await?;
+        resolved_by_binding.insert(association.binding_id, thread_id);
         threads.push(ResolvedThread {
             thread_id,
             channel_id: association.channel_id,
@@ -306,14 +414,12 @@ async fn add_thread_principals(
     association: &ThreadAssociation,
     thread_id: Uuid,
 ) -> AppResult<()> {
-    let opens_thread = matches!(association.target, ThreadTarget::Create { .. });
-    super::insert_thread_email_principals(
+    super::insert_thread_principals(
         tx,
         request.company_id,
         association.channel_id,
         thread_id,
-        &association.participants,
-        opens_thread,
+        &association.principals,
     )
     .await?;
     sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
@@ -326,9 +432,8 @@ async fn add_thread_principals(
 
 /// Bind each interface's provider conversation key to the thread it reached.
 ///
-/// Before the message is materialized, so that a delivery which fails afterwards still leaves the
-/// conversation bound: the retry then lands in the thread the first attempt chose instead of
-/// opening a second one.
+/// Before the message is materialized so every later write uses the locked, winning conversation.
+/// A later failure rolls this mapping back with the rest of the transaction.
 async fn bind_conversations(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
@@ -356,7 +461,7 @@ async fn store_canonical(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
     write: &MessageWrite,
-) -> AppResult<CanonicalMessageId> {
+) -> AppResult<StoredMessage> {
     let author = message::resolve_author(tx, request.company_id, &write.author).await?;
     let participants = message::resolve_participants(tx, request.company_id, write).await?;
     let attachments = message::encode_attachments(&write.attachments)?;
@@ -382,7 +487,10 @@ async fn store_canonical(
         )
         .await?;
     }
-    Ok(message_id)
+    Ok(StoredMessage {
+        id: message_id,
+        content_hash,
+    })
 }
 
 /// One canonical payload, one association per conversation it landed in.
@@ -419,29 +527,58 @@ async fn map_provider_message(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
     threads: &[ResolvedThread],
-    message_id: CanonicalMessageId,
+    stored: &StoredMessage,
 ) -> AppResult<()> {
-    let key = request.envelope.source.message_key.as_str();
     let mut written = Vec::with_capacity(threads.len());
     for thread in threads {
         if written.contains(&thread.binding_id) {
             continue;
         }
         written.push(thread.binding_id);
-        sqlx::query(
-            r#"INSERT INTO external_messages (
-                    id, company_id, binding_id, external_message_key, message_id
-               ) VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (binding_id, external_message_key) DO NOTHING"#,
+        external::insert_or_verify_external_message(
+            tx,
+            request.company_id,
+            thread.binding_id,
+            &request.envelope.source.message_key,
+            stored.id,
+            &stored.content_hash,
         )
-        .bind(Uuid::new_v4())
+        .await?;
+    }
+    Ok(())
+}
+
+/// Associate outreach responses and wake any satisfied waiting task inside this commit.
+async fn apply_outreach_transitions(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    message_id: CanonicalMessageId,
+) -> AppResult<()> {
+    for transition in &request.outreach_transitions {
+        let association_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT association.id
+               FROM thread_messages AS association
+               WHERE association.company_id = $1 AND association.channel_id = $2
+                 AND association.message_id = $3"#,
+        )
         .bind(request.company_id)
-        .bind(thread.binding_id.as_uuid())
-        .bind(key)
+        .bind(transition.channel_id)
         .bind(message_id.as_uuid())
-        .execute(&mut **tx)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(AppError::from)?;
+        let association_id = association_id.ok_or_else(|| {
+            AppError::BadRequest(format!(
+                "Outreach transition channel {} has no message association",
+                transition.channel_id
+            ))
+        })?;
+        Box::pin(record_outreach_reply_on(
+            &mut **tx,
+            &transition.matched,
+            association_id,
+        ))
+        .await?;
     }
     Ok(())
 }

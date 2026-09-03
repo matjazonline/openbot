@@ -56,10 +56,10 @@ use crate::{
         },
         participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
         thread::{Thread, ThreadParticipantProjection},
-        transport::PrincipalId,
+        transport::{PrincipalId, TransportKind},
         value_objects::{EmailAddress, ThreadIndex},
     },
-    transport::{DeliveryCreation, NewDelivery},
+    transport::{DeliveryCreation, NewDelivery, ThreadPrincipalIntent},
     use_cases::{
         participant::IdentityObservation,
         thread::{MessageWrite, ThreadPersistence},
@@ -166,50 +166,70 @@ async fn insert_thread_email_principals(
     participant_emails: &[EmailAddress],
     first_is_author: bool,
 ) -> AppResult<()> {
-    for (index, email) in normalized_participants(participant_emails)
-        .into_iter()
-        .enumerate()
-    {
+    let participants = normalized_participants(participant_emails);
+    let mut intents = Vec::with_capacity(participants.len() + usize::from(first_is_author));
+    for (index, email) in participants.into_iter().enumerate() {
         let identity = EmailIdentity::parse(EmailAddress::from(email))
             .map(EmailIdentity::qualify_default)
             .map_err(|error| {
                 AppError::BadRequest(format!("Invalid thread participant: {error}"))
             })?;
+        if first_is_author && index == 0 {
+            intents.push(ThreadPrincipalIntent::new(
+                identity.clone(),
+                ThreadPrincipalRole::Author,
+            ));
+        }
+        intents.push(ThreadPrincipalIntent::new(
+            identity,
+            ThreadPrincipalRole::Participant,
+        ));
+    }
+    insert_thread_principals(transaction, company_id, channel_id, thread_id, &intents).await
+}
+
+/// Resolve transport-qualified handles and record their explicitly stated thread roles.
+pub(super) async fn insert_thread_principals(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    intents: &[ThreadPrincipalIntent],
+) -> AppResult<()> {
+    let mut seen = HashSet::new();
+    for intent in intents {
+        if !seen.insert((intent.identity.clone(), intent.role)) {
+            continue;
+        }
+        let provenance = match intent.identity.transport() {
+            TransportKind::Email => IdentityProvenance::EmailIngress,
+            TransportKind::Slack => IdentityProvenance::SlackEvent,
+        };
         let resolved = resolve_or_create_external_identity_on(
             transaction,
             company_id,
             IdentityObservation {
-                identity,
+                identity: intent.identity.clone(),
                 display_label: None,
                 claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::EmailIngress,
+                provenance,
             },
         )
         .await?;
-        let roles: &[ThreadPrincipalRole] = if first_is_author && index == 0 {
-            &[
-                ThreadPrincipalRole::Author,
-                ThreadPrincipalRole::Participant,
-            ]
-        } else {
-            &[ThreadPrincipalRole::Participant]
-        };
-        for role in roles {
-            sqlx::query(
-                r#"INSERT INTO thread_principals
-                       (company_id, channel_id, thread_id, principal_id, role)
-                   VALUES ($1, $2, $3, $4, $5)
-                   ON CONFLICT DO NOTHING"#,
-            )
-            .bind(company_id)
-            .bind(channel_id)
-            .bind(thread_id)
-            .bind(resolved.principal.id.as_uuid())
-            .bind(role.as_str())
-            .execute(&mut **transaction)
-            .await
-            .map_err(AppError::from)?;
-        }
+        sqlx::query(
+            r#"INSERT INTO thread_principals
+                   (company_id, channel_id, thread_id, principal_id, role)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT DO NOTHING"#,
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .bind(thread_id)
+        .bind(resolved.principal.id.as_uuid())
+        .bind(intent.role.as_str())
+        .execute(&mut **transaction)
+        .await
+        .map_err(AppError::from)?;
     }
     Ok(())
 }

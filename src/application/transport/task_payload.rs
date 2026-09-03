@@ -17,7 +17,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{correlation::CorrelationId, message::CanonicalMessageId},
-    transport::ingress::ReplyDelivery,
+    transport::{
+        bounded::BoundedVec,
+        ingress::{MAX_TRACE_CHANNELS, ReplyDelivery},
+    },
 };
 
 /// The canonical, transport-neutral identifiers one agent-dispatch task needs to reload its world,
@@ -43,7 +46,7 @@ pub struct InboundTaskPayloadV1 {
     /// How many times this message had already been relayed between channels.
     pub hop_count: u32,
     /// The channels it had already passed through, so a reply cannot cycle back into one.
-    pub trace_channels: Vec<Uuid>,
+    pub trace_channels: BoundedVec<Uuid, MAX_TRACE_CHANNELS>,
     /// Whether the body is a forwarded conversation, which decides whether the sender's trust
     /// extends to the words inside it.
     pub is_forwarded: bool,
@@ -102,7 +105,7 @@ mod tests {
             source_message_id: CanonicalMessageId::random(),
             correlation_id: CorrelationId::new(),
             hop_count: 0,
-            trace_channels: Vec::new(),
+            trace_channels: BoundedVec::empty(),
             is_forwarded: false,
             reply_delivery: ReplyDelivery::Send,
         })
@@ -142,5 +145,25 @@ mod tests {
         let oversized = serde_json::json!({ "version": "1", "company_id": "x".repeat(10_000) });
         assert!(InboundTaskPayload::decode(&oversized).is_err());
         assert!(InboundTaskPayload::decode(&serde_json::Value::Null).is_err());
+    }
+
+    #[test]
+    fn a_trace_at_the_hop_limit_decodes_and_one_past_it_is_refused() {
+        let mut encoded = payload().encode().unwrap();
+        encoded["trace_channels"] = serde_json::to_value(
+            (0..MAX_TRACE_CHANNELS)
+                .map(|_| Uuid::new_v4())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert!(InboundTaskPayload::decode(&encoded).is_ok());
+
+        encoded["trace_channels"] = serde_json::to_value(
+            (0..=MAX_TRACE_CHANNELS)
+                .map(|_| Uuid::new_v4())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert!(InboundTaskPayload::decode(&encoded).is_err());
     }
 }

@@ -22,8 +22,8 @@ use crate::{
     },
     application::use_cases::channel::parse_recipient_address,
     application::use_cases::thread::{
-        InboundIngestResult, IngestRejection, IngressOrigin, ReplyDelivery, ThreadUseCases,
-        qualified_email_identity,
+        InboundIngestResult, InboundPreflight, IngestRejection, IngressOrigin, ReplyDelivery,
+        ThreadUseCases, qualified_email_identity,
     },
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     entities::auth::AuthVerdict,
@@ -558,23 +558,27 @@ impl SmtpServer {
             dmarc: raw_payload.dmarc,
             spam_score: raw_payload.spam_score,
         });
-        let accepted = self
-            .ingress
-            .store_and_accept(
-                raw_payload,
-                &self.config,
-                self.file_storage.as_deref(),
-                trust,
-            )
-            .await;
+        let accepted = self.ingress.accept(raw_payload, trust);
         let ingest_result = match accepted {
             Ok(accepted) => {
-                self.thread_use_cases
-                    .ingest(
-                        accepted
-                            .into_inbound(IngressOrigin::ExternalTransport, ReplyDelivery::Send),
-                    )
-                    .await
+                let (inbound, attachments) = accepted
+                    .into_preflight_parts(IngressOrigin::ExternalTransport, ReplyDelivery::Send);
+                match self.thread_use_cases.preflight_inbound(inbound).await? {
+                    InboundPreflight::Rejected(result) => Ok(result),
+                    InboundPreflight::Accepted(mut prepared) => {
+                        let persisted = attachments
+                            .persist(&self.config, self.file_storage.as_deref())
+                            .await?;
+                        prepared.replace_attachments(
+                            persisted.metadata,
+                            persisted.stored_count,
+                            persisted.failed_count,
+                        );
+                        self.thread_use_cases
+                            .commit_prepared_inbound(prepared)
+                            .await
+                    }
+                }
             }
             // A message this adapter could not turn into a canonical one will not parse on a
             // retry either, so it is a permanent rejection rather than a transient failure.
@@ -638,7 +642,8 @@ impl SmtpServer {
         };
         let context = match self
             .thread_use_cases
-            .observe_ingress_identity(company.id, &sender)
+            .participant_persistence()
+            .access_context_for_identity(company.id, &sender)
             .await
         {
             Ok(context) => context,

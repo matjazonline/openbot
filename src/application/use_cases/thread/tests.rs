@@ -720,7 +720,7 @@ fn a_payload_that_does_not_state_its_delivery_choice_is_refused() {
         source_message_id: crate::entities::message::CanonicalMessageId::random(),
         correlation_id: CorrelationId::new(),
         hop_count: 0,
-        trace_channels: Vec::new(),
+        trace_channels: BoundedVec::empty(),
         is_forwarded: false,
         reply_delivery: ReplyDelivery::InAppOnly,
     };

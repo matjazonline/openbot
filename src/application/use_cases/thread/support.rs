@@ -74,8 +74,8 @@ impl<'a> DirectoryCache<'a> {
         Ok(loaded)
     }
 
-    /// Resolve one transport identity to its stable principal and membership. The observation is
-    /// idempotent and confers no grant; it only ensures all later decisions use the same actor id.
+    /// Resolve one transport identity without observing it. Unknown handles remain unknown until
+    /// the accepted inbound transaction creates them.
     pub(crate) async fn access_context(
         &mut self,
         company_id: Uuid,
@@ -87,7 +87,8 @@ impl<'a> DirectoryCache<'a> {
         }
         let loaded = self
             .use_cases
-            .observe_ingress_identity(company_id, identity)
+            .participant_persistence
+            .access_context_for_identity(company_id, identity)
             .await?;
         self.access_contexts.insert(key, loaded);
         Ok(loaded)

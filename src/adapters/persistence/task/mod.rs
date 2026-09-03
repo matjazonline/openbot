@@ -50,6 +50,7 @@ mod queue;
 mod rows;
 
 pub(crate) use board::*;
+pub(crate) use operations::record_outreach_reply_on;
 pub(crate) use outreach::*;
 pub(crate) use queue::*;
 pub(crate) use rows::*;

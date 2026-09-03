@@ -687,6 +687,19 @@ async fn a_credential_opens_only_under_its_own_scope() {
         "a misplaced envelope must fail closed, not read as absent"
     );
 
+    let wrong_transport = CredentialScope {
+        transport: TransportKind::Email,
+        ..bot.clone()
+    };
+    assert!(
+        !persistence
+            .delete_credential(&wrong_transport)
+            .await
+            .unwrap(),
+        "a scope for another transport must not delete this installation's credential"
+    );
+    assert!(persistence.read_credential(&bot).await.unwrap().is_some());
+
     assert!(persistence.delete_credential(&bot).await.unwrap());
     assert!(persistence.read_credential(&bot).await.unwrap().is_none());
     assert!(!persistence.delete_credential(&bot).await.unwrap());
@@ -881,6 +894,25 @@ async fn binding_audit_rows_cannot_be_rewritten() {
             .execute(&pool)
             .await;
     assert!(rewrite.is_err());
+
+    let direct_delete = sqlx::query("DELETE FROM binding_audit_events WHERE binding_id = $1")
+        .bind(binding.id.as_uuid())
+        .execute(&pool)
+        .await;
+    assert!(direct_delete.is_err());
+
+    sqlx::query("DELETE FROM channel_bindings WHERE id = $1")
+        .bind(binding.id.as_uuid())
+        .execute(&pool)
+        .await
+        .expect("deleting the parent may cascade its audit history");
+    let remaining: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM binding_audit_events WHERE binding_id = $1")
+            .bind(binding.id.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(remaining, 0);
 }
 
 /// The two places each stored vocabulary is written -- a Rust enum and a SQL `CHECK` -- have to

@@ -19,9 +19,28 @@ use crate::{
 };
 
 /// What a provider key already names, and the content it named it with.
+#[derive(Clone)]
 pub(super) struct ExistingExternalMessage {
     pub message_id: CanonicalMessageId,
     pub content_hash: Vec<u8>,
+}
+
+/// The canonical thread a provider conversation already names on this binding, if any.
+pub(super) async fn find_external_thread(
+    connection: &mut sqlx::PgConnection,
+    binding_id: ChannelBindingId,
+    key: &ExternalThreadKey,
+) -> AppResult<Option<Uuid>> {
+    sqlx::query_scalar(
+        r#"SELECT mapping.thread_id
+           FROM external_threads AS mapping
+           WHERE mapping.binding_id = $1 AND mapping.external_thread_key = $2"#,
+    )
+    .bind(binding_id.as_uuid())
+    .bind(key.as_str())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(AppError::from)
 }
 
 /// The email interface of one channel.
@@ -132,6 +151,47 @@ pub(super) async fn insert_external_message(
     Ok(())
 }
 
+/// Insert a mapping, or verify that a competing writer stored this exact canonical message.
+pub(super) async fn insert_or_verify_external_message(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    binding_id: ChannelBindingId,
+    key: &ExternalMessageKey,
+    message_id: CanonicalMessageId,
+    content_hash: &[u8],
+) -> AppResult<()> {
+    sqlx::query(
+        r#"INSERT INTO external_messages (
+                id, company_id, binding_id, external_message_key, message_id
+           ) VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (binding_id, external_message_key) DO NOTHING"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(binding_id.as_uuid())
+    .bind(key.as_str())
+    .bind(message_id.as_uuid())
+    .execute(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
+
+    let stored = find_external_message(connection, binding_id, key)
+        .await?
+        .ok_or_else(|| {
+            AppError::Internal("External message mapping vanished after insert".into())
+        })?;
+    if stored.message_id != message_id {
+        return Err(ExternalMessageCollision {
+            binding_id,
+            external_message_key: key.clone(),
+            existing_message_id: stored.message_id,
+        }
+        .into());
+    }
+    reuse_or_reject(stored, binding_id, key, content_hash)?;
+    Ok(())
+}
+
 /// Bind a provider conversation to an internal thread, if it is not bound already.
 ///
 /// `DO NOTHING` rather than `DO UPDATE` is the invariant: one provider conversation resolves to
@@ -158,6 +218,17 @@ pub(super) async fn upsert_external_thread(
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;
+    let stored = find_external_thread(connection, binding_id, key)
+        .await?
+        .ok_or_else(|| {
+            AppError::Internal("External thread mapping vanished after insert".into())
+        })?;
+    if stored != thread_id {
+        return Err(AppError::Conflict(format!(
+            "provider thread key '{}' on binding {binding_id} already names thread {stored}",
+            key.as_str()
+        )));
+    }
     Ok(())
 }
 

@@ -20,6 +20,12 @@ use crate::{
     entities::{upload::ImageFormat, value_objects::ObjectKey},
 };
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AttachmentStorageReport {
+    pub stored_count: usize,
+    pub failed_count: usize,
+}
+
 /// What an attachment with no recognizable type is stored and served as.
 const DEFAULT_CONTENT_TYPE: &str = "application/octet-stream";
 
@@ -32,7 +38,8 @@ pub async fn store_inbound_attachments(
     storage: &dyn FileStorage,
     folder: &str,
     attachments: &mut [RawAttachmentData],
-) {
+) -> AttachmentStorageReport {
+    let mut report = AttachmentStorageReport::default();
     for attachment in attachments {
         let key = attachment_key(folder, &attachment.content, &attachment.filename);
         let content_type = stored_content_type(attachment);
@@ -46,15 +53,22 @@ pub async fn store_inbound_attachments(
             )
             .await
         {
-            Ok(()) => attachment.stored_key = Some(key),
-            Err(error) => warn!(
-                %key,
-                filename = %attachment.filename,
-                %error,
-                "Could not store an inbound attachment; the message keeps its metadata only"
-            ),
+            Ok(()) => {
+                attachment.stored_key = Some(key);
+                report.stored_count += 1;
+            }
+            Err(error) => {
+                report.failed_count += 1;
+                warn!(
+                    %key,
+                    filename = %attachment.filename,
+                    %error,
+                    "Could not store an inbound attachment; the message keeps its metadata only"
+                );
+            }
         }
     }
+    report
 }
 
 /// Where an attachment's bytes go: the content hash, under the configured folder.

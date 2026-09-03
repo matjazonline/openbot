@@ -9,17 +9,19 @@ use super::*;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
+    participant::ThreadPrincipalRole,
     transport::{
         ChannelBindingId, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
         IdentitySubject, InboundSource, QualifiedIdentity, TransportKind,
     },
-    value_objects::{EmailAddress, MessageId},
+    value_objects::MessageId,
 };
 use crate::transport::{
     AddressedIdentity, BoundedVec, CanonicalContent, CommitDisposition, ExternalCorrelationStore,
     InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundMessageCommitter,
     InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep,
-    ProtocolExtension, RecipientRole, ReplyDelivery, ThreadAssociation, ThreadTarget,
+    ProtocolExtension, RecipientRole, ReplyDelivery, ThreadAssociation, ThreadPrincipalIntent,
+    ThreadTarget,
 };
 
 /// The one task type inbound mail produces.
@@ -31,6 +33,21 @@ fn identity(address: &str) -> QualifiedIdentity {
         IdentityNamespace::parse("email").unwrap(),
         IdentitySubject::parse(address).unwrap(),
     )
+}
+
+fn sender_principals()
+-> BoundedVec<ThreadPrincipalIntent, { crate::transport::MAX_THREAD_PRINCIPALS }> {
+    BoundedVec::parse(
+        "thread principals",
+        vec![
+            ThreadPrincipalIntent::new(identity("sender@example.com"), ThreadPrincipalRole::Author),
+            ThreadPrincipalIntent::new(
+                identity("sender@example.com"),
+                ThreadPrincipalRole::Participant,
+            ),
+        ],
+    )
+    .unwrap()
 }
 
 /// One arriving mail, bound to the interface it came in on.
@@ -80,7 +97,7 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
                 },
                 role: RecipientRole::To,
                 step: PipelineStep::only(),
-                participants: vec![EmailAddress::from("sender@example.com")],
+                principals: sender_principals(),
             }],
         )
         .unwrap(),
@@ -91,6 +108,7 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
                 role: RecipientRole::To,
             }],
         }),
+        outreach_transitions: BoundedVec::empty(),
         deliveries: Vec::new(),
         reply_delivery: ReplyDelivery::Send,
     }
@@ -373,7 +391,7 @@ async fn a_commit_that_fails_at_the_threads_writes_nothing_either() {
         target: ThreadTarget::Existing(fixture.thread.id),
         role: RecipientRole::Cc,
         step: PipelineStep { index: 1, total: 2 },
-        participants: Vec::new(),
+        principals: BoundedVec::empty(),
     });
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
 
@@ -431,7 +449,7 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
         },
         role: RecipientRole::Cc,
         step: PipelineStep { index: 1, total: 2 },
-        participants: vec![EmailAddress::from("sender@example.com")],
+        principals: sender_principals(),
     });
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
 

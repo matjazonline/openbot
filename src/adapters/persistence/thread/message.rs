@@ -369,12 +369,11 @@ pub(super) async fn resolve_participants(
 
 /// The fingerprint of everything a provider actually delivered.
 ///
-/// Deliberately excludes `clean_text_body`: that is a *rendering* of the body, produced by
-/// stripping quoted history against whatever the receiving thread already held, so two channels
-/// receiving one email can legitimately derive different text from identical bytes. Hashing it
-/// would turn ordinary fan-out into a redelivery collision. Everything the sender actually sent --
-/// subject, raw bodies, headers, attachments, who it was from and to -- is in here, which is what
-/// makes a changed redelivery detectable.
+/// Email hashes its raw body representations: `clean_text_body` is a rendering produced by quote
+/// stripping against the receiving thread, so it is not stable across fan-out. A non-email event
+/// has no raw representation elsewhere and hashes its canonical body instead. Identities include
+/// transport and namespace as well as subject, so equal provider subjects in different workspaces
+/// cannot collide.
 pub(super) fn canonical_message_hash(
     write: &MessageWrite,
     author: &ResolvedAuthor,
@@ -387,18 +386,25 @@ pub(super) fn canonical_message_hash(
         "author_identity": author
             .identity
             .as_ref()
-            .map(|identity| identity.subject().as_str()),
+            .map(|identity| serde_json::json!({
+                "transport": identity.transport().as_str(),
+                "namespace": identity.namespace().as_str(),
+                "subject": identity.subject().as_str(),
+            })),
         "participants": participants
             .iter()
             .map(|participant| {
                 serde_json::json!({
                     "kind": participant.kind.as_str(),
                     "position": participant.position,
+                    "transport": participant.identity.transport().as_str(),
+                    "namespace": participant.identity.namespace().as_str(),
                     "subject": participant.identity.subject().as_str(),
                 })
             })
             .collect::<Vec<_>>(),
         "subject": write.subject,
+        "canonical_body": email.is_none().then_some(write.clean_text_body.as_str()),
         "direction": write.direction.as_str(),
         "role": write.role.as_str(),
         "attachments": attachments,

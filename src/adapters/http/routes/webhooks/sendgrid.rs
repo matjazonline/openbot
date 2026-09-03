@@ -22,7 +22,7 @@ use crate::{
         },
         storage::FileStorage,
     },
-    use_cases::thread::{IngressOrigin, ReplyDelivery, ThreadUseCases},
+    use_cases::thread::{InboundPreflight, IngressOrigin, ReplyDelivery, ThreadUseCases},
 };
 
 /// The largest request body this endpoint reads.
@@ -191,27 +191,49 @@ async fn sendgrid_inbound_webhook(
         spam_score: raw_payload.spam_score,
     });
     let accepted = EmailIngressAdapter::for_config(config)
-        .store_and_accept(raw_payload, config, file_storage.as_deref(), trust)
-        .await
+        .accept(raw_payload, trust)
         .map_err(|error| {
             warn!(%error, "Refusing an inbound message this adapter could not read");
             StatusCode::UNPROCESSABLE_ENTITY
         })?;
 
-    let ingest = thread_use_cases
-        .ingest(accepted.into_inbound(IngressOrigin::ExternalTransport, ReplyDelivery::Send))
+    let (inbound, attachments) =
+        accepted.into_preflight_parts(IngressOrigin::ExternalTransport, ReplyDelivery::Send);
+    let ingest = match thread_use_cases
+        .preflight_inbound(inbound)
         .await
         .map_err(|error| {
-            warn!(%error, "Could not ingest an inbound message");
+            warn!(%error, "Could not preflight an inbound message");
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        })? {
+        InboundPreflight::Rejected(result) => result,
+        InboundPreflight::Accepted(mut prepared) => {
+            let persisted = attachments
+                .persist(config, file_storage.as_deref())
+                .await
+                .map_err(|error| {
+                    warn!(%error, "Could not prepare inbound attachment metadata");
+                    StatusCode::UNPROCESSABLE_ENTITY
+                })?;
+            prepared.replace_attachments(
+                persisted.metadata,
+                persisted.stored_count,
+                persisted.failed_count,
+            );
+            thread_use_cases
+                .commit_prepared_inbound(prepared)
+                .await
+                .map_err(|error| {
+                    warn!(%error, "Could not ingest an inbound message");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
+        }
+    };
 
     if !ingest.accepted {
-        let thread_use_cases_bg = thread_use_cases.clone();
-        let ingest_bg = ingest.clone();
-        tokio::spawn(async move {
-            thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
-        });
+        // The HTTP server supervises this request task. Awaiting avoids a detached task whose
+        // delivery can be silently cancelled when the runtime shuts down.
+        thread_use_cases.handle_bounce_dispatch(&ingest).await;
     }
 
     let result = serde_json::json!({

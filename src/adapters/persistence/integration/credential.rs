@@ -108,13 +108,18 @@ impl InstallationCredentialStore for PostgresPersistence {
     async fn delete_credential(&self, scope: &CredentialScope) -> AppResult<bool> {
         let deleted = sqlx::query(
             r#"DELETE FROM integration_credentials AS credential
+               USING integration_installations AS installation
                WHERE credential.company_id = $1
                  AND credential.installation_id = $2
-                 AND credential.credential_kind = $3"#,
+                 AND credential.credential_kind = $3
+                 AND installation.company_id = credential.company_id
+                 AND installation.id = credential.installation_id
+                 AND installation.transport = $4"#,
         )
         .bind(scope.company_id)
         .bind(scope.installation_id.as_uuid())
         .bind(scope.kind.as_str())
+        .bind(scope.transport.as_str())
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?

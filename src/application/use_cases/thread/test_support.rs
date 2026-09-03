@@ -1179,9 +1179,18 @@ impl InboundMessageCommitter for InMemoryIngress {
     ) -> AppResult<InboundCommitOutcome> {
         let mut thread_ids = Vec::with_capacity(request.associations.len());
         for association in &request.associations {
+            let emails: Vec<EmailAddress> = association
+                .principals
+                .iter()
+                .filter(|intent| {
+                    intent.role == crate::entities::participant::ThreadPrincipalRole::Participant
+                        && intent.identity.transport() == TransportKind::Email
+                })
+                .map(|intent| EmailAddress::from(intent.identity.subject().as_str()))
+                .collect();
             let thread_id = match &association.target {
                 ThreadTarget::Existing(thread_id) => {
-                    if !association.participants.is_empty() {
+                    if !emails.is_empty() {
                         let thread = self
                             .threads
                             .get_thread_by_id(*thread_id)
@@ -1189,7 +1198,7 @@ impl InboundMessageCommitter for InMemoryIngress {
                             .ok_or_else(|| AppError::NotFound("Thread was not found".into()))?;
                         let mut participants =
                             thread.participant_projection.email_addresses.clone();
-                        for handle in &association.participants {
+                        for handle in &emails {
                             if !participants
                                 .iter()
                                 .any(|existing| existing.eq_ignore_ascii_case(handle))
@@ -1205,7 +1214,7 @@ impl InboundMessageCommitter for InMemoryIngress {
                 }
                 ThreadTarget::Create { subject } => {
                     self.threads
-                        .create_thread(association.channel_id, subject, &association.participants)
+                        .create_thread(association.channel_id, subject, &emails)
                         .await?
                         .id
                 }
@@ -1227,10 +1236,28 @@ impl InboundMessageCommitter for InMemoryIngress {
         // `create_message` is where the double's dedup lives: a repeated provider key returns the
         // stored message, and one carrying different content is refused.
         let stored = self.threads.create_message(&write).await?;
-        for thread_id in thread_ids.iter().skip(1) {
-            self.threads
+        let mut association_by_channel = std::collections::HashMap::new();
+        association_by_channel.insert(request.associations[0].channel_id, stored.id);
+        for (association, thread_id) in request.associations.iter().zip(&thread_ids).skip(1) {
+            let message = self
+                .threads
                 .associate_message(*thread_id, stored.canonical_id)
                 .await?;
+            association_by_channel.insert(association.channel_id, message.id);
+        }
+        if !already_stored {
+            for transition in &request.outreach_transitions {
+                let response_id = *association_by_channel
+                    .get(&transition.channel_id)
+                    .ok_or_else(|| {
+                        AppError::BadRequest(
+                            "An outreach transition has no message association".into(),
+                        )
+                    })?;
+                self.tasks
+                    .record_outreach_reply(&transition.matched, response_id)
+                    .await?;
+            }
         }
 
         let mut task_id = None;

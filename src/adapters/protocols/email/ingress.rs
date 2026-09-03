@@ -21,7 +21,7 @@ use crate::{
     adapters::{
         protocols::email::{
             EmailChannelSelectorParser, EmailIdentity, EmailMessageKey, EmailRecipientDestination,
-            attachments::store_inbound_attachments,
+            attachments::{AttachmentStorageReport, store_inbound_attachments},
             parser::{EmailParser, ParsedEmail, RawInboundPayload},
         },
         storage::FileStorage,
@@ -39,8 +39,8 @@ use crate::{
     transport::{
         AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, BoundsError,
         CanonicalContent, EmailIngressFacts, InboundDraft, InboundRouting, IngressDirectives,
-        IngressPolicyFacts, MAX_REPLY_CANDIDATES, MessageDisposition, ProtocolExtension,
-        RecipientRole, SystemAddress,
+        IngressPolicyFacts, MAX_ATTACHMENTS, MAX_REPLY_CANDIDATES, MessageDisposition,
+        ProtocolExtension, RecipientRole, SystemAddress,
     },
     use_cases::thread::{InboundMessage, IngressOrigin, ReplyDelivery, UnusableHint},
 };
@@ -116,6 +116,7 @@ impl From<EmailIngressError> for AppError {
 pub struct AcceptedEmail {
     pub draft: InboundDraft,
     pub routing: InboundRouting,
+    pending_attachments: PendingEmailAttachments,
     /// Conversation hints this adapter parsed but could not use.
     ///
     /// Reported rather than logged here: parsing is this adapter's job, and deciding whether a
@@ -137,6 +138,69 @@ impl AcceptedEmail {
         InboundMessage::arriving(self.draft, self.routing, origin)
             .with_reply_delivery(reply_delivery)
             .with_unusable_hints(self.unusable_hints)
+    }
+
+    /// Split the policy input from attachment bytes. The bytes stay at the adapter boundary until
+    /// the application has produced an accepted commit plan.
+    pub fn into_preflight_parts(
+        self,
+        origin: IngressOrigin,
+        reply_delivery: ReplyDelivery,
+    ) -> (InboundMessage, PendingEmailAttachments) {
+        let Self {
+            draft,
+            routing,
+            pending_attachments,
+            unusable_hints,
+        } = self;
+        (
+            InboundMessage::arriving(draft, routing, origin)
+                .with_reply_delivery(reply_delivery)
+                .with_unusable_hints(unusable_hints),
+            pending_attachments,
+        )
+    }
+}
+
+/// Attachment bytes held outside the application while ingress policy is evaluated.
+#[derive(Debug, Clone)]
+pub struct PendingEmailAttachments {
+    data: Vec<crate::adapters::protocols::email::parser::RawAttachmentData>,
+    metadata: BoundedVec<crate::entities::message::AttachmentMetadata, MAX_ATTACHMENTS>,
+}
+
+/// Metadata after the accepted message's content-addressed uploads have been attempted.
+pub struct PersistedEmailAttachments {
+    pub metadata: BoundedVec<crate::entities::message::AttachmentMetadata, MAX_ATTACHMENTS>,
+    pub stored_count: usize,
+    pub failed_count: usize,
+}
+
+impl PendingEmailAttachments {
+    /// Persist bytes only after application preflight accepts the message. Storage failure remains
+    /// non-fatal; the returned metadata simply has no object key for that attachment.
+    pub async fn persist(
+        mut self,
+        config: &AppConfig,
+        storage: Option<&dyn FileStorage>,
+    ) -> Result<PersistedEmailAttachments, EmailIngressError> {
+        let report = if let (Some(storage), Some(gcs)) = (storage, config.gcs.as_ref())
+            && gcs.attachments_bucket.is_some()
+            && !self.data.is_empty()
+        {
+            store_inbound_attachments(storage, &gcs.attachments_folder, &mut self.data).await
+        } else {
+            AttachmentStorageReport::default()
+        };
+        let mut metadata = self.metadata.into_inner();
+        for (metadata, attachment) in metadata.iter_mut().zip(&self.data) {
+            metadata.storage_key = attachment.stored_key.clone();
+        }
+        Ok(PersistedEmailAttachments {
+            metadata: BoundedVec::parse("attachments", metadata)?,
+            stored_count: report.stored_count,
+            failed_count: report.failed_count,
+        })
     }
 }
 
@@ -163,44 +227,31 @@ impl EmailIngressAdapter {
         Self::new(&config.app_domain_name)
     }
 
-    /// Store any attachments, then parse.
-    ///
-    /// The storing happens here rather than inside [`EmailParser::parse`] because this is the last
-    /// point that holds the bytes *and* may await: everything past it carries metadata only. With
-    /// no storage configured this is exactly [`EmailIngressAdapter::accept`].
-    pub async fn store_and_accept(
-        &self,
-        mut payload: RawInboundPayload,
-        config: &AppConfig,
-        storage: Option<&dyn FileStorage>,
-        trust: EmailIngressTrust,
-    ) -> Result<AcceptedEmail, EmailIngressError> {
-        if let (Some(storage), Some(gcs)) = (storage, config.gcs.as_ref())
-            && gcs.attachments_bucket.is_some()
-            && !payload.attachments_data.is_empty()
-        {
-            store_inbound_attachments(
-                storage,
-                &gcs.attachments_folder,
-                &mut payload.attachments_data,
-            )
-            .await;
-        }
-        self.accept(payload, trust)
-    }
-
     /// Validate one mail and state what it says and where it was addressed.
     pub fn accept(
         &self,
         payload: RawInboundPayload,
         trust: EmailIngressTrust,
     ) -> Result<AcceptedEmail, EmailIngressError> {
-        let parsed = EmailParser::parse(payload, &self.app_domain);
+        if payload.attachments_data.len() > MAX_ATTACHMENTS {
+            return Err(BoundsError::TooMany {
+                field: "attachments",
+                actual: payload.attachments_data.len(),
+                max: MAX_ATTACHMENTS,
+            }
+            .into());
+        }
+        let (parsed, attachment_data) = EmailParser::parse(payload, &self.app_domain);
         let routing = self.route(&parsed)?;
         let draft = self.draft(&parsed, &routing, trust)?;
+        let pending_attachments = PendingEmailAttachments {
+            data: attachment_data,
+            metadata: draft.attachments.clone(),
+        };
         Ok(AcceptedEmail {
             draft,
             routing,
+            pending_attachments,
             unusable_hints: parsed
                 .thread_index_rejection
                 .map(|error| UnusableHint::ThreadIndex(error, parsed.thread_index_raw_bytes))
@@ -323,7 +374,7 @@ impl EmailIngressAdapter {
             attachments: BoundedVec::parse("attachments", parsed.attachments.clone())?,
             directives: IngressDirectives {
                 hop_count: parsed.hop_count,
-                trace_channels: parsed.trace_channels.clone(),
+                trace_channels: BoundedVec::parse("trace channels", parsed.trace_channels.clone())?,
                 disposition,
                 source_channel_id: parsed.channel_id_header,
                 is_auto_reply: parsed.is_auto_reply,

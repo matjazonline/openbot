@@ -158,7 +158,11 @@ impl EmailParser {
         (false, text.to_string())
     }
 
-    pub fn parse(payload: RawInboundPayload, app_domain: &str) -> ParsedEmail {
+    pub fn parse(
+        mut payload: RawInboundPayload,
+        app_domain: &str,
+    ) -> (ParsedEmail, Vec<RawAttachmentData>) {
+        let attachments_data = std::mem::take(&mut payload.attachments_data);
         let ParsedHeaders {
             message_id: extracted_msg_id,
             in_reply_to,
@@ -233,7 +237,7 @@ impl EmailParser {
         let mut attachments = Vec::new();
         let mut attachment_prompts = Vec::new();
 
-        for att in payload.attachments_data {
+        for att in &attachments_data {
             let size = att.content.len();
             let is_small_image = att.content_type.to_lowercase().starts_with("image/")
                 && size < SMALL_INLINE_IMAGE_BYTES;
@@ -267,7 +271,7 @@ impl EmailParser {
             format!("{}\n\n{}", clean_text_body, attachment_prompts.join("\n"))
         };
 
-        ParsedEmail {
+        let parsed = ParsedEmail {
             message_id,
             in_reply_to,
             references,
@@ -294,7 +298,8 @@ impl EmailParser {
             dmarc_status: payload.dmarc,
             spam_score: payload.spam_score,
             is_context_only,
-        }
+        };
+        (parsed, attachments_data)
     }
 
     pub fn html_to_markdown(html: &str) -> String {

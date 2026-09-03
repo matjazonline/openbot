@@ -214,19 +214,16 @@ pub fn fold_disposition(
 /// Pure so the rule can be read at a glance: the sender joins unless their message merely closes
 /// an outreach the channel was waiting on, and third parties join only when the sender is trusted
 /// *and* the channel opted in. The flag can narrow who is pulled in, never widen it.
-pub fn thread_participants(
-    existing: &[EmailAddress],
-    sender: &EmailAddress,
-    third_parties: &[EmailAddress],
+pub fn thread_participants<T: Clone + Eq>(
+    existing: &[T],
+    sender: &T,
+    third_parties: &[T],
     add_sender: bool,
     pull_third_parties: bool,
-) -> Vec<EmailAddress> {
+) -> Vec<T> {
     let mut participants = existing.to_vec();
-    let mut push = |candidate: &EmailAddress| {
-        if !participants
-            .iter()
-            .any(|existing| existing.eq_ignore_ascii_case(candidate))
-        {
+    let mut push = |candidate: &T| {
+        if !participants.contains(candidate) {
             participants.push(candidate.clone());
         }
     };

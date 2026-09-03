@@ -40,11 +40,12 @@ pub use delivery::{
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
     EmailIngressFacts, InboundCommitOutcome, InboundCommitRequest, InboundDraft, InboundEnvelope,
-    InboundRouting, InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts,
-    MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS, MAX_ATTACHMENTS, MAX_BODY_BYTES,
-    MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES, MAX_THREAD_ASSOCIATIONS,
-    MessageDisposition, PipelineStep, ProtocolExtension, ReplyCandidates, ReplyDelivery,
-    SMALL_INLINE_IMAGE_BYTES, SystemAddress, ThreadAssociation, ThreadTarget,
+    InboundOutreachTransition, InboundRouting, InboundTaskRequest, InboundTaskTarget,
+    IngressDirectives, IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS,
+    MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES,
+    MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_CHANNELS, MessageDisposition,
+    PipelineStep, ProtocolExtension, ReplyCandidates, ReplyDelivery, SMALL_INLINE_IMAGE_BYTES,
+    SystemAddress, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{

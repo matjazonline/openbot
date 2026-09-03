@@ -9,11 +9,11 @@ use uuid::Uuid;
 
 use crate::{
     app_error::AppResult,
-    entities::{outreach::OutreachReplyMatch, value_objects::EmailAddress},
+    entities::outreach::OutreachReplyMatch,
     transport::{
         BoundedVec, CanonicalContent, InboundCommitRequest, InboundDraft, InboundEnvelope,
-        InboundTaskRequest, InboundTaskTarget, MAX_THREAD_ASSOCIATIONS, MessageDisposition,
-        NewDelivery, ThreadAssociation, ThreadTarget,
+        InboundOutreachTransition, InboundTaskRequest, InboundTaskTarget, MAX_THREAD_ASSOCIATIONS,
+        MessageDisposition, NewDelivery, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
     },
     use_cases::thread::ingest::{AGENT_DISPATCH_TASK, ReplyDelivery, routing::ResolvedAddresses},
 };
@@ -31,7 +31,7 @@ pub(crate) struct PreparedChannel {
     /// awaiting outreach; the agent must not be re-run for it.
     pub outreach: Option<OutreachReplyMatch>,
     /// The handles this channel's thread gains from the message, under this channel's own policy.
-    pub participants: Vec<EmailAddress>,
+    pub principals: BoundedVec<ThreadPrincipalIntent, { crate::transport::MAX_THREAD_PRINCIPALS }>,
 }
 
 /// What phases 3 and 4 concluded for every channel the message reached.
@@ -52,6 +52,7 @@ pub(crate) struct CommitPlan {
     envelope: InboundEnvelope,
     associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     task: Option<InboundTaskRequest>,
+    outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
     deliveries: Vec<NewDelivery>,
     prepared: PreparedChannels,
     disposition: MessageDisposition,
@@ -93,7 +94,7 @@ impl CommitPlan {
                 target: channel.target.clone(),
                 role: channel.candidate.role,
                 step: channel.candidate.step,
-                participants: channel.participants.clone(),
+                principals: channel.principals.clone(),
             })
             .collect();
 
@@ -108,6 +109,22 @@ impl CommitPlan {
                 role: channel.candidate.role,
             })
             .collect();
+        let outreach_transitions = BoundedVec::parse(
+            "outreach transitions",
+            prepared
+                .channels
+                .iter()
+                .filter_map(|channel| {
+                    channel
+                        .outreach
+                        .clone()
+                        .map(|matched| InboundOutreachTransition {
+                            channel_id: channel.candidate.channel.id,
+                            matched,
+                        })
+                })
+                .collect(),
+        )?;
 
         Ok(Self {
             company_id: resolved.company.id,
@@ -117,6 +134,7 @@ impl CommitPlan {
                 task_type: AGENT_DISPATCH_TASK.to_string(),
                 targets,
             }),
+            outreach_transitions,
             // Inbound fan-out onto a channel's *other* interfaces has a durable queue now, but
             // nothing to fan out to: email is the only transport a channel speaks, and delivering
             // a message back to the interface it arrived on is an echo. So this is correctly empty
@@ -137,13 +155,28 @@ impl CommitPlan {
             claimed_event: None,
             associations: self.associations.clone(),
             task: self.task.clone(),
+            outreach_transitions: self.outreach_transitions.clone(),
             deliveries: self.deliveries.clone(),
             reply_delivery: self.reply_delivery,
         }
     }
 
+    pub(crate) fn replace_attachments(
+        &mut self,
+        attachments: crate::transport::BoundedVec<
+            crate::entities::message::AttachmentMetadata,
+            { crate::transport::MAX_ATTACHMENTS },
+        >,
+    ) {
+        self.envelope.attachments = attachments;
+    }
+
     pub(crate) const fn envelope(&self) -> &InboundEnvelope {
         &self.envelope
+    }
+
+    pub(crate) const fn company_id(&self) -> Uuid {
+        self.company_id
     }
 
     pub(crate) const fn disposition(&self) -> MessageDisposition {

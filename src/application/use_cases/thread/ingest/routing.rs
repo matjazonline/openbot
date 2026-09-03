@@ -17,7 +17,7 @@ use crate::{
         company::Company,
         email_message::EmailMessageMetadata,
         outreach::OutreachReplyMatch,
-        participant::{IdentityProvenance, PrincipalAccessContext},
+        participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
         transport::{ChannelBindingId, ChannelSelector, QualifiedIdentity, TransportKind},
         value_objects::{ChannelSlug, EmailAddress, MessageId},
@@ -27,7 +27,6 @@ use crate::{
     },
     use_cases::{
         channel::find_similar_channel_slugs,
-        participant::observe_access_context,
         thread::{
             BounceInfo, ChannelDirectoryEntry, ThreadUseCases,
             ingest::{
@@ -120,28 +119,6 @@ impl<'a> ThreadSender<'a> {
 }
 
 impl ThreadUseCases {
-    /// Resolve one transport identity to its stable principal and membership.
-    ///
-    /// The observation is idempotent and confers no grant; it only ensures every later decision
-    /// about this handle names the same actor.
-    pub(crate) async fn observe_ingress_identity(
-        &self,
-        company_id: Uuid,
-        identity: &QualifiedIdentity,
-    ) -> AppResult<PrincipalAccessContext> {
-        let provenance = match identity.transport() {
-            TransportKind::Email => IdentityProvenance::EmailIngress,
-            TransportKind::Slack => IdentityProvenance::System,
-        };
-        observe_access_context(
-            self.participant_persistence.as_ref(),
-            company_id,
-            identity,
-            provenance,
-        )
-        .await
-    }
-
     /// Phases 2 and 3: walk every `To` then `Cc` target, expanding channel pipelines into
     /// authorized matches.
     ///
@@ -503,8 +480,7 @@ impl ThreadUseCases {
             .access_context(resolved.company.id, &draft.author)
             .await?;
         let sender = ThreadSender::new(&draft.author, sender_context);
-        let sender_address = EmailAddress::from(sender.address());
-        let third_parties = third_party_handles(routing, &sender_address);
+        let third_parties = third_party_handles(routing, sender.handle);
 
         let mut existing_threads = Vec::with_capacity(resolved.candidates.len());
         for candidate in &resolved.candidates {
@@ -567,15 +543,29 @@ impl ThreadUseCases {
             // A third party joins the thread only when the sender is trusted *and* the channel
             // permits it: the flag can narrow who gets pulled in, never widen it.
             let pull_third_parties = candidate.access.trusted && candidate.channel.add_3rd_party;
-            let participants = thread_participants(
+            let participant_identities = thread_participants(
                 &[],
-                &sender_address,
+                sender.handle,
                 &third_parties,
                 // Recording an outreach reply satisfies the outreach; it does not make its sender
                 // a party to the channel's conversation.
                 outreach.is_none(),
                 pull_third_parties,
             );
+
+            let mut principals = Vec::with_capacity(participant_identities.len() + 1);
+            for identity in participant_identities {
+                if matches!(target, ThreadTarget::Create { .. }) && identity == draft.author {
+                    principals.push(crate::transport::ThreadPrincipalIntent::new(
+                        identity.clone(),
+                        ThreadPrincipalRole::Author,
+                    ));
+                }
+                principals.push(crate::transport::ThreadPrincipalIntent::new(
+                    identity,
+                    ThreadPrincipalRole::Participant,
+                ));
+            }
 
             let answers = candidate.role == RecipientRole::To
                 || self
@@ -587,7 +577,7 @@ impl ThreadUseCases {
                 target,
                 answers,
                 outreach,
-                participants,
+                principals: crate::transport::BoundedVec::parse("thread principals", principals)?,
             });
         }
 
@@ -857,18 +847,16 @@ pub(crate) fn sender_address(draft: &InboundDraft) -> EmailAddress {
 ///
 /// Pure, because the adapter already decided which addresses are platform interfaces: the
 /// pre-canonical path re-parsed every recipient and looked its company up again here.
-fn third_party_handles(routing: &InboundRouting, sender: &EmailAddress) -> Vec<EmailAddress> {
-    let mut third_parties: Vec<EmailAddress> = Vec::new();
+fn third_party_handles(
+    routing: &InboundRouting,
+    sender: &QualifiedIdentity,
+) -> Vec<QualifiedIdentity> {
+    let mut third_parties: Vec<QualifiedIdentity> = Vec::new();
     for handle in routing.outsiders() {
-        let address = EmailAddress::from(handle.subject().as_str());
-        if address.eq_ignore_ascii_case(sender)
-            || third_parties
-                .iter()
-                .any(|seen| seen.eq_ignore_ascii_case(&address))
-        {
+        if handle == sender || third_parties.contains(handle) {
             continue;
         }
-        third_parties.push(address);
+        third_parties.push(handle.clone());
     }
     third_parties
 }
