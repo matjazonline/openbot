@@ -35,12 +35,15 @@ pub(crate) const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
 /// attempt number as the run that vanished. That earlier run reported nothing, so its half-written
 /// row is reset here rather than left to be read as a finished attempt that took forever.
 pub(crate) const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
-       (id, task_id, attempt_number, execution_generation, status, started_at)
-   VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP)
+       (id, task_id, attempt_number, execution_generation, status, started_at,
+        worker_id, machine_id, machine_region)
+   VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP, $5, $6, $7)
    ON CONFLICT (task_id, attempt_number) DO UPDATE
       SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
           error = NULL, stop_reason = NULL, prompt_tokens = NULL, completion_tokens = NULL,
-          execution_generation = EXCLUDED.execution_generation"#;
+          execution_generation = EXCLUDED.execution_generation,
+          worker_id = EXCLUDED.worker_id, machine_id = EXCLUDED.machine_id,
+          machine_region = EXCLUDED.machine_region"#;
 
 /// Close the ledger row, but only while it is still the open one. If another worker took the task
 /// over and reopened the row, this run is no longer the run of record and must not overwrite it.

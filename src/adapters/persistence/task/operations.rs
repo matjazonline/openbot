@@ -30,6 +30,7 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch, OutreachStatus},
+        runtime_metrics::{MachineIdentity, MachineRegion},
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRecord,
@@ -855,7 +856,8 @@ impl TaskPersistence for PostgresPersistence {
             r#"SELECT attempt.attempt_number, attempt.status, attempt.error,
                       attempt.stop_reason, attempt.prompt_tokens, attempt.completion_tokens,
                       attempt.result, attempt.started_at, attempt.finished_at,
-                      attempt.execution_generation
+                      attempt.execution_generation, attempt.worker_id, attempt.machine_id,
+                      attempt.machine_region
                FROM task_attempts AS attempt
                JOIN background_tasks AS task ON task.id = attempt.task_id
                WHERE task.company_id = $1 AND attempt.task_id = $2
@@ -1032,12 +1034,19 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
-    async fn begin_task_attempt(&self, attempt: TaskAttemptRef) -> AppResult<()> {
+    async fn begin_task_attempt(
+        &self,
+        attempt: TaskAttemptRef,
+        machine: &MachineIdentity,
+    ) -> AppResult<()> {
         sqlx::query(BEGIN_ATTEMPT_SQL)
             .bind(Uuid::new_v4())
             .bind(attempt.task_id)
             .bind(attempt.attempt_number)
             .bind(attempt.execution_generation)
+            .bind(attempt.worker_id)
+            .bind(machine.id.as_str())
+            .bind(machine.region.as_ref().map(MachineRegion::as_str))
             .execute(&self.pool)
             .await
             .map_err(AppError::from)?;

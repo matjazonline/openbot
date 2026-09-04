@@ -7,7 +7,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::adapters::persistence::test_support::{
-    DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_pool,
+    DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_machine, test_pool,
 };
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskFailureOutcome;
@@ -1354,7 +1354,7 @@ async fn an_expired_task_lease_costs_an_attempt_and_eventually_dead_letters() {
         let lease = TaskLeaseRef::of(&claimed).expect("a claim records its lease");
         generations.push(lease.execution_generation);
         persistence
-            .begin_task_attempt(TaskAttemptRef::of(&claimed, lease))
+            .begin_task_attempt(TaskAttemptRef::of(&claimed, lease), &test_machine())
             .await
             .unwrap();
 
@@ -3219,8 +3219,12 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
                 task_id: task.id,
                 attempt_number,
                 execution_generation: Uuid::new_v4(),
+                worker_id: Uuid::new_v4(),
             };
-            persistence.begin_task_attempt(attempt).await.unwrap();
+            persistence
+                .begin_task_attempt(attempt, &test_machine())
+                .await
+                .unwrap();
         }
         for _ in 0..expected {
             queue_one_delivery(&persistence, task, "grouped").await;
@@ -3284,8 +3288,11 @@ async fn bulk_tasks(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
 
 async fn bulk_attempts(pool: &sqlx::PgPool, task_id: Uuid, count: i32) {
     sqlx::query(
-        "INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation)
-             SELECT gen_random_uuid(), $1, series, 'completed', gen_random_uuid()
+        "INSERT INTO task_attempts
+                 (id, task_id, attempt_number, status, execution_generation,
+                  worker_id, machine_id, machine_region)
+             SELECT gen_random_uuid(), $1, series, 'completed', gen_random_uuid(),
+                    gen_random_uuid(), 'bulk-machine', NULL
                FROM generate_series(1, $2::int) AS series",
     )
     .bind(task_id)
@@ -3874,13 +3881,20 @@ async fn task_attempt_history_is_ordered_and_company_scoped() {
         .await
         .unwrap();
 
+    // Distinct workers per attempt: a task retried across a restart runs somewhere else, and the
+    // ledger is the only durable record of which run was which.
+    let workers = [Uuid::new_v4(), Uuid::new_v4()];
     for attempt_number in [1, 2] {
         let attempt = TaskAttemptRef {
             task_id: task.id,
             attempt_number,
             execution_generation: Uuid::new_v4(),
+            worker_id: workers[attempt_number as usize - 1],
         };
-        persistence.begin_task_attempt(attempt).await.unwrap();
+        persistence
+            .begin_task_attempt(attempt, &test_machine())
+            .await
+            .unwrap();
         persistence
             .finish_task_attempt(&TaskAttemptOutcome {
                 attempt,
@@ -3922,6 +3936,15 @@ async fn task_attempt_history_is_ordered_and_company_scoped() {
     );
     assert_eq!(attempts[0].total_tokens(), Some(12));
     assert!(attempts[0].duration_ms().is_some());
+    assert_eq!(
+        attempts
+            .iter()
+            .map(|attempt| attempt.worker_id)
+            .collect::<Vec<_>>(),
+        workers.to_vec(),
+        "each attempt keeps the worker that made it, not the last one to run"
+    );
+    assert_eq!(attempts[0].machine, test_machine());
     assert!(
         persistence
             .list_task_attempts(other_company.id, task.id)

@@ -655,10 +655,7 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
         Some(thread_id) => thread_id.to_string(),
         None => "—".to_string(),
     };
-    let worker = match task.worker_id {
-        Some(worker_id) => worker_id.to_string(),
-        None => "—".to_string(),
-    };
+    let last_run = pane.attempts.last();
 
     let rows: String = [
         ("Channel", channel),
@@ -670,7 +667,8 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
             "Retries",
             format!("{}/{}", task.retry_count, task.max_retries),
         ),
-        ("Worker", worker),
+        ("Worker", task_worker_fact(task, last_run)),
+        ("Machine", task_machine_fact(last_run)),
     ]
     .into_iter()
     .map(|(label, value)| {
@@ -686,6 +684,37 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
     format!(
         r##"<dl class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200">{rows}</dl>"##
     )
+}
+
+/// Which worker ran this task, given that `worker_id` is a lease and not a record.
+///
+/// `background_tasks_lease_check` nulls the lease the moment a run ends, so for every status but
+/// `processing` the answer has to come from the attempt ledger — and it is a *past* run, which the
+/// suffix says so a released lease is not read as one still held.
+fn task_worker_fact(task: &BackgroundTask, last_run: Option<&TaskAttemptRecord>) -> String {
+    match (task.worker_id, last_run) {
+        (Some(worker_id), _) => super::short_id(worker_id),
+        (None, Some(attempt)) => format!("{} · last run", super::short_id(attempt.worker_id)),
+        // Nothing has ever claimed it: enqueued and still pending, or stopped before it ran.
+        (None, None) => "—".to_string(),
+    }
+}
+
+/// Where the last run executed. Off Fly the id is a per-boot `local-<uuid>`, which is still the
+/// honest answer — it distinguishes one local process from the next.
+fn task_machine_fact(last_run: Option<&TaskAttemptRecord>) -> String {
+    match last_run {
+        Some(attempt) => machine_label(&attempt.machine),
+        None => "—".to_string(),
+    }
+}
+
+fn machine_label(machine: &MachineIdentity) -> String {
+    let id = escape_html_text(machine.id.as_str());
+    match &machine.region {
+        Some(region) => format!("{id} · {}", escape_html_text(region.as_str())),
+        None => id,
+    }
 }
 
 fn task_queue_diagnostics(task: &BackgroundTask) -> String {
@@ -804,6 +833,8 @@ fn task_attempt_row(attempt: &TaskAttemptRecord) -> String {
                             <div><dt class="text-[11px] uppercase opacity-60">Finished</dt><dd class="font-mono text-xs">{finished}</dd></div>
                             <div><dt class="text-[11px] uppercase opacity-60">Stop reason</dt><dd class="font-mono text-xs">{stop_reason}</dd></div>
                             <div><dt class="text-[11px] uppercase opacity-60">Tokens</dt><dd class="font-mono text-xs">{tokens}</dd></div>
+                            <div><dt class="text-[11px] uppercase opacity-60">Worker</dt><dd class="truncate font-mono text-xs">{worker}</dd></div>
+                            <div><dt class="text-[11px] uppercase opacity-60">Machine</dt><dd class="truncate font-mono text-xs">{machine}</dd></div>
                             <div class="sm:col-span-2"><dt class="text-[11px] uppercase opacity-60">Execution generation</dt><dd class="truncate font-mono text-xs">{generation}</dd></div>
                         </dl>
                         {error}
@@ -812,6 +843,8 @@ fn task_attempt_row(attempt: &TaskAttemptRecord) -> String {
                 </details>"##,
         attempt_number = attempt.attempt_number,
         started = super::format_time(attempt.started_at),
+        worker = super::short_id(attempt.worker_id),
+        machine = machine_label(&attempt.machine),
         generation = attempt.execution_generation,
     )
 }

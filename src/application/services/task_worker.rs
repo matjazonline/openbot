@@ -13,6 +13,7 @@ use crate::{
         channel::Channel,
         message::{MessageDirection, MessageRole},
         outreach::DueOutreach,
+        runtime_metrics::MachineIdentity,
         stuck_work::StuckWorkThresholds,
         task::{
             BackgroundTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRef,
@@ -257,6 +258,9 @@ pub struct TaskWorker {
     config: Arc<AppConfig>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     worker_id: uuid::Uuid,
+    /// Where this process runs, recorded on every attempt it opens. `worker_id` alone is a fencing
+    /// token minted per boot and names no machine, so it cannot answer "which instance ran this".
+    machine: MachineIdentity,
     task_concurrency: usize,
     agent_run_timeout: std::time::Duration,
     active_task_executions: ActiveTaskExecutions,
@@ -275,6 +279,7 @@ impl TaskWorker {
             config,
             monitoring: None,
             worker_id: uuid::Uuid::new_v4(),
+            machine: MachineIdentity::process().clone(),
             task_concurrency: 1,
             agent_run_timeout: std::time::Duration::from_secs(300),
             active_task_executions: ActiveTaskExecutions::default(),
@@ -288,6 +293,13 @@ impl TaskWorker {
 
     pub fn with_schedules(mut self, schedule_use_cases: Arc<ScheduleUseCases>) -> Self {
         self.schedule_use_cases = Some(schedule_use_cases);
+        self
+    }
+
+    /// Override the recorded machine. Only tests need this: a process has exactly one identity,
+    /// and [`MachineIdentity::process`] is it.
+    pub fn with_machine(mut self, machine: MachineIdentity) -> Self {
+        self.machine = machine;
         self
     }
 
@@ -977,7 +989,11 @@ impl TaskWorker {
         // Open the ledger row alongside the lease: both describe this one run, and both are wanted
         // even if it never reaches a terminal state. A failure to open it is logged, not fatal —
         // the run is the point, the bookkeeping is not.
-        if let Err(error) = self.task_persistence.begin_task_attempt(attempt).await {
+        if let Err(error) = self
+            .task_persistence
+            .begin_task_attempt(attempt, &self.machine)
+            .await
+        {
             warn!(
                 "Could not open the attempt ledger for task {}: {error}",
                 task.id

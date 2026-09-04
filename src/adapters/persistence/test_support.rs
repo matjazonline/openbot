@@ -40,6 +40,7 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         message::{CanonicalMessageId, MessageDirection, MessageRole},
+        runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
         transport::{
             ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, TransportKind,
         },
@@ -57,6 +58,16 @@ use crate::{
 
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";
+
+/// A fixed machine for the attempt ledger, so a test asserting on what was recorded has something
+/// to compare against. The real one is [`MachineIdentity::process`], which is boot-local off Fly
+/// and would differ from run to run.
+pub fn test_machine() -> MachineIdentity {
+    MachineIdentity {
+        id: MachineId::new("test-machine"),
+        region: Some(MachineRegion::new("tst")),
+    }
+}
 
 /// Serialises tests that exercise an *unscoped* queue claim.
 ///

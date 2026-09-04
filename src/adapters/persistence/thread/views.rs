@@ -98,27 +98,78 @@ struct ThreadMessageDb {
     direction: String,
     role: String,
     created_at: DateTime<Utc>,
+    correlation_id: Uuid,
 }
 
-impl TryFrom<ThreadMessageDb> for ThreadMessageView {
-    type Error = AppError;
-
-    fn try_from(db: ThreadMessageDb) -> AppResult<Self> {
+impl ThreadMessageDb {
+    fn into_view(self, task_id: Option<Uuid>) -> AppResult<ThreadMessageView> {
         Ok(ThreadMessageView {
-            id: db.id,
-            canonical_id: CanonicalMessageId::new(db.canonical_id),
-            thread_id: db.thread_id,
-            author: db.author.try_into()?,
-            subject: db.subject,
-            body: db.clean_text_body,
-            attachments: decode_attachments(db.attachments)?.unwrap_or_default(),
-            direction: MessageDirection::from_str(&db.direction)
+            id: self.id,
+            canonical_id: CanonicalMessageId::new(self.canonical_id),
+            thread_id: self.thread_id,
+            task_id,
+            author: self.author.try_into()?,
+            subject: self.subject,
+            body: self.clean_text_body,
+            attachments: decode_attachments(self.attachments)?.unwrap_or_default(),
+            direction: MessageDirection::from_str(&self.direction)
                 .map_err(|error| AppError::Internal(error.to_string()))?,
-            role: MessageRole::from_str(&db.role)
+            role: MessageRole::from_str(&self.role)
                 .map_err(|error| AppError::Internal(error.to_string()))?,
-            created_at: db.created_at,
+            created_at: self.created_at,
         })
     }
+}
+
+#[derive(sqlx::FromRow, Debug)]
+struct ThreadTaskLookupDb {
+    id: Uuid,
+    source_message_uuid: Option<Uuid>,
+    correlation_id: Uuid,
+    task_type: String,
+    created_at: DateTime<Utc>,
+}
+
+async fn fetch_thread_tasks(pool: &PgPool, thread_id: Uuid) -> AppResult<Vec<ThreadTaskLookupDb>> {
+    sqlx::query_as::<_, ThreadTaskLookupDb>(
+        r#"SELECT id, source_message_uuid, correlation_id, task_type, created_at
+             FROM background_tasks
+            WHERE thread_id = $1
+            ORDER BY created_at ASC"#,
+    )
+    .bind(thread_id)
+    .fetch_all(pool)
+    .await
+    .map_err(AppError::from)
+}
+
+fn match_task_id(
+    canonical_id: Uuid,
+    correlation_id: Uuid,
+    tasks: &[ThreadTaskLookupDb],
+) -> Option<Uuid> {
+    if let Some(task) = tasks
+        .iter()
+        .find(|t| t.source_message_uuid == Some(canonical_id))
+    {
+        return Some(task.id);
+    }
+
+    let mut candidates: Vec<&ThreadTaskLookupDb> = tasks
+        .iter()
+        .filter(|t| t.correlation_id == correlation_id)
+        .collect();
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    candidates.sort_by_key(|t| {
+        let is_main = t.task_type == "email_agent_dispatch" || t.task_type == "scheduled_agent_run";
+        (!is_main, std::cmp::Reverse(t.created_at))
+    });
+
+    candidates.first().map(|t| t.id)
 }
 
 fn thread_message_select() -> String {
@@ -133,7 +184,8 @@ fn thread_message_select() -> String {
            message.attachments,
            message.direction,
            message.role,
-           association.created_at
+           association.created_at,
+           message.correlation_id
     FROM thread_messages AS association
 {AUTHOR_JOINS}
 "#
@@ -159,14 +211,23 @@ pub(super) async fn list_thread_messages(
            ) recent
            ORDER BY recent.created_at ASC, recent.id ASC"#
     );
-    sqlx::query_as::<_, ThreadMessageDb>(&query)
+    let rows = sqlx::query_as::<_, ThreadMessageDb>(&query)
         .bind(thread_id)
         .bind(THREAD_HISTORY_LIMIT as i64)
         .fetch_all(pool)
         .await
-        .map_err(AppError::from)?
-        .into_iter()
-        .map(TryInto::try_into)
+        .map_err(AppError::from)?;
+
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    rows.into_iter()
+        .map(|row| {
+            let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+            row.into_view(task_id)
+        })
         .collect()
 }
 
@@ -190,7 +251,7 @@ pub(super) async fn list_thread_messages_after(
            ORDER BY association.created_at ASC, association.id ASC
            LIMIT $4"#
     );
-    sqlx::query_as::<_, ThreadMessageDb>(&query)
+    let rows = sqlx::query_as::<_, ThreadMessageDb>(&query)
         .bind(thread_id)
         // Both sides stay `timestamptz`. Binding a naive value instead would make Postgres promote
         // it through the *session* `TimeZone` to compare it, so the same cursor would mean
@@ -200,9 +261,18 @@ pub(super) async fn list_thread_messages_after(
         .bind(limit.min(THREAD_HISTORY_LIMIT) as i64)
         .fetch_all(pool)
         .await
-        .map_err(AppError::from)?
-        .into_iter()
-        .map(TryInto::try_into)
+        .map_err(AppError::from)?;
+
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    rows.into_iter()
+        .map(|row| {
+            let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+            row.into_view(task_id)
+        })
         .collect()
 }
 
@@ -215,14 +285,20 @@ pub(super) async fn get_thread_message(
     let select = thread_message_select();
     let query =
         format!("{select} WHERE association.thread_id = $1 AND association.message_id = $2");
-    sqlx::query_as::<_, ThreadMessageDb>(&query)
+    let row = sqlx::query_as::<_, ThreadMessageDb>(&query)
         .bind(thread_id)
         .bind(message_id.as_uuid())
         .fetch_optional(pool)
         .await
-        .map_err(AppError::from)?
-        .map(TryInto::try_into)
-        .transpose()
+        .map_err(AppError::from)?;
+
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+    Ok(Some(row.into_view(task_id)?))
 }
 
 #[derive(sqlx::FromRow, Debug)]

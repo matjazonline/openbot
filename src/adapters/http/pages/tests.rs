@@ -3,6 +3,7 @@ use crate::entities::correlation::CorrelationId;
 use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::message_view::{AuthorView, ExternalMessageRef};
+use crate::entities::runtime_metrics::{MachineId, MachineRegion};
 use crate::entities::schedule::ScheduleRunAsChoices;
 use crate::entities::task::{
     TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
@@ -2382,6 +2383,7 @@ fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
         thread_id,
+        task_id: None,
         author: AuthorView {
             principal_id: PrincipalId::random(),
             label: "Ada Lovelace".into(),
@@ -3185,23 +3187,28 @@ fn each_message_bubble_links_to_tasks_in_list_view() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
-    let message = mailbox_message(thread.id, "A message.");
+    let mut message = mailbox_message(thread.id, "A message.");
 
-    let html = message_bubble_chat(
-        &message,
-        None,
-        None,
-        MessageScope {
-            company_id: company.id,
-            channel_id: channel.id,
-        },
-    );
+    let scope = MessageScope {
+        company_id: company.id,
+        channel_id: channel.id,
+    };
 
-    assert!(html.contains(&format!(
+    let html_without_task = message_bubble_chat(&message, None, None, scope);
+    assert!(html_without_task.contains(&format!(
         r#"href="/ui/tasks?company_id={}&amp;view=list""#,
         company.id
     )));
-    assert!(html.contains(">tasks</a>"));
+    assert!(html_without_task.contains(">tasks</a>"));
+
+    let task_id = Uuid::new_v4();
+    message.task_id = Some(task_id);
+    let html_with_task = message_bubble_chat(&message, None, None, scope);
+    assert!(html_with_task.contains(&format!(
+        r#"href="/ui/tasks?company_id={}&amp;view=list&amp;task_id={task_id}""#,
+        company.id
+    )));
+    assert!(html_with_task.contains(">tasks</a>"));
 }
 
 /// The pane names the interface every key belongs to. A bare `Message-ID` identifies nothing: the
@@ -3417,6 +3424,15 @@ fn compose_pane_shows_the_channel_address_and_errors() {
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Channel rejected the message"));
     assert!(html.contains("hx-post=\"/ui/compose\""));
+}
+
+/// A fixed machine for pane fixtures. The real one is boot-local off Fly, so a test asserting on
+/// what the pane rendered needs something that does not change between runs.
+fn rendered_machine() -> MachineIdentity {
+    MachineIdentity {
+        id: MachineId::new("fixture-machine"),
+        region: Some(MachineRegion::new("tst")),
+    }
 }
 
 fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> BackgroundTask {
@@ -3758,6 +3774,10 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
             }
         }
     });
+    // Two runs of the same task on different workers: the ledger has to keep them apart, which is
+    // the whole reason it records a worker at all.
+    let first_worker = Uuid::new_v4();
+    let second_worker = Uuid::new_v4();
     let attempts = [
         TaskAttemptRecord {
             attempt_number: 1,
@@ -3770,6 +3790,8 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
             started_at,
             finished_at: Some(started_at + chrono::Duration::seconds(2)),
             execution_generation: Uuid::new_v4(),
+            worker_id: first_worker,
+            machine: rendered_machine(),
         },
         TaskAttemptRecord {
             attempt_number: 2,
@@ -3782,6 +3804,8 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
             started_at,
             finished_at: None,
             execution_generation: generation,
+            worker_id: second_worker,
+            machine: rendered_machine(),
         },
     ];
 
@@ -3818,6 +3842,10 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
     assert!(html.contains(&generation.to_string()));
     assert!(html.contains("Delivery details could not be loaded"));
     assert!(html.contains("Execution attempts were partially unavailable"));
+    // Each attempt names the run that made it, and the machine it ran on.
+    assert!(html.contains(&short_id(first_worker)));
+    assert!(html.contains(&short_id(second_worker)));
+    assert!(html.contains("fixture-machine · tst"));
 }
 
 #[test]
@@ -3902,6 +3930,8 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         started_at,
         finished_at: Some(started_at + chrono::Duration::seconds(2)),
         execution_generation: generation,
+        worker_id: Uuid::new_v4(),
+        machine: rendered_machine(),
     }];
 
     let pane_html = task_detail_pane(&TaskDetailPane {
@@ -6000,6 +6030,8 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
         started_at: at,
         finished_at: Some(at),
         execution_generation: Uuid::new_v4(),
+        worker_id: Uuid::new_v4(),
+        machine: rendered_machine(),
     };
 
     let detail = TaskChainDetail {

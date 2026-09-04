@@ -19,6 +19,7 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch},
+        runtime_metrics::MachineIdentity,
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRecord,
@@ -377,8 +378,12 @@ pub trait TaskPersistence: Send + Sync {
     ///
     /// Defaulted to a no-op for the same reason as [`Self::renew_task_lease`]: the hand-written
     /// mocks across the suite assert on queue transitions, and this ledger is not one.
-    async fn begin_task_attempt(&self, attempt: TaskAttemptRef) -> AppResult<()> {
-        let _ = attempt;
+    async fn begin_task_attempt(
+        &self,
+        attempt: TaskAttemptRef,
+        machine: &MachineIdentity,
+    ) -> AppResult<()> {
+        let _ = (attempt, machine);
         Ok(())
     }
 

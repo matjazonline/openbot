@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::OnceLock};
 
 use chrono::{DateTime, Utc};
 
@@ -88,6 +88,17 @@ impl MachineIdentity {
             .map(MachineRegion::new);
 
         Self { id, region }
+    }
+
+    /// The identity of *this* process, resolved once.
+    ///
+    /// Off Fly [`Self::from_runtime_environment`] mints a fresh `local-<uuid>` on every call, so
+    /// two callers asking separately would invent two machines and report the same process under
+    /// both. Everything that names the running process -- the metrics sampler and the task
+    /// attempt ledger -- goes through here so they cannot disagree.
+    pub fn process() -> &'static Self {
+        static PROCESS: OnceLock<MachineIdentity> = OnceLock::new();
+        PROCESS.get_or_init(Self::from_runtime_environment)
     }
 }
 

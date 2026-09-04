@@ -225,7 +225,7 @@ fn task_chain_card(
             </button>
         </article>"##,
         title = escape_html_text(&card.title),
-        short_id = &correlation_id.to_string()[..8],
+        short_id = short_id(correlation_id.as_uuid()),
         channels = escape_html_text(&channels),
         agents = escape_html_text(&agents),
         created = format_time(card.created_at),
@@ -352,7 +352,7 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
             sequence: event.sequence,
             html: format!(
                 r##"<li class="border-l-2 border-primary pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{}</strong> → <strong>{}</strong></div><div class="font-mono text-[11px] opacity-65">{}</div></li>"##,
-                format_time(event.transitioned_at), &event.task_id.to_string()[..8],
+                format_time(event.transitioned_at), short_id(event.task_id),
                 from, task_status_label(event.to_status), escape_html_text(&event.reason.to_string())
             ),
         });
@@ -371,7 +371,7 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 sequence: attempt.attempt_number,
                 html: format!(
                     r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{label}</strong> #{}</div><div class="text-[11px] opacity-65">{} · {} tokens</div></li>"##,
-                    format_time(attempt.finished_at.unwrap_or(attempt.started_at)), &item.task.id.to_string()[..8], attempt.attempt_number,
+                    format_time(attempt.finished_at.unwrap_or(attempt.started_at)), short_id(item.task.id), attempt.attempt_number,
                     attempt.duration_ms().map(|ms| format!("{ms} ms")).unwrap_or_else(|| "in progress".into()),
                     attempt.total_tokens().unwrap_or(0)
                 ),
@@ -386,7 +386,7 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 html: format!(
                     r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{} delivery {}</strong></div><div class="text-[11px] opacity-65">{} of {} attempts spent</div></li>"##,
                     format_time(delivery.updated_at),
-                    &item.task.id.to_string()[..8],
+                    short_id(item.task.id),
                     delivery.transport.label(),
                     delivery.status.label(),
                     delivery.attempt_count,
@@ -404,10 +404,10 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
             html: format!(
                 r##"<li class="border-l-2 border-accent pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Approval {}</strong></div><div class="text-[11px] opacity-65">{} · approval {}</div></li>"##,
                 format_time(approval.updated_at),
-                &approval.task_id.to_string()[..8],
+                short_id(approval.task_id),
                 escape_html_text(&approval.status),
                 escape_html_text(&approval.action_title),
-                &approval.id.to_string()[..8]
+                short_id(approval.id)
             ),
         });
     }
@@ -420,13 +420,13 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
             html: format!(
                 r##"<li class="border-l-2 border-info pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Outreach {}</strong></div><div class="text-[11px] opacity-65">{} of {} replies · {:.0}% required · deadline {} · outreach {}</div></li>"##,
                 format_time(outreach.created_at),
-                &outreach.task_id.to_string()[..8],
+                short_id(outreach.task_id),
                 escape_html_text(&outreach.status),
                 outreach.response_count,
                 outreach.target_count,
                 outreach.required_threshold_percent,
                 format_time(outreach.expires_at),
-                &outreach.id.to_string()[..8]
+                short_id(outreach.id)
             ),
         });
     }
@@ -475,7 +475,7 @@ fn chain_task(item: &TaskChainTaskDetail, company_id: Uuid) -> String {
         task_status_style(task.status),
         task_status_label(task.status),
         escape_html_text(&task.task_type),
-        &task.id.to_string()[..8],
+        short_id(task.id),
         item.attempts.len(),
         item.deliveries.len()
     )

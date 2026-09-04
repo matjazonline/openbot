@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
+    entities::runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
     entities::task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskChainCard,
         TaskChainCounts, TaskStatus, TaskStatusEvent, TaskStopReason, TaskTransitionActorKind,
@@ -52,6 +53,9 @@ pub(crate) struct TaskAttemptRecordDb {
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) finished_at: Option<DateTime<Utc>>,
     pub(crate) execution_generation: Uuid,
+    pub(crate) worker_id: Uuid,
+    pub(crate) machine_id: String,
+    pub(crate) machine_region: Option<String>,
 }
 
 /// One attempt as read by a chain-wide batch, carrying the task it belongs to.
@@ -210,6 +214,11 @@ impl TryFrom<TaskAttemptRecordDb> for TaskAttemptRecord {
             started_at: db.started_at,
             finished_at: db.finished_at,
             execution_generation: db.execution_generation,
+            worker_id: db.worker_id,
+            machine: MachineIdentity {
+                id: MachineId::new(db.machine_id),
+                region: db.machine_region.map(MachineRegion::new),
+            },
         })
     }
 }

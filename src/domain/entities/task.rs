@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::CanonicalMessageId;
+use crate::entities::runtime_metrics::MachineIdentity;
 use crate::entities::transport::RecipientRole;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -221,6 +222,9 @@ pub struct TaskAttemptRef {
     pub task_id: Uuid,
     pub attempt_number: i32,
     pub execution_generation: Uuid,
+    /// Who is making this attempt. Taken from the lease, never passed in separately: the ledger
+    /// row and the fence on every write of this run have to name one worker, not two.
+    pub worker_id: Uuid,
 }
 
 impl TaskAttemptRef {
@@ -233,6 +237,7 @@ impl TaskAttemptRef {
             task_id: task.id,
             attempt_number: task.retry_count + 1,
             execution_generation: lease.execution_generation,
+            worker_id: lease.worker_id,
         }
     }
 }
@@ -373,6 +378,11 @@ pub struct TaskAttemptRecord {
     pub started_at: chrono::DateTime<chrono::Utc>,
     pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
     pub execution_generation: Uuid,
+    /// The worker run that made this attempt, and where it ran. `BackgroundTask::worker_id` is a
+    /// lease and is nulled as soon as the run ends, so this ledger is the only place a finished
+    /// task can still say who ran it.
+    pub worker_id: Uuid,
+    pub machine: MachineIdentity,
 }
 
 impl TaskAttemptRecord {

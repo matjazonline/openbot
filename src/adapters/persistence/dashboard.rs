@@ -589,7 +589,7 @@ mod tests {
     //! suite still runs without a database.
 
     use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::persistence::test_support::{test_machine, test_pool};
     use crate::entities::task::NewTask;
     use crate::entities::task::{
         TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskStopReason, TokenUsage,
@@ -716,9 +716,10 @@ mod tests {
             task_id,
             attempt_number: 9_998,
             execution_generation: Uuid::new_v4(),
+            worker_id: Uuid::new_v4(),
         };
         persistence
-            .begin_task_attempt(attempt)
+            .begin_task_attempt(attempt, &test_machine())
             .await
             .expect("the ledger row opens");
         persistence
@@ -759,11 +760,15 @@ mod tests {
 
         for attempt_number in [1, 2] {
             persistence
-                .begin_task_attempt(TaskAttemptRef {
-                    task_id,
-                    attempt_number,
-                    execution_generation: Uuid::new_v4(),
-                })
+                .begin_task_attempt(
+                    TaskAttemptRef {
+                        task_id,
+                        attempt_number,
+                        execution_generation: Uuid::new_v4(),
+                        worker_id: Uuid::new_v4(),
+                    },
+                    &test_machine(),
+                )
                 .await
                 .expect("the attempt starts");
         }
@@ -812,10 +817,11 @@ mod tests {
             task_id,
             attempt_number: 9_999,
             execution_generation: Uuid::new_v4(),
+            worker_id: Uuid::new_v4(),
         };
 
         persistence
-            .begin_task_attempt(attempt)
+            .begin_task_attempt(attempt, &test_machine())
             .await
             .expect("the ledger row opens");
 
@@ -848,10 +854,11 @@ mod tests {
         // conflict must reopen the row rather than fail the insert.
         let replacement = TaskAttemptRef {
             execution_generation: Uuid::new_v4(),
+            worker_id: Uuid::new_v4(),
             ..attempt
         };
         persistence
-            .begin_task_attempt(replacement)
+            .begin_task_attempt(replacement, &test_machine())
             .await
             .expect("a re-run reopens the same attempt rather than colliding with it");
 
@@ -873,8 +880,8 @@ mod tests {
             "the current execution generation must still be able to finish"
         );
 
-        let reopened: (String, Option<i32>, Option<String>) = sqlx::query_as(
-            "SELECT status, prompt_tokens, stop_reason FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
+        let reopened: (String, Option<i32>, Option<String>, Uuid) = sqlx::query_as(
+            "SELECT status, prompt_tokens, stop_reason, worker_id FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
         )
         .bind(task_id)
         .bind(9_999_i32)
@@ -891,6 +898,10 @@ mod tests {
         assert_eq!(
             reopened.2.as_deref(),
             Some(TaskStopReason::Completed.as_str())
+        );
+        assert_eq!(
+            reopened.3, replacement.worker_id,
+            "reopening the row hands it to the run that reclaimed the task, not the one that vanished"
         );
 
         CompanyPersistence::delete(&persistence, company)

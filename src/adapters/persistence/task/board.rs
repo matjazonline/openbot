@@ -513,7 +513,8 @@ pub(crate) async fn chain_detail_on(
         r#"SELECT attempt.task_id, attempt.attempt_number, attempt.status, attempt.error,
                   attempt.stop_reason, attempt.prompt_tokens, attempt.completion_tokens,
                   attempt.result, attempt.started_at, attempt.finished_at,
-                  attempt.execution_generation
+                  attempt.execution_generation, attempt.worker_id, attempt.machine_id,
+                  attempt.machine_region
            FROM task_attempts AS attempt
            JOIN background_tasks AS task ON task.id = attempt.task_id
            WHERE task.company_id = $1 AND attempt.task_id = ANY($2)

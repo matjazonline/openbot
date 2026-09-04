@@ -82,6 +82,7 @@ pub struct ThreadMessageView {
     /// `messages.id` -- the payload every thread association of this message shares.
     pub canonical_id: CanonicalMessageId,
     pub thread_id: Uuid,
+    pub task_id: Option<Uuid>,
     pub author: AuthorView,
     pub subject: String,
     pub body: String,

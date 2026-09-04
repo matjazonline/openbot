@@ -2332,20 +2332,25 @@ pub fn message_bubble_chat(
         created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
         diagnostics = diagnostics_link(message, scope),
-        tasks = tasks_link(scope),
+        tasks = tasks_link(message, scope),
         body = body,
         attachments = attachment_chips(message, scope),
     )
 }
 
-/// A direct link into the company's Tasks workspace in list view.
-fn tasks_link(scope: MessageScope) -> String {
+/// A direct link into the company's Tasks workspace in list view, opening the task if one is matched.
+fn tasks_link(message: &ThreadMessageView, scope: MessageScope) -> String {
+    let task_param = match message.task_id {
+        Some(task_id) => format!("&amp;task_id={task_id}"),
+        None => String::new(),
+    };
     format!(
         r##" · <a class="link link-hover"
                     title="Tasks list"
                     data-action="navigate-workspace"
-                    href="/ui/tasks?company_id={company_id}&amp;view=list">tasks</a>"##,
+                    href="/ui/tasks?company_id={company_id}&amp;view=list{task_param}">tasks</a>"##,
         company_id = scope.company_id,
+        task_param = task_param,
     )
 }
 

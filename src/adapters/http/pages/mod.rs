@@ -24,6 +24,7 @@ use crate::entities::{
     },
     message::{AttachmentMetadata, MessageDirection, MessageRole},
     message_view::{EmailReplyContext, MessageAuditView, ThreadMessageView},
+    runtime_metrics::MachineIdentity,
     task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
         TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail, TaskChainTaskDetail,
@@ -126,6 +127,17 @@ pub(crate) fn format_date_time(at: DateTime<Utc>) -> String {
 
 pub(crate) fn format_time(at: DateTime<Utc>) -> String {
     local_time(at, "time", "%b %d, %H:%M:%S UTC")
+}
+
+/// A UUID shortened to the leading group, which is what identifies it on screen.
+///
+/// A full UUID is wider than the columns these ids appear in and truncates to an ellipsis anyway;
+/// the first group is enough to tell two of them apart at a glance. Callers hand-rolled
+/// `&id.to_string()[..8]` at a dozen sites before this existed.
+pub(crate) fn short_id(id: Uuid) -> String {
+    let mut rendered = id.to_string();
+    rendered.truncate(8);
+    rendered
 }
 
 fn local_time(at: DateTime<Utc>, precision: &str, fallback_format: &str) -> String {

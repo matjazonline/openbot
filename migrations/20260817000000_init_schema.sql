@@ -1690,8 +1690,17 @@ CREATE TABLE task_attempts (
     -- keeps counting `attempt_number` from where it left off, so the generation is what separates
     -- one execution's attempts from the next's.
     execution_generation UUID NOT NULL,
+    -- Which worker run produced this attempt. `background_tasks.worker_id` is a lease and is
+    -- nulled the moment the run ends, so the ledger is the only durable answer to "who ran this".
+    worker_id UUID NOT NULL,
+    -- Where that run executed: FLY_MACHINE_ID, or a per-boot `local-<uuid>` off Fly. Denormalized
+    -- onto the attempt on purpose -- there is no worker registry to join to, and a ledger row is
+    -- the record of what was true at the time, not a pointer to what is true now.
+    machine_id TEXT NOT NULL,
+    machine_region TEXT,
     CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number),
     CONSTRAINT task_attempts_status_check CHECK (status IN ('processing', 'completed', 'failed')),
+    CONSTRAINT task_attempts_machine_id_check CHECK (length(trim(machine_id)) > 0),
     CONSTRAINT task_attempts_token_check CHECK (
         (prompt_tokens IS NULL OR prompt_tokens >= 0)
         AND (completion_tokens IS NULL OR completion_tokens >= 0)
