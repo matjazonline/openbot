@@ -13,6 +13,19 @@ enum exhaustively and fails closed for absent, neutral, soft-fail, temporary-err
 unknown, or newly introduced variants unless a documented policy explicitly accepts one. Do not
 carry security verdicts inward as `Option<String>`.
 
+The trusted-upstream exception has two halves and neither is optional. *Authenticating* the upstream
+is the request signature -- an HMAC over the exact bytes, inside a replay window. *Identifying* it
+is the `authserv-id`, and that part is easy to get wrong: a sender composes the message, so a
+message can arrive already carrying `Authentication-Results: <your provider>; dmarc=pass`. Read only
+the **first** such header -- a receiving MTA prepends its own above whatever the message arrived
+with -- and require its `authserv-id` to equal a configured value. Scanning for any header that
+claims a pass authenticates every forgery it is shown. A missing, unparsable, or foreign header
+leaves every verdict `Unknown`, which the ingress guard already refuses.
+
+An upstream that supplies neither its own verdicts nor the connecting IP cannot be trusted for
+authentication at all: without the IP there is no SPF to evaluate, and `AuthenticationResults` in
+`protocols::email` is where the alternative lives.
+
 # Enforce the SMTP limits you advertise
 
 Reject over-limit input while reading it; never buffer first and check later. Enforce message and

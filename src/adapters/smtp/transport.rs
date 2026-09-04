@@ -11,8 +11,9 @@ use lettre::{
 };
 
 use crate::{
-    adapters::protocols::email::{MailHeader, MailMessage, MailTransport},
+    adapters::protocols::email::{MailHeader, MailMessage, MailSendOutcome, MailTransport},
     app_error::{AppError, AppResult},
+    entities::transport::FailureClass,
     infra::config::{AppConfig, is_loopback_host},
 };
 
@@ -132,52 +133,78 @@ fn mailbox(
 
 #[async_trait]
 impl MailTransport for LettreMailTransport {
-    async fn send(&self, mail: MailMessage) -> AppResult<()> {
+    /// SMTP has exactly two outcomes to report.
+    ///
+    /// A submission this deployment never built is [`MailSendOutcome::Rejected`]: an address
+    /// lettre will not parse is not going to parse on the fifth attempt. Everything else -- a
+    /// refused connection, a 5xx, an accepted `DATA` whose final acknowledgement was lost -- is
+    /// one `Err` from `lettre`, and the third of those may already be in the relay's queue. That
+    /// is [`MailSendOutcome::Unknown`], not `Retryable`: SMTP submission carries no idempotency
+    /// key, so re-sending is how one answer arrives twice.
+    async fn send(&self, mail: MailMessage) -> MailSendOutcome {
         let Some(transport) = self.inner.as_ref() else {
             tracing::info!(
                 message_id = mail.message_id.as_ref().map(|id| id.as_str()),
                 "SMTP relay is disabled; simulating dispatch"
             );
-            return Ok(());
+            return MailSendOutcome::Accepted { provider_key: None };
         };
 
-        let mut builder = Message::builder()
-            .from(mailbox(&mail.from, mail.from_name)?)
-            .subject(mail.subject)
-            .header(ContentType::TEXT_PLAIN);
-        for recipient in &mail.recipients_to {
-            builder = builder.to(mailbox(recipient, None)?);
+        let message = match build_message(mail) {
+            Ok(message) => message,
+            Err(error) => {
+                return MailSendOutcome::Rejected {
+                    class: FailureClass::InvalidPayload,
+                    detail: error.to_string(),
+                };
+            }
+        };
+        match transport.send(message).await {
+            Ok(_) => MailSendOutcome::Accepted { provider_key: None },
+            Err(error) => MailSendOutcome::Unknown {
+                class: FailureClass::Network,
+                detail: format!("SMTP dispatch failed: {error}"),
+            },
         }
-        for recipient in &mail.recipients_cc {
-            builder = builder.cc(mailbox(recipient, None)?);
-        }
-        if let Some(message_id) = mail.message_id {
-            builder = builder.header(MessageId::from(message_id.to_string()));
-        }
-        if let Some(in_reply_to) = mail.in_reply_to.filter(|id| !id.is_empty()) {
-            builder = builder.header(InReplyTo::from(in_reply_to.to_string()));
-        }
-        if !mail.references.is_empty() {
-            builder = builder.header(References::from(
-                mail.references
-                    .iter()
-                    .map(|id| id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            ));
-        }
-        for header in mail.headers {
-            builder = builder.header(DynamicHeader(header));
-        }
-        let message = builder.body(mail.body_text).map_err(|error| {
-            AppError::Internal(format!("Failed to build outbound email: {error}"))
-        })?;
-        transport
-            .send(message)
-            .await
-            .map_err(|error| AppError::Internal(format!("SMTP dispatch failed: {error}")))?;
-        Ok(())
     }
+}
+
+/// One [`MailMessage`] as RFC 5322 bytes.
+///
+/// Split out from the send so the fallible composition has one exit rather than being threaded
+/// through the outcome enum at six `?` sites.
+fn build_message(mail: MailMessage) -> AppResult<Message> {
+    let mut builder = Message::builder()
+        .from(mailbox(&mail.from, mail.from_name)?)
+        .subject(mail.subject)
+        .header(ContentType::TEXT_PLAIN);
+    for recipient in &mail.recipients_to {
+        builder = builder.to(mailbox(recipient, None)?);
+    }
+    for recipient in &mail.recipients_cc {
+        builder = builder.cc(mailbox(recipient, None)?);
+    }
+    if let Some(message_id) = mail.message_id {
+        builder = builder.header(MessageId::from(message_id.to_string()));
+    }
+    if let Some(in_reply_to) = mail.in_reply_to.filter(|id| !id.is_empty()) {
+        builder = builder.header(InReplyTo::from(in_reply_to.to_string()));
+    }
+    if !mail.references.is_empty() {
+        builder = builder.header(References::from(
+            mail.references
+                .iter()
+                .map(|id| id.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ));
+    }
+    for header in mail.headers {
+        builder = builder.header(DynamicHeader(header));
+    }
+    builder
+        .body(mail.body_text)
+        .map_err(|error| AppError::Internal(format!("Failed to build outbound email: {error}")))
 }
 
 #[cfg(test)]

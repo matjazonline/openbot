@@ -8,8 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use super::{MailMessage, MailTransport};
-use crate::app_error::AppResult;
+use super::{MailMessage, MailSendOutcome, MailTransport};
 
 /// Accepts every mail and keeps it, so a test can assert on the envelope that went out.
 #[derive(Default)]
@@ -38,21 +37,22 @@ impl RecordingTransport {
 
 #[async_trait]
 impl MailTransport for RecordingTransport {
-    async fn send(&self, message: MailMessage) -> AppResult<()> {
+    async fn send(&self, message: MailMessage) -> MailSendOutcome {
         self.sent.lock().unwrap().push(message);
-        Ok(())
+        MailSendOutcome::Accepted { provider_key: None }
     }
 }
 
-/// A transport whose relay always refuses, for the ambiguity rules.
+/// A transport whose relay always fails without a verdict, for the ambiguity rules.
 pub struct RefusingTransport;
 
 #[async_trait]
 impl MailTransport for RefusingTransport {
-    async fn send(&self, _message: MailMessage) -> AppResult<()> {
-        Err(crate::app_error::AppError::Internal(
-            "the relay closed the connection".into(),
-        ))
+    async fn send(&self, _message: MailMessage) -> MailSendOutcome {
+        MailSendOutcome::Unknown {
+            class: crate::entities::transport::FailureClass::Network,
+            detail: "the relay closed the connection".to_string(),
+        }
     }
 }
 

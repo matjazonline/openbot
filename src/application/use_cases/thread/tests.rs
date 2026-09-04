@@ -28,6 +28,8 @@ fn internal_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -822,6 +824,8 @@ async fn test_inter_channel_hop_limit_rejection() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -933,6 +937,8 @@ async fn test_spf_authentication_failure_rejection() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1039,6 +1045,8 @@ async fn test_high_spam_score_rejection() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1143,6 +1151,8 @@ async fn test_dmarc_authentication_failure_rejection() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1247,6 +1257,8 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1352,6 +1364,8 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1458,6 +1472,8 @@ async fn test_channel_in_cc_resolves_properly() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1594,6 +1610,8 @@ async fn test_multi_channel_to_and_cc_execution() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1772,6 +1790,8 @@ async fn test_pipeline_address_chaining_execution() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -1911,6 +1931,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -2065,6 +2087,8 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -2271,6 +2295,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -2425,6 +2451,8 @@ async fn test_sender_verification_and_delegation_target_check() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -3016,6 +3044,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -3233,6 +3263,8 @@ async fn test_context_only_quiet_mode_ingestion() {
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        resend_inbound: None,
+        resend_outbound: None,
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),

@@ -10,6 +10,7 @@
 //! or a [`ParsedEmail`](parser::ParsedEmail).
 
 pub mod attachments;
+pub mod authentication;
 pub mod egress;
 pub mod ingress;
 pub mod mail;
@@ -19,10 +20,14 @@ mod selector;
 pub mod test_support;
 mod types;
 
+pub use authentication::{
+    AuthResults, AuthenticationResults, parse_raw_mime_to_payload, verify_email_authentication,
+};
 pub use egress::{EmailRenderer, EmailSender, OUTBOUND_EMAIL_VERSION, OutboundEmailV1};
 pub use ingress::{EmailIngressAdapter, EmailIngressError, EmailIngressTrust, VerifiedEmailAuth};
 pub use mail::{
-    DisabledMailTransport, MailHeader, MailMessage, MailTransport, SmtpConfirmationSender,
+    DisabledMailTransport, MailHeader, MailMessage, MailSendOutcome, MailTransport,
+    SmtpConfirmationSender,
 };
 pub use selector::{
     EmailChannelSelection, EmailChannelSelectorParser, EmailDeliveryHints, EmailDeliveryMode,

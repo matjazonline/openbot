@@ -17,8 +17,9 @@ use crate::{
     adapters::{
         http::app_state::AppState,
         protocols::email::{
-            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
+            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth, parse_raw_mime_to_payload,
             parser::{MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload},
+            verify_email_authentication,
         },
         storage::FileStorage,
     },
@@ -165,13 +166,8 @@ async fn sendgrid_inbound_webhook(
     let sender_ip = sender_ip.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
     let envelope_from = raw_payload.from.clone();
     let envelope_to = raw_payload.to.clone();
-    let auth = crate::adapters::smtp::server::verify_email_authentication(
-        &raw_mime,
-        Some(&envelope_from),
-        sender_ip,
-    )
-    .await;
-    raw_payload = crate::adapters::smtp::server::parse_raw_mime_to_payload(
+    let auth = verify_email_authentication(&raw_mime, Some(&envelope_from), sender_ip).await;
+    raw_payload = parse_raw_mime_to_payload(
         &raw_mime,
         Some(&envelope_from),
         Some(&envelope_to),
@@ -1170,6 +1166,8 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            resend_inbound: None,
+            resend_outbound: None,
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),

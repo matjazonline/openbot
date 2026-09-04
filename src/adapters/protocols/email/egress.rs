@@ -38,7 +38,8 @@ use crate::{
 };
 
 use super::{
-    EmailChannelSelectorParser, EmailRecipientDestination, MailHeader, MailMessage, MailTransport,
+    EmailChannelSelectorParser, EmailRecipientDestination, MailHeader, MailMessage,
+    MailSendOutcome, MailTransport,
 };
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
@@ -529,30 +530,62 @@ impl TransportSender for EmailSender {
         let message_id = email.message_id.clone();
 
         match self.transport.send(email.into_mail_message()).await {
-            // The relay accepted the message and the `Message-ID` we chose is the provider's key
-            // for it: SMTP returns no identifier of its own, and this is the value a recipient's
-            // `References:` header will name when they reply.
-            Ok(()) => ProviderSendOutcome::Delivered {
-                provider_key: provider_key(&message_id, delivery),
+            // The `Message-ID` this renderer chose is the provider's key unless the provider says
+            // otherwise: it is the value a recipient's `References:` header will name when they
+            // reply, and it is what an inbound reply resolves back to this thread through. SMTP
+            // returns no identifier of its own and answers `None`; an API that substitutes its own
+            // id hands it back here so the mapping still points at what actually went out.
+            MailSendOutcome::Accepted { provider_key: key } => ProviderSendOutcome::Delivered {
+                provider_key: key.or_else(|| provider_key(&message_id, delivery)),
             },
-            // One `Err` for every SMTP failure is all the transport port offers, and a submission
-            // that failed may still have been queued by the relay -- an accepted `DATA` whose
-            // final acknowledgement was lost is indistinguishable here from a refused connection.
-            // Ambiguity is the honest classification: it is reconciled or dead-lettered, never
-            // silently sent twice.
-            //
-            // Retrying anyway would be the previous shape's behaviour, and the duplicate it
-            // produces is the failure this whole queue exists to avoid.
-            Err(error) => {
+            MailSendOutcome::Rejected { class, detail: why } => {
                 warn!(
                     delivery_id = %delivery.id,
                     correlation_id = %delivery.correlation_id,
-                    %error,
+                    %class,
+                    "A mail submission was definitively refused"
+                );
+                ProviderSendOutcome::Terminal {
+                    class,
+                    detail: detail(&why),
+                }
+            }
+            MailSendOutcome::RateLimited {
+                retry_after,
+                detail: why,
+            } => match retry_after {
+                Some(retry_after) => ProviderSendOutcome::RetryAfter {
+                    retry_after,
+                    class: FailureClass::RateLimited,
+                    detail: detail(&why),
+                },
+                // Rate limited without a stated wait. The queue's own backoff is the answer;
+                // inventing a delay here would be a guess dressed as the provider's instruction.
+                None => ProviderSendOutcome::Retryable {
+                    class: FailureClass::RateLimited,
+                    detail: detail(&why),
+                },
+            },
+            // Only a transport that can promise a re-send cannot duplicate reports this arm.
+            MailSendOutcome::Retryable { class, detail: why } => ProviderSendOutcome::Retryable {
+                class,
+                detail: detail(&why),
+            },
+            // A submission that failed may still have been queued -- an accepted `DATA` whose
+            // final acknowledgement was lost is indistinguishable from a refused connection.
+            // Ambiguity is the honest classification: it is reconciled or dead-lettered, never
+            // silently sent twice, because the duplicate that would produce is the failure this
+            // whole queue exists to avoid.
+            MailSendOutcome::Unknown { class, detail: why } => {
+                warn!(
+                    delivery_id = %delivery.id,
+                    correlation_id = %delivery.correlation_id,
+                    %class,
                     "A mail submission failed without a definite verdict"
                 );
                 ProviderSendOutcome::OutcomeUnknown {
-                    class: FailureClass::Network,
-                    detail: detail(&error.to_string()),
+                    class,
+                    detail: detail(&why),
                 }
             }
         }

@@ -584,6 +584,45 @@ a provider sent us is what a test is for. What the gate forbids is *production* 
    rather than claimed exactly once; provider Message-ID and durable state support reconciliation
    and operator handling.
 
+### Email inbound and reply through a provider MX (Resend)
+
+The same canonical path as above, entered differently. Worth its own trace because two of the
+things the SMTP listener knows for free -- the connecting IP, and the mail itself -- are not
+available at the moment the request arrives.
+
+1. **Authentication boundary:** `POST /webhooks/email/resend` verifies the Svix headers (`svix-id`,
+   `svix-timestamp`, `svix-signature`) as an HMAC-SHA256 over `{id}.{timestamp}.{raw body}` inside
+   a replay window, over the exact bytes and before anything parses them.
+2. **Tenant, and only the tenant:** the route resolves a company from the platform address the mail
+   was received for, because `inbound_events.company_id` is not nullable. A recipient that resolves
+   to no company is acknowledged and dropped rather than bounced: nothing has authenticated the
+   sender yet, so a bounce would be backscatter. Which channel, which ACL and whether the mail
+   authenticates are all decided later, with the message in hand.
+3. **Durable placement:** the exact bytes go to `inbound_events` keyed by the *Resend mail id*, not
+   the Svix delivery id, so a redelivery and a duplicate webhook for one mail collapse onto one
+   row. The route then answers 2xx. It makes no provider call: the `email.received` payload carries
+   no body, headers or attachments, so reading the mail costs two further round trips and doing
+   them inline would earn a webhook timeout and a redelivery of half-done work.
+4. **Decode under lease:** the inbound worker claims the row and the email decoder fetches
+   `GET /emails/receiving/{id}`, then the signed raw-MIME URL it names, bounded by the same 20 MiB
+   the SMTP listener enforces. One representation yields body, headers and attachments, so no two
+   sources can disagree.
+5. **Authentication verdicts:** only the receiving MTA saw the connecting IP, so SPF cannot be
+   re-derived here. The verdicts come from the *first* `Authentication-Results` header whose
+   `authserv-id` equals the configured value -- the trusted-upstream exception in
+   `src/adapters/smtp/AGENTS.md`, whose safety rests entirely on reading that one header and no
+   other. Anything else leaves every verdict `Unknown` and `guard_ingress` refuses the message.
+6. **Canonical commit:** from here it is step 2 onward of the trace above, unchanged. The decoder
+   hands the worker an `InboundCommitRequest` with `claimed_event` empty; the worker injects the
+   live fence, so completing the event and storing the message are one transaction. The commit
+   carries the event's own correlation id, which is why a correlation header on mail arriving this
+   way does not continue a chain: the durable event existed before anything had read the mail.
+7. **Recovery point:** a rate limit, a 5xx or a dropped connection costs an attempt with backoff; a
+   404, an expired URL or a body past the bound is terminal, because asking again asks the same
+   question. Outbound, the rendered `Message-ID` is replayed as the `Idempotency-Key`, so an
+   ambiguous send is retryable rather than dead-lettered -- the one place a provider API can be
+   less conservative than SMTP submission, which has no such key.
+
 ### Slack inbound and reply
 
 1. **Authentication boundary:** the Slack endpoint verifies timestamp, exact raw-body HMAC, app ID,

@@ -1,13 +1,16 @@
-//! SMTP-facing mail values and account-confirmation delivery.
+//! Provider-facing mail values and account-confirmation delivery.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use tracing::info;
 
 use crate::{
-    app_error::AppResult,
-    entities::value_objects::{EmailAddress, MessageId},
+    app_error::{AppError, AppResult},
+    entities::{
+        transport::{ExternalMessageKey, FailureClass},
+        value_objects::{EmailAddress, MessageId},
+    },
     infra::config::AppConfig,
     use_cases::user::{ConfirmationCodeSender, ConfirmationPurpose},
 };
@@ -32,22 +35,70 @@ pub struct MailMessage {
     pub headers: Vec<MailHeader>,
 }
 
-#[async_trait]
-pub trait MailTransport: Send + Sync {
-    async fn send(&self, message: MailMessage) -> AppResult<()>;
+/// What a mail provider said about one submission.
+///
+/// A value rather than an `AppResult<()>` because the difference between the arms is the whole
+/// reason a delivery queue exists. `Err` collapses "this address is malformed and always will be",
+/// "come back in thirty seconds" and "the connection dropped after I sent the body" into one
+/// thing, and only the last of those forbids sending again. SMTP genuinely cannot tell the second
+/// from the third and answers [`Self::Unknown`]; an HTTP API can, and an adapter that knows should
+/// not have to throw the knowledge away at this seam.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MailSendOutcome {
+    /// The provider took it.
+    Accepted {
+        /// The provider's own key, when it minted one instead of honouring the `Message-ID` this
+        /// deployment chose. `None` means the rendered `Message-ID` is still the key, which is the
+        /// SMTP case and the case a compliant API leaves alone.
+        provider_key: Option<ExternalMessageKey>,
+    },
+    /// Refused, and the identical submission will be refused again.
+    Rejected { class: FailureClass, detail: String },
+    /// Refused with an explicit wait the provider asked for.
+    RateLimited {
+        retry_after: Option<Duration>,
+        detail: String,
+    },
+    /// Not accepted, and worth another attempt. Only for a transport that can promise re-sending
+    /// cannot duplicate -- an idempotency key the provider honours, or a request that provably
+    /// never reached it.
+    Retryable { class: FailureClass, detail: String },
+    /// It may or may not have been accepted. Reconcile or dead-letter; never blind-retry.
+    Unknown { class: FailureClass, detail: String },
 }
 
-/// A transport that logs and drops, used when SMTP is disabled and by focused tests.
+impl MailSendOutcome {
+    /// This outcome as an `AppResult`, for the callers that only need "did it go".
+    ///
+    /// Used by [`SmtpConfirmationSender`], which sends a confirmation code inside a registration
+    /// and has no queue to record a nuance in.
+    pub fn into_result(self) -> AppResult<()> {
+        match self {
+            Self::Accepted { .. } => Ok(()),
+            Self::Rejected { detail, .. }
+            | Self::RateLimited { detail, .. }
+            | Self::Retryable { detail, .. }
+            | Self::Unknown { detail, .. } => Err(AppError::Internal(detail)),
+        }
+    }
+}
+
+#[async_trait]
+pub trait MailTransport: Send + Sync {
+    async fn send(&self, message: MailMessage) -> MailSendOutcome;
+}
+
+/// A transport that logs and drops, used when no relay is configured and by focused tests.
 pub struct DisabledMailTransport;
 
 #[async_trait]
 impl MailTransport for DisabledMailTransport {
-    async fn send(&self, message: MailMessage) -> AppResult<()> {
+    async fn send(&self, message: MailMessage) -> MailSendOutcome {
         info!(
             message_id = message.message_id.as_ref().map(MessageId::as_str),
-            "SMTP delivery is disabled; simulating dispatch"
+            "Mail delivery is disabled; simulating dispatch"
         );
-        Ok(())
+        MailSendOutcome::Accepted { provider_key: None }
     }
 }
 
@@ -87,6 +138,7 @@ impl ConfirmationCodeSender for SmtpConfirmationSender {
                 headers: Vec::new(),
             })
             .await
+            .into_result()
     }
 }
 

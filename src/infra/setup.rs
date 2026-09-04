@@ -4,6 +4,7 @@ use crate::{
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::email::{EmailRenderer, EmailSender, MailTransport, SmtpConfirmationSender},
+        resend::{ReqwestResendClient, ResendApi, ResendInboundDecoder, ResendMailTransport},
         smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
@@ -45,8 +46,28 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
     let agent_run_timeout = agent_run_timeout_from_env();
-    let mail_transport: Arc<dyn MailTransport> =
-        LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
+
+    // One client for both directions. The outbound credential is what buys the inbound calls too:
+    // reading a received mail is an authenticated API request, so a deployment that receives
+    // through Resend but sends over SMTP still needs the key configured.
+    let resend_api: Option<Arc<dyn ResendApi>> = match config.resend_outbound.as_ref() {
+        Some(outbound) => Some(Arc::new(
+            ReqwestResendClient::from_config(outbound)
+                .map_err(|error| anyhow::anyhow!("Could not build the Resend client: {error}"))?,
+        )),
+        None => None,
+    };
+    // Config-selected rather than either/or in code: a deployment with no Resend key keeps the
+    // relay it has, including the loopback one the local stack runs on.
+    let mail_transport: Arc<dyn MailTransport> = match resend_api.clone() {
+        Some(api) => {
+            tracing::info!("Sending mail through the Resend API");
+            Arc::new(ResendMailTransport::new(api))
+        }
+        None => {
+            LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?
+        }
+    };
 
     let sessions = Arc::new(SessionAuthority::new(&config));
 
@@ -113,7 +134,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         memory_providers,
         monitoring.clone(),
     ));
-    let runtime_identity = MachineIdentity::from_runtime_environment();
+    let runtime_identity = MachineIdentity::process().clone();
     let argon_hasher = argon2_password_hasher();
 
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone())
@@ -194,15 +215,35 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_memory(memory_coordinator),
     );
 
-    // The generic inbox exists before any webhook uses it. Slack adds its decoder to this
-    // registry in the transport phase; an empty registry is safe because no route can enqueue a
-    // Slack event yet, while startup reconciliation is already supervised and exercised.
+    // A decoder is registered only for a transport whose route can actually enqueue an event.
+    // Registering the email decoder without Resend inbound configured would advertise a reader for
+    // rows nothing writes; leaving it out when Resend *is* configured would leave every stored
+    // event unclaimed, so both halves are the same condition.
+    let mut inbound_decoders = InboundEventDecoderRegistry::new();
+    if config.resend_inbound.is_some() {
+        let api = resend_api.clone().ok_or_else(|| {
+            anyhow::anyhow!(
+                "RESEND_INBOUND_ENABLED=true requires RESEND_API_KEY: the mail behind a webhook is \
+                 fetched with an authenticated API call"
+            )
+        })?;
+        inbound_decoders = inbound_decoders
+            .register(Arc::new(ResendInboundDecoder::new(
+                api,
+                config.clone(),
+                thread_use_cases.clone(),
+                file_storage.clone(),
+            )))
+            .map_err(|error| {
+                anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
+            })?;
+    }
     let inbound_event_wakeups = InboundEventWakeups::new();
     let inbound_event_worker = Arc::new(
         InboundEventWorker::new(
             postgres_arc.clone(),
             postgres_arc.clone(),
-            Arc::new(InboundEventDecoderRegistry::new()),
+            Arc::new(inbound_decoders),
             inbound_event_wakeups.clone(),
         )
         .with_monitoring(monitoring.clone()),

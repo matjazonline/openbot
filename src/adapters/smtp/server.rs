@@ -1,4 +1,3 @@
-use mail_parser::MimeHeaders;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, RwLock};
@@ -14,10 +13,9 @@ use crate::{
     adapters::{
         protocols::email::{
             EmailChannelSelectorParser, EmailIdentity, EmailIngressAdapter, EmailIngressTrust,
-            VerifiedEmailAuth,
-            parser::{
-                MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
-            },
+            VerifiedEmailAuth, parse_raw_mime_to_payload,
+            parser::{MAX_INBOUND_MESSAGE_BYTES, RawInboundPayload, extract_email},
+            verify_email_authentication,
         },
         storage::FileStorage,
     },
@@ -26,7 +24,6 @@ use crate::{
         ThreadUseCases,
     },
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
-    entities::auth::AuthVerdict,
     infra::config::AppConfig,
 };
 
@@ -777,86 +774,6 @@ enum CommandOutcome {
     Close,
 }
 
-/// DNS-backed authentication shared by direct SMTP and authenticated upstream ingress.
-pub(crate) async fn verify_email_authentication(
-    raw_mime: &[u8],
-    mail_from: Option<&str>,
-    client_ip: IpAddr,
-) -> AuthResults {
-    let mut results = AuthResults::default();
-    let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() else {
-        return results;
-    };
-
-    let mut spf_output = None;
-    if let Some(sender) = mail_from {
-        let domain = sender.split('@').nth(1).unwrap_or(sender);
-        let spf_res = resolver
-            .verify_spf(mail_auth::spf::verify::SpfParameters::verify_mail_from(
-                client_ip, domain, domain, sender,
-            ))
-            .await;
-        results.spf = match spf_res.result() {
-            mail_auth::SpfResult::Pass => AuthVerdict::Pass,
-            mail_auth::SpfResult::Fail => AuthVerdict::Fail,
-            mail_auth::SpfResult::SoftFail => AuthVerdict::SoftFail,
-            mail_auth::SpfResult::Neutral => AuthVerdict::Neutral,
-            mail_auth::SpfResult::TempError => AuthVerdict::TempError,
-            mail_auth::SpfResult::PermError => AuthVerdict::PermError,
-            _ => AuthVerdict::Unavailable,
-        };
-        spf_output = Some(spf_res);
-    }
-
-    let Some(auth_msg) = mail_auth::AuthenticatedMessage::parse(raw_mime) else {
-        return results;
-    };
-    let dkim_outputs = resolver.verify_dkim(&auth_msg).await;
-    if !dkim_outputs.is_empty() {
-        results.dkim = if dkim_outputs
-            .iter()
-            .any(|output| matches!(output.result(), mail_auth::DkimResult::Pass))
-        {
-            AuthVerdict::Pass
-        } else if dkim_outputs
-            .iter()
-            .any(|output| matches!(output.result(), mail_auth::DkimResult::Fail(_)))
-        {
-            AuthVerdict::Fail
-        } else {
-            AuthVerdict::Unavailable
-        };
-    }
-
-    if let (Some(spf_output), Some(sender)) = (spf_output.as_ref(), mail_from) {
-        let domain = sender.split('@').nth(1).unwrap_or(sender);
-        let dmarc = resolver
-            .verify_dmarc(mail_auth::dmarc::verify::DmarcParameters::new(
-                &auth_msg,
-                &dkim_outputs,
-                domain,
-                spf_output,
-            ))
-            .await;
-        results.dmarc = if matches!(dmarc.dkim_result(), mail_auth::DmarcResult::Pass)
-            || matches!(dmarc.spf_result(), mail_auth::DmarcResult::Pass)
-        {
-            AuthVerdict::Pass
-        } else {
-            AuthVerdict::Fail
-        };
-    }
-    results
-}
-
-/// SPF/DKIM/DMARC verdicts from the local DNS verifier.
-#[derive(Default)]
-pub(crate) struct AuthResults {
-    pub(crate) spf: AuthVerdict,
-    pub(crate) dkim: AuthVerdict,
-    pub(crate) dmarc: AuthVerdict,
-}
-
 fn extract_command_address(re: &regex::Regex, arg: &str) -> Option<String> {
     let cap = re.captures(arg)?;
     let raw = cap
@@ -946,122 +863,6 @@ impl SmtpAnswer {
 
     fn line(&self) -> String {
         format!("{} {}\r\n", self.code, self.detail)
-    }
-}
-
-fn extract_address_str(addr: &mail_parser::Address) -> Option<String> {
-    match addr {
-        mail_parser::Address::List(list) => list
-            .first()
-            .and_then(|a| a.address.as_deref())
-            .map(extract_email),
-        mail_parser::Address::Group(groups) => groups
-            .first()
-            .and_then(|g| g.addresses.first())
-            .and_then(|a| a.address.as_deref())
-            .map(extract_email),
-    }
-}
-
-pub fn parse_raw_mime_to_payload(
-    raw_mime: &[u8],
-    smtp_mail_from: Option<&str>,
-    smtp_rcpt_to: Option<&str>,
-    _all_rcpts: &[String],
-    spf_status: AuthVerdict,
-    dkim_status: AuthVerdict,
-    dmarc_status: AuthVerdict,
-) -> RawInboundPayload {
-    if let Some(msg) = mail_parser::MessageParser::new().parse(raw_mime) {
-        // Extract sender
-        let from = smtp_mail_from
-            .filter(|s| !s.is_empty())
-            .map(extract_email)
-            .or_else(|| msg.from().and_then(extract_address_str))
-            .unwrap_or_default();
-
-        // Extract primary recipient ('to')
-        let to = smtp_rcpt_to
-            .filter(|s| !s.is_empty())
-            .map(extract_email)
-            .or_else(|| msg.to().and_then(extract_address_str))
-            .unwrap_or_default();
-
-        // Extract CC
-        let cc = msg.cc().and_then(extract_address_str);
-
-        // Extract subject
-        let subject = msg.subject().map(|s| s.to_string());
-
-        // Extract body text and html
-        let text = msg.body_text(0).map(|t| t.to_string());
-        let html = msg.body_html(0).map(|h| h.to_string());
-
-        // Format headers string & fallback header-based SPF/DKIM extraction
-        let headers = {
-            let mut hdrs = String::new();
-            for header in msg.headers() {
-                let name = header.name();
-                if let Some(val_str) = header.value().as_text() {
-                    hdrs.push_str(name);
-                    hdrs.push_str(": ");
-                    hdrs.push_str(val_str);
-                    hdrs.push('\n');
-                } else if let Some(addr) = header.value().as_address()
-                    && let Some(addr_str) = extract_address_str(addr)
-                {
-                    hdrs.push_str(name);
-                    hdrs.push_str(": ");
-                    hdrs.push_str(&addr_str);
-                    hdrs.push('\n');
-                }
-            }
-            if hdrs.is_empty() { None } else { Some(hdrs) }
-        };
-
-        // Extract attachments
-        let mut attachments_data = Vec::new();
-        for att in msg.attachments() {
-            let filename = att.attachment_name().unwrap_or("attachment").to_string();
-            let content_type = att
-                .content_type()
-                .map(|c| c.c_type.to_string())
-                .unwrap_or_else(|| "application/octet-stream".to_string());
-            let content = att.contents().to_vec();
-
-            attachments_data.push(RawAttachmentData {
-                filename,
-                content_type,
-                content,
-                stored_key: None,
-            });
-        }
-
-        RawInboundPayload {
-            to,
-            from,
-            cc,
-            subject,
-            text,
-            html,
-            headers,
-            spf: spf_status,
-            dkim: dkim_status,
-            dmarc: dmarc_status,
-            spam_score: None,
-            attachments_data,
-        }
-    } else {
-        let raw_text = String::from_utf8_lossy(raw_mime).to_string();
-        RawInboundPayload {
-            to: smtp_rcpt_to.map(extract_email).unwrap_or_default(),
-            from: smtp_mail_from.map(extract_email).unwrap_or_default(),
-            text: Some(raw_text),
-            spf: spf_status,
-            dkim: dkim_status,
-            dmarc: dmarc_status,
-            ..Default::default()
-        }
     }
 }
 
@@ -1496,6 +1297,7 @@ mod tests {
 
     #[test]
     fn test_parse_raw_mime_to_payload() {
+        use crate::entities::auth::AuthVerdict;
         let raw_mime = b"From: Sender <sender@external.com>\r\nTo: Agent <inbound@acme.mailagents.com>\r\nSubject: Test Email\r\nMessage-ID: <TEST12345@external.com>\r\nAuthentication-Results: spf=pass dkim=pass\r\nContent-Type: text/plain\r\n\r\nHello from SMTP server!";
 
         let payload = parse_raw_mime_to_payload(
@@ -1579,6 +1381,8 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            resend_inbound: None,
+            resend_outbound: None,
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
@@ -1811,6 +1615,8 @@ regis";
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            resend_inbound: None,
+            resend_outbound: None,
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
@@ -1938,6 +1744,8 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            resend_inbound: None,
+            resend_outbound: None,
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),

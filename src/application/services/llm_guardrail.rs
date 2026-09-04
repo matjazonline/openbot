@@ -190,6 +190,8 @@ mod tests {
         let config = AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            resend_inbound: None,
+            resend_outbound: None,
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),

@@ -43,8 +43,8 @@ use crate::{
         value_objects::ThreadIndexParseError,
     },
     transport::{
-        BoundedVec, InboundCommitOutcome, InboundDraft, InboundRouting, MAX_ATTACHMENTS,
-        MessageDisposition, ReplyDelivery,
+        BoundedVec, InboundCommitOutcome, InboundCommitRequest, InboundDraft, InboundRouting,
+        MAX_ATTACHMENTS, MessageDisposition, ReplyDelivery,
     },
     use_cases::thread::{
         ChannelMatch, InboundIngestResult, ThreadUseCases, ingest::commit::CommitPlan,
@@ -179,6 +179,20 @@ pub struct PreparedInbound {
 }
 
 impl PreparedInbound {
+    /// This message as the commit request it will be written by, without writing it.
+    ///
+    /// The two ingress shapes need the same plan at different moments. A listener that must answer
+    /// its own session commits inline through [`ThreadUseCases::commit_prepared_inbound`] and reads
+    /// the result back. A transport whose events come off the durable inbox cannot: the worker owns
+    /// the execution fence, and only it may put the live lease into `claimed_event` so the event's
+    /// completion and the message become durable together. So a decoder hands the plan over and the
+    /// worker commits it.
+    ///
+    /// `claimed_event` is deliberately left `None` here. Filling it is the worker's alone.
+    pub fn into_commit_request(self) -> InboundCommitRequest {
+        self.plan.request()
+    }
+
     pub fn replace_attachments(
         &mut self,
         attachments: BoundedVec<crate::entities::message::AttachmentMetadata, MAX_ATTACHMENTS>,
