@@ -21,13 +21,16 @@ use crate::{
     entities::{
         agent::Agent,
         approval::ApprovalSubject,
-        channel::{PUBLIC_PARTICIPANT, ParticipantAccess},
+        channel::{Channel, ParticipantAccess, PUBLIC_PARTICIPANT},
+        company::Company,
         correlation::CorrelationId,
+        email_message::EmailMessageMetadata,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{CanonicalMessageId, MessageDirection, MessageRole},
-        task::TokenUsage,
-        transport::PrincipalId,
-        value_objects::EmailAddress,
+        schedule::ScheduledRunPayload,
+        task::{BackgroundTask, TokenUsage},
+        transport::{PrincipalId, TransportKind},
+        value_objects::{EmailAddress, MessageId},
     },
     services::{
         agent_channel_tool::AgentChannelToolContext,
@@ -39,8 +42,9 @@ use crate::{
     },
     task_queue::{AgentDispatchCommit, DispatchCommit, TASK_LEASE_SECONDS},
     transport::{
-        CanonicalContent, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
-        EmailRelayTrace, EmailThreading, InboundEnvelope, NewDelivery,
+        CanonicalContent, ComposedDelivery, ConversationAnchor, DeliveryContext, DeliveryPurpose,
+        DeliveryRequest, EmailDeliveryContext, EmailRelayTrace, EmailThreading, InboundEnvelope,
+        NewDelivery,
     },
 };
 
@@ -125,6 +129,35 @@ fn guardrail_may_be_skipped(access: &ParticipantAccess, envelope: &InboundEnvelo
 /// a `MessageId` instead -- which is what this used to do -- puts a Slack timestamp into a live
 /// `In-Reply-To:` and into the `email_message_metadata` index that resolves inbound replies to
 /// threads.
+/// The email extension an outbound answer records, from the mail that was actually frozen.
+///
+/// `None` for a transport that cannot name its key in advance, which is the honest answer: a
+/// fabricated `Message-ID` in `external_messages` would map the answer to a value no mail was sent
+/// under, and every reply quoting the real one would still miss.
+fn email_correlation(
+    composed: &ComposedDelivery,
+    threading: &EmailThreading,
+    body: String,
+) -> Option<EmailMessageMetadata> {
+    if composed.delivery.transport != TransportKind::Email {
+        return None;
+    }
+    let provider_key = composed.provider_key.as_ref()?;
+    let (in_reply_to, references) = match threading {
+        EmailThreading::Received {
+            in_reply_to,
+            references,
+        } => (Some(in_reply_to.clone()), references.clone()),
+        EmailThreading::Standalone | EmailThreading::Anchored(_) => (None, Vec::new()),
+    };
+    Some(
+        EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
+            .in_reply_to(in_reply_to)
+            .references(references)
+            .raw_bodies(Some(body), None),
+    )
+}
+
 fn answering(envelope: &InboundEnvelope) -> EmailThreading {
     EmailThreading::received(
         rfc_message_id(envelope).cloned(),
@@ -158,6 +191,12 @@ fn reply_subject(subject: &str) -> String {
     } else {
         format!("Re: {subject}")
     }
+}
+
+/// The conversation a scheduled run's mail threads onto: the run's own durable slot.
+pub(crate) fn scheduled_run_anchor(payload: &ScheduledRunPayload) -> ConversationAnchor {
+    ConversationAnchor::parse(format!("schedule-run:{}", payload.run_key))
+        .expect("a prefixed UUID is within the anchor bound")
 }
 
 /// One agent's contribution to the reply.
@@ -201,6 +240,21 @@ pub enum DispatchOutcome {
 ///
 /// Kept together because the three parts are one effect: the message describes the reply, the
 /// deliveries carry it, and both are derived from the same `delivery`.
+/// What freezing the agent's answer produced.
+///
+/// The correlation is the half this used to drop. A delivery can name the `Message-ID` it will go
+/// out under before it is sent, and unless that id is written onto the canonical message nothing
+/// maps the answer: `find_ancestor_thread` looks a reply's `In-Reply-To:` up in
+/// `external_messages`, so an answer that was never registered there cannot be found, and a reply
+/// naming only the answer -- no `References:` back to the customer's own first mail -- opens a
+/// thread of its own. `OutreachAndAwaitQuorumTool` has always recorded its question this way; the
+/// reply path is the producer that did not.
+struct PlannedReply {
+    deliveries: Vec<NewDelivery>,
+    /// `None` when nothing was sent -- a simulated run -- and so nothing named a key.
+    correlation: Option<EmailMessageMetadata>,
+}
+
 struct PreparedDispatch {
     delivery: OutboundDelivery,
     /// Empty for a simulated run, which answers in the thread and sends nothing.
@@ -287,6 +341,363 @@ impl ThreadUseCases {
         Box::pin(self.run_claimed_dispatch(ingest, mode, lease, correlation_id)).await
     }
 
+    /// Run one `scheduled_agent_run` task: answer the schedule's prompt in its thread, record
+    /// execution audit metadata and tokens in the task payload, and email the answer if configured.
+    pub async fn execute_claimed_scheduled_agent_task_and_dispatch(
+        &self,
+        task: &BackgroundTask,
+        lease: TaskLeaseRef,
+    ) -> AppResult<DispatchOutcome> {
+        Box::pin(self.run_claimed_scheduled_dispatch(task, lease)).await
+    }
+
+    async fn run_claimed_scheduled_dispatch(
+        &self,
+        task: &BackgroundTask,
+        lease: TaskLeaseRef,
+    ) -> AppResult<DispatchOutcome> {
+        let payload: ScheduledRunPayload = serde_json::from_value(task.payload.clone())
+            .map_err(|e| AppError::Internal(format!("Invalid scheduled task payload: {e}")))?;
+
+        let company = self
+            .company_persistence
+            .get_by_id(payload.company_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Company {} not found", payload.company_id)))?;
+
+        let channel = self
+            .channel_persistence
+            .get_by_id(payload.channel_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Channel {} not found", payload.channel_id)))?;
+
+        let first_agent_id = channel
+            .agent_ids
+            .as_ref()
+            .and_then(|ids| ids.first().copied())
+            .ok_or_else(|| {
+                AppError::Internal("Enabled channel has no active agent at position 0.".to_string())
+            })?;
+        let agents = self
+            .agent_persistence
+            .as_ref()
+            .ok_or_else(|| AppError::Internal("Agent persistence is unavailable.".to_string()))?;
+        let agent = agents
+            .get_by_id(first_agent_id)
+            .await?
+            .ok_or_else(|| {
+                AppError::NotFound(format!("Active agent {first_agent_id} was not found."))
+            })?;
+
+        // Idempotency Guard: Check if an outbound reply for this prompt message was already sent
+        if let Some(existing) = self
+            .find_outbound_reply_after(payload.thread_id, payload.prompt_message_id)
+            .await?
+        {
+            info!(
+                "Idempotency Guard: schedule '{}' already answered in thread {}, skipping the agent",
+                payload.schedule_name, payload.thread_id
+            );
+            if let Some(delivery) = self
+                .scheduled_delivery(
+                    task,
+                    &payload,
+                    &company,
+                    &channel,
+                    existing.canonical_id,
+                    &existing.clean_text_body,
+                )
+                .await?
+            {
+                self.task_persistence.enqueue_delivery(delivery).await?;
+            }
+            return Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
+                reply_message_id: Some(existing.canonical_id),
+                agent_response: existing.clean_text_body,
+                email_sent: payload.wants_email(),
+                token_usage: task.token_usage(),
+                metadata: None,
+            })));
+        }
+
+        let history = self
+            .thread_persistence
+            .list_agent_history(payload.thread_id)
+            .await?;
+
+        let params = Box::pin(resolve_agent_params(
+            self.company_persistence.as_ref(),
+            &company,
+            Some(&agent),
+        ))
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to resolve agent parameters: {e}")))?;
+
+        let mut prompt = payload.prompt.clone();
+        if let Some(memory) = self.memory.as_ref()
+            && let Some(recalled) = memory
+                .recall(MemoryRecallInput {
+                    company: &company,
+                    channel: &channel,
+                    agent: Some(&agent),
+                    subject_principal: payload.run_as_principal(),
+                    audience: MemoryRecallAudience::MemberOrSystem,
+                    task_id: task.id,
+                    latest_prompt: &payload.prompt,
+                })
+                .await?
+        {
+            prompt.push_str("\n\n");
+            prompt.push_str(&recalled);
+        }
+
+        let mut runner = AgentRunner::new(&prompt, &params)
+            .subject(Some(&payload.subject))
+            .history(&history)
+            .approval_use_cases(self.approval_use_cases.clone())
+            .approval_context(Some(
+                self.approval_context_for_channel(
+                    &company,
+                    &channel,
+                    task.thread_id.unwrap_or(payload.thread_id),
+                    Some(task.id),
+                    lease,
+                    task.correlation_id,
+                )
+                .await,
+            ))
+            .monitoring(self.monitoring.clone())
+            .config(Some(self.config.clone()))
+            .company(Some(company.clone()))
+            .ids(Some(company.id), Some(channel.id), Some(agent.id))
+            .trace(task.correlation_id, Some(task.id));
+
+        if let Some(agent_persistence) = self.agent_persistence() {
+            runner = runner.agent_directory(
+                agent_persistence.clone(),
+                self.binding_persistence.clone(),
+            );
+        }
+        if let Some(provisioning) = self.agent_channel_provisioning.clone() {
+            runner = runner.agent_channel_tool(
+                provisioning,
+                AgentChannelToolContext {
+                    company_id: company.id,
+                    company_slug: company.slug.clone(),
+                    source_agent_id: agent.id,
+                    source_agent_name: agent.name.clone(),
+                    source_channel_id: channel.id,
+                    task_id: task.id,
+                    app_domain_name: self.config.app_domain_name.clone(),
+                    channel_defaults: company.channel_defaults.clone(),
+                    spam_scanning: if self.config.is_spam_scan_enabled() {
+                        crate::use_cases::agent::SpamScanning::Available
+                    } else {
+                        crate::use_cases::agent::SpamScanning::Unavailable
+                    },
+                },
+            );
+        }
+
+        let run_timeout = agent.run_timeout(self.agent_run_timeout);
+        let output = match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
+            Ok(result) => result.map_err(AppError::from)?,
+            Err(_) => {
+                return Err(AppError::Timeout(format!(
+                    "agent run exceeded the {}s limit",
+                    run_timeout.as_secs()
+                )));
+            }
+        };
+
+        if output.disposition == AgentExecutionDisposition::Suspended {
+            info!("Scheduled agent execution suspended for task approval or outreach");
+            return Ok(DispatchOutcome::Suspended);
+        }
+
+        let reply_message = MessageWrite::internal(
+            payload.thread_id,
+            MessageAuthorWrite::Agent(AgentAuthor {
+                agent_id: agent.id,
+                display_label: agent.name.clone(),
+            }),
+            reply_subject(&payload.subject),
+            output.content.clone(),
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            task.correlation_id,
+        );
+        let reply = AgentReply {
+            message: reply_message,
+            also_in_threads: Vec::new(),
+        };
+
+        let deliveries = self
+            .scheduled_delivery(
+                task,
+                &payload,
+                &company,
+                &channel,
+                reply.message.id,
+                &output.content,
+            )
+            .await?
+            .into_iter()
+            .collect::<Vec<_>>();
+        let email_sent = !deliveries.is_empty();
+
+        let execution_parameters = build_execution_parameters(
+            Some(&params),
+            Some(&agent),
+            &payload.prompt,
+        );
+        let execution_result = build_execution_result(
+            &output.content,
+            email_sent,
+            reply.message.id,
+            None,
+            output.token_usage.clone(),
+            output.metadata.as_ref(),
+        );
+
+        let mut new_payload = task.payload.clone();
+        if let Some(object) = new_payload.as_object_mut() {
+            object.insert("execution_parameters".to_string(), execution_parameters);
+            object.insert("execution_result".to_string(), execution_result);
+        }
+
+        match self
+            .task_persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease,
+                reply: &reply,
+                deliveries,
+                payload: new_payload,
+                complete_outreach: true,
+            })
+            .await?
+        {
+            DispatchCommit::Committed { .. } => {}
+            DispatchCommit::LeaseLost => {
+                return Err(AppError::Internal(
+                    "Task lease was lost before the dispatch could be committed".into(),
+                ));
+            }
+        }
+
+        if let Some(memory) = self.memory.as_ref() {
+            memory
+                .persist(MemoryPersistInput {
+                    company: &company,
+                    channel: &channel,
+                    agent: Some(&agent),
+                    subject_principal: payload.run_as_principal(),
+                    task_id: task.id,
+                    user_context: &payload.prompt,
+                    final_answer: &output.content,
+                })
+                .await;
+        }
+
+        Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
+            reply_message_id: Some(reply.message.id),
+            agent_response: output.content,
+            email_sent,
+            token_usage: Some(output.token_usage),
+            metadata: output.metadata,
+        })))
+    }
+
+    async fn scheduled_delivery(
+        &self,
+        task: &BackgroundTask,
+        payload: &ScheduledRunPayload,
+        company: &Company,
+        channel: &Channel,
+        message_id: CanonicalMessageId,
+        answer: &str,
+    ) -> AppResult<Option<NewDelivery>> {
+        if !payload.wants_email() {
+            return Ok(None);
+        }
+
+        let recipients = self.scheduled_recipients(payload, channel).await;
+        let Some((primary_to, cc_list)) = recipients.split_first() else {
+            warn!(
+                "Schedule '{}' asked for email delivery but resolved no recipients",
+                payload.schedule_name
+            );
+            return Ok(None);
+        };
+
+        let context = EmailDeliveryContext {
+            from: Channel::address_for(&channel.slug, &company.slug, &self.config.app_domain_name),
+            from_name: Some(channel.name.clone()),
+            recipient_to: primary_to.clone(),
+            recipients_cc: cc_list.to_vec(),
+            threading: EmailThreading::Anchored(scheduled_run_anchor(payload)),
+            relay: Some(EmailRelayTrace {
+                source_channel_id: channel.id,
+                hop_count: 0,
+                trace_channels: vec![channel.id],
+            }),
+        };
+
+        let body = super::agent_response_body(answer);
+        let content = CanonicalContent::parse(
+            reply_subject(&payload.subject),
+            body,
+        )
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+
+        let composed = self
+            .deliveries
+            .compose(DeliveryRequest {
+                company_id: company.id,
+                channel_id: channel.id,
+                message_id,
+                task_id: Some(task.id),
+                correlation_id: task.correlation_id,
+                purpose: DeliveryPurpose::Notification,
+                source_key: format!("task:{}:scheduled-email", task.id),
+                content: &content,
+                context: DeliveryContext::Email(context),
+            })
+            .await?;
+
+        Ok(Some(composed.delivery))
+    }
+
+    async fn scheduled_recipients(
+        &self,
+        payload: &ScheduledRunPayload,
+        channel: &Channel,
+    ) -> Vec<EmailAddress> {
+        if let Some(custom) = payload.custom_recipients() {
+            return custom.to_vec();
+        }
+
+        let participants: Vec<EmailAddress> = channel
+            .participant_emails
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|email| !email.eq_ignore_ascii_case(PUBLIC_PARTICIPANT))
+            .collect();
+
+        if !participants.is_empty() {
+            return participants;
+        }
+
+        self.company_persistence
+            .list_company_team_emails(payload.company_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(EmailAddress::from)
+            .collect()
+    }
+
     /// The dispatch proper: run the agents, deliver the reply, and record what happened on the
     /// task. Marking the task done is the worker's job, not this one's.
     async fn run_claimed_dispatch(
@@ -323,14 +734,14 @@ impl ThreadUseCases {
         // The reply is built before its deliveries, not after: a delivery names the canonical
         // message it exposes, and that id is minted here so the message and the queue rows can be
         // written in one transaction.
-        let reply = Self::agent_reply_write(
+        let mut reply = Self::agent_reply_write(
             &matches,
             run.primary_agent.as_ref(),
             reply_subject(envelope.content.subject()),
             &response,
             correlation_id,
         )?;
-        let deliveries = self
+        let planned = self
             .plan_agent_deliveries(
                 AgentDelivery {
                     matches: &matches,
@@ -344,6 +755,18 @@ impl ThreadUseCases {
                 &reply,
             )
             .await?;
+        let PlannedReply {
+            deliveries,
+            correlation,
+        } = planned;
+        // Recorded on the message the commit writes, so the answer is findable under the id it is
+        // sent with. Without this a reply that names only this answer has no ancestor to resolve
+        // against.
+        if let Some(correlation) = correlation {
+            reply.message = reply
+                .message
+                .with_correlation(MessageCorrelation::Email(correlation));
+        }
         let delivery = OutboundDelivery {
             email_sent: !deliveries.is_empty(),
         };
@@ -644,24 +1067,23 @@ impl ThreadUseCases {
         })
     }
 
-    /// Approvals go to the first non-public channel participant, falling back to any company team
-    /// member.
-    async fn approval_context_for(
+    async fn approval_context_for_channel(
         &self,
-        channel_match: &ChannelMatch,
-        ingest: &InboundIngestResult,
+        company: &Company,
+        channel: &Channel,
+        thread_id: Uuid,
+        task_id: Option<Uuid>,
         lease: TaskLeaseRef,
         correlation_id: CorrelationId,
     ) -> ApprovalSubject {
         let team_approver = self
             .company_persistence
-            .list_company_team_emails(channel_match.company.id)
+            .list_company_team_emails(company.id)
             .await
             .unwrap_or_default()
             .into_iter()
             .next();
-        let approver_email = channel_match
-            .channel
+        let approver_email = channel
             .participant_emails
             .as_ref()
             .and_then(|participants| {
@@ -674,21 +1096,39 @@ impl ThreadUseCases {
             .unwrap_or_default();
 
         ApprovalSubject {
-            company_id: channel_match.company.id,
-            channel_id: channel_match.channel.id,
-            channel_name: channel_match.channel.name.clone(),
-            channel_slug: channel_match.reply_slug(),
-            company_slug: channel_match.company.slug.clone(),
-            thread_id: channel_match.thread.id,
-            // Only a task-driven run has a task to park; a direct ingest has no task row at
-            // all. When it does, it parks itself under its own lease.
+            company_id: company.id,
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            thread_id,
             correlation_id,
-            suspension: ingest
-                .task_id
-                .is_some()
-                .then_some(TaskSuspension::Leased(lease)),
+            suspension: task_id.is_some().then_some(TaskSuspension::Leased(lease)),
             approver_email,
         }
+    }
+
+    /// Approvals go to the first non-public channel participant, falling back to any company team
+    /// member.
+    async fn approval_context_for(
+        &self,
+        channel_match: &ChannelMatch,
+        ingest: &InboundIngestResult,
+        lease: TaskLeaseRef,
+        correlation_id: CorrelationId,
+    ) -> ApprovalSubject {
+        let mut subject = self
+            .approval_context_for_channel(
+                &channel_match.company,
+                &channel_match.channel,
+                channel_match.thread.id,
+                ingest.task_id,
+                lease,
+                correlation_id,
+            )
+            .await;
+        subject.channel_slug = channel_match.reply_slug();
+        subject
     }
 
     fn outreach_context_for(
@@ -802,7 +1242,7 @@ impl ThreadUseCases {
         &self,
         delivery: AgentDelivery<'_>,
         reply: &AgentReply,
-    ) -> AppResult<Vec<NewDelivery>> {
+    ) -> AppResult<PlannedReply> {
         let AgentDelivery {
             matches,
             envelope,
@@ -818,7 +1258,10 @@ impl ThreadUseCases {
                 channel = %primary.channel.slug,
                 "Simulation test mode (Run_Test): the answer is recorded and nothing is delivered"
             );
-            return Ok(Vec::new());
+            return Ok(PlannedReply {
+                deliveries: Vec::new(),
+                correlation: None,
+            });
         };
 
         // The lease must still be ours at the moment the answer is frozen, or two workers could
@@ -839,6 +1282,9 @@ impl ThreadUseCases {
         }
 
         let recipients_cc = self.outbound_cc_for(primary, envelope).await?;
+        // Bound before the context takes it: the same headers that go on the wire are what the
+        // canonical message has to record, or the two disagree about what this answer replies to.
+        let threading = answering(envelope);
         let context = EmailDeliveryContext {
             from: crate::entities::channel::Channel::address_for(
                 &primary.reply_slug(),
@@ -848,7 +1294,7 @@ impl ThreadUseCases {
             from_name: Some(primary.channel.name.clone()),
             recipient_to: sender_address(envelope),
             recipients_cc: recipients_cc.into_iter().map(EmailAddress::from).collect(),
-            threading: answering(envelope),
+            threading: threading.clone(),
             // An agent's answer continues the chain, so it carries the hop budget: the receiving
             // side needs it to stop two channels answering each other for ever.
             relay: Some(EmailRelayTrace {
@@ -858,10 +1304,8 @@ impl ThreadUseCases {
             }),
         };
 
-        let content = CanonicalContent::parse(
-            reply.message.subject.clone(),
-            super::agent_response_body(response),
-        )?;
+        let body = super::agent_response_body(response);
+        let content = CanonicalContent::parse(reply.message.subject.clone(), body.clone())?;
         let composed = self
             .deliveries
             .compose(DeliveryRequest {
@@ -876,7 +1320,11 @@ impl ThreadUseCases {
                 context: DeliveryContext::Email(context),
             })
             .await?;
-        Ok(vec![composed.delivery])
+
+        Ok(PlannedReply {
+            correlation: email_correlation(&composed, &threading, body),
+            deliveries: vec![composed.delivery],
+        })
     }
 
     /// Who the agent's reply is copied to: whoever the inbound mail copied, plus this channel's
@@ -1089,39 +1537,20 @@ impl ThreadUseCases {
             response,
             metadata,
         } = audit;
-        let execution_parameters = match &run.primary_params {
-            Some(params) => {
-                let mut config = params.config().clone();
-                scrub_json_secrets(Some(&mut config));
-                serde_json::json!({
-                    "provider": params.provider(),
-                    "model": params.model(),
-                    "agent_id": run.primary_agent.as_ref().map(|a| a.id),
-                    "agent_name": run.primary_agent.as_ref().map(|a| a.name.as_str()),
-                    "prompt": build_prompt_text(envelope),
-                    "config": config,
-                    "executed_at": chrono::Utc::now().to_rfc3339(),
-                })
-            }
-            None => serde_json::json!({
-                "prompt": build_prompt_text(envelope),
-                "executed_at": chrono::Utc::now().to_rfc3339(),
-            }),
-        };
-
-        let mut execution_result = serde_json::json!({
-            "response": response,
-            "email_sent": delivery.email_sent,
-            // The canonical reply, named by the id it is about to be written under in this same
-            // transaction. The mail this run also queued is named by its own delivery key, which
-            // belongs to the queue row rather than to the message.
-            "reply_message_id": reply.message.id,
-            "error": run.failure.as_ref().map(ToString::to_string),
-            "token_usage": TokenUsage::new(run.prompt_tokens, run.completion_tokens),
-        });
-        if let (Some(meta), Some(object)) = (metadata, execution_result.as_object_mut()) {
-            object.insert("metadata".to_string(), meta.clone());
-        }
+        let prompt = build_prompt_text(envelope);
+        let execution_parameters = build_execution_parameters(
+            run.primary_params.as_ref(),
+            run.primary_agent.as_ref(),
+            &prompt,
+        );
+        let execution_result = build_execution_result(
+            response,
+            delivery.email_sent,
+            reply.message.id,
+            run.failure.as_ref(),
+            TokenUsage::new(run.prompt_tokens, run.completion_tokens),
+            metadata.as_ref(),
+        );
 
         let mut payload = ingest.durable_task_payload();
         if let Some(object) = payload.as_object_mut() {
@@ -1130,6 +1559,57 @@ impl ThreadUseCases {
         }
         payload
     }
+}
+
+fn build_execution_parameters(
+    params: Option<&ResolvedAgentParams>,
+    agent: Option<&Agent>,
+    prompt: &str,
+) -> serde_json::Value {
+    match params {
+        Some(params) => {
+            let mut config = params.config().clone();
+            scrub_json_secrets(Some(&mut config));
+            serde_json::json!({
+                "provider": params.provider(),
+                "model": params.model(),
+                "agent_id": agent.map(|a| a.id),
+                "agent_name": agent.map(|a| a.name.as_str()),
+                "prompt": prompt,
+                "config": config,
+                "executed_at": chrono::Utc::now().to_rfc3339(),
+            })
+        }
+        None => serde_json::json!({
+            "prompt": prompt,
+            "executed_at": chrono::Utc::now().to_rfc3339(),
+        }),
+    }
+}
+
+fn build_execution_result(
+    response: &str,
+    email_sent: bool,
+    reply_message_id: CanonicalMessageId,
+    error: Option<&AppError>,
+    token_usage: TokenUsage,
+    metadata: Option<&serde_json::Value>,
+) -> serde_json::Value {
+    let mut execution_result = serde_json::json!({
+        "response": response,
+        "email_sent": email_sent,
+        // The canonical reply, named by the id it is about to be written under in this same
+        // transaction. The mail this run also queued is named by its own delivery key, which
+        // belongs to the queue row rather than to the message.
+        "reply_message_id": reply_message_id,
+        "outbound_message_id": reply_message_id,
+        "error": error.map(ToString::to_string),
+        "token_usage": token_usage,
+    });
+    if let (Some(meta), Some(object)) = (metadata, execution_result.as_object_mut()) {
+        object.insert("metadata".to_string(), meta.clone());
+    }
+    execution_result
 }
 
 fn append_bounded_upstream(context: &mut String, value: &str) -> bool {

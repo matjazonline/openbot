@@ -238,9 +238,10 @@ fn http_response(body: &str) -> String {
 ///   `outreach_and_await_quorum` but no top-level `tools:` list, and `declared_tool_ids` in the
 ///   `ai-agents` builder comes from that list -- so an agent without one is offered no tools at
 ///   all. `docs/inter_channel_agent_communication.md` is where the grant is documented.
-/// * a `tool_choice` has to be set. The runtime asks the provider for one, and with `None` it
-///   sends neither native tool definitions nor the prompt-protocol instructions, so the grant
-///   above reaches the model as nothing at all.
+/// * a `tool_choice` has to reach the provider, or it sends neither native tool definitions nor
+///   the prompt-protocol instructions and the grant above reaches the model as nothing at all.
+///   `ensure_config_fields` now defaults one for any config that grants tools, so this fixture
+///   sets no `tool_choice` of its own -- and would stop delegating if that default regressed.
 /// * `allowed_target_scope` defaults to `external_only` and `internal_requires_approval` to
 ///   `true`, so a sibling channel is refused outright and a permitted one still waits for a human.
 ///
@@ -249,8 +250,7 @@ fn http_response(body: &str) -> String {
 /// `ToolSecurityConfig::enabled` defaults to false, so the `ai-agents` security engine hands every
 /// tool a null `custom_config` and never carries these values itself.
 ///
-/// This is the delegating configuration `docs/inter_channel_agent_communication.md` documents,
-/// plus the `tool_choice` that doc does not mention.
+/// This is the delegating configuration `docs/inter_channel_agent_communication.md` documents.
 pub fn delegating_agent_config(base_url: &str) -> Value {
     let mut config = scripted_agent_config(base_url);
     let outreach_tool_config = json!({
@@ -260,7 +260,6 @@ pub fn delegating_agent_config(base_url: &str) -> Value {
         // a colleague does not.
         "internal_requires_approval": false,
     });
-    config["llm"]["tool_choice"] = json!("auto");
     config["tools"] = json!([
         { "name": crate::services::agent_directory_tool::AGENT_DIRECTORY_TOOL_ID },
         { "name": crate::services::outreach_tool::OUTREACH_TOOL_ID },

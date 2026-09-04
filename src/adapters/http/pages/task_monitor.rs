@@ -587,7 +587,11 @@ fn task_latest_execution(task: &BackgroundTask) -> String {
         &mut rows,
         "Outbound message",
         result
-            .and_then(|value| value.get("outbound_message_id"))
+            .and_then(|value| {
+                value
+                    .get("outbound_message_id")
+                    .or_else(|| value.get("reply_message_id"))
+            })
             .and_then(|value| value.as_str()),
     );
     push_execution_text(

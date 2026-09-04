@@ -16,7 +16,7 @@ list_company_agents
 
 ## Agent YAML
 
-Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its YAML configuration. Registration alone does not expose a tool to the model.
+Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its YAML configuration. Registration alone does not expose a tool to the model: the runtime's effective tool set is built from the top-level `tools:` list, so `hitl` or `tool_security` entries for a tool that is not in that list are inert.
 
 ```yaml
 name: VendorResearchAgent
@@ -247,7 +247,8 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 - The canonical tool ID must be exactly `outreach_and_await_quorum` everywhere.
 - A YAML `tools:` grant without the Rust implementation causes agent build validation to fail.
 - Omitting the tool from `tools:` means the model has no access to it.
-- Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` are available to the Rust tool through `ToolExecutionContext.custom_config`.
+- Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` reach the Rust tool because `AgentRunner` reads that path off the merged agent config and hands it to the tool directly. They do *not* arrive through `ToolExecutionContext.custom_config`: the `ai-agents` tool-security engine is disabled unless `tool_security.enabled` is set, and a disabled engine hands every tool an empty custom config.
+- Granting a tool in `tools:` is enough to make the model aware of it. A grant is only advertised when the provider has a tool choice, so `ensure_config_fields` sets `llm.tool_choice: auto` for any config that grants at least one tool; without that a config listing `tools:` would run with no tools and no error. Name a choice explicitly only to override it — `required` to force a call, `none` to keep the grant but disable it.
 - `allowed_target_scope` accepts `external_only` (default), `same_company_channels`, or `any`.
 - `default_timeout_hours` (default 96) fills in an omitted `timeout_hours`. A default above `max_timeout_hours` is rejected, not clamped.
 - `internal_requires_approval` (default `true`) governs whether a call whose recipients are *all* same-company agent channels may skip human approval. Anything other than an explicit `false` — absent, malformed, or the wrong type — means `true`.

@@ -420,6 +420,10 @@ fn append_base_context_prompt(config: &mut serde_json::Value) {
         return;
     };
 
+    if system_prompt.contains(BASE_CONTEXT_SYSTEM_PROMPT) {
+        return;
+    }
+
     config["system_prompt"] = serde_json::json!(full_system_prompt(system_prompt));
 }
 
@@ -446,6 +450,17 @@ pub fn merge_json(base: &mut serde_json::Value, override_val: &serde_json::Value
     }
 }
 
+/// Whether this config grants the model any tools.
+///
+/// The `tools:` list is the grant `ai-agents` builds `declared_tool_ids` from; `tool_security`
+/// only carries policy for tools that are granted elsewhere, so it is deliberately not consulted.
+fn declares_tools(config: &serde_json::Map<String, serde_json::Value>) -> bool {
+    config
+        .get("tools")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|tools| !tools.is_empty())
+}
+
 pub fn ensure_config_fields(
     config: &mut serde_json::Value,
     provider: &str,
@@ -459,17 +474,35 @@ pub fn ensure_config_fields(
     }
 
     if let serde_json::Value::Object(map) = config {
-        let name_str = fallback_name
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .unwrap_or("agent");
-        map.insert("name".to_string(), serde_json::json!(name_str));
+        // Read before the `llm` entry is borrowed below: a grant in one half of the config decides
+        // a default in the other.
+        let grants_tools = declares_tools(map);
 
-        let sys_prompt = fallback_system_prompt
+        let has_valid_name = map
+            .get("name")
+            .and_then(serde_json::Value::as_str)
             .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .unwrap_or("You are a helpful assistant.");
-        map.insert("system_prompt".to_string(), serde_json::json!(sys_prompt));
+            .is_some_and(|s| !s.is_empty());
+        if !has_valid_name {
+            let name_str = fallback_name
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("agent");
+            map.insert("name".to_string(), serde_json::json!(name_str));
+        }
+
+        let has_valid_sys_prompt = map
+            .get("system_prompt")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .is_some_and(|s| !s.is_empty());
+        if !has_valid_sys_prompt {
+            let sys_prompt = fallback_system_prompt
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("You are a helpful assistant.");
+            map.insert("system_prompt".to_string(), serde_json::json!(sys_prompt));
+        }
 
         let llm_val = map.entry("llm").or_insert_with(|| serde_json::json!({}));
         if !llm_val.is_object() {
@@ -481,6 +514,15 @@ pub fn ensure_config_fields(
                 // Override ai-agents' small implicit 2,048-token limit, which can
                 // otherwise stop long email responses in the middle of a sentence.
                 llm_map.insert("max_tokens".to_string(), serde_json::json!(8192));
+            }
+
+            // A granted tool the model is never told about is not a grant. The runtime asks the
+            // provider for a tool choice, and with none it sends neither native tool definitions
+            // nor the prompt-protocol instructions -- so a config that lists `tools:` and omits
+            // `tool_choice` runs with no tools at all, silently. Defaulting it here covers every
+            // authoring path, and an explicit choice (`none` included) is left alone.
+            if grants_tools && !llm_map.contains_key("tool_choice") {
+                llm_map.insert("tool_choice".to_string(), serde_json::json!("auto"));
             }
 
             llm_map.insert("provider".to_string(), serde_json::json!(provider));
@@ -1013,6 +1055,7 @@ impl<'a> AgentRunner<'a> {
             None,
             None,
         );
+        append_base_context_prompt(&mut config);
         let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
         let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
 
@@ -2112,6 +2155,99 @@ mod tests {
     }
 
     #[test]
+    fn test_ensure_config_fields_preserves_existing_name_and_system_prompt() {
+        let mut config = serde_json::json!({
+            "name": "CustomAgent",
+            "system_prompt": "You are a custom assistant.",
+        });
+
+        ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", None, None);
+
+        assert_eq!(config["name"], "CustomAgent");
+        assert_eq!(config["system_prompt"], "You are a custom assistant.");
+
+        // Even with fallback arguments provided, existing values must take precedence
+        ensure_config_fields(
+            &mut config,
+            "openai",
+            "gpt-4o",
+            "sk-test-123",
+            Some("Fallback prompt"),
+            Some("Fallback name"),
+        );
+
+        assert_eq!(config["name"], "CustomAgent");
+        assert_eq!(config["system_prompt"], "You are a custom assistant.");
+    }
+
+    #[test]
+    fn test_append_base_context_prompt_is_idempotent() {
+        let mut config = serde_json::json!({
+            "system_prompt": "Initial prompt",
+        });
+
+        append_base_context_prompt(&mut config);
+        let prompt_once = config["system_prompt"].as_str().unwrap().to_string();
+        assert!(prompt_once.contains(BASE_CONTEXT_SYSTEM_PROMPT));
+
+        append_base_context_prompt(&mut config);
+        let prompt_twice = config["system_prompt"].as_str().unwrap().to_string();
+        assert_eq!(prompt_once, prompt_twice);
+    }
+
+    /// A `tools:` grant with no `tool_choice` used to run with no tools at all: the runtime asks
+    /// the provider for a choice, and `None` suppresses both the native tool definitions and the
+    /// prompt-protocol instructions. Granting is the operator's decision; telling the model about
+    /// the grant is not something they should have to remember separately.
+    #[test]
+    fn a_tool_grant_gets_a_tool_choice_so_the_model_is_told_about_it() {
+        let mut config = serde_json::json!({
+            "tools": [{ "name": OUTREACH_TOOL_ID }],
+        });
+
+        ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", None, None);
+
+        assert_eq!(config["llm"]["tool_choice"].as_str(), Some("auto"));
+    }
+
+    #[test]
+    fn an_explicit_tool_choice_survives_including_one_that_turns_tools_off() {
+        for explicit in ["required", "none"] {
+            let mut config = serde_json::json!({
+                "tools": [{ "name": OUTREACH_TOOL_ID }],
+                "llm": { "tool_choice": explicit },
+            });
+
+            ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", None, None);
+
+            assert_eq!(
+                config["llm"]["tool_choice"].as_str(),
+                Some(explicit),
+                "an operator who named a choice must keep it"
+            );
+        }
+    }
+
+    /// No grant, no choice. The default exists to make a grant effective, not to advertise a tool
+    /// protocol to an agent that has no tools.
+    #[test]
+    fn an_agent_without_tools_is_given_no_tool_choice() {
+        for empty in [
+            serde_json::json!({}),
+            serde_json::json!({ "tools": [] }),
+            // Policy for a tool is not a grant of it: `declared_tool_ids` is built from `tools:`.
+            serde_json::json!({ "tool_security": { "tools": { OUTREACH_TOOL_ID: {} } } }),
+        ] {
+            let mut config = empty.clone();
+            ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", None, None);
+            assert!(
+                config["llm"].get("tool_choice").is_none(),
+                "{empty} must not gain a tool choice"
+            );
+        }
+    }
+
+    #[test]
     fn test_provider_config_preserves_agent_llm_settings() {
         let config = serde_json::json!({
             "llm": {
@@ -2317,6 +2453,61 @@ mod tests {
         assert_eq!(context["recipient_role"], serde_json::json!("cc"));
         assert_eq!(context["is_to"], serde_json::json!(false));
         assert_eq!(context["is_cc"], serde_json::json!(true));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn agent_execution_sends_resolved_current_date_to_llm() -> anyhow::Result<()> {
+        let mut llm = crate::services::test_support::scripted_llm(vec![
+            crate::services::test_support::LlmTurn::text("Today is noted."),
+        ])
+        .await;
+
+        let mut config = base_agent_config();
+        config["llm"]["base_url"] = serde_json::json!(&llm.base_url);
+
+        let params = ResolvedAgentParams {
+            provider: crate::services::test_support::SCRIPTED_PROVIDER.to_string(),
+            model: crate::services::test_support::SCRIPTED_MODEL.to_string(),
+            api_key: "test-key".to_string(),
+            config,
+        };
+
+        let runner = AgentRunner::new("What date is it today?", &params);
+        let output = runner.execute().await?;
+        assert_eq!(output.content, "Today is noted.");
+
+        let requests = llm.observed();
+        assert_eq!(requests.len(), 1);
+
+        let messages = requests[0]["messages"]
+            .as_array()
+            .expect("messages array present");
+        let sys_msg = messages
+            .iter()
+            .find(|m| m["role"] == "system")
+            .expect("system message present");
+        let content = sys_msg["content"]
+            .as_str()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                sys_msg["content"].as_array().and_then(|arr| {
+                    arr.iter()
+                        .find_map(|item| item["text"].as_str().map(|s| s.to_string()))
+                })
+            })
+            .expect("system message text content");
+
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        assert!(
+            content.contains(&format!("Current local date: {today}")),
+            "Expected system prompt to contain resolved local date '{today}', got: {content}"
+        );
+        assert!(
+            !content.contains("{{ context.time.date }}"),
+            "System prompt must not contain unrendered time template variable: {content}"
+        );
+
         Ok(())
     }
 

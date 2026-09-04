@@ -3797,6 +3797,125 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
 }
 
 #[test]
+fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let started_at = Utc::now() - chrono::Duration::seconds(30);
+    let generation = Uuid::new_v4();
+    let thread_id = Uuid::new_v4();
+
+    let task = BackgroundTask {
+        correlation_id: CorrelationId::new(),
+        id: Uuid::new_v4(),
+        company_id: company.id,
+        channel_id: channel.id,
+        thread_id: Some(thread_id),
+        task_type: "scheduled_agent_run".to_string(),
+        status: TaskStatus::Completed,
+        payload: json!({
+            "schedule_id": Uuid::new_v4(),
+            "schedule_name": "Daily Summary",
+            "prompt": "Summarize yesterday's tickets",
+            "execution_parameters": {
+                "provider": "anthropic",
+                "model": "claude-3-5-sonnet",
+                "agent_name": "Summary Agent",
+                "executed_at": started_at.to_rfc3339(),
+            },
+            "execution_result": {
+                "response": "Here is the summary of yesterday's tickets.",
+                "email_sent": true,
+                "reply_message_id": "reply-msg-456",
+                "outbound_message_id": "reply-msg-456",
+                "token_usage": { "prompt_tokens": 80, "completion_tokens": 40, "total_tokens": 120 },
+                "metadata": {
+                    "finish_reason": "end_turn",
+                    "execution_diagnostics": {
+                        "duration_ms": 1500,
+                        "tool_call_count": 3,
+                        "response_characters": 500,
+                        "token_usage_source": "provider"
+                    },
+                    "observability": { "summary": { "total_events": 5, "total_llm_calls": 1 } }
+                }
+            }
+        }),
+        retry_count: 0,
+        max_retries: 3,
+        last_error: None,
+        worker_id: Some(Uuid::new_v4()),
+        execution_generation: Some(generation),
+        locked_at: None,
+        lock_expires_at: None,
+        run_at: started_at,
+        created_at: started_at,
+        updated_at: started_at + chrono::Duration::seconds(2),
+    };
+
+    assert_eq!(task.token_usage().unwrap().total_tokens, 120);
+
+    let filter = TaskFilter::new(None, None, false, None, None);
+    let list = TaskMonitorList {
+        company: &company,
+        tasks: std::slice::from_ref(&task),
+        filter: &filter,
+        has_next: false,
+        selected_task_id: Some(task.id),
+    };
+
+    let list_html = task_monitor_list(&list, FragmentSwap::Inline);
+    assert!(list_html.contains("scheduled_agent_run"));
+    assert!(list_html.contains("120 tokens"));
+
+    let attempts = [TaskAttemptRecord {
+        attempt_number: 1,
+        status: TaskAttemptRecordStatus::Completed,
+        error: None,
+        stop_reason: Some(TaskStopReason::Completed),
+        prompt_tokens: Some(80),
+        completion_tokens: Some(40),
+        result: None,
+        started_at,
+        finished_at: Some(started_at + chrono::Duration::seconds(2)),
+        execution_generation: generation,
+    }];
+
+    let pane_html = task_detail_pane(&TaskDetailPane {
+        company_id: company.id,
+        task: &task,
+        channel: Some(&channel),
+        deliveries: &[],
+        delivery_error: None,
+        attempts: &attempts,
+        attempts_error: None,
+        error: None,
+    });
+
+    // Verify token stats
+    assert!(pane_html.contains("120"));
+    assert!(pane_html.contains("80"));
+    assert!(pane_html.contains("40"));
+
+    // Verify latest execution card data fields
+    assert!(pane_html.contains("Provider"));
+    assert!(pane_html.contains("anthropic"));
+    assert!(pane_html.contains("Model"));
+    assert!(pane_html.contains("claude-3-5-sonnet"));
+    assert!(pane_html.contains("Agent"));
+    assert!(pane_html.contains("Summary Agent"));
+    assert!(pane_html.contains("1.50 s"));
+    assert!(pane_html.contains("end_turn"));
+    assert!(pane_html.contains("reply-msg-456"));
+
+    // Verify execution attempts
+    assert!(pane_html.contains("120 tokens"));
+    assert!(pane_html.contains("Completed"));
+
+    // Verify task thread link
+    assert!(pane_html.contains("Open Thread"));
+}
+
+#[test]
 fn task_filter_clamps_paging_and_probes_for_a_next_page() {
     let filter = TaskFilter::new(None, None, false, Some(0), Some(1000));
     assert_eq!(filter.page(), 1);

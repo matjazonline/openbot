@@ -522,11 +522,8 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
         "the reply must not open a second conversation"
     );
 
-    // What resolved it: the conversation root the customer's `References` names, bound to this
-    // thread when their first mail was committed. Nothing maps the *agent's* outbound Message-ID
-    // -- `external_messages` is written on the inbound path only -- so this binding is the whole
-    // mechanism, and a client that drops `References` is the case
-    // `a_reply_that_names_only_the_answer_it_replies_to_opens_its_own_thread` pins.
+    // Both halves of the correlation are on record. The conversation root the customer's
+    // `References` names was bound when their first mail was committed:
     let bound_to: Option<Uuid> = sqlx::query_scalar(
         "SELECT thread_id FROM external_threads
           WHERE company_id = $1 AND external_thread_key = $2",
@@ -540,6 +537,31 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
         bound_to,
         Some(thread.id),
         "the conversation root must stay bound to the thread it opened"
+    );
+
+    // ...and the answer itself is mapped under the id it was posted with, onto the outbound
+    // message in this thread. That mapping is what lets a reply quoting only the answer find its
+    // way home, and it is the half the reply path used to leave unwritten.
+    let answer_is_mapped: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*)
+             FROM external_messages AS mapping
+             JOIN messages AS message
+               ON (message.company_id, message.id) = (mapping.company_id, mapping.message_id)
+             JOIN thread_messages AS association
+               ON (association.company_id, association.message_id)
+                  = (message.company_id, message.id)
+            WHERE mapping.company_id = $1 AND mapping.external_message_key = $2
+              AND association.thread_id = $3 AND message.direction = 'outbound'"#,
+    )
+    .bind(fx.company.id)
+    .bind(answered_under.as_str())
+    .bind(thread.id)
+    .fetch_one(&fx.pool)
+    .await
+    .expect("the provider message mappings are readable");
+    assert_eq!(
+        answer_is_mapped, 1,
+        "the answer must be findable under the Message-ID it was sent with"
     );
 
     // One new task, and the first one untouched by it.
@@ -577,16 +599,12 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
 /// own first mail.
 ///
 /// Most clients send both, which is the path the test above walks. Some send only `In-Reply-To`,
-/// and then the conversation root the ingress derives *is* the agent's outbound `Message-ID` —
-/// which nothing maps, because `external_messages` is written on the inbound path and an outbound
-/// delivery's provider key never reaches it.
-///
-/// This test states what that costs today rather than asserting a fix: the reply opens a second
-/// thread on the channel. It is the regression guard for whichever way that is settled — either
-/// the outbound key gains a mapping and this becomes a rejoin, or it stays deliberate and this
-/// keeps saying so.
+/// and then the conversation root the ingress derives *is* the agent's outbound `Message-ID`. That
+/// resolves through `find_ancestor_thread`, the second of `resolve_thread`'s steps -- but only
+/// because the answer was registered in `external_messages` under the id it was sent with. The
+/// reply path used to drop that id, and this case opened a second thread.
 #[tokio::test]
-async fn a_reply_that_names_only_the_answer_it_replies_to_opens_its_own_thread() {
+async fn a_reply_naming_only_the_answer_still_finds_the_thread_it_answers() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -653,17 +671,15 @@ async fn a_reply_that_names_only_the_answer_it_replies_to_opens_its_own_thread()
         reply.reason()
     );
 
-    let threads = fx.threads_on_channel().await;
     assert_eq!(
-        threads.len(),
-        2,
-        "documented behaviour: with no References, the reply cannot find the thread it answers"
-    );
-    assert_eq!(threads[0], thread.id);
-    assert_ne!(
         reply.thread.as_ref().map(|reply_thread| reply_thread.id),
         Some(thread.id),
-        "documented behaviour: the reply lands in a thread of its own"
+        "the answer's own Message-ID is enough to find the conversation it belongs to"
+    );
+    assert_eq!(
+        fx.threads_on_channel().await,
+        vec![thread.id],
+        "a reply without References must not open a conversation of its own"
     );
 
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
