@@ -36,6 +36,9 @@ pub const MAX_DELIVERY_KEY_BYTES: usize = 512;
 pub const MAX_PART_KEY_BYTES: usize = 200;
 pub const MAX_FAILURE_DETAIL_BYTES: usize = 512;
 pub const MAX_CONTENT_DIGEST_BYTES: usize = 128;
+/// Comfortably under the 998-byte line an RFC `Message-ID` derived from an anchor has to fit on,
+/// once a renderer has wrapped it in angle brackets and qualified it with a domain.
+pub const MAX_CONVERSATION_ANCHOR_BYTES: usize = 200;
 
 /// The largest rendered payload one part may carry, serialized.
 pub const MAX_PART_PAYLOAD_BYTES: usize = 256 * 1024;
@@ -47,6 +50,12 @@ bounded_string!(DeliveryKey, MAX_DELIVERY_KEY_BYTES);
 bounded_string!(PartKey, MAX_PART_KEY_BYTES);
 bounded_string!(FailureDetail, MAX_FAILURE_DETAIL_BYTES);
 bounded_string!(ContentDigest, MAX_CONTENT_DIGEST_BYTES);
+// `ConversationAnchor` is the stable name of a conversation this deployment anchors itself, for
+// `EmailThreading::Anchored`. Derived from something durable -- a schedule's slot -- so every
+// attempt and every later run about the same thing derives the same anchor. It is not a
+// `Message-ID` and must not be written into a header as one: what makes an anchor safe is that
+// the *renderer* decides how it appears on the wire.
+bounded_string!(ConversationAnchor, MAX_CONVERSATION_ANCHOR_BYTES);
 
 impl ContentDigest {
     /// The digest a reconciliation lookup matches on. Content, not credentials: this value is
@@ -416,14 +425,63 @@ pub struct EmailDeliveryContext {
     pub from_name: Option<String>,
     pub recipient_to: EmailAddress,
     pub recipients_cc: Vec<EmailAddress>,
-    pub in_reply_to: Option<MessageId>,
-    pub references: Vec<MessageId>,
+    /// What this mail is answering, said once. The renderer turns it into headers.
+    pub threading: EmailThreading,
     /// Loop control for mail that one channel's agent sends, absent for a platform notice.
     ///
     /// `None` is what makes a bounce or a stop notice unanswerable: without it the renderer emits
     /// no `X-MailAgents-*` headers, so the receiving side has no hop count to continue and the
     /// notice ends the chain instead of extending it.
     pub relay: Option<EmailRelayTrace>,
+}
+
+/// What one outbound mail is answering.
+///
+/// One decision with three arms, rather than an `in_reply_to`/`references` pair each producer
+/// fills in for itself. Only the email adapter knows what an RFC `Message-ID` looks like, so a
+/// producer says *what* it is answering and the renderer decides which headers say so.
+///
+/// [`Self::Anchored`] is the arm that was missing. A schedule firing, or a turn that arrived over
+/// a transport with no headers, answers nothing that was ever received -- and every producer in
+/// that position used to invent an RFC id from a UUID or a provider key. That put a value no mail
+/// was ever sent under into a live `In-Reply-To:`, which threads onto nothing in a recipient's
+/// client and which no reply can ever resolve back to this deployment.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum EmailThreading {
+    /// A notice that starts and ends by itself: a bounce, an approval request, a stop notice.
+    #[default]
+    Standalone,
+    /// Answering mail this deployment received, quoting the headers it actually carried.
+    Received {
+        in_reply_to: MessageId,
+        /// Oldest first, as the wire wants it. The renderer appends `in_reply_to` when the chain
+        /// does not already name it.
+        references: Vec<MessageId>,
+    },
+    /// Answering something no mail carried. The renderer derives one stable anchor id from this
+    /// key, so repeated mail about the same subject threads together in a recipient's client
+    /// without anything having been received to thread onto.
+    ///
+    /// The key is opaque and transport-neutral on purpose: a schedule that one day delivers over
+    /// Slack hands the same key to a renderer that has no use for it.
+    Anchored(ConversationAnchor),
+}
+
+impl EmailThreading {
+    /// Answering received mail when it carried an RFC id, and answering nothing when it did not.
+    ///
+    /// The fallback is deliberately [`Self::Standalone`] rather than an anchor: a message with no
+    /// RFC id of its own has nothing a recipient could thread onto, and inventing one would only
+    /// move the fabrication somewhere quieter.
+    pub fn received(in_reply_to: Option<MessageId>, references: Vec<MessageId>) -> Self {
+        match in_reply_to {
+            Some(in_reply_to) => Self::Received {
+                in_reply_to,
+                references,
+            },
+            None => Self::Standalone,
+        }
+    }
 }
 
 /// The inter-channel hop budget one piece of mail carries on the wire.

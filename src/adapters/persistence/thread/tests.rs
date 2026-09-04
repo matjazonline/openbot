@@ -476,19 +476,38 @@ async fn a_message_records_its_author_as_a_principal_and_projects_its_recipients
         .unwrap();
 
     assert_eq!(
-        stored.author.email_address(),
-        Some(EmailAddress::from("sender@partner.test"))
+        stored
+            .author
+            .identity
+            .as_ref()
+            .map(|identity| identity.subject().as_str()),
+        Some("sender@partner.test")
+    );
+    let participant_subjects = |kind| {
+        stored
+            .participants
+            .iter()
+            .filter(|participant| participant.kind == kind)
+            .map(|participant| participant.identity.subject().as_str())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        participant_subjects(MessageParticipantKind::To),
+        vec!["primary@example.com"]
     );
     assert_eq!(
-        stored.email_recipients(MessageParticipantKind::To),
-        vec![EmailAddress::from("primary@example.com")]
+        participant_subjects(MessageParticipantKind::Cc),
+        vec!["watcher@partner.test"]
     );
+    let extension = fixture
+        .persistence
+        .get_message_protocol_extension(stored.company_id, stored.canonical_id)
+        .await
+        .unwrap();
     assert_eq!(
-        stored.email_recipients(MessageParticipantKind::Cc),
-        vec![EmailAddress::from("watcher@partner.test")]
-    );
-    assert_eq!(
-        stored.rfc_message_id().map(MessageId::as_str),
+        extension
+            .email_metadata()
+            .map(|metadata| metadata.rfc_message_id.as_str()),
         Some(format!("<author-{}@partner.test>", fixture.suffix).as_str())
     );
 
@@ -526,10 +545,17 @@ async fn a_message_no_transport_carried_needs_no_email_fields() {
         .await
         .unwrap();
 
-    assert!(note.email.is_none());
     assert!(note.participants.is_empty());
-    assert_eq!(note.sender_email(), None);
     assert_eq!(note.author.display(), "System");
+    assert!(
+        fixture
+            .persistence
+            .get_message_protocol_extension(note.company_id, note.canonical_id)
+            .await
+            .unwrap()
+            .email_metadata()
+            .is_none()
+    );
 
     let kind: String =
         sqlx::query_scalar("SELECT kind FROM principals WHERE company_id = $1 AND id = $2")

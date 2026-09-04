@@ -5,10 +5,10 @@ addresses the destination with a transport-neutral `ChannelSelector`, resolves i
 channel ID, and then performs internal delivery. A platform email address is one email-adapter
 syntax for producing that selector; it is not the identity of the destination channel.
 
-The current compatibility path preserves email-style message metadata and reuses the existing
-thread, task, outreach, target, and delivery records. New application contracts follow the
-[Transport Architecture Contract](transport_architecture.md) and must not manufacture an email
-address merely to call another channel.
+Internal delivery uses canonical message, thread, task, outreach, target, and delivery records.
+Email metadata is an optional protocol extension only when mail actually carried the message.
+Application contracts follow the [Transport Architecture Contract](transport_architecture.md) and
+do not manufacture an email address merely to call another channel.
 
 No separate agent-call or parent-child task model is required.
 
@@ -35,13 +35,13 @@ Human -> Agent A channel
 
 | Responsibility | Existing storage |
 |---|---|
-| Agent A conversation | `threads`, `email_messages`, `thread_messages` |
+| Agent A conversation | `threads`, `messages`, `thread_messages` |
 | Agent A wait state | `task_outreaches`, `task_outreach_targets` |
 | Durable A to B request | `message_deliveries` + `message_delivery_parts` |
 | Agent B conversation | A new row in `threads` |
 | Agent B execution | A normal `background_tasks` row |
 | Agent B external wait | `task_outreaches`, `task_outreach_targets` |
-| Agent B result in Agent A context | `email_messages`, `thread_messages` |
+| Agent B result in Agent A context | `messages`, `thread_messages` |
 
 The A to B relationship can be followed through the existing identifiers:
 
@@ -59,8 +59,8 @@ A single target and a 100 percent threshold represent one channel call, and both
 so the model need only supply the target selector, subject, and body.
 
 Grant `list_company_agents` alongside it so Agent A can discover Agent B as a channel selector
-instead of carrying adapter routing syntax in its prompt. During the email compatibility cutover,
-the tool may also return the channel's email address as a display/delivery projection.
+instead of carrying adapter routing syntax in its prompt. An email address may be shown only as the
+initial email binding's display/delivery projection.
 
 ```yaml
 tools:
@@ -123,8 +123,8 @@ Use `same_company_channels` for coordinator agents that must not contact third p
 
 ## Tool Call
 
-Agent A calls Agent B through a channel selector. This compatibility example uses the email
-adapter's platform-address syntax:
+Agent A calls Agent B through a channel selector. The current email binding accepts its
+platform-address syntax at the tool boundary:
 
 ```json
 {
@@ -137,7 +137,7 @@ adapter's platform-address syntax:
 `completion_threshold_percent` defaults to 100 and `timeout_hours` to `default_timeout_hours`, so a delegated request omits both. Spelling them out explicitly produces an identical idempotency key.
 
 Agent A finds that channel by calling `list_company_agents` first, which returns one entry per
-callable sibling channel. The compatibility projection below exposes email adapter syntax:
+callable sibling channel. The current directory projection exposes the initial email binding:
 
 ```json
 {
@@ -158,8 +158,8 @@ callable sibling channel. The compatibility projection below exposes email adapt
 An internal target must satisfy all of these conditions after selector parsing and canonical
 channel resolution:
 
-- It resolves to a direct channel selector (the email adapter accepts
-  `<channel>@<company>.<application-domain>` during the compatibility cutover).
+- It resolves to a direct channel selector (the initial email adapter accepts
+  `<channel>@<company>.<application-domain>`).
 - It belongs to the caller's company.
 - It is not the caller's own channel.
 - It has at least one configured agent.
@@ -219,8 +219,8 @@ The internal ingress path validates:
 
 - Source channel ID exists.
 - Source channel and destination channel belong to the same company.
-- The sender principal and resolved selector match the source channel (the compatibility path also
-  verifies its projected email address).
+- The sender principal and resolved selector match the source channel; the email adapter also
+  verifies its projected sending address.
 - The destination is a direct agent channel.
 - The hop limit has not been reached.
 

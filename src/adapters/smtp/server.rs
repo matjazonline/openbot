@@ -13,17 +13,17 @@ use tracing::{error, info, warn};
 use crate::{
     adapters::{
         protocols::email::{
-            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
+            EmailChannelSelectorParser, EmailIdentity, EmailIngressAdapter, EmailIngressTrust,
+            VerifiedEmailAuth,
             parser::{
                 MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
             },
         },
         storage::FileStorage,
     },
-    application::use_cases::channel::parse_recipient_address,
     application::use_cases::thread::{
         InboundIngestResult, InboundPreflight, IngestRejection, IngressOrigin, ReplyDelivery,
-        ThreadUseCases, qualified_email_identity,
+        ThreadUseCases,
     },
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     entities::auth::AuthVerdict,
@@ -615,15 +615,22 @@ impl SmtpServer {
 
     /// Spam scanning is for strangers: a sender the destination channel already trusts skips it.
     async fn sender_needs_spam_scan(&self, raw_payload: &RawInboundPayload) -> bool {
-        let Some((company_slug, channel_slug)) =
-            parse_recipient_address(&raw_payload.to, &self.config.app_domain_name)
+        let Some(selection) =
+            EmailChannelSelectorParser::new(&self.config.app_domain_name).parse(&raw_payload.to)
         else {
             return true;
         };
+        let Some(selector) = selection.selectors().first() else {
+            return true;
+        };
+        let Some(company_slug) = selector.company() else {
+            return true;
+        };
+        let channel_slug = selector.channel();
         let Ok(Some(company)) = self
             .thread_use_cases
             .company_persistence()
-            .get_by_slug(&company_slug)
+            .get_by_slug(company_slug)
             .await
         else {
             return true;
@@ -631,13 +638,16 @@ impl SmtpServer {
         let Ok(Some(channel)) = self
             .thread_use_cases
             .channel_persistence()
-            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slug)
+            .get_by_company_slug_and_channel_slug(company_slug, channel_slug)
             .await
         else {
             return true;
         };
 
-        let Ok(sender) = qualified_email_identity(extract_email(&raw_payload.from)) else {
+        let Ok(sender) = EmailIdentity::parse(crate::entities::value_objects::EmailAddress::from(
+            extract_email(&raw_payload.from),
+        ))
+        .map(EmailIdentity::qualify_default) else {
             return true;
         };
         let context = match self
@@ -1349,11 +1359,11 @@ mod tests {
 
     struct MockTaskPersistence;
 
-    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
 
     #[async_trait]
-    impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+    impl crate::task_queue::TaskPersistence for MockTaskPersistence {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,

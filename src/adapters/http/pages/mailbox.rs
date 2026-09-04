@@ -1965,8 +1965,8 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
 pub fn opened_by_another_channel(thread: &Thread, app_domain_name: &str) -> bool {
     thread
         .participant_projection
-        .email_addresses
-        .iter()
+        .subjects_for(TransportKind::Email)
+        .into_iter()
         .any(|email| parse_platform_address(email, app_domain_name).is_some())
 }
 
@@ -2030,10 +2030,13 @@ pub fn thread_row_fragment(
     selected: bool,
     marks: ThreadRowMarks,
 ) -> String {
-    let participants = if thread.participant_projection.email_addresses.is_empty() {
+    let participant_addresses = thread
+        .participant_projection
+        .subjects_for(TransportKind::Email);
+    let participants = if participant_addresses.is_empty() {
         "No participants".to_string()
     } else {
-        escape_html_text(&thread.participant_projection.email_addresses.join(", "))
+        escape_html_text(&participant_addresses.join(", "))
     };
     let channel_id = channel.id;
 
@@ -2113,21 +2116,14 @@ pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
 }
 
 pub fn message_pane(pane: &MessagePane<'_>) -> String {
-    let participants = if pane
+    let participant_addresses = pane
         .thread
         .participant_projection
-        .email_addresses
-        .is_empty()
-    {
+        .subjects_for(TransportKind::Email);
+    let participants = if participant_addresses.is_empty() {
         "No participants".to_string()
     } else {
-        escape_html_text(
-            &pane
-                .thread
-                .participant_projection
-                .email_addresses
-                .join(", "),
-        )
+        escape_html_text(&participant_addresses.join(", "))
     };
 
     let messages_html = if pane.messages.is_empty() {

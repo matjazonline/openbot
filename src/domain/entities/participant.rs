@@ -7,9 +7,9 @@ use uuid::Uuid;
 use crate::entities::{
     company_member::CompanyMembership,
     transport::{
-        IdentityNamespace, IdentitySubject, ParticipantIdentityId, PrincipalId, TransportKind,
+        IdentityNamespace, IdentitySubject, ParticipantIdentityId, PrincipalId, QualifiedIdentity,
+        TransportKind,
     },
-    value_objects::EmailAddress,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,9 +96,8 @@ pub enum IdentityProvenance {
     Account,
     Agent,
     ChannelAllowlist,
-    EmailIngress,
-    SlackEvent,
-    SlackProfileClaim,
+    TransportIngress,
+    ProviderProfileClaim,
     System,
 }
 
@@ -108,9 +107,8 @@ impl IdentityProvenance {
             Self::Account => "account",
             Self::Agent => "agent",
             Self::ChannelAllowlist => "channel_allowlist",
-            Self::EmailIngress => "email_ingress",
-            Self::SlackEvent => "slack_event",
-            Self::SlackProfileClaim => "slack_profile_claim",
+            Self::TransportIngress => "transport_ingress",
+            Self::ProviderProfileClaim => "provider_profile_claim",
             Self::System => "system",
         }
     }
@@ -124,17 +122,16 @@ impl FromStr for IdentityProvenance {
             "account" => Ok(Self::Account),
             "agent" => Ok(Self::Agent),
             "channel_allowlist" => Ok(Self::ChannelAllowlist),
-            "email_ingress" => Ok(Self::EmailIngress),
-            "slack_event" => Ok(Self::SlackEvent),
-            "slack_profile_claim" => Ok(Self::SlackProfileClaim),
+            "transport_ingress" => Ok(Self::TransportIngress),
+            "provider_profile_claim" => Ok(Self::ProviderProfileClaim),
             "system" => Ok(Self::System),
             _ => Err(InvalidParticipantValue::new("identity provenance", value)),
         }
     }
 }
 
-/// Versioned claims are enrichment only. In particular, a Slack profile email is never a key
-/// used to merge principals or to grant access.
+/// Versioned provider claims are enrichment only and are never a key used to merge principals or
+/// grant access.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum IdentityClaimMetadata {
@@ -144,9 +141,9 @@ pub enum IdentityClaimMetadata {
     Account {
         version: u8,
     },
-    SlackProfile {
+    ProviderProfile {
         version: u8,
-        profile_email: Option<EmailAddress>,
+        claimed_identity: Option<QualifiedIdentity>,
     },
 }
 
@@ -159,12 +156,11 @@ impl IdentityClaimMetadata {
         Self::Account { version: 1 }
     }
 
-    /// A profile email a provider told us about. It is recorded so an operator can see what was
-    /// claimed, and is deliberately not a key: nothing resolves, merges or authorizes by it.
-    pub const fn slack_profile(profile_email: Option<EmailAddress>) -> Self {
-        Self::SlackProfile {
+    /// A profile identity a provider told us about. It is recorded for diagnostics only.
+    pub const fn provider_profile(claimed_identity: Option<QualifiedIdentity>) -> Self {
+        Self::ProviderProfile {
             version: 1,
-            profile_email,
+            claimed_identity,
         }
     }
 
@@ -172,13 +168,13 @@ impl IdentityClaimMetadata {
         match self {
             Self::Observation { version }
             | Self::Account { version }
-            | Self::SlackProfile { version, .. } => *version,
+            | Self::ProviderProfile { version, .. } => *version,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParticipantIdentity {
+pub struct PrincipalIdentity {
     pub id: ParticipantIdentityId,
     pub company_id: Uuid,
     pub principal_id: PrincipalId,
@@ -224,18 +220,18 @@ impl FromStr for PrincipalCapability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GrantProvenance {
-    EmailAllowlist,
+    ConfiguredAllowlist,
     Manager,
-    SlackConversation,
+    ConversationMembership,
     System,
 }
 
 impl GrantProvenance {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::EmailAllowlist => "email_allowlist",
+            Self::ConfiguredAllowlist => "configured_allowlist",
             Self::Manager => "manager",
-            Self::SlackConversation => "slack_conversation",
+            Self::ConversationMembership => "conversation_membership",
             Self::System => "system",
         }
     }
@@ -246,9 +242,9 @@ impl FromStr for GrantProvenance {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "email_allowlist" => Ok(Self::EmailAllowlist),
+            "configured_allowlist" => Ok(Self::ConfiguredAllowlist),
             "manager" => Ok(Self::Manager),
-            "slack_conversation" => Ok(Self::SlackConversation),
+            "conversation_membership" => Ok(Self::ConversationMembership),
             "system" => Ok(Self::System),
             _ => Err(InvalidParticipantValue::new("grant provenance", value)),
         }

@@ -13,11 +13,12 @@ use super::*;
 use crate::{
     entities::{
         message::CanonicalMessageId,
-        transport::{ChannelBindingId, DeliveryPurpose},
+        transport::{ChannelBindingId, ChannelSelector, DeliveryPurpose},
+        value_objects::{ChannelSlug, CompanySlug},
     },
     transport::{
-        CanonicalContent, DeliveryComposer, DeliveryDestination, DeliveryIntent, DeliveryKey,
-        DeliveryRecord, MAX_DELIVERY_ATTEMPTS,
+        CanonicalContent, ConversationAnchor, DeliveryComposer, DeliveryDestination,
+        DeliveryIntent, DeliveryKey, DeliveryRecord, EmailThreading, MAX_DELIVERY_ATTEMPTS,
     },
 };
 
@@ -59,8 +60,10 @@ fn context(recipient: &str) -> EmailDeliveryContext {
         from_name: Some("Support".to_string()),
         recipient_to: EmailAddress::from(recipient),
         recipients_cc: Vec::new(),
-        in_reply_to: Some(MessageId::from("<inbound@example.com>")),
-        references: vec![MessageId::from("<root@example.com>")],
+        threading: EmailThreading::Received {
+            in_reply_to: MessageId::from("<inbound@example.com>"),
+            references: vec![MessageId::from("<root@example.com>")],
+        },
         relay: Some(crate::transport::EmailRelayTrace {
             source_channel_id: Uuid::new_v4(),
             hop_count: 1,
@@ -142,6 +145,80 @@ fn the_reply_subject_and_reference_chain_are_normalized() {
     assert_eq!(reply_subject("Re: Order 91"), "Re: Order 91");
     assert_eq!(reply_subject("RE: Order 91"), "RE: Order 91");
     assert_eq!(reply_subject("   "), "Re:");
+}
+
+/// An anchored conversation gets an RFC id, and it is derived here rather than by the producer.
+///
+/// A schedule firing answers nothing that was received. Every producer in that position used to
+/// build its own `<schedule-run-...>` id, which is how an unbracketed UUID and a Slack timestamp
+/// both ended up in live `In-Reply-To:` headers. The anchor is an opaque key; only this renderer
+/// knows what one looks like on the wire.
+#[test]
+fn an_anchored_conversation_is_given_its_message_id_by_the_renderer() {
+    let anchored = |key: &str| {
+        frozen(
+            &renderer()
+                .render(&envelope(EmailDeliveryContext {
+                    threading: EmailThreading::Anchored(ConversationAnchor::parse(key).unwrap()),
+                    ..context("customer@example.com")
+                }))
+                .unwrap(),
+        )
+    };
+
+    let run = anchored("schedule-run:0f9a");
+    let parent = run
+        .in_reply_to
+        .clone()
+        .expect("an anchored mail threads onto something");
+    assert!(
+        parent.as_str().starts_with('<') && parent.as_str().ends_with(&format!("@{DOMAIN}>")),
+        "an anchor becomes a real RFC id, qualified by this deployment: {parent}"
+    );
+    assert_eq!(
+        run.references,
+        vec![parent.clone()],
+        "the chain ends at the message In-Reply-To names, or clients thread it nowhere"
+    );
+
+    // Same slot, same conversation -- this is the whole reason the anchor is derived rather than
+    // random. A second firing of one schedule files under the first.
+    assert_eq!(
+        anchored("schedule-run:0f9a").in_reply_to,
+        Some(parent.clone())
+    );
+    assert_ne!(anchored("schedule-run:1b7c").in_reply_to, Some(parent));
+}
+
+/// A standalone notice threads onto nothing, so it emits neither header.
+///
+/// The arm exists so that "this answers nothing" is a thing a producer can *say*. Before it, a
+/// notice about a message that carried no RFC id fabricated one from the canonical UUID, which put
+/// an unbracketed value into `In-Reply-To:` that no client could match and no reply could resolve.
+#[test]
+fn a_standalone_notice_carries_no_threading_headers() {
+    let notice = frozen(
+        &renderer()
+            .render(&envelope(EmailDeliveryContext {
+                threading: EmailThreading::Standalone,
+                ..context("customer@example.com")
+            }))
+            .unwrap(),
+    );
+    assert_eq!(notice.in_reply_to, None);
+    assert!(notice.references.is_empty());
+}
+
+/// Received mail with no RFC id of its own is standalone, not anchored.
+///
+/// A turn that arrived over a transport with no headers gives a recipient nothing to thread onto.
+/// Anchoring it would invent a conversation nobody is in.
+#[test]
+fn received_mail_without_an_rfc_id_threads_onto_nothing() {
+    assert_eq!(
+        EmailThreading::received(None, vec![MessageId::from("<root@example.com>")]),
+        EmailThreading::Standalone
+    );
 }
 
 /// The `Cc` line loses the recipient, the sender, and every address inside this deployment.
@@ -227,12 +304,20 @@ fn only_a_relayed_message_carries_the_loop_control_headers() {
 fn the_internal_relay_and_the_wire_agree_on_the_hop_budget() {
     let relayed = frozen(
         &renderer()
-            .render(&envelope(context("c@example.com")))
+            .render(&envelope(context(&format!("sales@acme.{DOMAIN}"))))
             .unwrap(),
     );
     let mail = relayed
         .as_relay_mail()
-        .expect("a channel's mail can be relayed");
+        .expect("a channel's mail addressed to one of our channels can be relayed");
+    assert_eq!(
+        mail.target,
+        &ChannelSelector::Qualified {
+            company: CompanySlug::new("acme"),
+            channel: ChannelSlug::new("sales"),
+        },
+        "the adapter, not the application, reads its own address syntax"
+    );
     let header = relayed
         .wire_headers()
         .into_iter()
@@ -244,6 +329,45 @@ fn the_internal_relay_and_the_wire_agree_on_the_hop_budget() {
         mail.trace.contains(&mail.source_channel_id),
         "the sending channel joins the trace, or a return hop reads as an unexplained cycle"
     );
+}
+
+/// A mail addressed outside this deployment is never handed to the in-process relay.
+///
+/// `EmailSender` tries the relay before SMTP, so the address syntax has to be read once, here,
+/// where the adapter owns it. If an external recipient still produced a relay mail, the relay
+/// would have to re-parse the address to reject it -- two copies of the same decision, and the
+/// one that drifts silently delivers a customer's reply into a channel instead of to them.
+#[test]
+fn a_mail_addressed_outside_this_deployment_carries_no_internal_target() {
+    let external = frozen(
+        &renderer()
+            .render(&envelope(context("customer@example.com")))
+            .unwrap(),
+    );
+    assert!(external.internal_target.is_none());
+    assert!(external.as_relay_mail().is_none());
+}
+
+/// A fan-out or context-only address selects no single channel, so it is not a direct relay.
+///
+/// Both are still valid mail -- they go out over SMTP and are ingested through the normal inbound
+/// path, which is what resolves *several* recipient channels. The relay shortcut exists only for
+/// the unambiguous one-channel case.
+#[test]
+fn only_one_unambiguous_channel_is_relayed_directly() {
+    let fan_out = frozen(
+        &renderer()
+            .render(&envelope(context(&format!("sales+billing@acme.{DOMAIN}"))))
+            .unwrap(),
+    );
+    assert!(fan_out.internal_target.is_none());
+
+    let context_only = frozen(
+        &renderer()
+            .render(&envelope(context(&format!("sales.quiet@acme.{DOMAIN}"))))
+            .unwrap(),
+    );
+    assert!(context_only.internal_target.is_none());
 }
 
 /// The renderer refuses a context it does not speak rather than reading the wrong arm.

@@ -14,7 +14,6 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
-    services::outbound_dispatcher::ConfirmationPurpose,
 };
 
 const CONFIRMATION_TTL_MINUTES: i64 = 15;
@@ -264,6 +263,13 @@ pub trait ConfirmationCodeSender: Send + Sync {
         code: &str,
         purpose: ConfirmationPurpose,
     ) -> AppResult<()>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmationPurpose {
+    Registration,
+    EmailChange,
+    PasswordChange,
 }
 
 #[async_trait]

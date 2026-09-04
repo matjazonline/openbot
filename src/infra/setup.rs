@@ -3,7 +3,7 @@ use crate::{
         http::{app_state::AppState, session::SessionAuthority},
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
-        protocols::email::{EmailRenderer, EmailSender},
+        protocols::email::{EmailRenderer, EmailSender, MailTransport, SmtpConfirmationSender},
         smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
@@ -21,7 +21,6 @@ use crate::{
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
         memory_worker::MemoryWorker,
-        outbound_dispatcher::{MailTransport, OutboundDispatcher, SmtpConfirmationSender},
         runtime_metrics::MemoryProviderActivity,
     },
     transport::{
@@ -48,10 +47,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let agent_run_timeout = agent_run_timeout_from_env();
     let mail_transport: Arc<dyn MailTransport> =
         LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
-    let mail_dispatcher = Arc::new(OutboundDispatcher::new(
-        config.clone(),
-        mail_transport.clone(),
-    ));
 
     let sessions = Arc::new(SessionAuthority::new(&config));
 
@@ -125,7 +120,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_email_confirmation(EmailConfirmation {
             registrations: postgres_arc.clone(),
             account_changes: postgres_arc.clone(),
-            codes: Arc::new(SmtpConfirmationSender::new(mail_dispatcher.clone())),
+            codes: Arc::new(SmtpConfirmationSender::new(
+                config.clone(),
+                mail_transport.clone(),
+            )),
             config: config.clone(),
         });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
@@ -189,7 +187,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             config.clone(),
         )
         .with_agent_run_timeout(agent_run_timeout)
-        .with_mail_transport(mail_transport.clone())
         .with_agent_persistence(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())

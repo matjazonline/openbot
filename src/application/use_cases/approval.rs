@@ -4,10 +4,6 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{
-        approval::{ApprovalPersistence, NewApproval},
-        task::TaskPersistence,
-    },
     app_error::{AppError, AppResult},
     entities::{
         approval::{
@@ -20,12 +16,65 @@ use crate::{
         task::{ResumeActor, StopActor, TaskSuspension},
     },
     infra::config::AppConfig,
+    task_queue::TaskPersistence,
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
-        EmailDeliveryContext, NewDelivery,
+        EmailDeliveryContext, EmailThreading, NewDelivery,
     },
     use_cases::thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
 };
+
+/// One approval and the message/delivery that must be committed with it.
+pub struct NewApproval<'a> {
+    pub subject: &'a ApprovalSubject,
+    pub action: &'a ApprovalAction,
+    pub message: &'a MessageWrite,
+    pub delivery: NewDelivery,
+    pub token: Uuid,
+    pub expires_at: chrono::DateTime<Utc>,
+}
+
+#[async_trait::async_trait]
+pub trait ApprovalPersistence: Send + Sync {
+    async fn create_approval(
+        &self,
+        new_approval: NewApproval<'_>,
+    ) -> AppResult<(HumanApproval, bool)>;
+    async fn find_approval_by_step_key(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+        thread_id: Uuid,
+        step_key: &str,
+    ) -> AppResult<Option<HumanApproval>>;
+    async fn get_approval_by_token(&self, token: &str) -> AppResult<Option<HumanApproval>>;
+    async fn consume_pending_approval(
+        &self,
+        token: &str,
+        status: ApprovalStatus,
+        now: chrono::DateTime<Utc>,
+    ) -> AppResult<Option<HumanApproval>>;
+    async fn consume_quorum_timeout_action(
+        &self,
+        _token: &str,
+        _action: QuorumTimeoutAction,
+        _now: chrono::DateTime<Utc>,
+    ) -> AppResult<Option<HumanApproval>> {
+        Err(AppError::Internal(
+            "Atomic quorum approval persistence is not configured".into(),
+        ))
+    }
+    async fn expire_pending_approval(
+        &self,
+        token: &str,
+        now: chrono::DateTime<Utc>,
+    ) -> AppResult<Option<HumanApproval>>;
+    async fn list_approvals_by_channel(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Vec<HumanApproval>>;
+}
 
 pub struct ApprovalUseCases {
     approval_persistence: Arc<dyn ApprovalPersistence>,
@@ -173,8 +222,7 @@ impl ApprovalUseCases {
             from_name: Some(subject.channel_name.clone()),
             recipient_to: subject.approver_email.clone(),
             recipients_cc: Vec::new(),
-            in_reply_to: None,
-            references: Vec::new(),
+            threading: EmailThreading::Standalone,
             relay: None,
         };
         let content = CanonicalContent::parse(subject_line, body_text)?;
@@ -576,13 +624,13 @@ mod tests {
             ApprovalStatus::Approved
         );
     }
-    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::correlation::CorrelationId;
     use crate::entities::task::NewTask;
     use crate::entities::task::{
         ResumeActor, StopActor, TaskFailure, TaskLeaseRef, TaskSuspension,
     };
     use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
 
     use async_trait::async_trait;
     use std::sync::Mutex;
@@ -1119,8 +1167,16 @@ mod tests {
         assert_eq!(note.author.identity, None, "no handle authored this");
         assert_eq!(note.author.label, "System");
         assert!(note.clean_text_body.contains("manager@acme.com"));
-        assert_eq!(note.rfc_message_id(), None, "nothing carried the note");
         assert!(note.participants.is_empty(), "it is addressed to nobody");
+        assert!(
+            thread_persistence
+                .get_message_protocol_extension(note.company_id, note.canonical_id)
+                .await
+                .unwrap()
+                .email_metadata()
+                .is_none(),
+            "nothing carried the note"
+        );
     }
 
     #[tokio::test]

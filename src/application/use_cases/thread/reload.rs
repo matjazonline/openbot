@@ -24,8 +24,7 @@ use crate::{
     },
     transport::{
         AddressedIdentity, BoundedVec, CanonicalContent, InboundEnvelope, InboundTaskPayloadV1,
-        IngressDirectives, IngressPolicyFacts, MessageDisposition, ProtocolExtension,
-        RecipientRole, ReplyCandidates,
+        IngressDirectives, IngressPolicyFacts, MessageDisposition, RecipientRole, ReplyCandidates,
     },
     use_cases::thread::{
         ChannelMatch, InboundIngestResult, PipelineStep, TaskChannelTarget, ThreadUseCases,
@@ -168,7 +167,11 @@ impl ThreadUseCases {
         message: &Message,
     ) -> AppResult<InboundEnvelope> {
         let binding_id = self.email_binding_of(primary).await?;
-        let email = message.email.clone();
+        let extension = self
+            .thread_persistence
+            .get_message_protocol_extension(message.company_id, message.canonical_id)
+            .await?;
+        let email = extension.email_metadata();
         let message_key = ExternalMessageKey::parse(
             email
                 .as_ref()
@@ -234,7 +237,7 @@ impl ThreadUseCases {
             },
             policy: IngressPolicyFacts::TrustedApplication,
             correlation_id: payload.correlation_id,
-            extension: email.map_or_else(ProtocolExtension::none, ProtocolExtension::email),
+            extension,
         })
     }
 

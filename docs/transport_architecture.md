@@ -109,7 +109,7 @@ company-scoped external principal and its qualified identity. It does **not** cr
 membership, a channel principal grant, or access to any other binding. Concurrent observations of
 the same identity must converge through a uniqueness constraint and transactional upsert.
 
-Slack profile email is optional display enrichment with `slack_profile_claim` provenance. It is not
+Slack profile email is optional display enrichment with `provider_profile_claim` provenance. It is not
 a verified email identity and never causes an automatic merge. Only an authenticated app user or a
 company manager can explicitly link it to a same-company person principal. Link and unlink events
 write an append-only `principal_identity_audit_events` row containing the authenticated actor,
@@ -305,10 +305,9 @@ an email address as the identity or internal routing mechanism for another chann
 | Durable inbound adapter boundary | `inbound_events` | Bounded authenticated raw event, safe header facts, lease/fence, classification | Credentials, signature headers, long-term canonical history |
 | Generic delivery queue | `message_deliveries`, `message_delivery_parts` | Canonical destination intent or explicitly unattributed notification, frozen provider payload, lease/fence, per-part result | Secret credentials; partial canonical attribution; a single result field for multipart delivery |
 
-`email_outbox` is gone: the generic delivery queue replaced it outright on the clean-reset premise,
-so there is no email-shaped queue left to be an exception to this model. Legacy `email_messages` and
-email-keyed participant columns remain only for an explicitly bounded
-expand-backfill-cutover-contract transition.
+The generic delivery queue is the only delivery queue. The clean-reset schema contains no legacy
+email-shaped canonical message store, delivery queue, thread key, or email-keyed participant
+columns.
 
 ## Tenancy and composite foreign keys
 
@@ -501,7 +500,7 @@ A parent is `delivered` only when every part is delivered. Any unknown part keep
 retain the original stable part ID, index, payload, and digest. Automatic retry of an unknown Slack
 part is forbidden.
 
-### Two decisions the email implementation settled
+### Three decisions the email implementation settled
 
 **`pending` and `retryable` are both claimable.** A failed attempt lands in `retryable` with its
 backoff on `available_at`, rather than being reset to `pending`. The two are one claim predicate --
@@ -526,6 +525,40 @@ fire-and-forget: an approval request and a stop notice are now written as system
 messages in the thread they concern, in the transaction that queues their delivery. A task parked
 on an approval nobody was told about is not a state this can reach any more, and the conversation
 shows that a human was asked.
+
+**A producer says what it answers; only the email adapter writes a header.** `EmailThreading` has
+three arms -- `Standalone`, `Received { in_reply_to, references }`, and
+`Anchored(ConversationAnchor)` -- and `EmailRenderer` turns whichever one it is handed into
+`In-Reply-To:` and `References:`. `Anchored` is the arm that was missing: a schedule firing answers
+nothing that was ever received, and producers in that position used to build their own
+`<schedule-run-...>` id. That put a value no mail was ever sent under into a live `In-Reply-To:`,
+which threads onto nothing in a recipient's client and which no inbound reply can resolve back
+here. The anchor is an opaque durable key -- a schedule's run slot -- so a retry of one firing
+files under the first, two schedules never share a conversation, and a schedule that later
+delivers over Slack hands the same key to a renderer with no use for it.
+
+## The abstraction gate
+
+`scripts/transport-boundary-check.sh` runs in CI beside formatting, offline compilation,
+migrations, the database suite, Clippy and the stack budget. It replaces a structural limitation
+that the email-shaped spine used to provide for free: while every canonical message was an email
+row, a transport type could not reach the application layer without the compiler objecting. The
+canonical spine is transport-neutral now, so nothing in the type system objects -- the script does,
+before the code is merged. It fails on:
+
+- an import of `crate::adapters`, `sqlx`, `axum`, `lettre`, `mail_parser` or `slack_morphism` in
+  `src/application` or `src/domain`;
+- a provider type (`EmailAddress`, `MessageId`, `SlackTeamId`, ...) in `message.rs`, `thread.rs` or
+  `participant.rs`, the three canonical entities every transport shares;
+- SQL naming the retired `email_messages` or `email_outbox` tables;
+- a retired compatibility type (`NormalizedInboundMessage`, `ParticipantIdentity`, `ChannelType`,
+  `OutboxEmail`, `OutboundSend`, `parsed_email_from_normalized`);
+- a synthetic `.invalid` address, or an RFC `Message-ID` literal, outside
+  `src/adapters/protocols/email`;
+- an `OutboundEmail` constructed outside that same directory.
+
+Inline `#[cfg(test)]` modules and `*_tests.rs` files are exempt from the last two: simulating what
+a provider sent us is what a test is for. What the gate forbids is *production* code inventing it.
 
 ## Required sequence traces
 

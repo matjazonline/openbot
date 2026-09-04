@@ -773,8 +773,8 @@ fn correlation_of(envelope: &InboundEnvelope) -> MessageCorrelation {
 /// principal every later decision about that handle will name.
 fn observation(identity: QualifiedIdentity) -> IdentityObservation {
     let provenance = match identity.transport() {
-        crate::entities::transport::TransportKind::Email => IdentityProvenance::EmailIngress,
-        crate::entities::transport::TransportKind::Slack => IdentityProvenance::SlackEvent,
+        crate::entities::transport::TransportKind::Email
+        | crate::entities::transport::TransportKind::Slack => IdentityProvenance::TransportIngress,
     };
     IdentityObservation {
         identity,

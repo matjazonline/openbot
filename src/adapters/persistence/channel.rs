@@ -111,7 +111,7 @@ const CHANNEL_SELECT: &str = r#"
                          (channel_grant.company_id, channel_grant.principal_id)
                     WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id
                       AND channel_grant.capability = 'participate'
-                      AND channel_grant.provenance = 'email_allowlist'
+                      AND channel_grant.provenance = 'configured_allowlist'
                       AND identity.transport = 'email' AND identity.status <> 'disabled'),
                    ARRAY[]::text[])
                WHEN 'allowlist' THEN COALESCE(
@@ -122,7 +122,7 @@ const CHANNEL_SELECT: &str = r#"
                          (channel_grant.company_id, channel_grant.principal_id)
                     WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id
                       AND channel_grant.capability = 'participate'
-                      AND channel_grant.provenance = 'email_allowlist'
+                      AND channel_grant.provenance = 'configured_allowlist'
                       AND identity.transport = 'email' AND identity.status <> 'disabled'),
                    ARRAY[]::text[])
                ELSE NULL::text[]
@@ -257,7 +257,7 @@ pub(crate) async fn insert_email_allowlist_grants(
             sqlx::query(
                 r#"INSERT INTO channel_principal_grants
                        (company_id, channel_id, principal_id, capability, provenance)
-                   VALUES ($1, $2, $3, $4, 'email_allowlist')
+                   VALUES ($1, $2, $3, $4, 'configured_allowlist')
                    ON CONFLICT (company_id, channel_id, principal_id, capability)
                    DO UPDATE SET provenance = EXCLUDED.provenance"#,
             )
@@ -563,7 +563,7 @@ impl ChannelPersistence for PostgresPersistence {
         // allowlist's to replace.
         sqlx::query(
             r#"DELETE FROM channel_principal_grants
-               WHERE channel_id = $1 AND provenance = 'email_allowlist'"#,
+               WHERE channel_id = $1 AND provenance = 'configured_allowlist'"#,
         )
         .bind(id)
         .execute(&mut *tx)

@@ -589,12 +589,12 @@ mod tests {
     //! suite still runs without a database.
 
     use super::*;
-    use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::entities::task::NewTask;
     use crate::entities::task::{
         TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskStopReason, TokenUsage,
     };
+    use crate::task_queue::TaskPersistence;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},

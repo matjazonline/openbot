@@ -11,7 +11,6 @@ pub mod memory_job_lease;
 mod memory_job_schedule;
 pub mod memory_provider;
 pub mod memory_worker;
-pub mod outbound_dispatcher;
 pub mod outreach_tool;
 pub mod prompt_fence;
 pub mod runtime_metrics;

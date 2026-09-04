@@ -15,6 +15,7 @@ use crate::{
         task::TaskStatus,
         value_objects::EmailAddress,
     },
+    use_cases::schedule::SchedulePersistence,
 };
 
 pub const SCHEDULE_COLUMNS: &str = r#"
@@ -169,96 +170,6 @@ fn next_run_after_cadence_change(write: &ScheduleWrite) -> Option<DateTime<Utc>>
             .map(|secs| Utc::now() + chrono::Duration::seconds(secs)),
         ScheduleType::OneOff => write.scheduled_at,
     }
-}
-
-#[async_trait]
-pub trait SchedulePersistence: Send + Sync {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        write: ScheduleWrite,
-    ) -> AppResult<ChannelSchedule>;
-
-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
-
-    /// Scoped by company as well as channel: the company is the tenant boundary, and leaving it
-    /// to the caller is how a channel id from another tenant reads this one's schedules.
-    async fn list_by_channel_id(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-    ) -> AppResult<Vec<ChannelSchedule>>;
-
-    async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<ChannelSchedule>>;
-
-    /// Takes the stored row rather than an id: whether the next run moves depends on what the
-    /// cadence *was*, and the caller has already loaded it to authorize the write.
-    async fn update(
-        &self,
-        existing: &ChannelSchedule,
-        channel_id: Uuid,
-        write: ScheduleWrite,
-    ) -> AppResult<ChannelSchedule>;
-
-    async fn delete(&self, id: Uuid) -> AppResult<()>;
-
-    async fn set_enabled(&self, id: Uuid, enabled: bool) -> AppResult<bool>;
-
-    /// Persists each logical slot and advances its schedule in one transaction. Previously
-    /// persisted, unfinished slots are returned as well so a process restart resumes them.
-    async fn claim_and_advance_due_schedules(
-        &self,
-        worker_id: Uuid,
-        lock_expires_at: DateTime<Utc>,
-        limit: i64,
-    ) -> AppResult<Vec<ClaimedScheduleRun>>;
-
-    async fn record_run_task(
-        &self,
-        run_id: Uuid,
-        worker_id: Uuid,
-        generation: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<bool>;
-
-    async fn record_run_error(
-        &self,
-        run_id: Uuid,
-        worker_id: Uuid,
-        generation: Uuid,
-        error: &str,
-    ) -> AppResult<bool>;
-
-    /// Updates `last_run_at` on a manual "run now" execution.
-    async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
-
-    /// Hands a claimed schedule back when its run could not be launched, so the slot is retried
-    /// rather than silently skipped, and records why on the row.
-    async fn release_failed_claim(&self, schedule: &ChannelSchedule, error: &str) -> AppResult<()>;
-
-    /// Clears `last_error` once a run launches, so a stale failure does not linger in the UI.
-    async fn clear_last_error(&self, id: Uuid) -> AppResult<()>;
-
-    /// Lists paginated execution runs (threads) triggered by this schedule.
-    async fn list_schedule_runs(
-        &self,
-        schedule_id: Uuid,
-        offset: i64,
-        limit: i64,
-    ) -> AppResult<Vec<ScheduleRun>>;
-
-    /// Proves that a caller-selected thread was launched by this tenant's schedule.
-    ///
-    /// Scheduled runs are represented by their `scheduled_agent_run` task.  Timed runs also have
-    /// a durable `schedule_runs` record, but a manual "run now" deliberately launches directly
-    /// and therefore has no such record.
-    async fn schedule_run_contains_thread(
-        &self,
-        company_id: Uuid,
-        schedule_id: Uuid,
-        thread_id: Uuid,
-    ) -> AppResult<bool>;
 }
 
 #[async_trait]
@@ -724,9 +635,9 @@ impl SchedulePersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::entities::task::{NewTask, TaskSource};
+    use crate::task_queue::TaskPersistence;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},

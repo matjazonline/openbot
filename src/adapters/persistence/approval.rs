@@ -11,30 +11,9 @@ use crate::{
         thread::insert_message_on,
     },
     app_error::{AppError, AppResult},
-    entities::approval::{
-        ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QuorumTimeoutAction,
-    },
-    transport::NewDelivery,
-    use_cases::thread::MessageWrite,
+    entities::approval::{ApprovalStatus, HumanApproval, QuorumTimeoutAction},
+    use_cases::approval::{ApprovalPersistence, NewApproval},
 };
-
-/// One approval to write, with the note and the delivery that tell a human about it.
-///
-/// Borrows the halves of the request rather than copying them: the caller has just built the
-/// notification body out of both and still owns them. All three rows land in one transaction, so
-/// a crash cannot leave an approval nobody was ever told about -- or, worse, a task parked on one.
-pub struct NewApproval<'a> {
-    pub subject: &'a ApprovalSubject,
-    pub action: &'a ApprovalAction,
-    /// The request as a message in its thread, written in the same transaction as the approval.
-    pub message: &'a MessageWrite,
-    /// The mail it goes out as, already rendered.
-    pub delivery: NewDelivery,
-    /// The secret in the decision URLs. A `Uuid` end to end -- the column is one, so taking a
-    /// `&str` here only added a parse that could fail on a value this code had just generated.
-    pub token: Uuid,
-    pub expires_at: DateTime<Utc>,
-}
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct HumanApprovalDb {
@@ -86,58 +65,6 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
             updated_at: db.updated_at,
         })
     }
-}
-
-#[async_trait]
-pub trait ApprovalPersistence: Send + Sync {
-    /// Writes the approval and queues its notification in one transaction.
-    ///
-    /// Returns the approval and whether *this* call created it: asking twice about the same
-    /// `step_key` returns the standing one rather than mailing a second link.
-    async fn create_approval(
-        &self,
-        new_approval: NewApproval<'_>,
-    ) -> AppResult<(HumanApproval, bool)>;
-
-    async fn find_approval_by_step_key(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Uuid,
-        step_key: &str,
-    ) -> AppResult<Option<HumanApproval>>;
-
-    async fn get_approval_by_token(&self, token: &str) -> AppResult<Option<HumanApproval>>;
-
-    async fn consume_pending_approval(
-        &self,
-        token: &str,
-        status: ApprovalStatus,
-        now: DateTime<Utc>,
-    ) -> AppResult<Option<HumanApproval>>;
-
-    async fn consume_quorum_timeout_action(
-        &self,
-        _token: &str,
-        _action: QuorumTimeoutAction,
-        _now: DateTime<Utc>,
-    ) -> AppResult<Option<HumanApproval>> {
-        Err(AppError::Internal(
-            "Atomic quorum approval persistence is not configured".into(),
-        ))
-    }
-
-    async fn expire_pending_approval(
-        &self,
-        token: &str,
-        now: DateTime<Utc>,
-    ) -> AppResult<Option<HumanApproval>>;
-
-    async fn list_approvals_by_channel(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-    ) -> AppResult<Vec<HumanApproval>>;
 }
 
 #[async_trait]
@@ -541,15 +468,15 @@ impl ApprovalPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::task::CreateOutreachRequest;
-    use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
-    use crate::entities::approval::QUORUM_TIMEOUT_ACTION;
+    use crate::entities::approval::{ApprovalAction, ApprovalSubject, QUORUM_TIMEOUT_ACTION};
     use crate::entities::correlation::CorrelationId;
     use crate::entities::message::{MessageDirection, MessageRole};
     use crate::entities::task::{NewTask, TaskTransitionReason};
     use crate::entities::transport::DeliveryPurpose;
+    use crate::task_queue::{CreateOutreachRequest, TaskPersistence};
+    use crate::transport::NewDelivery;
     use crate::use_cases::thread::{MessageAuthorWrite, MessageWrite};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},

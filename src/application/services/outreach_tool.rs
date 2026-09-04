@@ -1,5 +1,4 @@
 use crate::{
-    adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence},
     app_error::AppResult,
     entities::{
         channel::Channel,
@@ -7,12 +6,13 @@ use crate::{
         email_message::EmailMessageMetadata,
         message::CanonicalMessageId,
         message::{MessageDirection, MessageParticipantKind, MessageRole},
-        transport::{ChannelSelector, ExternalDestination},
+        transport::{ChannelSelector, ExternalDestination, TransportKind},
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     },
+    task_queue::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence},
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
-        EmailDeliveryContext, EmailRelayTrace, ExternalDestinationClassification,
+        EmailDeliveryContext, EmailRelayTrace, EmailThreading, ExternalDestinationClassification,
         TransportRenderer,
     },
     use_cases::{
@@ -60,8 +60,9 @@ pub struct OutreachToolContext {
     /// before it is sent, which is what tells the reply guard that an outbound message was the
     /// agent asking rather than the agent answering.
     pub thread_id: Uuid,
-    pub trigger_message_id: MessageId,
-    pub thread_references: Vec<MessageId>,
+    /// What a question sent from this run threads onto, decided once by the dispatcher from what
+    /// the triggering message actually carried.
+    pub threading: EmailThreading,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
     pub app_domain_name: String,
@@ -180,10 +181,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
         };
 
         let limits = OutreachLimits::from_config(&ctx.custom_config);
-        let email_renderer = match self
-            .deliveries
-            .renderer(crate::entities::transport::TransportKind::Email)
-        {
+        let email_renderer = match self.deliveries.renderer(TransportKind::Email) {
             Ok(renderer) => renderer,
             Err(error) => return ToolResult::error(error.to_string()),
         };
@@ -380,8 +378,7 @@ impl OutreachAndAwaitQuorumTool {
             from_name: Some(self.context.channel_name.clone()),
             recipient_to: email.clone(),
             recipients_cc: Vec::new(),
-            in_reply_to: Some(self.context.trigger_message_id.clone()),
-            references: self.context.thread_references.clone(),
+            threading: self.context.threading.clone(),
             // An outreach continues the run's chain into someone else's mailbox, so it carries the
             // hop budget: a question delegated to another channel must not be able to loop.
             relay: Some(EmailRelayTrace {
@@ -440,11 +437,31 @@ impl OutreachAndAwaitQuorumTool {
                 qualified_email_identity(email.as_str())?,
             ),
         ]);
-        if let Some(provider_key) = composed.provider_key.as_ref() {
+        // The key comes back from the composer because the email renderer derives it before the
+        // send, so the question is findable by the reply that quotes it. The headers recorded
+        // beside it are the ones the mail will actually carry -- an arm that threads onto nothing
+        // records nothing, rather than indexing a value no reply will ever name.
+        //
+        // Matched on the transport, not just on the key being present. Only email's key *is* an
+        // RFC Message-ID; a provider that one day predicts a key of its own shape would otherwise
+        // have it filed in `email_message_metadata`, which is the index inbound replies are
+        // resolved against.
+        if let Some(provider_key) = composed
+            .provider_key
+            .as_ref()
+            .filter(|_| composed.delivery.transport == TransportKind::Email)
+        {
+            let (in_reply_to, references) = match &self.context.threading {
+                EmailThreading::Received {
+                    in_reply_to,
+                    references,
+                } => (Some(in_reply_to.clone()), references.clone()),
+                EmailThreading::Standalone | EmailThreading::Anchored(_) => (None, Vec::new()),
+            };
             message = message.with_correlation(MessageCorrelation::Email(
                 EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
-                    .in_reply_to(Some(self.context.trigger_message_id.clone()))
-                    .references(self.context.thread_references.clone())
+                    .in_reply_to(in_reply_to)
+                    .references(references)
                     .raw_bodies(Some(request.body.to_string()), None),
             ));
         }
@@ -759,8 +776,10 @@ mod tests {
             channel_name: "Source".into(),
             channel_slug: "source".into(),
             company_slug: "acme".into(),
-            trigger_message_id: MessageId::new("<trigger@acme.mailagents.test>"),
-            thread_references: Vec::new(),
+            threading: EmailThreading::Received {
+                in_reply_to: MessageId::new("<trigger@acme.mailagents.test>"),
+                references: Vec::new(),
+            },
             hop_count: 0,
             trace_channels: Vec::new(),
             app_domain_name: "mailagents.test".into(),

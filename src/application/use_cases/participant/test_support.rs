@@ -22,9 +22,8 @@ use crate::{
         company::CompanyAccess,
         company_member::CompanyMembership,
         participant::{
-            ChannelPrincipalGrant, GrantProvenance, IdentityProvenance, IdentityStatus,
-            ParticipantIdentity, Principal, PrincipalAccessContext, PrincipalCapability,
-            PrincipalKind,
+            ChannelPrincipalGrant, GrantProvenance, IdentityProvenance, IdentityStatus, Principal,
+            PrincipalAccessContext, PrincipalCapability, PrincipalIdentity, PrincipalKind,
         },
         transport::{ParticipantIdentityId, PrincipalId, QualifiedIdentity, TransportKind},
         value_objects::EmailAddress,
@@ -106,7 +105,7 @@ pub fn email_allowlist_grants(company_id: Uuid, addresses: &[&str]) -> Vec<Chann
                 ChannelPrincipalGrant {
                     principal_id,
                     capability,
-                    provenance: GrantProvenance::EmailAllowlist,
+                    provenance: GrantProvenance::ConfiguredAllowlist,
                     created_at: Utc::now(),
                 }
             })
@@ -139,7 +138,7 @@ pub trait TeamFixture: Send + Sync {
 
 #[derive(Default)]
 struct DirectoryState {
-    identities: HashMap<(Uuid, QualifiedIdentity), ParticipantIdentity>,
+    identities: HashMap<(Uuid, QualifiedIdentity), PrincipalIdentity>,
     users: HashMap<(Uuid, Uuid), PrincipalId>,
 }
 
@@ -214,12 +213,12 @@ impl InMemoryParticipantDirectory {
         display_label: Option<String>,
         provenance: IdentityProvenance,
         claim_metadata: crate::entities::participant::IdentityClaimMetadata,
-    ) -> ParticipantIdentity {
+    ) -> PrincipalIdentity {
         let mut state = self.state.lock().unwrap();
         state
             .identities
             .entry((company_id, identity.clone()))
-            .or_insert_with(|| ParticipantIdentity {
+            .or_insert_with(|| PrincipalIdentity {
                 id: ParticipantIdentityId::random(),
                 company_id,
                 principal_id: principal_for_identity(company_id, identity),
@@ -238,7 +237,7 @@ impl InMemoryParticipantDirectory {
 
     fn principal_from(
         &self,
-        identity: &ParticipantIdentity,
+        identity: &PrincipalIdentity,
         membership: CompanyMembership,
     ) -> Principal {
         Principal {
@@ -289,9 +288,9 @@ impl IdentityDirectory for InMemoryParticipantDirectory {
         company_id: Uuid,
         principal_ids: &[PrincipalId],
         transport: TransportKind,
-    ) -> AppResult<Vec<ParticipantIdentity>> {
+    ) -> AppResult<Vec<PrincipalIdentity>> {
         let state = self.state.lock().unwrap();
-        let mut found: Vec<ParticipantIdentity> = state
+        let mut found: Vec<PrincipalIdentity> = state
             .identities
             .values()
             .filter(|identity| {
@@ -398,7 +397,7 @@ impl IdentityDirectory for FailingParticipantDirectory {
         _company_id: Uuid,
         _principal_ids: &[PrincipalId],
         _transport: TransportKind,
-    ) -> AppResult<Vec<ParticipantIdentity>> {
+    ) -> AppResult<Vec<PrincipalIdentity>> {
         Err(outage())
     }
 }

@@ -470,10 +470,13 @@ fn channel_thread_card(
     app_domain_name: &str,
     thread: &Thread,
 ) -> String {
-    let participants = if thread.participant_projection.email_addresses.is_empty() {
+    let participant_addresses = thread
+        .participant_projection
+        .subjects_for(TransportKind::Email);
+    let participants = if participant_addresses.is_empty() {
         "No participants".to_string()
     } else {
-        escape_html_text(&thread.participant_projection.email_addresses.join(", "))
+        escape_html_text(&participant_addresses.join(", "))
     };
 
     format!(

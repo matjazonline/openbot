@@ -15,32 +15,56 @@ use crate::{
     },
 };
 
-/// Reassemble the email extension from a read row.
-///
-/// Every column is nullable in the projection because the join is a `LEFT JOIN`: a message no mail
-/// carried has no row here at all. The RFC Message-ID is what says which of the two it is.
-pub(super) fn email_metadata_from_row(
-    rfc_message_id: Option<String>,
+/// The email extension columns as they are stored, named so a five-`Option<String>` projection
+/// cannot be reassembled in the wrong order.
+#[derive(sqlx::FromRow)]
+struct EmailMetadataDb {
+    rfc_message_id: String,
     in_reply_to: Option<String>,
-    references_list: Option<Vec<String>>,
+    references_list: Vec<String>,
     thread_index: Option<String>,
     raw_text_body: Option<String>,
     raw_html_body: Option<String>,
-) -> Option<EmailMessageMetadata> {
-    let rfc_message_id = rfc_message_id?;
-    Some(
-        EmailMessageMetadata::new(MessageId::from(rfc_message_id))
-            .in_reply_to(in_reply_to.map(MessageId::from))
+}
+
+impl From<EmailMetadataDb> for EmailMessageMetadata {
+    fn from(row: EmailMetadataDb) -> Self {
+        EmailMessageMetadata::new(MessageId::from(row.rfc_message_id))
+            .in_reply_to(row.in_reply_to.map(MessageId::from))
             .references(
-                references_list
-                    .unwrap_or_default()
+                row.references_list
                     .into_iter()
                     .map(MessageId::from)
                     .collect(),
             )
-            .thread_index(thread_index.map(ThreadIndex::from))
-            .raw_bodies(raw_text_body, raw_html_body),
+            .thread_index(row.thread_index.map(ThreadIndex::from))
+            .raw_bodies(row.raw_text_body, row.raw_html_body)
+    }
+}
+
+/// The email extension of one canonical message, or `None` when no mail carried it.
+///
+/// Absence is the answer, not an error: a message that arrived over a transport with no RFC
+/// headers has no row here at all, and the caller decides what a reply without a `Message-ID`
+/// means.
+pub(super) async fn load_email_metadata(
+    pool: &sqlx::PgPool,
+    company_id: Uuid,
+    message_id: Uuid,
+) -> AppResult<Option<EmailMessageMetadata>> {
+    let row = sqlx::query_as::<_, EmailMetadataDb>(
+        r#"SELECT rfc_message_id, in_reply_to, references_list, thread_index,
+                  raw_text_body, raw_html_body
+             FROM email_message_metadata
+            WHERE company_id = $1 AND message_id = $2"#,
     )
+    .bind(company_id)
+    .bind(message_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(row.map(EmailMessageMetadata::from))
 }
 
 /// Record the email headers of a message being stored for the first time.

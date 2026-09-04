@@ -19,11 +19,15 @@ use crate::{
         outreach::OutreachReplyMatch,
         participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
-        transport::{ChannelBindingId, ChannelSelector, QualifiedIdentity, TransportKind},
+        transport::{
+            ChannelBindingId, ChannelSelector, DeliveryPurpose, QualifiedIdentity, TransportKind,
+        },
         value_objects::{ChannelSlug, EmailAddress, MessageId},
     },
     transport::{
-        InboundDraft, InboundRouting, PipelineStep, RecipientRole, SystemAddress, ThreadTarget,
+        CanonicalContent, DeliveryContext, EmailDeliveryContext, EmailThreading, InboundDraft,
+        InboundRouting, PipelineStep, RecipientRole, StandaloneDeliveryRequest, SystemAddress,
+        ThreadTarget,
     },
     use_cases::{
         channel::find_similar_channel_slugs,
@@ -796,21 +800,22 @@ impl ThreadUseCases {
                 .writable_channel_directory(&company, &draft.author, directory)
                 .await?;
             self.send_system_reply(draft, &company, system, entries)
-                .await;
+                .await?;
             answered = true;
         }
         Ok(answered)
     }
 
-    /// A reserved-address reply remains a direct best-effort system-mail operation: it is produced
-    /// during preflight and has no canonical message to make atomic with a delivery row.
+    /// Queue a reserved-address reply through the same durable delivery state machine as every
+    /// other notification. It has no canonical message attribution, but it still must survive a
+    /// process crash after ingress accepted the request.
     async fn send_system_reply(
         &self,
         draft: &InboundDraft,
         company: &Company,
         system: SystemAddress,
         entries: Vec<ChannelDirectoryEntry>,
-    ) {
+    ) -> AppResult<()> {
         let body = match system {
             SystemAddress::Help => crate::use_cases::thread::format_help_email_body(
                 &entries,
@@ -818,28 +823,60 @@ impl ThreadUseCases {
                 &self.config.app_domain_name,
             ),
         };
-        if let Err(error) = self
-            .mail_dispatcher
-            .send_system_reply(
-                &company.slug,
-                system.local_part(),
-                &sender_address(draft),
-                draft.content.subject(),
-                email_metadata(draft).map(|metadata| metadata.rfc_message_id.clone()),
-                &body,
-            )
-            .await
-        {
-            warn!(
-                address = system.local_part(),
-                %error,
-                "Could not deliver a reserved-address reply"
-            );
-        }
+        let subject = match draft.content.subject().trim() {
+            "" => "Mail Agents Help".to_string(),
+            value
+                if value
+                    .get(..3)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("re:")) =>
+            {
+                value.to_string()
+            }
+            value => format!("Re: {value}"),
+        };
+        let content = CanonicalContent::parse(subject, body)?;
+        let source_key = format!(
+            "system:{}:{}:{}",
+            company.id,
+            system.local_part(),
+            draft.message_key
+        );
+        let delivery = self
+            .deliveries
+            .compose_standalone(StandaloneDeliveryRequest {
+                correlation_id: draft.correlation_id,
+                purpose: DeliveryPurpose::Notification,
+                source_key,
+                content: &content,
+                context: DeliveryContext::Email(EmailDeliveryContext {
+                    from: EmailAddress::from(format!(
+                        "{}@{}.{}",
+                        system.local_part(),
+                        company.slug,
+                        self.config.app_domain_name
+                    )),
+                    from_name: Some("Mail Agents".to_string()),
+                    recipient_to: sender_address(draft),
+                    recipients_cc: Vec::new(),
+                    threading: EmailThreading::received(
+                        email_metadata(draft).map(|metadata| metadata.rfc_message_id.clone()),
+                        Vec::new(),
+                    ),
+                    relay: None,
+                }),
+            })?;
+        self.standalone_deliveries
+            .enqueue_standalone_delivery(delivery)
+            .await?;
+        Ok(())
     }
 }
 
 /// The sender's mailbox, for rejection bounces and reserved-address replies.
+///
+/// Same single-transport assumption as `dispatch::sender_address`: the subject is an address only
+/// because email is the only ingress. A bounce to a Slack author is not an email at all, so this
+/// gains a transport decision when Slack ingress does, not a fallback address before then.
 pub(crate) fn sender_address(draft: &InboundDraft) -> EmailAddress {
     EmailAddress::from(draft.author.subject().as_str())
 }

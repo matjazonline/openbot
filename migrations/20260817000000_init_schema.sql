@@ -130,6 +130,14 @@ CREATE TABLE companies (
     name TEXT NOT NULL,
     slug CITEXT NOT NULL UNIQUE,
     enable_llm_spam_guardrail BOOLEAN,
+    default_add_3rd_party BOOLEAN NOT NULL DEFAULT TRUE,
+    default_participant_emails CITEXT[],
+    default_retrieve_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    default_retrieve_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    default_retrieve_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    default_persist_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    default_persist_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    default_persist_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- A company gets a picture of its own, on the same terms as a user's or an agent's: an
     -- http(s) URL or nothing, so what a page renders into an `<img src>` can never be an active
@@ -146,7 +154,15 @@ CREATE TABLE companies (
     CONSTRAINT companies_avatar_url_scheme_check
         CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
     CONSTRAINT companies_memory_provider_check
-        CHECK (memory_provider IS NULL OR memory_provider IN ('hydradb', 'hindsight'))
+        CHECK (memory_provider IS NULL OR memory_provider IN ('hydradb', 'hindsight')),
+    CONSTRAINT companies_default_participants_bounded CHECK (
+        default_participant_emails IS NULL
+        OR (
+            cardinality(default_participant_emails) <= 64
+            AND array_position(default_participant_emails, NULL) IS NULL
+            AND array_position(default_participant_emails, ''::citext) IS NULL
+        )
+    )
 );
 
 CREATE INDEX companies_user_created_idx
@@ -250,6 +266,7 @@ CREATE TABLE agents (
         CHECK (memory_max_results BETWEEN 1 AND 20),
     memory_persistence_mode TEXT NOT NULL DEFAULT 'audience_only'
         CHECK (memory_persistence_mode IN ('audience_only', 'scope_specific_facts')),
+    memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT agents_name_not_blank CHECK (btrim(name) <> ''),
@@ -354,6 +371,8 @@ CREATE TABLE participant_identities (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT participant_identities_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT participant_identities_company_principal_id_key
+        UNIQUE (company_id, principal_id, id),
     CONSTRAINT participant_identities_qualified_key
         UNIQUE (company_id, transport, namespace, subject),
     CONSTRAINT participant_identities_principal_fk
@@ -372,8 +391,8 @@ CREATE TABLE participant_identities (
     CONSTRAINT participant_identities_status_check
         CHECK (status IN ('observed', 'verified', 'disabled')),
     CONSTRAINT participant_identities_provenance_check CHECK (
-        provenance IN ('account', 'agent', 'channel_allowlist', 'email_ingress',
-                       'slack_event', 'slack_profile_claim', 'system')
+        provenance IN ('account', 'agent', 'channel_allowlist', 'transport_ingress',
+                       'provider_profile_claim', 'system')
     ),
     -- A claim is enrichment, never a key: a Slack profile email lives in here and merges nothing.
     -- The payload is versioned, discriminated and bounded; Rust still decodes it fallibly because
@@ -382,7 +401,7 @@ CREATE TABLE participant_identities (
         jsonb_typeof(claim_metadata) = 'object'
         AND claim_metadata->'version' = '1'::JSONB
         AND jsonb_typeof(claim_metadata->'kind') = 'string'
-        AND claim_metadata->>'kind' IN ('observation', 'account', 'slack_profile')
+        AND claim_metadata->>'kind' IN ('observation', 'account', 'provider_profile')
         AND octet_length(claim_metadata::text) <= 8192
     )
 );
@@ -546,7 +565,12 @@ CREATE TABLE channels (
     -- What this channel is for, in one line. Read back to a teammate who mails an address that
     -- does not exist, so they can find the channel they meant without asking anyone.
     description TEXT,
+    owner_agent_id UUID,
     CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT channels_owner_agent_key UNIQUE (owner_agent_id),
+    CONSTRAINT channels_owner_agent_fk
+        FOREIGN KEY (company_id, owner_agent_id)
+        REFERENCES agents(company_id, id) ON DELETE CASCADE,
     CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT channels_access_mode_check
         CHECK (access_mode IN ('team', 'allowlist', 'public')),
@@ -618,6 +642,63 @@ CREATE TRIGGER channel_agents_scope_check
 BEFORE INSERT OR UPDATE ON channel_agents
 FOR EACH ROW EXECUTE FUNCTION enforce_channel_agent_scope();
 
+CREATE FUNCTION enforce_owned_channel_position_zero() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    checked_channel_id UUID;
+BEGIN
+    IF TG_TABLE_NAME = 'channels' THEN
+        checked_channel_id := COALESCE(NEW.id, OLD.id);
+    ELSE
+        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM channels AS channel
+        WHERE channel.id = checked_channel_id
+          AND channel.owner_agent_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM channel_agents AS assignment
+              WHERE assignment.channel_id = channel.id
+                AND assignment.agent_id = channel.owner_agent_id
+                AND assignment.position = 0
+          )
+    ) THEN
+        RAISE EXCEPTION 'owned channel must assign its owner agent at position 0'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER owned_channel_position_zero_check
+AFTER INSERT OR UPDATE OF owner_agent_id ON channels
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION enforce_owned_channel_position_zero();
+
+CREATE CONSTRAINT TRIGGER owned_channel_assignment_position_zero_check
+AFTER INSERT OR UPDATE OR DELETE ON channel_agents
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION enforce_owned_channel_position_zero();
+
+CREATE FUNCTION prevent_owned_channel_delete() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.owner_agent_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM agents WHERE id = OLD.owner_agent_id) THEN
+        RAISE EXCEPTION 'owned channel must be deleted through its owner agent'
+            USING ERRCODE = '23503';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+CREATE TRIGGER owned_channel_delete_guard
+BEFORE DELETE ON channels
+FOR EACH ROW EXECUTE FUNCTION prevent_owned_channel_delete();
+
 CREATE FUNCTION enforce_enabled_channel_has_active_agent() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -673,7 +754,9 @@ CREATE TABLE channel_principal_grants (
     CONSTRAINT channel_principal_grants_capability_check
         CHECK (capability IN ('participate', 'view')),
     CONSTRAINT channel_principal_grants_provenance_check
-        CHECK (provenance IN ('email_allowlist', 'manager', 'slack_conversation', 'system'))
+        CHECK (provenance IN (
+            'configured_allowlist', 'manager', 'conversation_membership', 'system'
+        ))
 );
 
 CREATE INDEX channel_principal_grants_principal_idx
@@ -832,13 +915,174 @@ CREATE INDEX binding_audit_events_binding_idx
 CREATE FUNCTION reject_binding_audit_rewrite() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+    IF TG_OP = 'UPDATE' OR pg_trigger_depth() <= 1 THEN
+        RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+    END IF;
+    RETURN OLD;
 END;
 $$;
 
 CREATE TRIGGER binding_audit_events_append_only
-BEFORE UPDATE ON binding_audit_events
+BEFORE UPDATE OR DELETE ON binding_audit_events
 FOR EACH ROW EXECUTE FUNCTION reject_binding_audit_rewrite();
+
+-- The durable boundary between a fast authenticated webhook acknowledgement and canonical
+-- ingestion. Exact provider bytes live here only for the short incident/retry window; tasks and
+-- canonical messages carry identifiers and bounded normalized content instead.
+
+CREATE FUNCTION valid_inbound_event_error_class(class TEXT) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN class IN (
+    'decode', 'invalid_payload', 'routing', 'dependency', 'rate_limited', 'provider_fault',
+    'deadline', 'internal', 'unsupported_transport', 'lease_expired'
+);
+
+CREATE FUNCTION valid_inbound_event_ignore_reason(reason TEXT) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN reason IN (
+    'not_message', 'unsupported_event', 'unsupported_subtype', 'automated_sender',
+    'empty_content', 'inactive_binding', 'delivery_confirmation'
+);
+
+-- Header selection is the authenticating adapter's responsibility. This function only guarantees
+-- that the selected diagnostic facts stay small, printable, and structurally predictable.
+CREATE FUNCTION valid_inbound_safe_header_facts(facts JSONB) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN jsonb_typeof(facts) = 'object'
+   AND (SELECT COUNT(*) <= 16 FROM jsonb_object_keys(facts))
+   AND octet_length(facts::TEXT) <= 4096
+   AND NOT EXISTS (
+       SELECT 1
+         FROM jsonb_each(facts) AS fact(name, value)
+        WHERE fact.name !~ '^[a-z0-9_]{1,64}$'
+           OR jsonb_typeof(fact.value) <> 'string'
+           OR octet_length(fact.value #>> '{}') NOT BETWEEN 1 AND 256
+           OR fact.value #>> '{}' ~ '[[:cntrl:]]'
+   );
+
+CREATE TABLE inbound_events (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    installation_id UUID,
+    transport TEXT NOT NULL,
+    external_event_key TEXT NOT NULL,
+    correlation_id UUID NOT NULL,
+    raw_payload BYTEA NOT NULL,
+    content_type TEXT,
+    content_hash BYTEA NOT NULL,
+    safe_header_facts JSONB NOT NULL DEFAULT '{}'::JSONB,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_error_class TEXT,
+    last_error_detail TEXT,
+    ignore_reason TEXT,
+    execution_id UUID,
+    owner_worker_id UUID,
+    locked_at TIMESTAMPTZ,
+    lock_expires_at TIMESTAMPTZ,
+    received_at TIMESTAMPTZ NOT NULL,
+    processed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT inbound_events_company_id_id_key UNIQUE (company_id, id),
+    -- Slack event_id is globally unique. A future provider with tenant-local delivery ids must
+    -- change this documented key to include installation_id before it can use this inbox.
+    CONSTRAINT inbound_events_transport_external_event_key
+        UNIQUE (transport, external_event_key),
+    -- The three-column reference proves installation, company and discriminator agree. Its NULL
+    -- behavior permits deployment transports; the check immediately below says exactly which
+    -- transports are allowed to use that arm.
+    CONSTRAINT inbound_events_installation_fk
+        FOREIGN KEY (company_id, installation_id, transport)
+        REFERENCES integration_installations(company_id, id, transport) ON DELETE CASCADE,
+    CONSTRAINT inbound_events_installation_check CHECK (
+        transport_requires_installation(transport) = (installation_id IS NOT NULL)
+    ),
+    CONSTRAINT inbound_events_transport_check CHECK (transport IN ('email', 'slack')),
+    CONSTRAINT inbound_events_external_event_key_check CHECK (
+        btrim(external_event_key) <> '' AND octet_length(external_event_key) <= 512
+    ),
+    -- This is the same 1 MiB boundary exported as MAX_INBOUND_EVENT_PAYLOAD_BYTES. The HTTP route
+    -- rejects before allocation; this check prevents a second writer bypassing that guard.
+    CONSTRAINT inbound_events_payload_check CHECK (
+        octet_length(raw_payload) BETWEEN 1 AND 1048576
+    ),
+    CONSTRAINT inbound_events_content_type_check CHECK (
+        content_type IS NULL
+        OR (btrim(content_type) <> '' AND octet_length(content_type) <= 255
+            AND content_type !~ '[[:cntrl:]]')
+    ),
+    CONSTRAINT inbound_events_content_hash_check CHECK (octet_length(content_hash) = 32),
+    CONSTRAINT inbound_events_safe_header_facts_check
+        CHECK (valid_inbound_safe_header_facts(safe_header_facts)),
+    CONSTRAINT inbound_events_status_check CHECK (status IN (
+        'pending', 'processing', 'retryable', 'completed', 'ignored', 'dead_letter'
+    )),
+    CONSTRAINT inbound_events_attempt_check CHECK (
+        attempt_count >= 0 AND max_attempts > 0 AND attempt_count <= max_attempts
+    ),
+    CONSTRAINT inbound_events_error_check CHECK (
+        (last_error_class IS NULL OR valid_inbound_event_error_class(last_error_class))
+        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
+        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
+        AND ((status IN ('retryable', 'dead_letter')) = (last_error_class IS NOT NULL))
+    ),
+    CONSTRAINT inbound_events_ignore_check CHECK (
+        (status = 'ignored') = (ignore_reason IS NOT NULL)
+        AND (ignore_reason IS NULL OR valid_inbound_event_ignore_reason(ignore_reason))
+    ),
+    CONSTRAINT inbound_events_lease_check CHECK (
+        (status = 'processing'
+         AND execution_id IS NOT NULL
+         AND owner_worker_id IS NOT NULL
+         AND locked_at IS NOT NULL
+         AND lock_expires_at IS NOT NULL
+         AND lock_expires_at > locked_at)
+        OR
+        (status <> 'processing'
+         AND execution_id IS NULL
+         AND owner_worker_id IS NULL
+         AND locked_at IS NULL
+         AND lock_expires_at IS NULL)
+    ),
+    CONSTRAINT inbound_events_processed_check CHECK (
+        (status IN ('completed', 'ignored', 'dead_letter')) = (processed_at IS NOT NULL)
+    )
+);
+
+CREATE INDEX inbound_events_claimable_idx
+    ON inbound_events (available_at, received_at, id)
+    WHERE status IN ('pending', 'retryable');
+CREATE INDEX inbound_events_processing_lease_idx
+    ON inbound_events (lock_expires_at, id) WHERE status = 'processing';
+-- Retention walks terminal rows by status and processed time and deletes in bounded batches.
+CREATE INDEX inbound_events_processed_retention_idx
+    ON inbound_events (status, processed_at, id)
+    WHERE status IN ('completed', 'ignored', 'dead_letter');
+CREATE INDEX inbound_events_company_installation_created_idx
+    ON inbound_events (company_id, installation_id, created_at DESC, id DESC);
+
+-- A hint only. Polling and startup reconciliation remain authoritative, so a dropped notification
+-- cannot lose work and a process on another machine can recover without receiving this payload.
+CREATE FUNCTION notify_inbound_event_ready() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status IN ('pending', 'retryable')
+       AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status
+            OR OLD.available_at IS DISTINCT FROM NEW.available_at) THEN
+        PERFORM pg_notify('inbound_event_ready', NEW.id::TEXT);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER inbound_events_notify_ready
+AFTER INSERT OR UPDATE OF status, available_at ON inbound_events
+FOR EACH ROW EXECUTE FUNCTION notify_inbound_event_ready();
 
 -- One conversation inside one business channel.
 --
@@ -918,6 +1162,10 @@ CREATE TABLE messages (
     CONSTRAINT messages_authored_identity_fk
         FOREIGN KEY (company_id, authored_identity_id)
         REFERENCES participant_identities(company_id, id)
+        ON DELETE SET NULL (authored_identity_id),
+    CONSTRAINT messages_authored_identity_author_fk
+        FOREIGN KEY (company_id, author_principal_id, authored_identity_id)
+        REFERENCES participant_identities(company_id, principal_id, id)
         ON DELETE SET NULL (authored_identity_id),
     CONSTRAINT messages_direction_check CHECK (direction IN ('inbound', 'outbound')),
     CONSTRAINT messages_role_check CHECK (role IN ('human', 'agent', 'system')),
@@ -1095,7 +1343,7 @@ CREATE INDEX external_messages_message_idx
 --
 -- Carries no payload of its own: the body, role and direction belong to the message, and this row
 -- says only that the message is part of this conversation. `id` is the association identity the
--- UI and `task_outreach_targets.response_message_id` name, so a message in two threads has two
+-- UI and `task_outreach_targets.response_association_id` name, so a message in two threads has two
 -- addressable rows.
 CREATE TABLE thread_messages (
     id UUID PRIMARY KEY,
@@ -1164,8 +1412,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- INSERT only: `create_message` upserts, but the UPDATE branch just rewrites the body of a message
--- that was already announced, and re-announcing it would append a duplicate bubble.
+-- INSERT only, and the association insert is `ON CONFLICT DO NOTHING`: a redelivered provider
+-- message writes no second row here and so announces nothing, which is what stops a duplicate
+-- bubble appearing in an open mailbox. The body lives on `messages` and is never rewritten by the
+-- association, so there is nothing else here worth announcing.
 CREATE TRIGGER thread_messages_notify
     AFTER INSERT ON thread_messages
     FOR EACH ROW
@@ -1343,6 +1593,7 @@ CREATE TABLE agent_channel_provisions (
     request_hash TEXT NOT NULL,
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (task_id, request_hash)
 );
@@ -1497,8 +1748,7 @@ CREATE INDEX human_approvals_task_idx
 
 -- One durable attempt to expose one canonical message through one protocol interface.
 --
--- This is the generic replacement for the email-shaped `email_outbox`. What made that table
--- email-shaped was not the payload column but the assumptions around it: one provider result per
+-- The generic queue avoids transport-shaped assumptions: one provider result per
 -- row (`provider_message_id`), a single flat status vocabulary that could not tell "the provider
 -- refused this" from "the connection dropped after the request went out", and a lease that lived
 -- on the same row as the thing being sent. A chat provider splits one answer into several posts,
@@ -1513,22 +1763,18 @@ CREATE INDEX human_approvals_task_idx
 -- proves the copy agrees with the binding it came from.
 CREATE TABLE message_deliveries (
     id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    -- The business channel whose interface carries this. Not nullable: a delivery with no channel
-    -- has no policy behind it and nothing to attribute it to. Deleting the channel deletes the
-    -- delivery, because the canonical message and thread go with it.
-    channel_id UUID NOT NULL,
-    -- The canonical message being exposed. Not nullable: a delivery is one attempt to expose one
-    -- stored message, and a queue row whose content lived only in its own payload column is what
-    -- made the table this replaces email-shaped. A platform notice -- an approval request, a stop
-    -- notice -- is therefore written as a system-authored message first, which also puts it in the
-    -- thread whose participants are reading it.
-    message_id UUID NOT NULL,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    -- The business channel whose interface carries this. Canonical deliveries require it; the
+    -- attribution check permits NULL only for a standalone rejection notification.
+    channel_id UUID,
+    -- The canonical message being exposed. Canonical deliveries require it. A pre-ingest
+    -- rejection has no accepted message to invent, so the standalone notification arm omits it.
+    message_id UUID,
     -- The interface the message came from, or that its producing channel speaks through. Recorded
     -- so fan-out can exclude it: delivering a message back to its own interface is an echo.
-    source_binding_id UUID NOT NULL,
+    source_binding_id UUID,
     -- The interface that actually carries this delivery. Deduplication is scoped to it.
-    destination_binding_id UUID NOT NULL,
+    destination_binding_id UUID,
     -- The recipient named inside the destination interface's own namespace, when the destination
     -- is an address rather than the interface itself: an outreach recipient, the customer a reply
     -- answers. `NULL` means the interface *is* the destination, which is what a mirror is.
@@ -1600,6 +1846,23 @@ CREATE TABLE message_deliveries (
         REFERENCES message_deliveries(company_id, id) ON DELETE SET NULL (depends_on_delivery_id),
     CONSTRAINT message_deliveries_no_self_dependency_check
         CHECK (depends_on_delivery_id IS NULL OR depends_on_delivery_id <> id),
+    CONSTRAINT message_deliveries_attribution_check CHECK (
+        (company_id IS NOT NULL
+         AND channel_id IS NOT NULL
+         AND message_id IS NOT NULL
+         AND source_binding_id IS NOT NULL
+         AND destination_binding_id IS NOT NULL)
+        OR
+        (company_id IS NULL
+         AND channel_id IS NULL
+         AND message_id IS NULL
+         AND source_binding_id IS NULL
+         AND destination_binding_id IS NULL
+         AND task_id IS NULL
+         AND depends_on_delivery_id IS NULL
+         AND external_destination IS NOT NULL
+         AND purpose = 'notification')
+    ),
     CONSTRAINT message_deliveries_transport_check CHECK (transport IN ('email', 'slack')),
     CONSTRAINT message_deliveries_purpose_check
         CHECK (purpose IN ('reply', 'mirror', 'outreach', 'notification')),
@@ -1675,6 +1938,9 @@ CREATE INDEX message_deliveries_message_idx
 CREATE INDEX message_deliveries_dependency_idx
     ON message_deliveries (depends_on_delivery_id)
     WHERE depends_on_delivery_id IS NOT NULL;
+CREATE UNIQUE INDEX message_deliveries_standalone_key_key
+    ON message_deliveries (transport, idempotency_key)
+    WHERE destination_binding_id IS NULL;
 
 -- One frozen piece of a delivery, and what its provider said about it.
 --
@@ -1684,7 +1950,7 @@ CREATE INDEX message_deliveries_dependency_idx
 -- why `begin_part`/`complete_part` take the parent's execution rather than a claim of their own.
 CREATE TABLE message_delivery_parts (
     id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
+    company_id UUID,
     delivery_id UUID NOT NULL,
     part_index INTEGER NOT NULL,
     -- Stable across re-renders of the same delivery, and derived from the delivery's idempotency
@@ -1720,6 +1986,8 @@ CREATE TABLE message_delivery_parts (
     CONSTRAINT message_delivery_parts_delivery_fk
         FOREIGN KEY (company_id, delivery_id)
         REFERENCES message_deliveries(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT message_delivery_parts_delivery_id_fk
+        FOREIGN KEY (delivery_id) REFERENCES message_deliveries(id) ON DELETE CASCADE,
     CONSTRAINT message_delivery_parts_index_check
         CHECK (part_index >= 0 AND part_index < 50),
     CONSTRAINT message_delivery_parts_status_check CHECK (status IN (
@@ -1821,7 +2089,12 @@ CREATE TABLE task_outreach_targets (
     outreach_id UUID NOT NULL REFERENCES task_outreaches(id) ON DELETE CASCADE,
     email CITEXT NOT NULL,
     responded_at TIMESTAMPTZ,
-    response_message_id UUID,
+    -- The *association* the reply landed on -- `thread_messages.id`, not `messages.id`. Named for
+    -- the table it points at, because its sibling `request_message_id` points at the canonical row
+    -- and two columns called `*_message_id` referencing different tables is a join waiting to be
+    -- written the wrong way round. A reply is a turn in one thread; the question is a canonical
+    -- message that may appear in several.
+    response_association_id UUID,
     -- The delivery that carried this outreach's question. `SET NULL` so closing a company's
     -- deliveries does not erase the record that this target was asked.
     delivery_id UUID REFERENCES message_deliveries(id) ON DELETE SET NULL,
@@ -1834,18 +2107,18 @@ CREATE TABLE task_outreach_targets (
     -- transport that has none.
     request_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     PRIMARY KEY (outreach_id, email),
-    CONSTRAINT task_outreach_targets_response_message_id_fkey
-        FOREIGN KEY (response_message_id) REFERENCES thread_messages(id) ON DELETE SET NULL,
+    CONSTRAINT task_outreach_targets_response_association_fk
+        FOREIGN KEY (response_association_id) REFERENCES thread_messages(id) ON DELETE SET NULL,
     CONSTRAINT task_outreach_targets_response_check CHECK (
-        response_message_id IS NULL OR responded_at IS NOT NULL
+        response_association_id IS NULL OR responded_at IS NOT NULL
     )
 );
 
 CREATE INDEX task_outreach_targets_email_waiting_idx
     ON task_outreach_targets (email, outreach_id) WHERE responded_at IS NULL;
-CREATE INDEX task_outreach_targets_response_message_idx
-    ON task_outreach_targets (response_message_id)
-    WHERE response_message_id IS NOT NULL;
+CREATE INDEX task_outreach_targets_response_association_idx
+    ON task_outreach_targets (response_association_id)
+    WHERE response_association_id IS NOT NULL;
 -- The reply guard's `NOT EXISTS` runs per candidate outbound message, so it reads this rather than
 -- the table.
 CREATE INDEX task_outreach_targets_request_message_idx

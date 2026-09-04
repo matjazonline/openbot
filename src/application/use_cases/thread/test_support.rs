@@ -21,7 +21,6 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::TaskPersistence,
     app_error::{AppError, AppResult},
     entities::participant::{IdentityClaimMetadata, IdentityProvenance},
     entities::{
@@ -47,6 +46,8 @@ use crate::{
         },
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
+    infra::config::AppConfig,
+    task_queue::TaskPersistence,
     transport::{
         CommitDisposition, DeliveryCreation, ExternalCorrelationStore, InboundCommitOutcome,
         InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, InboundTaskPayload,
@@ -54,17 +55,51 @@ use crate::{
         ThreadTarget,
     },
     use_cases::{
+        channel::ChannelPersistence,
+        company::CompanyPersistence,
         integration::{
             BindingStatusChange, BindingWrite, ChannelBindingPersistence, InboundEndpoint,
         },
-        participant::IdentityObservation,
         participant::test_support::{principal_for_email, principal_for_identity},
+        participant::{IdentityObservation, ParticipantPersistence},
         thread::{
             InboundIngestPorts, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite,
-            MessageWrite, ThreadPersistence,
+            MessageWrite, ThreadPersistence, ThreadStores, ThreadUseCases,
         },
     },
 };
+
+impl ThreadUseCases {
+    pub fn for_test(
+        thread_persistence: Arc<InMemoryThreads>,
+        channel_persistence: Arc<dyn ChannelPersistence>,
+        company_persistence: Arc<dyn CompanyPersistence>,
+        participant_persistence: Arc<dyn ParticipantPersistence>,
+        task_persistence: Arc<dyn TaskPersistence>,
+        config: Arc<AppConfig>,
+    ) -> Self {
+        let ingest = InMemoryIngress::ports(thread_persistence.clone(), task_persistence.clone());
+        let renderers = Arc::new(
+            crate::transport::ports::TransportRenderers::new()
+                .register(Arc::new(
+                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
+                ))
+                .expect("one renderer registers"),
+        );
+        Self::new(
+            ThreadStores {
+                threads: thread_persistence,
+                channels: channel_persistence,
+                companies: company_persistence,
+                participants: participant_persistence,
+                tasks: task_persistence,
+            },
+            ingest,
+            renderers,
+            config,
+        )
+    }
+}
 
 /// One stored canonical payload.
 #[derive(Clone)]
@@ -216,7 +251,6 @@ impl InMemoryThreads {
             role: canonical.role,
             correlation_id: canonical.correlation_id,
             participants: canonical.participants.clone(),
-            email: canonical.email.clone(),
             created_at: association.created_at,
         })
     }
@@ -334,7 +368,13 @@ impl ThreadPersistence for InMemoryThreads {
             subject: subject.to_string(),
             participant_principal_ids: self.principals_for(participant_emails),
             participant_projection: ThreadParticipantProjection {
-                email_addresses: participant_emails.to_vec(),
+                identities: participant_emails
+                    .iter()
+                    .map(|email| {
+                        super::qualified_email_identity(email.as_str())
+                            .expect("test participant address is parseable")
+                    })
+                    .collect(),
             },
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -411,7 +451,13 @@ impl ThreadPersistence for InMemoryThreads {
             .iter()
             .map(|email| principal_for_email(self.company_id, email))
             .collect();
-        thread.participant_projection.email_addresses = participant_emails.to_vec();
+        thread.participant_projection.identities = participant_emails
+            .iter()
+            .map(|email| {
+                super::qualified_email_identity(email.as_str())
+                    .expect("test participant address is parseable")
+            })
+            .collect();
         Ok(thread.clone())
     }
 
@@ -428,6 +474,25 @@ impl ThreadPersistence for InMemoryThreads {
                 association.thread_id == thread_id && association.message_id == message_id
             })
             .and_then(|association| self.read(&store, association)))
+    }
+
+    async fn get_message_protocol_extension(
+        &self,
+        _company_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<crate::transport::ProtocolExtension> {
+        let metadata = self
+            .store
+            .lock()
+            .unwrap()
+            .canonical
+            .iter()
+            .find(|message| message.id == message_id)
+            .and_then(|message| message.email.clone());
+        Ok(metadata.map_or_else(
+            crate::transport::ProtocolExtension::none,
+            crate::transport::ProtocolExtension::email,
+        ))
     }
 
     async fn find_thread_by_thread_index(
@@ -704,20 +769,29 @@ impl ThreadPersistence for InMemoryThreads {
         &self,
         thread_id: Uuid,
     ) -> AppResult<Option<EmailReplyContext>> {
-        Ok(self
-            .thread_messages(thread_id)
-            .last()
-            .map(|message| EmailReplyContext {
+        let store = self.store.lock().unwrap();
+        let association = store
+            .associations
+            .iter()
+            .filter(|association| association.thread_id == thread_id)
+            .max_by_key(|association| (association.created_at, association.id));
+        Ok(association.and_then(|association| {
+            let message = self.read(&store, association)?;
+            let metadata = store
+                .canonical
+                .iter()
+                .find(|canonical| canonical.id == association.message_id)
+                .and_then(|canonical| canonical.email.as_ref());
+            Some(EmailReplyContext {
                 canonical_id: message.canonical_id,
-                author_email: message.author.email_address(),
-                rfc_message_id: message.rfc_message_id().cloned(),
-                references: message
-                    .email
-                    .as_ref()
+                author_email: message_sender_email(&message),
+                rfc_message_id: metadata.map(|email| email.rfc_message_id.clone()),
+                references: metadata
                     .map(|email| email.references.clone())
                     .unwrap_or_default(),
-                cc: message.email_recipients(MessageParticipantKind::Cc),
-            }))
+                cc: message_email_recipients(&message, MessageParticipantKind::Cc),
+            })
+        }))
     }
 
     async fn get_message_audit(
@@ -884,15 +958,36 @@ pub fn stored_email(draft: EmailMessageDraft) -> Message {
         role: draft.role,
         correlation_id: CorrelationId::new(),
         participants: InMemoryThreads::resolve_participants(&participants),
-        email: Some(
-            EmailMessageMetadata::new(draft.message_id)
-                .in_reply_to(draft.in_reply_to)
-                .references(draft.references_list)
-                .thread_index(draft.thread_index)
-                .raw_bodies(draft.raw_text_body, draft.raw_html_body),
-        ),
         created_at: draft.created_at,
     }
+}
+
+fn message_email_recipients(message: &Message, kind: MessageParticipantKind) -> Vec<EmailAddress> {
+    let mut selected: Vec<_> = message
+        .participants
+        .iter()
+        .filter(|participant| participant.kind == kind)
+        .filter(|participant| participant.identity.transport() == TransportKind::Email)
+        .collect();
+    selected.sort_by_key(|participant| participant.position);
+    selected
+        .into_iter()
+        .map(|participant| EmailAddress::from(participant.identity.subject().as_str()))
+        .collect()
+}
+
+fn message_sender_email(message: &Message) -> Option<EmailAddress> {
+    message_email_recipients(message, MessageParticipantKind::Sender)
+        .into_iter()
+        .next()
+        .or_else(|| {
+            message
+                .author
+                .identity
+                .as_ref()
+                .filter(|identity| identity.transport() == TransportKind::Email)
+                .map(|identity| EmailAddress::from(identity.subject().as_str()))
+        })
 }
 
 /// The stored message a draft describes, as a page reads it.
@@ -942,7 +1037,7 @@ pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
             identity: sender,
             display_label: None,
             claim_metadata: IdentityClaimMetadata::observation(),
-            provenance: IdentityProvenance::EmailIngress,
+            provenance: IdentityProvenance::TransportIngress,
         }),
         subject: draft.subject,
         clean_text_body: draft.clean_text_body,
@@ -1224,8 +1319,12 @@ impl InboundMessageCommitter for InMemoryIngress {
                             .get_thread_by_id(*thread_id)
                             .await?
                             .ok_or_else(|| AppError::NotFound("Thread was not found".into()))?;
-                        let mut participants =
-                            thread.participant_projection.email_addresses.clone();
+                        let mut participants: Vec<EmailAddress> = thread
+                            .participant_projection
+                            .subjects_for(TransportKind::Email)
+                            .into_iter()
+                            .map(EmailAddress::from)
+                            .collect();
                         for handle in &emails {
                             if !participants
                                 .iter()
@@ -1374,8 +1473,7 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
             display_label: None,
             claim_metadata: IdentityClaimMetadata::observation(),
             provenance: match envelope.author.transport() {
-                TransportKind::Email => IdentityProvenance::EmailIngress,
-                TransportKind::Slack => IdentityProvenance::SlackEvent,
+                TransportKind::Email | TransportKind::Slack => IdentityProvenance::TransportIngress,
             },
         }),
         subject: envelope.content.subject().to_string(),

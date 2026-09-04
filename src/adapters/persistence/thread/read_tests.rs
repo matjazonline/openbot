@@ -414,8 +414,10 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
         .unwrap();
     assert_eq!(thread.participant_principal_ids.len(), 1);
     assert_eq!(
-        thread.participant_projection.email_addresses,
-        vec![EmailAddress::from("author@partner.test")],
+        thread
+            .participant_projection
+            .subjects_for(TransportKind::Email),
+        vec!["author@partner.test"],
         "the projection carries the normalized mailbox, not what the header said"
     );
 
@@ -438,11 +440,10 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
         .unwrap();
     assert_eq!(joined.participant_principal_ids.len(), 2);
     assert_eq!(
-        joined.participant_projection.email_addresses,
-        vec![
-            EmailAddress::from("author@partner.test"),
-            EmailAddress::from("cc@partner.test"),
-        ]
+        joined
+            .participant_projection
+            .subjects_for(TransportKind::Email),
+        vec!["author@partner.test", "cc@partner.test"]
     );
     let authors: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM thread_principals WHERE thread_id = $1 AND role = 'author'",

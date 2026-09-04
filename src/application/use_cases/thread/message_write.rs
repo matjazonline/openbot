@@ -176,7 +176,7 @@ impl MessageWrite {
             display_label: None,
             claim_metadata: IdentityClaimMetadata::observation(),
             provenance: match self.correlation {
-                MessageCorrelation::Email(_) => IdentityProvenance::EmailIngress,
+                MessageCorrelation::Email(_) => IdentityProvenance::TransportIngress,
                 MessageCorrelation::Internal => IdentityProvenance::System,
             },
         }

@@ -5,7 +5,6 @@ use tracing::{info, instrument};
 use uuid::Uuid;
 
 use crate::{
-    adapters::protocols::email::EmailChannelSelectorParser,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -15,7 +14,7 @@ use crate::{
         company::Company,
         creation::CreationProvenance,
         participant::{IdentityProvenance, PrincipalAccessContext},
-        transport::ChannelSelector,
+        transport::{ChannelSelector, QualifiedIdentity},
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -24,9 +23,7 @@ use crate::{
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
     use_cases::participant::{ParticipantPersistence, observe_access_context},
-    use_cases::thread::qualified_email_identity,
 };
-use serde::{Deserialize, Serialize};
 
 /// Everything one channel write sets, so create and update cannot drift apart and so a caller
 /// cannot transpose two same-typed arguments in a nine-parameter list.
@@ -487,127 +484,50 @@ impl ChannelUseCases {
         self.channel_persistence.delete(channel_id).await
     }
 
-    #[instrument(skip(self, email))]
-    pub async fn process_inbound_email(
+    #[instrument(skip(self, sender))]
+    pub async fn preview_inbound_route(
         &self,
-        provider: &str,
-        email: InboundEmail,
-        app_domain_name: &str,
-    ) -> AppResult<InboundEmailResult> {
-        info!(
-            "Processing inbound email via provider '{}' for recipient: {}",
-            provider, email.to
-        );
-
-        let parsed = parse_recipient_address(&email.to, app_domain_name);
-        match parsed {
-            Some((company_slug, channel_slug)) => {
-                info!(
-                    "Parsed recipient -> company_slug: '{}', channel_slug: '{}'",
-                    company_slug, channel_slug
-                );
-
-                let company = self.company_persistence.get_by_slug(&company_slug).await?;
-                let channel = self
-                    .channel_persistence
-                    .get_by_company_slug_and_channel_slug(&company_slug, &channel_slug)
-                    .await?;
-
-                let sender_email = extract_email_address(&email.from);
-
-                // The same verdict the real inbound path reaches, from the same method: a preview
-                // that re-implemented the participant rule would drift out of sync with it.
-                let sender_authorized = match (company.as_ref(), channel.as_ref()) {
-                    (Some(comp), Some(ch)) => {
-                        let context = observe_access_context(
-                            self.participant_persistence.as_ref(),
-                            comp.id,
-                            &qualified_email_identity(sender_email.clone())?,
-                            IdentityProvenance::EmailIngress,
-                        )
-                        .await?;
-                        ch.participant_access(context).authorized
-                    }
-                    _ => false,
-                };
-
-                let resolved = company.is_some() && channel.is_some() && sender_authorized;
-
-                if resolved {
-                    info!(
-                        "Successfully resolved channel '{}' for company '{}' with authorized sender '{}'",
-                        channel_slug, company_slug, sender_email
-                    );
-                } else if !sender_authorized {
-                    info!(
-                        "Unauthorized sender '{}' for channel '{}@{}' (no participate grant)",
-                        sender_email, channel_slug, company_slug
-                    );
-                } else {
-                    info!(
-                        "Channel or company not found for '{}@{}'",
-                        channel_slug, company_slug
-                    );
-                }
-
-                Ok(InboundEmailResult {
-                    resolved,
-                    sender_authorized,
-                    company_slug: Some(company_slug),
-                    channel_slug: Some(channel_slug),
-                    company,
-                    channel,
-                    email,
-                })
+        company_slug: CompanySlug,
+        channel_slug: ChannelSlug,
+        sender: QualifiedIdentity,
+    ) -> AppResult<InboundRoutePreview> {
+        let company = self.company_persistence.get_by_slug(&company_slug).await?;
+        let channel = self
+            .channel_persistence
+            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slug)
+            .await?;
+        let sender_authorized = match (company.as_ref(), channel.as_ref()) {
+            (Some(company), Some(channel)) => {
+                let context = observe_access_context(
+                    self.participant_persistence.as_ref(),
+                    company.id,
+                    &sender,
+                    IdentityProvenance::TransportIngress,
+                )
+                .await?;
+                channel.participant_access(context).authorized
             }
-            None => {
-                info!("Could not parse recipient email address: '{}'", email.to);
-                Ok(InboundEmailResult {
-                    resolved: false,
-                    sender_authorized: false,
-                    company_slug: None,
-                    channel_slug: None,
-                    company: None,
-                    channel: None,
-                    email,
-                })
-            }
-        }
+            _ => false,
+        };
+        Ok(InboundRoutePreview {
+            resolved: company.is_some() && channel.is_some() && sender_authorized,
+            sender_authorized,
+            company_slug,
+            channel_slug,
+            company,
+            channel,
+        })
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InboundEmail {
-    pub to: String,
-    pub from: String,
-    pub subject: Option<String>,
-    pub text_body: Option<String>,
-    pub html_body: Option<String>,
-    pub raw_payload: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InboundEmailResult {
+#[derive(Debug, Clone)]
+pub struct InboundRoutePreview {
     pub resolved: bool,
     pub sender_authorized: bool,
-    pub company_slug: Option<CompanySlug>,
-    pub channel_slug: Option<ChannelSlug>,
+    pub company_slug: CompanySlug,
+    pub channel_slug: ChannelSlug,
     pub company: Option<Company>,
     pub channel: Option<Channel>,
-    pub email: InboundEmail,
-}
-
-pub fn extract_email_address(input: &str) -> String {
-    let email_addr = if let (Some(start), Some(end)) = (input.find('<'), input.rfind('>')) {
-        if start < end {
-            &input[start + 1..end]
-        } else {
-            input
-        }
-    } else {
-        input
-    };
-    email_addr.trim().to_lowercase()
 }
 
 /// Which field a slug came from, so a rejection can name the input the user has to fix instead of
@@ -667,38 +587,6 @@ pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
 /// context-suffix stripping — because callers disagree about what it means. Channel routing expands
 /// it; [`SystemAddress::parse`] must see it whole, before context-suffix handling could
 /// eat a name like `_msg`.
-pub(crate) fn parse_platform_address(
-    to_str: &str,
-    app_domain_name: &str,
-) -> Option<(CompanySlug, String)> {
-    // TODO(slack-step-11): compatibility shim for system-address parsing.
-    EmailChannelSelectorParser::new(app_domain_name).parse_platform_address(to_str)
-}
-
-pub(crate) fn parse_recipient_address_pipeline(
-    to_str: &str,
-    app_domain_name: &str,
-) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
-    // TODO(slack-step-11): compatibility projection for the legacy ingest pipeline.
-    let selection = EmailChannelSelectorParser::new(app_domain_name).parse(to_str)?;
-    let company = selection.selectors().first()?.company()?.clone();
-    let channels = selection
-        .selectors()
-        .iter()
-        .map(ChannelSelector::channel)
-        .cloned()
-        .collect();
-    Some((company, channels, selection.delivery().is_context_only()))
-}
-
-pub(crate) fn parse_recipient_address(
-    to_str: &str,
-    app_domain_name: &str,
-) -> Option<(CompanySlug, ChannelSlug)> {
-    parse_recipient_address_pipeline(to_str, app_domain_name)
-        .map(|(company, channels, _)| (company, channels[0].clone()))
-}
-
 /// Why a same-company channel cannot be called by another channel's agent.
 ///
 /// Every variant is a rule the internal transport enforces anyway; naming them lets the caller
@@ -852,6 +740,7 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::protocols::email::EmailChannelSelectorParser;
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::{Company, CompanyAccess};
     use crate::entities::company_member::CompanyMembership;
@@ -862,6 +751,30 @@ mod tests {
     };
     use chrono::Utc;
     use std::sync::Mutex;
+
+    fn parse_platform_address(value: &str, domain: &str) -> Option<(CompanySlug, String)> {
+        EmailChannelSelectorParser::new(domain).parse_platform_address(value)
+    }
+
+    fn parse_recipient_address_pipeline(
+        value: &str,
+        domain: &str,
+    ) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
+        let selection = EmailChannelSelectorParser::new(domain).parse(value)?;
+        let company = selection.primary().company()?.clone();
+        let channels = selection
+            .selectors()
+            .iter()
+            .map(ChannelSelector::channel)
+            .cloned()
+            .collect();
+        Some((company, channels, selection.delivery().is_context_only()))
+    }
+
+    fn parse_recipient_address(value: &str, domain: &str) -> Option<(CompanySlug, ChannelSlug)> {
+        parse_recipient_address_pipeline(value, domain)
+            .and_then(|(company, channels, _)| channels.into_iter().next().map(|c| (company, c)))
+    }
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
@@ -1708,24 +1621,19 @@ mod tests {
             .await
             .unwrap();
 
-        let email = InboundEmail {
-            to: "Support <support@acme.mailagents.com>".to_string(),
-            from: "customer@example.com".to_string(),
-            subject: Some("Need help".to_string()),
-            text_body: Some("Hello".to_string()),
-            html_body: None,
-            raw_payload: None,
-        };
-
         let result = use_cases
-            .process_inbound_email("sendgrid", email, "mailagents.com")
+            .preview_inbound_route(
+                "acme".into(),
+                "support".into(),
+                crate::use_cases::thread::qualified_email_identity("customer@example.com").unwrap(),
+            )
             .await
             .unwrap();
 
         assert!(result.resolved);
         assert!(result.sender_authorized);
-        assert_eq!(result.company_slug.as_deref(), Some("acme"));
-        assert_eq!(result.channel_slug.as_deref(), Some("support"));
+        assert_eq!(result.company_slug, "acme");
+        assert_eq!(result.channel_slug, "support");
         assert_eq!(result.company.unwrap().name, "Acme Corp");
         assert_eq!(result.channel.unwrap().name, "Support Flow");
 
@@ -1747,17 +1655,12 @@ mod tests {
             .unwrap();
 
         // 1. Authorized sender
-        let auth_email = InboundEmail {
-            to: "restricted@acme.mailagents.com".to_string(),
-            from: "Agent Smith <agent@example.com>".to_string(),
-            subject: Some("Allowed".to_string()),
-            text_body: None,
-            html_body: None,
-            raw_payload: None,
-        };
-
         let auth_result = use_cases
-            .process_inbound_email("sendgrid", auth_email, "mailagents.com")
+            .preview_inbound_route(
+                "acme".into(),
+                "restricted".into(),
+                crate::use_cases::thread::qualified_email_identity("agent@example.com").unwrap(),
+            )
             .await
             .unwrap();
 
@@ -1765,17 +1668,13 @@ mod tests {
         assert!(auth_result.sender_authorized);
 
         // 2. Unauthorized sender
-        let unauth_email = InboundEmail {
-            to: "restricted@acme.mailagents.com".to_string(),
-            from: "stranger@external.com".to_string(),
-            subject: Some("Denied".to_string()),
-            text_body: None,
-            html_body: None,
-            raw_payload: None,
-        };
-
         let unauth_result = use_cases
-            .process_inbound_email("sendgrid", unauth_email, "mailagents.com")
+            .preview_inbound_route(
+                "acme".into(),
+                "restricted".into(),
+                crate::use_cases::thread::qualified_email_identity("stranger@external.com")
+                    .unwrap(),
+            )
             .await
             .unwrap();
 

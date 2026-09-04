@@ -391,8 +391,8 @@ the moment someone leaves the channel. The same service account key covers both 
 Storage Object Creator **and** Storage Object Viewer on the private one.
 
 Objects are named by the SHA-256 of their contents, so the same file arriving twice is stored once.
-With no attachments bucket configured, mail still arrives and its attachments are recorded in
-`email_messages.attachments` — they simply show in the mailbox as files we do not have.
+With no attachments bucket configured, mail still arrives and attachment metadata is recorded on
+the canonical `messages` row — the files simply show in the mailbox as unavailable.
 
 ### Who can read what
 

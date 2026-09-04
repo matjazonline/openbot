@@ -8,7 +8,7 @@ The local development database was audited before the equality-only lookup was e
 SELECT COUNT(*) FILTER (WHERE thread_index IS NOT NULL),
        COUNT(DISTINCT thread_index) FILTER (WHERE thread_index IS NOT NULL),
        COALESCE(MAX(octet_length(thread_index)), 0)
-  FROM email_messages;
+  FROM email_message_metadata;
 ```
 
 Result: `0 | 0 | 0`. Consequently the same-parser classification is zero canonical values, zero
@@ -26,14 +26,14 @@ channel-scoped join.
 
 No index migration is included in this change:
 
-- The local database has no representative `email_messages`, `thread_messages`, or
+- The local database has no representative `email_message_metadata`, `thread_messages`, or
   `task_attempts` population from which to capture meaningful `EXPLAIN (ANALYZE, BUFFERS)` output.
 - Statistics collection is live — `pg_stat_statements` is preloaded, the extension is created by
   `migrations/20260901000000_enable_pg_stat_statements.sql`, and the operator query-health panel and
   `scripts/db-stats.sh` read it — but its counters are accruing against a near-empty database, and
   the skewed-seed and workload tooling tracked in `plan/db_improve/05-deferred-until-traffic.md` is
   not present yet.
-- Therefore neither the partial `email_messages (thread_index)` candidate nor a
+- Therefore neither the partial `email_message_metadata (thread_index)` candidate nor a
   `task_attempts (started_at)` candidate has passed the repository's evidence gate.
 
 Before either index is proposed, retain the complete before/after plans, buffer activity, relation

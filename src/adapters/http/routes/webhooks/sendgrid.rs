@@ -343,12 +343,12 @@ fn verify_sendgrid_signature_at(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::approval::NewApproval;
-    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::task::NewTask;
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
+    use crate::use_cases::approval::NewApproval;
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
     use crate::use_cases::thread::test_support::InMemoryThreads;
     use async_trait::async_trait;
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+    impl crate::task_queue::TaskPersistence for MockTaskPersistence {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
@@ -972,7 +972,7 @@ mod tests {
 
     struct MockApprovalPersistence;
     #[async_trait]
-    impl crate::adapters::persistence::approval::ApprovalPersistence for MockApprovalPersistence {
+    impl crate::use_cases::approval::ApprovalPersistence for MockApprovalPersistence {
         async fn create_approval(
             &self,
             _new_approval: NewApproval<'_>,
@@ -1020,7 +1020,7 @@ mod tests {
 
     struct MockSchedulePersistence;
     #[async_trait]
-    impl crate::adapters::persistence::schedule::SchedulePersistence for MockSchedulePersistence {
+    impl crate::use_cases::schedule::SchedulePersistence for MockSchedulePersistence {
         async fn create(
             &self,
             _company_id: Uuid,

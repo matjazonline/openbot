@@ -79,7 +79,7 @@ async fn cancel_unsent_outreach_questions(
 pub(crate) async fn record_outreach_reply_on(
     connection: &mut sqlx::PgConnection,
     matched: &OutreachReplyMatch,
-    response_message_id: Uuid,
+    response_association_id: Uuid,
 ) -> AppResult<OutreachProgress> {
     let mut outreach = sqlx::query_as::<_, OutreachDb>(
         r#"SELECT id, task_id, status,
@@ -94,12 +94,12 @@ pub(crate) async fn record_outreach_reply_on(
 
     sqlx::query(
         r#"UPDATE task_outreach_targets
-           SET responded_at = CURRENT_TIMESTAMP, response_message_id = $3
+           SET responded_at = CURRENT_TIMESTAMP, response_association_id = $3
            WHERE outreach_id = $1 AND email = $2 AND responded_at IS NULL"#,
     )
     .bind(matched.outreach_id)
     .bind(matched.target_email.as_str())
-    .bind(response_message_id)
+    .bind(response_association_id)
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;
@@ -411,7 +411,7 @@ impl TaskPersistence for PostgresPersistence {
     async fn record_outreach_reply(
         &self,
         matched: &OutreachReplyMatch,
-        response_message_id: Uuid,
+        response_association_id: Uuid,
     ) -> AppResult<OutreachProgress> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         // Box the shared transaction body so this broad trait method does not absorb its future;
@@ -419,7 +419,7 @@ impl TaskPersistence for PostgresPersistence {
         let progress = Box::pin(record_outreach_reply_on(
             &mut tx,
             matched,
-            response_message_id,
+            response_association_id,
         ))
         .await?;
         tx.commit().await.map_err(AppError::from)?;

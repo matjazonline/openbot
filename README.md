@@ -1,6 +1,7 @@
 # Mail Agents Server
 
-An email agent automation platform built in Rust.
+A transport-neutral agent automation platform built in Rust. Email is the initial/default channel
+binding; canonical channels, actors, messages, threads, and deliveries are not email-shaped.
 
 ## Architecture Glossary
 
@@ -19,15 +20,17 @@ The normative identity, authorization, threading, ingress, and delivery decision
 
 ## 1. System Architecture Overview
 
-The system operates as an asynchronous, event-driven pipeline mapping standard SMTP/IMAP email traffic into a stateful LLM context window, executing agentic workflows, and proxying the output back to human clients via properly threaded outbound SMTP.
+The system operates as an asynchronous, event-driven pipeline that maps authenticated transport
+events into canonical messages and a stateful LLM context, then exposes results through durable
+transport deliveries. The first complete adapter supports SMTP and SendGrid email.
 
 ### 1.1 Core Subsystems
 
 - **Inbound Mail Transfer Agent (MTA) / Webhook Gateway:** Listens for incoming traffic, terminating the SMTP connection and passing raw MIME payloads.
 - **Message Parser & Normalizer:** Dissects MIME parts, sanitizes HTML to markdown/text, strips historical email quotes, and maps RFC headers.
-- **State & Thread Manager:** Reconstructs conversational graphs using message IDs and manages access control lists (ACLs) per thread.
+- **State & Thread Manager:** Reconstructs canonical conversations from binding-qualified provider keys and manages principal access control lists per thread.
 - **Agent Orchestrator:** The intelligent routing layer (detailed in `AGENTS.md`).
-- **Outbound Dispatcher:** Constructs valid MIME payloads, applies spoof-safe "From" formatting, manages thread headers, and dispatches via SMTP.
+- **Delivery Worker:** Claims generic deliveries; the email adapter renders MIME, applies spoof-safe "From" formatting, manages thread headers, and dispatches through SMTP.
 
 ## 2. Email Standards & Protocol Handling
 
@@ -37,7 +40,7 @@ To ensure native compatibility with clients like Gmail, Outlook, and Apple Mail,
 
 To maintain the illusion of a standard group chat, the outbound dispatcher must perfectly mimic human reply headers.
 
-- **Message-ID:** Every incoming and outgoing message possesses a globally unique ID (e.g., `<unique-hash@mailagents.domain>`).
+- **Message-ID:** Every email part has a stable RFC Message-ID within its binding. Canonical messages use UUIDs and do not require an RFC Message-ID.
 - **In-Reply-To:** Outbound agent messages MUST set this header to the `Message-ID` of the human email that triggered the execution.
 - **References:** Outbound messages MUST append the triggering human's `Message-ID` to the existing chain of references. This builds the hierarchical thread tree in the client.
 

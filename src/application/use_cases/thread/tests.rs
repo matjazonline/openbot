@@ -1,6 +1,5 @@
 use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
-use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
@@ -11,6 +10,7 @@ use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageDirection;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
 use crate::transport::{DeliveryCreation, NewDelivery};
 use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
@@ -305,8 +305,15 @@ async fn relay_hop(
     use_cases: &ThreadUseCases,
     hop: &InternalHop,
 ) -> crate::transport::RelayDisposition {
+    let target =
+        crate::adapters::protocols::email::EmailChannelSelectorParser::new("mailagents.com")
+            .parse(hop.to.as_str())
+            .expect("the test recipient is internal")
+            .primary()
+            .clone();
     use_cases
         .relay_internal(&crate::transport::InternalRelayMail {
+            target: &target,
             from: &hop.from,
             recipient_to: &hop.to,
             subject: &hop.subject,
@@ -462,7 +469,7 @@ impl TaskPersistence for MockTaskPersistence {
     async fn record_outreach_reply(
         &self,
         matched: &crate::entities::outreach::OutreachReplyMatch,
-        _response_message_id: Uuid,
+        _response_association_id: Uuid,
     ) -> AppResult<crate::entities::outreach::OutreachProgress> {
         let mut tasks = self.tasks.lock().unwrap();
         let task = tasks
@@ -3067,9 +3074,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     assert!(
         thread
             .participant_projection
-            .email_addresses
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("client@external.com"))
+            .subjects_for(TransportKind::Email)
+            .contains(&"client@external.com")
     );
 
     // 2. Third-party client replies to thread -> ACCEPTED because they were added to thread participants
@@ -3127,9 +3133,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     assert!(
         updated_thread
             .participant_projection
-            .email_addresses
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("vendor@supplier.com"))
+            .subjects_for(TransportKind::Email)
+            .contains(&"vendor@supplier.com")
     );
 
     // 5. vendor@supplier.com replies to thread -> ACCEPTED
@@ -3172,9 +3177,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     assert!(
         !current_thread
             .participant_projection
-            .email_addresses
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com"))
+            .subjects_for(TransportKind::Email)
+            .contains(&"unauthorized@other.com")
     );
 }
 
@@ -3727,9 +3731,9 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
         .as_ref()
         .unwrap()
         .participant_projection
-        .email_addresses
-        .iter()
-        .map(ToString::to_string)
+        .subjects_for(TransportKind::Email)
+        .into_iter()
+        .map(str::to_string)
         .collect()
 }
 

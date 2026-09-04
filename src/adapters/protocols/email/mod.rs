@@ -12,12 +12,16 @@
 pub mod attachments;
 pub mod egress;
 pub mod ingress;
+pub mod mail;
 pub mod parser;
 mod selector;
 mod types;
 
 pub use egress::{EmailRenderer, EmailSender, OUTBOUND_EMAIL_VERSION, OutboundEmailV1};
 pub use ingress::{EmailIngressAdapter, EmailIngressError, EmailIngressTrust, VerifiedEmailAuth};
+pub use mail::{
+    DisabledMailTransport, MailHeader, MailMessage, MailTransport, SmtpConfirmationSender,
+};
 pub use selector::{
     EmailChannelSelection, EmailChannelSelectorParser, EmailDeliveryHints, EmailDeliveryMode,
     EmailRecipientDestination,

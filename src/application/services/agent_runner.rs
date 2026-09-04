@@ -1,4 +1,3 @@
-use crate::adapters::persistence::task::TaskPersistence;
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
@@ -17,6 +16,7 @@ use crate::services::outreach_tool::{
     OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
 };
 use crate::services::prompt_fence::{UNTRUSTED_INPUT_SYSTEM_PROMPT, UntrustedFence, UntrustedKind};
+use crate::task_queue::TaskPersistence;
 use crate::transport::DeliveryComposer;
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::{

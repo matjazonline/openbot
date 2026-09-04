@@ -2,6 +2,20 @@
 
 use super::*;
 
+#[derive(Debug, Clone)]
+pub struct EmailSimulationResult {
+    pub resolved: bool,
+    pub sender_authorized: bool,
+    pub company_slug: Option<crate::entities::value_objects::CompanySlug>,
+    pub channel_slug: Option<crate::entities::value_objects::ChannelSlug>,
+    pub company: Option<Company>,
+    pub channel: Option<Channel>,
+    pub to: String,
+    pub from: String,
+    pub subject: Option<String>,
+    pub text_body: Option<String>,
+}
+
 /// Header shown instead of the compose form once a thread is loaded: the simulator is now
 /// replying within that thread, so the only action offered is starting a fresh one.
 fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str) -> String {
@@ -475,7 +489,7 @@ fn status_banner(glyph: Icon, tint: &str, sentence: &str) -> String {
 pub fn channel_simulation_result_fragment(
     company_id: Uuid,
     channel_id: Uuid,
-    result: &InboundEmailResult,
+    result: &EmailSimulationResult,
 ) -> String {
     let oob_form_swap = simulation_completed_banner(company_id, channel_id);
 
@@ -527,12 +541,8 @@ pub fn channel_simulation_result_fragment(
                 .unwrap_or_else(|| "N/A".to_string())
         });
 
-    let subject_str = result.email.subject.as_deref().unwrap_or("(No subject)");
-    let body_str = result
-        .email
-        .text_body
-        .as_deref()
-        .unwrap_or("(No text body)");
+    let subject_str = result.subject.as_deref().unwrap_or("(No subject)");
+    let body_str = result.text_body.as_deref().unwrap_or("(No text body)");
 
     let channel_config_str = "Execution config belongs to the active agent.".to_string();
 
@@ -543,8 +553,8 @@ pub fn channel_simulation_result_fragment(
         api_key_status,
         company_name: &company_name,
         channel_name: &channel_name,
-        to: &result.email.to,
-        from: &result.email.from,
+        to: &result.to,
+        from: &result.from,
         subject: subject_str,
         body: body_str,
         channel_config: &channel_config_str,
@@ -943,9 +953,9 @@ pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>
 
     let default_sender = thread
         .participant_projection
-        .email_addresses
+        .subjects_for(TransportKind::Email)
         .first()
-        .cloned()
+        .map(|address| EmailAddress::from(*address))
         .or_else(|| {
             channel
                 .participant_emails
@@ -1018,10 +1028,13 @@ pub(crate) fn loaded_thread_overview_card(
     target_recipient: &str,
     msg_count: usize,
 ) -> String {
-    let participants_str = if thread.participant_projection.email_addresses.is_empty() {
+    let participant_addresses = thread
+        .participant_projection
+        .subjects_for(TransportKind::Email);
+    let participants_str = if participant_addresses.is_empty() {
         "None recorded".to_string()
     } else {
-        thread.participant_projection.email_addresses.join(", ")
+        participant_addresses.join(", ")
     };
 
     format!(

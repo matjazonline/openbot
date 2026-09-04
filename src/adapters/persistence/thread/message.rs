@@ -58,12 +58,6 @@ pub(super) struct MessageDb {
     pub role: String,
     pub correlation_id: Uuid,
     pub participants: Value,
-    pub rfc_message_id: Option<String>,
-    pub in_reply_to: Option<String>,
-    pub references_list: Option<Vec<String>>,
-    pub thread_index: Option<String>,
-    pub raw_text_body: Option<String>,
-    pub raw_html_body: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -114,9 +108,6 @@ pub(super) const MESSAGE_SELECT: &str = r#"
                 WHERE participant.company_id = message.company_id
                   AND participant.message_id = message.id
            ), '[]'::jsonb) AS participants,
-           -- The email extension, decoded by `email_metadata::email_metadata_from_row`.
-           email.rfc_message_id, email.in_reply_to, email.references_list,
-           email.thread_index, email.raw_text_body, email.raw_html_body,
            association.created_at
     FROM thread_messages AS association
     JOIN messages AS message
@@ -126,8 +117,6 @@ pub(super) const MESSAGE_SELECT: &str = r#"
     LEFT JOIN participant_identities AS author_identity
       ON (author_identity.company_id, author_identity.id) =
          (message.company_id, message.authored_identity_id)
-    LEFT JOIN email_message_metadata AS email
-      ON (email.company_id, email.message_id) = (message.company_id, message.id)
 "#;
 
 impl TryFrom<MessageDb> for Message {
@@ -161,14 +150,6 @@ impl TryFrom<MessageDb> for Message {
             role,
             correlation_id: CorrelationId::from(db.correlation_id),
             participants: decode_participants(db.participants)?,
-            email: email_metadata::email_metadata_from_row(
-                db.rfc_message_id,
-                db.in_reply_to,
-                db.references_list,
-                db.thread_index,
-                db.raw_text_body,
-                db.raw_html_body,
-            ),
             created_at: db.created_at,
         })
     }

@@ -311,7 +311,7 @@ mod tests {
                         |capability| ChannelPrincipalGrant {
                             principal_id: *principal_id,
                             capability,
-                            provenance: GrantProvenance::EmailAllowlist,
+                            provenance: GrantProvenance::ConfiguredAllowlist,
                             created_at: chrono::Utc::now(),
                         },
                     )
@@ -475,13 +475,13 @@ mod tests {
                 ChannelPrincipalGrant {
                     principal_id: second,
                     capability: PrincipalCapability::View,
-                    provenance: GrantProvenance::EmailAllowlist,
+                    provenance: GrantProvenance::ConfiguredAllowlist,
                     created_at: chrono::Utc::now(),
                 },
                 ChannelPrincipalGrant {
                     principal_id: first,
                     capability: PrincipalCapability::View,
-                    provenance: GrantProvenance::EmailAllowlist,
+                    provenance: GrantProvenance::ConfiguredAllowlist,
                     created_at: earlier,
                 },
             ],

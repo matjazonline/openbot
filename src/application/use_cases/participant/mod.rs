@@ -1,7 +1,7 @@
 //! Company-scoped actors, and the two ports the application needs to reach them.
 //!
 //! A `Principal` is the stable identity every authorization and participation decision names. A
-//! `ParticipantIdentity` is one transport-qualified handle pointing at such a principal, so an
+//! `PrincipalIdentity` is one transport-qualified handle pointing at such a principal, so an
 //! email mailbox and a Slack user id are two rows rather than two identity models.
 
 #[cfg(test)]
@@ -14,8 +14,8 @@ use crate::{
     app_error::AppResult,
     entities::{
         participant::{
-            IdentityClaimMetadata, IdentityProvenance, ParticipantIdentity, Principal,
-            PrincipalAccessContext,
+            IdentityClaimMetadata, IdentityProvenance, Principal, PrincipalAccessContext,
+            PrincipalIdentity,
         },
         transport::{PrincipalId, QualifiedIdentity, TransportKind},
     },
@@ -34,7 +34,7 @@ pub struct IdentityObservation {
 #[derive(Debug, Clone)]
 pub struct IdentityResolution {
     pub principal: Principal,
-    pub identity: ParticipantIdentity,
+    pub identity: PrincipalIdentity,
 }
 
 /// Company-scoped qualified-identity resolution.
@@ -59,7 +59,7 @@ pub trait IdentityDirectory: Send + Sync {
         company_id: Uuid,
         principal_ids: &[PrincipalId],
         transport: TransportKind,
-    ) -> AppResult<Vec<ParticipantIdentity>>;
+    ) -> AppResult<Vec<PrincipalIdentity>>;
 }
 
 /// The actor facts channel policy needs, looked up by whichever handle the caller arrived with.

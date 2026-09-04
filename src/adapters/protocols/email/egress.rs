@@ -28,16 +28,18 @@ use crate::{
         transport::{ExternalMessageKey, FailureClass, TransportKind},
         value_objects::{EmailAddress, MessageId},
     },
-    services::outbound_dispatcher::{MailHeader, MailMessage, MailTransport},
     transport::{
-        CanonicalContentV1, ContentDigest, DeliveryEnvelope, DeliveryRecord, EmailDeliveryContext,
-        ExternalDestinationClassification, FailureDetail, InternalMailRelay, InternalRelayMail,
-        PartIndex, PartKey, ProviderSendOutcome, RelayDisposition, RenderedPart,
-        StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer, TransportSender,
+        CanonicalContentV1, ContentDigest, ConversationAnchor, DeliveryEnvelope, DeliveryRecord,
+        EmailDeliveryContext, EmailThreading, ExternalDestinationClassification, FailureDetail,
+        InternalMailRelay, InternalRelayMail, PartIndex, PartKey, ProviderSendOutcome,
+        RelayDisposition, RenderedPart, StandaloneDeliveryEnvelope, TransportPayload,
+        TransportRenderer, TransportSender,
     },
 };
 
-use super::{EmailChannelSelectorParser, EmailRecipientDestination};
+use super::{
+    EmailChannelSelectorParser, EmailRecipientDestination, MailHeader, MailMessage, MailTransport,
+};
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
 /// decode loudly instead of being read as a shape it is not.
@@ -71,6 +73,8 @@ pub struct OutboundEmailV1 {
     pub message_id: MessageId,
     pub in_reply_to: Option<MessageId>,
     pub references: Vec<MessageId>,
+    /// Present only when the adapter resolved the recipient as one direct internal channel.
+    pub internal_target: Option<crate::entities::transport::ChannelSelector>,
     /// The chain this mail belongs to, stamped onto the wire so a recipient channel stays on it.
     pub correlation_id: CorrelationId,
     /// Loop control for mail one channel's agent sends. `None` for a platform notice, which
@@ -154,6 +158,7 @@ impl OutboundEmailV1 {
     fn as_relay_mail(&self) -> Option<InternalRelayMail<'_>> {
         let (hop_count, _) = self.wire_relay()?;
         Some(InternalRelayMail {
+            target: self.internal_target.as_ref()?,
             from: &self.from,
             recipient_to: self.recipients_to.first()?,
             subject: &self.subject,
@@ -214,6 +219,52 @@ impl EmailRenderer {
             .map(|byte| format!("{byte:02x}"))
             .collect();
         MessageId::from(format!("<delivery-{local_part}@{}>", self.app_domain_name))
+    }
+
+    /// The `Message-ID` an anchored conversation is threaded onto.
+    ///
+    /// This deployment is the only party that ever names this id: nothing was received under it
+    /// and nothing is ever sent under it. Its whole job is to be *the same value* every time a
+    /// schedule fires, so a recipient's client files every run of one schedule as one thread.
+    ///
+    /// It is derived here, in the email adapter, because "what an RFC `Message-ID` looks like" is
+    /// this transport's knowledge. Producers that used to build one themselves put unbracketed
+    /// UUIDs and Slack timestamps into live `In-Reply-To:` headers.
+    fn anchor_message_id(&self, anchor: &ConversationAnchor) -> MessageId {
+        let digest = Sha256::digest(anchor.as_str().as_bytes());
+        let local_part: String = digest
+            .iter()
+            .take(16)
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        MessageId::from(format!("<anchor-{local_part}@{}>", self.app_domain_name))
+    }
+
+    /// The threading headers one delivery goes out with, from what the producer said it answers.
+    ///
+    /// The parent is appended to `References` when the chain does not already name it, so the two
+    /// headers agree however the inbound mail had them.
+    fn thread_headers(&self, threading: &EmailThreading) -> MailThreadHeaders {
+        let (in_reply_to, mut references) = match threading {
+            EmailThreading::Standalone => {
+                return MailThreadHeaders {
+                    in_reply_to: None,
+                    references: Vec::new(),
+                };
+            }
+            EmailThreading::Received {
+                in_reply_to,
+                references,
+            } => (in_reply_to.clone(), references.clone()),
+            EmailThreading::Anchored(anchor) => (self.anchor_message_id(anchor), Vec::new()),
+        };
+        if !references.contains(&in_reply_to) {
+            references.push(in_reply_to.clone());
+        }
+        MailThreadHeaders {
+            in_reply_to: Some(in_reply_to),
+            references,
+        }
     }
 
     /// The part key one email delivery always freezes under.
@@ -303,6 +354,7 @@ impl EmailRenderer {
     ) -> AppResult<Vec<RenderedPart>> {
         let key = Self::part_key(delivery_key)?;
         let message_id = self.message_id_for(&key);
+        let threading = self.thread_headers(&context.threading);
         let body_text = content.body_text.clone();
         let email = OutboundEmailV1 {
             from: context.from.clone(),
@@ -316,8 +368,12 @@ impl EmailRenderer {
             },
             body_text: body_text.clone(),
             message_id: message_id.clone(),
-            in_reply_to: context.in_reply_to.clone(),
-            references: thread_references(context),
+            in_reply_to: threading.in_reply_to,
+            references: threading.references,
+            internal_target: internal_target(
+                EmailChannelSelectorParser::new(&self.app_domain_name)
+                    .parse(context.recipient_to.as_str()),
+            ),
             correlation_id,
             relay: context.relay.as_ref().map(|relay| OutboundRelayV1 {
                 source_channel_id: relay.source_channel_id,
@@ -363,15 +419,23 @@ impl EmailRenderer {
     }
 }
 
-/// The `References:` chain, with the parent appended when it is not already in it.
-fn thread_references(context: &EmailDeliveryContext) -> Vec<MessageId> {
-    let mut references = context.references.clone();
-    if let Some(parent) = context.in_reply_to.as_ref()
-        && !references.contains(parent)
-    {
-        references.push(parent.clone());
+fn internal_target(
+    selection: Option<super::EmailChannelSelection>,
+) -> Option<crate::entities::transport::ChannelSelector> {
+    let selection = selection?;
+    if selection.delivery().is_context_only() || selection.selectors().len() != 1 {
+        return None;
     }
-    references
+    selection.into_selectors().into_iter().next()
+}
+
+/// The `In-Reply-To:` and `References:` headers one mail goes out with.
+///
+/// A struct because the two travel together and are the same decision: a `References` chain that
+/// does not end at the message `In-Reply-To` names is a broken thread in every mail client.
+struct MailThreadHeaders {
+    in_reply_to: Option<MessageId>,
+    references: Vec<MessageId>,
 }
 
 /// `Re:` exactly once, however the subject arrived.

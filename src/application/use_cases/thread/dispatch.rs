@@ -17,7 +17,6 @@ use uuid::Uuid;
 use crate::entities::task::{TaskLeaseRef, TaskSuspension};
 
 use crate::{
-    adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, TASK_LEASE_SECONDS},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -28,7 +27,7 @@ use crate::{
         message::{CanonicalMessageId, MessageDirection, MessageRole},
         task::TokenUsage,
         transport::PrincipalId,
-        value_objects::{EmailAddress, MessageId},
+        value_objects::EmailAddress,
     },
     services::{
         agent_channel_tool::AgentChannelToolContext,
@@ -36,12 +35,12 @@ use crate::{
             AgentExecutionDisposition, AgentRunner, ResolvedAgentParams, resolve_agent_params,
         },
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::agent_response_email_body,
         outreach_tool::OutreachToolContext,
     },
+    task_queue::{AgentDispatchCommit, DispatchCommit, TASK_LEASE_SECONDS},
     transport::{
         CanonicalContent, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
-        EmailRelayTrace, InboundEnvelope, NewDelivery,
+        EmailRelayTrace, EmailThreading, InboundEnvelope, NewDelivery,
     },
 };
 
@@ -118,20 +117,28 @@ fn guardrail_may_be_skipped(access: &ParticipantAccess, envelope: &InboundEnvelo
 
 /// The RFC id an outbound reply answers.
 ///
-/// One of the three helpers below that are deliberately email-shaped: they build the *delivery
-/// intent* -- the `In-Reply-To`, the `From` and the `Cc` a mail goes out with -- and no longer
-/// touch the stored reply, which carries none of it. They are here rather than in the mail adapter
-/// only until the generic delivery model gives them somewhere better to live.
+/// What a mail answering this message threads onto.
 ///
-/// A transport with no message key of its own is unreachable here -- every dispatch answers
-/// something that arrived -- so the source key is used directly rather than defaulted.
-fn trigger_message_id(envelope: &InboundEnvelope) -> MessageId {
-    rfc_message_id(envelope)
-        .cloned()
-        .unwrap_or_else(|| MessageId::from(envelope.source.message_key.as_str()))
+/// Only what the message actually carried. A turn that arrived over a transport with no RFC
+/// headers gives a recipient nothing to thread onto, and
+/// [`EmailThreading::received`] answers `Standalone` for it. Casting the inbound provider key into
+/// a `MessageId` instead -- which is what this used to do -- puts a Slack timestamp into a live
+/// `In-Reply-To:` and into the `email_message_metadata` index that resolves inbound replies to
+/// threads.
+fn answering(envelope: &InboundEnvelope) -> EmailThreading {
+    EmailThreading::received(
+        rfc_message_id(envelope).cloned(),
+        outbound_reference_ids(envelope),
+    )
 }
 
 /// The address a reply goes back to.
+///
+/// Reads the author's identity subject as an address, which holds only while email is the sole
+/// ingress: a Slack author's subject is a user id, and this would post an agent's answer to a
+/// mailbox named `U0123ABC`. Sound today because nothing else can reach this function, and unsound
+/// the moment step 15 lands -- so the reply path chooses a transport before this is called, rather
+/// than this learning to guess one.
 fn sender_address(envelope: &InboundEnvelope) -> EmailAddress {
     EmailAddress::from(envelope.author.subject().as_str())
 }
@@ -702,8 +709,7 @@ impl ThreadUseCases {
             channel_name: channel_match.channel.name.clone(),
             channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
-            trigger_message_id: trigger_message_id(envelope),
-            thread_references: outbound_reference_ids(envelope),
+            threading: answering(envelope),
             hop_count: envelope.directives.hop_count,
             trace_channels: envelope.directives.trace_channels.to_vec(),
             app_domain_name: self.config.app_domain_name.clone(),
@@ -842,8 +848,7 @@ impl ThreadUseCases {
             from_name: Some(primary.channel.name.clone()),
             recipient_to: sender_address(envelope),
             recipients_cc: recipients_cc.into_iter().map(EmailAddress::from).collect(),
-            in_reply_to: Some(trigger_message_id(envelope)),
-            references: outbound_reference_ids(envelope),
+            threading: answering(envelope),
             // An agent's answer continues the chain, so it carries the hop budget: the receiving
             // side needs it to stop two channels answering each other for ever.
             relay: Some(EmailRelayTrace {
@@ -855,7 +860,7 @@ impl ThreadUseCases {
 
         let content = CanonicalContent::parse(
             reply.message.subject.clone(),
-            agent_response_email_body(response),
+            super::agent_response_body(response),
         )?;
         let composed = self
             .deliveries

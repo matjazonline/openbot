@@ -16,8 +16,8 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, ExternalDestination, ExternalMessageKey, ExternalThreadKey,
-            TransportKind, UnsupportedTransport,
+            ChannelBindingId, ChannelSelector, ExternalDestination, ExternalMessageKey,
+            ExternalThreadKey, TransportKind, UnsupportedTransport,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -200,6 +200,8 @@ pub trait InternalMailRelay: Send + Sync {
 /// fields; positional parameters here are the argument-swap `src/AGENTS.md` warns about.
 #[derive(Debug, Clone)]
 pub struct InternalRelayMail<'a> {
+    /// The email adapter has already interpreted its own address syntax into application intent.
+    pub target: &'a ChannelSelector,
     pub from: &'a EmailAddress,
     pub recipient_to: &'a EmailAddress,
     pub subject: &'a str,

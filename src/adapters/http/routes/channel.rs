@@ -19,14 +19,17 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     adapters::protocols::email::{
-        EmailIngressAdapter, EmailIngressTrust, parser::RawInboundPayload,
+        EmailChannelSelectorParser, EmailIdentity, EmailIngressAdapter, EmailIngressTrust,
+        parser::RawInboundPayload,
     },
     app_error::{AppError, AppResult},
-    entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
+    entities::{
+        channel::Channel, cursor::ThreadCursor, thread::Thread, value_objects::EmailAddress,
+    },
     infra::{config::AppConfig, events::MailboxEvents},
     use_cases::{
         agent::AgentUseCases,
-        channel::{ChannelUseCases, ChannelWrite, parse_recipient_address_pipeline},
+        channel::{ChannelUseCases, ChannelWrite},
         company::CompanyUseCases,
         thread::{
             InboundIngestResult, IngressOrigin, ReplyDelivery, SimulationMode, ThreadUseCases,
@@ -959,23 +962,48 @@ async fn simulate_channel_handler(
         // Verify stops at routing: it resolves the address without running an agent.
         SimulationMode::Verify => {
             let sender = form.from.clone().unwrap_or_default();
-            let inbound_email = crate::use_cases::channel::InboundEmail {
-                to: form.to.clone(),
-                from: sender.clone(),
-                subject: form.subject.clone(),
-                text_body: form.text_body.clone(),
-                html_body: form.html_body.clone(),
-                raw_payload: None,
+            let Some(selection) =
+                EmailChannelSelectorParser::new(&config.app_domain_name).parse(&form.to)
+            else {
+                return failure_fragment(&sender, "Invalid simulation recipient".to_string());
+            };
+            let Some(selector) = selection.selectors().first() else {
+                return failure_fragment(&sender, "Invalid simulation recipient".to_string());
+            };
+            let Some(company_slug) = selector.company().cloned() else {
+                return failure_fragment(
+                    &sender,
+                    "Simulation recipient has no company".to_string(),
+                );
+            };
+            let channel_slug = selector.channel().clone();
+            let sender_identity = match EmailIdentity::parse(EmailAddress::from(sender.clone())) {
+                Ok(identity) => identity.qualify_default(),
+                Err(error) => return failure_fragment(&sender, error.to_string()),
             };
 
             match channel_use_cases
-                .process_inbound_email("simulation", inbound_email, &config.app_domain_name)
+                .preview_inbound_route(company_slug, channel_slug, sender_identity)
                 .await
             {
-                Ok(result) => Html(pages::channel_simulation_result_fragment(
-                    company_id, channel_id, &result,
-                ))
-                .into_response(),
+                Ok(route) => {
+                    let result = pages::EmailSimulationResult {
+                        resolved: route.resolved,
+                        sender_authorized: route.sender_authorized,
+                        company_slug: Some(route.company_slug),
+                        channel_slug: Some(route.channel_slug),
+                        company: route.company,
+                        channel: route.channel,
+                        to: form.to.clone(),
+                        from: sender,
+                        subject: form.subject.clone(),
+                        text_body: form.text_body.clone(),
+                    };
+                    Html(pages::channel_simulation_result_fragment(
+                        company_id, channel_id, &result,
+                    ))
+                    .into_response()
+                }
                 Err(err) => failure_fragment(&sender, format!("Simulation failed: {err}")),
             }
         }
@@ -1163,15 +1191,18 @@ fn simulation_recipient_matches(
     channel: &Channel,
     app_domain_name: &str,
 ) -> bool {
-    parse_recipient_address_pipeline(to, app_domain_name).is_some_and(
-        |(company_slug, channel_slugs, _)| {
-            company_slug.eq_ignore_ascii_case(&company.slug)
-                && !channel_slugs.is_empty()
-                && channel_slugs
-                    .iter()
-                    .all(|slug| slug.eq_ignore_ascii_case(&channel.slug))
-        },
-    )
+    EmailChannelSelectorParser::new(app_domain_name)
+        .parse(to)
+        .is_some_and(|selection| {
+            let selectors = selection.selectors();
+            !selectors.is_empty()
+                && selectors.iter().all(|selector| {
+                    selector
+                        .company()
+                        .is_some_and(|slug| slug.eq_ignore_ascii_case(&company.slug))
+                        && selector.channel().eq_ignore_ascii_case(&channel.slug)
+                })
+        })
 }
 
 /// Threading headers that make a simulated message a reply to an existing one.
@@ -1641,7 +1672,13 @@ mod tests {
             subject: "Question <script>".into(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection {
-                email_addresses: vec!["person@example.com".into()],
+                identities: vec![
+                    crate::adapters::protocols::email::EmailIdentity::parse(
+                        "person@example.com".into(),
+                    )
+                    .unwrap()
+                    .qualify_default(),
+                ],
             },
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -1716,21 +1753,17 @@ mod tests {
         assert!(sim_html_with_thread.contains("id=\"simulation-live\""));
         assert!(sim_html_with_thread.contains("sse-swap=\"simulation\""));
 
-        let sim_result = crate::use_cases::channel::InboundEmailResult {
+        let sim_result = pages::EmailSimulationResult {
             resolved: true,
             sender_authorized: true,
             company_slug: Some("acme".into()),
             channel_slug: Some("auto-dispatcher".into()),
             company: Some(company.clone()),
             channel: Some(channel.clone()),
-            email: crate::use_cases::channel::InboundEmail {
-                to: "auto-dispatcher@acme.example.com".to_string(),
-                from: "agent@test.com".to_string(),
-                subject: Some("Test".to_string()),
-                text_body: Some("Body text".to_string()),
-                html_body: None,
-                raw_payload: None,
-            },
+            to: "auto-dispatcher@acme.example.com".to_string(),
+            from: "agent@test.com".to_string(),
+            subject: Some("Test".to_string()),
+            text_body: Some("Body text".to_string()),
         };
         let sim_result_html =
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
@@ -1799,7 +1832,11 @@ mod tests {
             subject: "Existing Thread Subject".to_string(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection {
-                email_addresses: vec!["user@test.com".into()],
+                identities: vec![
+                    crate::adapters::protocols::email::EmailIdentity::parse("user@test.com".into())
+                        .unwrap()
+                        .qualify_default(),
+                ],
             },
             created_at: Utc::now(),
             updated_at: Utc::now(),

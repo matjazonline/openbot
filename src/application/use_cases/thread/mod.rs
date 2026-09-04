@@ -13,10 +13,6 @@ use uuid::Uuid;
 
 use crate::services::agent_channel_tool::AgentChannelProvisioning;
 use crate::{
-    adapters::persistence::task::TaskPersistence,
-    adapters::protocols::email::{
-        EmailChannelSelectorParser, EmailIdentity, EmailRecipientDestination,
-    },
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
@@ -32,16 +28,14 @@ use crate::{
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
         transport::{
-            ChannelSelector, ExternalMessageKey, ExternalThreadKey, QualifiedIdentity,
-            TransportKind,
+            ChannelSelector, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
+            IdentitySubject, QualifiedIdentity, TransportKind,
         },
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
-    services::{
-        memory_coordinator::MemoryCoordinator,
-        outbound_dispatcher::{MailTransport, OutboundDispatcher},
-    },
+    services::memory_coordinator::MemoryCoordinator,
+    task_queue::TaskPersistence,
     transport::{
         AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, CanonicalContent,
         ComposedDelivery, DeliveryComposer, DeliveryCreation, DeliveryRequest,
@@ -119,6 +113,11 @@ mod inter_channel_tests;
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
+/// Apply the product footer shared by agent replies before they become canonical content.
+pub fn agent_response_body(response: &str) -> String {
+    format!("{response}\n\nDone by busybots.net")
+}
+
 /// One channel an already-queued agent run drives.
 ///
 /// Written by the commit that created the task and read back when the run starts, so the worker
@@ -131,9 +130,15 @@ pub struct TaskChannelTarget {
 }
 
 pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
-    EmailIdentity::parse(EmailAddress::from(address.into()))
-        .map(EmailIdentity::qualify_default)
-        .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))
+    let subject = IdentitySubject::parse(address.into().trim().to_ascii_lowercase())
+        .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))?;
+    let namespace =
+        IdentityNamespace::parse("email").expect("the fixed email identity namespace is valid");
+    Ok(QualifiedIdentity::new(
+        TransportKind::Email,
+        namespace,
+        subject,
+    ))
 }
 
 /// One RFC Message-ID as an opaque provider message key, for the internal relay that mints them.
@@ -237,6 +242,16 @@ pub trait ThreadPersistence: Send + Sync {
         thread_id: Uuid,
         message_id: CanonicalMessageId,
     ) -> AppResult<Option<Message>>;
+
+    /// The protocol extension stored beside a canonical message.
+    ///
+    /// Kept off [`Message`]: provider headers are reload input for the owning transport, not part
+    /// of the canonical payload read by every message consumer.
+    async fn get_message_protocol_extension(
+        &self,
+        company_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<ProtocolExtension>;
 
     /// Store one canonical message and associate it with its thread.
     ///
@@ -351,9 +366,6 @@ pub struct ThreadUseCases {
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
-    /// The direct SMTP path still used by reserved `_` address replies. Rejection bounces use the
-    /// durable standalone-notification arm of the generic queue.
-    mail_dispatcher: Arc<OutboundDispatcher>,
     memory: Option<Arc<MemoryCoordinator>>,
     config: Arc<AppConfig>,
     agent_run_timeout: std::time::Duration,
@@ -380,7 +392,6 @@ impl ThreadUseCases {
         renderers: Arc<TransportRenderers>,
         config: Arc<AppConfig>,
     ) -> Self {
-        let mail_dispatcher = Arc::new(OutboundDispatcher::disabled(config.clone()));
         let deliveries = DeliveryComposer::new(renderers, ingest.bindings.clone());
 
         Self {
@@ -398,52 +409,10 @@ impl ThreadUseCases {
             agent_channel_provisioning: None,
             approval_use_cases: None,
             monitoring: None,
-            mail_dispatcher,
             memory: None,
             config,
             agent_run_timeout: std::time::Duration::from_secs(300),
         }
-    }
-
-    /// A handle over in-memory doubles, with the ingest ports wired from the same stores.
-    ///
-    /// So a test's ingest writes into exactly what its assertions read back. Production wiring goes
-    /// through [`Self::new`], which requires the ports rather than defaulting them: a deployment
-    /// that forgot to wire the committer would otherwise discover it one lost message at a time.
-    #[cfg(test)]
-    pub fn for_test(
-        thread_persistence: Arc<test_support::InMemoryThreads>,
-        channel_persistence: Arc<dyn ChannelPersistence>,
-        company_persistence: Arc<dyn CompanyPersistence>,
-        participant_persistence: Arc<dyn ParticipantPersistence>,
-        task_persistence: Arc<dyn TaskPersistence>,
-        config: Arc<AppConfig>,
-    ) -> Self {
-        let ingest = test_support::InMemoryIngress::ports(
-            thread_persistence.clone(),
-            task_persistence.clone(),
-        );
-        // The real email renderer, not a stand-in: the frozen part a test asserts on has to be the
-        // one production would freeze, or the tests prove nothing about what actually goes out.
-        let renderers = std::sync::Arc::new(
-            crate::transport::ports::TransportRenderers::new()
-                .register(std::sync::Arc::new(
-                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
-                ))
-                .expect("one renderer registers"),
-        );
-        Self::new(
-            ThreadStores {
-                threads: thread_persistence,
-                channels: channel_persistence,
-                companies: company_persistence,
-                participants: participant_persistence,
-                tasks: task_persistence,
-            },
-            ingest,
-            renderers,
-            config,
-        )
     }
 
     pub(crate) async fn preferred_email_for_principal(
@@ -464,11 +433,6 @@ impl ThreadUseCases {
     pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
         assert!(!timeout.is_zero(), "agent run timeout must be positive");
         self.agent_run_timeout = timeout;
-        self
-    }
-
-    pub fn with_mail_transport(mut self, transport: Arc<dyn MailTransport>) -> Self {
-        self.mail_dispatcher = Arc::new(OutboundDispatcher::new(self.config.clone(), transport));
         self
     }
 
@@ -534,27 +498,6 @@ impl ThreadUseCases {
 
     pub fn memory_coordinator(&self) -> Option<&Arc<MemoryCoordinator>> {
         self.memory.as_ref()
-    }
-
-    fn internal_channel_selector(&self, recipient: &str) -> AppResult<Option<ChannelSelector>> {
-        let destination = EmailChannelSelectorParser::new(&self.config.app_domain_name)
-            .classify(EmailAddress::from(recipient.trim().to_ascii_lowercase()));
-        match destination {
-            EmailRecipientDestination::External(_) => Ok(None),
-            EmailRecipientDestination::InvalidPlatformAddress => Err(AppError::Internal(format!(
-                "Invalid platform channel address: {recipient}"
-            ))),
-            EmailRecipientDestination::Channel(selection)
-                if selection.delivery().is_context_only() || selection.selectors().len() != 1 =>
-            {
-                Err(AppError::Internal(
-                    "Internal channel delivery requires one direct channel address".into(),
-                ))
-            }
-            EmailRecipientDestination::Channel(selection) => {
-                Ok(selection.into_selectors().into_iter().next())
-            }
-        }
     }
 
     async fn resolve_internal_destination(
@@ -730,11 +673,8 @@ impl ThreadUseCases {
         &self,
         mail: &InternalRelayMail<'_>,
     ) -> AppResult<Option<(ChannelSelector, Uuid)>> {
-        let Some(selector) = self.internal_channel_selector(mail.recipient_to)? else {
-            return Ok(None);
-        };
         let Some((source, _target, company)) = self
-            .resolve_internal_destination(mail.source_channel_id, &selector)
+            .resolve_internal_destination(mail.source_channel_id, mail.target)
             .await?
         else {
             return Ok(None);
@@ -746,7 +686,7 @@ impl ThreadUseCases {
                 "Internal sender address does not match its source channel".into(),
             ));
         }
-        Ok(Some((selector, company.id)))
+        Ok(Some((mail.target.clone(), company.id)))
     }
 
     /// Tell a sender their message could not be routed.
@@ -790,8 +730,7 @@ impl ThreadUseCases {
                         from_name: Some("Mail Agents Server".to_string()),
                         recipient_to: bounce.recipient_to.clone(),
                         recipients_cc: Vec::new(),
-                        in_reply_to: None,
-                        references: Vec::new(),
+                        threading: crate::transport::EmailThreading::Standalone,
                         relay: None,
                     },
                 ),

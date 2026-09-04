@@ -2108,7 +2108,7 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
             subject: "Question".into(),
             body: "Please respond".into(),
-            targets: vec![crate::adapters::persistence::task::OutreachTargetRequest {
+            targets: vec![crate::task_queue::OutreachTargetRequest {
                 email: target_email.into(),
                 request: email_write(EmailMessageDraft {
                     id: Uuid::new_v4(),
@@ -2291,7 +2291,7 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
         )
         .await;
         deliveries.push(queued.delivery.id);
-        targets.push(crate::adapters::persistence::task::OutreachTargetRequest {
+        targets.push(crate::task_queue::OutreachTargetRequest {
             email: address.into(),
             request: email_write(EmailMessageDraft {
                 id: Uuid::new_v4(),
@@ -2486,7 +2486,7 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
             subject: "Question".into(),
             body: "Please respond".into(),
-            targets: vec![crate::adapters::persistence::task::OutreachTargetRequest {
+            targets: vec![crate::task_queue::OutreachTargetRequest {
                 email: "vendor@supplier.example".into(),
                 request: question,
                 delivery: queued.delivery.clone(),
@@ -2678,9 +2678,9 @@ async fn park_for_approval(
     thread_id: Uuid,
     lease: TaskLeaseRef,
 ) -> Uuid {
-    use crate::adapters::persistence::approval::{ApprovalPersistence, NewApproval};
     use crate::entities::approval::{ApprovalAction, ApprovalSubject};
     use crate::entities::task::TaskSuspension;
+    use crate::use_cases::approval::{ApprovalPersistence, NewApproval};
 
     let step_key = format!("step-{}", Uuid::new_v4().simple());
     let subject = ApprovalSubject {

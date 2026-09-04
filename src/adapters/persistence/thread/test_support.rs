@@ -270,7 +270,7 @@ pub(super) fn inbound_email(
     MessageWrite {
         id: CanonicalMessageId::random(),
         thread_id,
-        author: observed("sender@partner.test", IdentityProvenance::EmailIngress),
+        author: observed("sender@partner.test", IdentityProvenance::TransportIngress),
         subject: "Subject".into(),
         clean_text_body: body.into(),
         attachments: Vec::new(),

@@ -6,7 +6,6 @@
 
 use super::test_support::*;
 use super::*;
-use crate::adapters::persistence::task::TaskPersistence;
 use crate::adapters::persistence::test_support::UNSCOPED_CLAIM;
 use crate::entities::{
     correlation::CorrelationId,
@@ -21,6 +20,7 @@ use crate::entities::{
     },
     value_objects::MessageId,
 };
+use crate::task_queue::TaskPersistence;
 use crate::transport::{
     AddressedIdentity, AuthenticatedInboundEvent, BoundedVec, CanonicalContent,
     ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome,
@@ -837,7 +837,7 @@ async fn authored_identity_cannot_belong_to_a_different_author_principal() {
                 identity: identity("first@example.com"),
                 display_label: None,
                 claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::EmailIngress,
+                provenance: IdentityProvenance::TransportIngress,
             },
         )
         .await
@@ -850,7 +850,7 @@ async fn authored_identity_cannot_belong_to_a_different_author_principal() {
                 identity: identity("second@example.com"),
                 display_label: None,
                 claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::EmailIngress,
+                provenance: IdentityProvenance::TransportIngress,
             },
         )
         .await
@@ -1069,7 +1069,7 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
     .await
     .unwrap();
     let (responded, response_id): (bool, Option<Uuid>) = sqlx::query_as(
-        r#"SELECT responded_at IS NOT NULL, response_message_id
+        r#"SELECT responded_at IS NOT NULL, response_association_id
            FROM task_outreach_targets WHERE outreach_id = $1 AND email = $2"#,
     )
     .bind(outreach_id)

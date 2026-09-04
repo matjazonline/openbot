@@ -12,13 +12,14 @@
 
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
-use crate::adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest};
 use crate::adapters::persistence::test_support::test_pool;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::adapters::protocols::email::{EmailRenderer, EmailSender};
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskStatus;
 use crate::entities::transport::{DeliveryId, DeliveryPurpose, TransportKind};
+use crate::task_queue::{CreateOutreachRequest, OutreachTargetRequest};
+use crate::transport::EmailThreading;
 use crate::transport::{
     CanonicalContent, ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryRequest,
     EmailDeliveryContext, EmailRelayTrace, NewDelivery, ProviderSendOutcome, TransportSender,
@@ -231,7 +232,7 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.
     let sender = EmailSender::new(
-        Arc::new(crate::services::outbound_dispatcher::DisabledMailTransport),
+        Arc::new(crate::adapters::protocols::email::DisabledMailTransport),
         threads.clone(),
     );
     let deliveries = DeliveryComposer::new(renderers, persistence.clone());
@@ -343,8 +344,10 @@ impl Fixture {
                     from_name: Some(hop.source.name.clone()),
                     recipient_to: hop.recipient.into(),
                     recipients_cc: Vec::new(),
-                    in_reply_to: Some(hop.in_reply_to.clone()),
-                    references: hop.references.clone(),
+                    threading: EmailThreading::received(
+                        Some(hop.in_reply_to.clone()),
+                        hop.references.clone(),
+                    ),
                     relay: Some(EmailRelayTrace {
                         source_channel_id: hop.source.id,
                         hop_count: hop.hop_count,

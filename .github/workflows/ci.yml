@@ -44,6 +44,8 @@ jobs:
           scripts/tests/credential-key-rotation.sh
       - name: Formatting
         run: cargo fmt --all -- --check
+      - name: Transport abstraction boundary
+        run: scripts/transport-boundary-check.sh
       - name: Offline compilation
         run: cargo check --locked --all-targets
       - name: Clippy

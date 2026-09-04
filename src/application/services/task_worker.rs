@@ -7,9 +7,6 @@ use tracing::{Instrument, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::{
-        Leased, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome, while_leased,
-    },
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
         agent::Agent,
@@ -26,18 +23,20 @@ use crate::{
             TaskAttemptStatus, TaskExecutionOutcome, TaskFailure, TaskFailureOutcome, TaskLeaseRef,
             TaskStopReason, TaskSuspension,
         },
-        value_objects::{EmailAddress, MessageId},
+        value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     services::{
         agent_runner::{AgentRunner, resolve_agent_params},
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::agent_response_email_body,
         runtime_metrics::ActiveTaskExecutions,
     },
+    task_queue::{
+        Leased, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome, while_leased,
+    },
     transport::{
-        CanonicalContent, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
-        EmailRelayTrace, InboundTaskPayload, NewDelivery,
+        CanonicalContent, ConversationAnchor, DeliveryContext, DeliveryPurpose, DeliveryRequest,
+        EmailDeliveryContext, EmailRelayTrace, EmailThreading, InboundTaskPayload, NewDelivery,
     },
     use_cases::{
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
@@ -220,24 +219,21 @@ struct ScheduledRunContext {
     agent: Agent,
 }
 
-/// The `Message-ID` the mail carrying a scheduled run's answer goes out under.
-///
-/// Derived from the task -- the delivery key -- rather than stored on the message. The answer
-/// itself is a canonical message with no headers on it, so a run that one day delivers to Slack
-/// instead needs nothing here; this is the *renderer* deciding what to put on an envelope, and a
-/// retry that re-renders the same envelope gets the same id.
-fn scheduled_reply_message_id(task_id: Uuid, domain: &str) -> MessageId {
-    MessageId::new(format!("<schedule-reply-{task_id}@{domain}>"))
-}
-
-/// The `Message-ID` a scheduled run's mail threads onto: the run itself, named by its durable slot
-/// where it has one and by its schedule and firing time otherwise.
+/// The conversation a scheduled run's mail threads onto: the run's own durable slot.
 ///
 /// Nothing carried the prompt this answers -- the platform asked because a slot came due -- so
-/// there is no header to reply to and one is derived here instead of being fabricated onto the
-/// prompt message.
-fn scheduled_thread_root_message_id(payload: &ScheduledRunPayload, domain: &str) -> MessageId {
-    MessageId::new(format!("<schedule-run-{}@{domain}>", payload.run_key))
+/// there is no received header to reply to. Naming the slot rather than the task is what makes a
+/// recipient's client file every firing of one schedule as one conversation, and what makes a
+/// retry of the same firing land in it rather than beside it.
+///
+/// Deliberately not an RFC `Message-ID`: what an anchor looks like on the wire is the email
+/// adapter's decision, and a schedule that one day delivers over Slack hands over this same key.
+fn scheduled_run_anchor(payload: &ScheduledRunPayload) -> ConversationAnchor {
+    // A prefix and a UUID: 49 bytes, never empty and never control-bearing, so the bound cannot
+    // be reached. A fallback here would be worse than a panic -- two schedules sharing one anchor
+    // is two schedules sharing one conversation in every recipient's client.
+    ConversationAnchor::parse(format!("schedule-run:{}", payload.run_key))
+        .expect("a prefixed UUID is within the anchor bound")
 }
 
 /// `Re:` a subject without stacking a second prefix.
@@ -753,11 +749,16 @@ impl TaskWorker {
         };
 
         // Claim the timeout first: only the worker that flips the state may raise the approval.
+        //
+        // The claim propagates rather than defaulting. `unwrap_or(false)` read "on a database
+        // error, someone else claimed it" -- which is the one answer that is never checkable: the
+        // timeout is then silently never raised by anyone, and the sweep that would retry it has
+        // already returned `Ok`. An error here is retried on the next sweep instead.
         if !self
             .task_persistence
             .mark_outreach_timeout_pending(outreach.outreach_id)
             .await
-            .unwrap_or(false)
+            .map_err(|error| error.to_string())?
         {
             return Ok(());
         }
@@ -1246,14 +1247,7 @@ impl TaskWorker {
             from_name: Some(channel.name.clone()),
             recipient_to: primary_to.clone(),
             recipients_cc: cc_list.to_vec(),
-            in_reply_to: Some(scheduled_thread_root_message_id(
-                payload,
-                &self.config.app_domain_name,
-            )),
-            references: vec![scheduled_reply_message_id(
-                task.id,
-                &self.config.app_domain_name,
-            )],
+            threading: EmailThreading::Anchored(scheduled_run_anchor(payload)),
             // A schedule's answer starts its own conversation rather than continuing an inbound
             // one, so it opens the hop budget rather than inheriting a spent one.
             relay: Some(EmailRelayTrace {
@@ -1265,7 +1259,7 @@ impl TaskWorker {
 
         let content = CanonicalContent::parse(
             reply_subject(&payload.subject),
-            agent_response_email_body(answer),
+            crate::use_cases::thread::agent_response_body(answer),
         )
         .map_err(|error| error.to_string())?;
 
@@ -1471,13 +1465,10 @@ impl TaskWorker {
             from_name: Some(channel.name.clone()),
             recipient_to: recipient,
             recipients_cc: reply_to.cc.clone(),
-            in_reply_to: Some(
-                reply_to
-                    .rfc_message_id
-                    .clone()
-                    .unwrap_or_else(|| reply_to.canonical_id.to_string().into()),
+            threading: EmailThreading::received(
+                reply_to.rfc_message_id.clone(),
+                reply_to.references.clone(),
             ),
-            references: reply_to.references.clone(),
             // The notice ends the chain rather than continuing it: with no relay trace it carries
             // no hop count and no channel id, so nothing on the receiving side may answer it.
             relay: None,
@@ -1541,12 +1532,13 @@ impl TaskWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
+    use crate::entities::value_objects::MessageId;
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
     use crate::use_cases::thread::test_support::{EmailMessageDraft, InMemoryThreads, email_write};
     use async_trait::async_trait;
@@ -2609,7 +2601,11 @@ mod tests {
             subject: "Help".to_string(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection {
-                email_addresses: vec!["user@test.com".into()],
+                identities: vec![
+                    crate::adapters::protocols::email::EmailIdentity::parse("user@test.com".into())
+                        .unwrap()
+                        .qualify_default(),
+                ],
             },
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
@@ -3048,33 +3044,39 @@ mod tests {
         assert_eq!(reply_subject("RE: Audit Report"), "RE: Audit Report");
     }
 
-    /// The RFC ids a scheduled run's mail goes out under are derived from delivery keys -- the
-    /// task, and the run -- so a retry re-renders the same envelope. Nothing about them is stored
-    /// on the answer, which is why the answer no longer needs a synthetic `<scheduled-...>` id.
+    /// A schedule's mail threads onto its own run slot, and says so with a key rather than with a
+    /// header it invented.
+    ///
+    /// The anchor is what a recipient's client files every firing of one schedule under, so it has
+    /// to be identical across retries of the same firing and different across schedules. It is
+    /// deliberately not an RFC `Message-ID`: the email adapter turns it into one, and a schedule
+    /// that one day delivers over Slack hands the same key to a renderer with no use for it.
     #[test]
-    fn a_scheduled_runs_mail_headers_are_derived_from_its_delivery_keys() {
-        let task_id = Uuid::new_v4();
-        assert_eq!(
-            scheduled_reply_message_id(task_id, "mailagents.com"),
-            scheduled_reply_message_id(task_id, "mailagents.com"),
-            "a retry must re-render the same envelope"
-        );
-        assert_ne!(
-            scheduled_reply_message_id(task_id, "mailagents.com"),
-            scheduled_reply_message_id(Uuid::new_v4(), "mailagents.com"),
-            "a different run is a different mail"
-        );
-
+    fn a_scheduled_run_threads_onto_its_slot_rather_than_an_invented_header() {
         let payload = scheduled_payload();
         assert_eq!(
-            scheduled_thread_root_message_id(&payload, "mailagents.com"),
-            scheduled_thread_root_message_id(&payload, "mailagents.com")
+            scheduled_run_anchor(&payload),
+            scheduled_run_anchor(&payload)
         );
         assert!(
-            scheduled_thread_root_message_id(&payload, "mailagents.com")
+            scheduled_run_anchor(&payload)
                 .as_str()
                 .contains(&payload.run_key.to_string()),
-            "the thread root names the run, not the prompt message"
+            "the anchor names the run slot, not the prompt message"
+        );
+        assert!(
+            !scheduled_run_anchor(&payload).as_str().contains('<'),
+            "an anchor is not a Message-ID; only the email renderer may make one"
+        );
+
+        let other = ScheduledRunPayload {
+            run_key: Uuid::new_v4(),
+            ..scheduled_payload()
+        };
+        assert_ne!(
+            scheduled_run_anchor(&payload),
+            scheduled_run_anchor(&other),
+            "two schedules must not share one conversation"
         );
     }
 

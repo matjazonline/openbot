@@ -35,6 +35,8 @@ pub(crate) use message::{associate_message_on, insert_message_on};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
+use serde_json::Value;
 use sqlx::PgPool;
 use std::{
     collections::{HashMap, HashSet},
@@ -74,14 +76,51 @@ pub struct ThreadDb {
     pub channel_id: Uuid,
     pub subject: String,
     pub participant_principal_ids: Vec<Uuid>,
-    pub participant_emails: Vec<String>,
+    pub participant_identities: Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<ThreadDb> for Thread {
-    fn from(db: ThreadDb) -> Self {
-        Thread {
+#[derive(Deserialize)]
+struct ThreadIdentityRow {
+    transport: String,
+    namespace: String,
+    subject: String,
+}
+
+impl TryFrom<ThreadDb> for Thread {
+    type Error = AppError;
+
+    fn try_from(db: ThreadDb) -> AppResult<Self> {
+        let rows: Vec<ThreadIdentityRow> = serde_json::from_value(db.participant_identities)
+            .map_err(|error| {
+                AppError::Internal(format!("Stored thread identities are invalid: {error}"))
+            })?;
+        let identities = rows
+            .into_iter()
+            .map(|row| {
+                Ok(crate::entities::transport::QualifiedIdentity::new(
+                    TransportKind::from_str(&row.transport).map_err(|error| {
+                        AppError::Internal(format!("Stored thread identity is invalid: {error}"))
+                    })?,
+                    crate::entities::transport::IdentityNamespace::parse(row.namespace).map_err(
+                        |error| {
+                            AppError::Internal(format!(
+                                "Stored thread identity is invalid: {error}"
+                            ))
+                        },
+                    )?,
+                    crate::entities::transport::IdentitySubject::parse(row.subject).map_err(
+                        |error| {
+                            AppError::Internal(format!(
+                                "Stored thread identity is invalid: {error}"
+                            ))
+                        },
+                    )?,
+                ))
+            })
+            .collect::<AppResult<Vec<_>>>()?;
+        Ok(Thread {
             id: db.id,
             channel_id: db.channel_id,
             subject: db.subject,
@@ -90,16 +129,10 @@ impl From<ThreadDb> for Thread {
                 .into_iter()
                 .map(PrincipalId::new)
                 .collect(),
-            participant_projection: ThreadParticipantProjection {
-                email_addresses: db
-                    .participant_emails
-                    .into_iter()
-                    .map(EmailAddress::from)
-                    .collect(),
-            },
+            participant_projection: ThreadParticipantProjection { identities },
             created_at: db.created_at,
             updated_at: db.updated_at,
-        }
+        })
     }
 }
 
@@ -112,17 +145,23 @@ const THREAD_SELECT: &str = r#"
                    AND thread_principal.thread_id = thread.id),
                ARRAY[]::uuid[]
            ) AS participant_principal_ids,
-           COALESCE(
-               (SELECT array_agg(DISTINCT identity.subject ORDER BY identity.subject)
-                  FROM thread_principals AS thread_principal
-                  JOIN participant_identities AS identity
-                    ON (identity.company_id, identity.principal_id) =
-                       (thread_principal.company_id, thread_principal.principal_id)
-                 WHERE thread_principal.company_id = thread.company_id
-                   AND thread_principal.thread_id = thread.id
-                   AND identity.transport = 'email' AND identity.status <> 'disabled'),
-               ARRAY[]::text[]
-           ) AS participant_emails,
+           COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                          'transport', identity.transport,
+                          'namespace', identity.namespace,
+                          'subject', identity.subject)
+                      ORDER BY identity.transport, identity.namespace, identity.subject)
+                 FROM (
+                     SELECT DISTINCT handle.transport, handle.namespace, handle.subject
+                       FROM thread_principals AS thread_principal
+                       JOIN participant_identities AS handle
+                         ON (handle.company_id, handle.principal_id) =
+                            (thread_principal.company_id, thread_principal.principal_id)
+                      WHERE thread_principal.company_id = thread.company_id
+                        AND thread_principal.thread_id = thread.id
+                        AND handle.status <> 'disabled'
+                 ) AS identity
+           ), '[]'::jsonb) AS participant_identities,
            thread.created_at, thread.updated_at
       FROM threads AS thread
 "#;
@@ -134,7 +173,7 @@ async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>> {
         .fetch_optional(pool)
         .await
         .map_err(AppError::from)?;
-    Ok(db.map(Into::into))
+    db.map(Thread::try_from).transpose()
 }
 
 async fn load_message(pool: &PgPool, association_id: Uuid) -> AppResult<Message> {
@@ -194,10 +233,7 @@ pub(super) async fn insert_thread_principals(
         if !seen.insert((intent.identity.clone(), intent.role)) {
             continue;
         }
-        let provenance = match intent.identity.transport() {
-            TransportKind::Email => IdentityProvenance::EmailIngress,
-            TransportKind::Slack => IdentityProvenance::SlackEvent,
-        };
+        let provenance = IdentityProvenance::TransportIngress;
         let resolved = resolve_or_create_external_identity_on(
             transaction,
             company_id,
@@ -358,7 +394,7 @@ impl ThreadPersistence for PostgresPersistence {
         }
         .map_err(AppError::from)?;
 
-        Ok(db.into_iter().map(Into::into).collect())
+        db.into_iter().map(Thread::try_from).collect()
     }
 
     async fn list_thread_last_roles(
@@ -420,7 +456,7 @@ impl ThreadPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
 
-        Ok(db.into_iter().map(Into::into).collect())
+        db.into_iter().map(Thread::try_from).collect()
     }
 
     async fn update_thread_participants(
@@ -487,7 +523,7 @@ impl ThreadPersistence for PostgresPersistence {
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
-        Ok(db.map(Into::into))
+        db.map(Thread::try_from).transpose()
     }
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize> {
@@ -519,6 +555,21 @@ impl ThreadPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
         db.map(Message::try_from).transpose()
+    }
+
+    async fn get_message_protocol_extension(
+        &self,
+        company_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<crate::transport::ProtocolExtension> {
+        Ok(
+            email_metadata::load_email_metadata(&self.pool, company_id, message_id.as_uuid())
+                .await?
+                .map_or_else(
+                    crate::transport::ProtocolExtension::none,
+                    crate::transport::ProtocolExtension::email,
+                ),
+        )
     }
 
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message> {

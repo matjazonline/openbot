@@ -193,21 +193,21 @@ impl ThreadUseCases {
         &self,
         address: &str,
         sender: &str,
-        directory: &mut DirectoryCache<'_>,
+        _directory: &mut DirectoryCache<'_>,
     ) -> AppResult<bool> {
         let address = address.trim();
         if address.is_empty() || address.eq_ignore_ascii_case(sender) {
             return Ok(false);
         }
-        let Some((company_slug, _, _)) =
-            crate::use_cases::channel::parse_recipient_address_pipeline(
-                address,
-                &self.config.app_domain_name,
-            )
-        else {
-            return Ok(true);
-        };
-        Ok(directory.company(&company_slug).await?.is_none())
+        let classification = self
+            .deliveries
+            .renderer(crate::entities::transport::TransportKind::Email)?
+            .classify_external_destination(address);
+        Ok(matches!(
+            classification,
+            crate::transport::ExternalDestinationClassification::External(_)
+                | crate::transport::ExternalDestinationClassification::InvalidSyntax
+        ))
     }
 }
 

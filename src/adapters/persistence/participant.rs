@@ -12,8 +12,8 @@ use crate::{
     entities::{
         company_member::CompanyMembership,
         participant::{
-            IdentityClaimMetadata, IdentityProvenance, IdentityStatus, ParticipantIdentity,
-            Principal, PrincipalAccessContext, PrincipalKind,
+            IdentityClaimMetadata, IdentityProvenance, IdentityStatus, Principal,
+            PrincipalAccessContext, PrincipalIdentity, PrincipalKind,
         },
         transport::{
             IdentityNamespace, IdentitySubject, ParticipantIdentityId, PrincipalId,
@@ -72,7 +72,7 @@ struct IdentityDb {
     updated_at: DateTime<Utc>,
 }
 
-impl TryFrom<IdentityDb> for ParticipantIdentity {
+impl TryFrom<IdentityDb> for PrincipalIdentity {
     type Error = AppError;
 
     fn try_from(row: IdentityDb) -> AppResult<Self> {
@@ -440,7 +440,7 @@ impl IdentityDirectory for PostgresPersistence {
         company_id: Uuid,
         principal_ids: &[PrincipalId],
         transport: TransportKind,
-    ) -> AppResult<Vec<ParticipantIdentity>> {
+    ) -> AppResult<Vec<PrincipalIdentity>> {
         if principal_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -599,7 +599,7 @@ mod tests {
             identity,
             display_label: None,
             claim_metadata: IdentityClaimMetadata::observation(),
-            provenance: IdentityProvenance::EmailIngress,
+            provenance: IdentityProvenance::TransportIngress,
         }
     }
 
@@ -642,7 +642,7 @@ mod tests {
                    (id, company_id, principal_id, transport, namespace, subject, status,
                     claim_metadata, provenance)
                VALUES ($1, $2, $3, 'email', 'email', 'stolen@partner.test', 'observed',
-                       '{"kind":"observation","version":1}'::jsonb, 'email_ingress')"#,
+                       '{"kind":"observation","version":1}'::jsonb, 'transport_ingress')"#,
         )
         .bind(Uuid::new_v4())
         .bind(company_b)
@@ -655,7 +655,7 @@ mod tests {
         let cross_tenant_grant = sqlx::query(
             r#"INSERT INTO channel_principal_grants
                    (company_id, channel_id, principal_id, capability, provenance)
-               VALUES ($1, $2, $3, 'participate', 'email_allowlist')"#,
+               VALUES ($1, $2, $3, 'participate', 'configured_allowlist')"#,
         )
         .bind(company_b)
         .bind(Uuid::new_v4())
@@ -793,10 +793,12 @@ mod tests {
                         IdentitySubject::parse("U-claimant").unwrap(),
                     ),
                     display_label: Some("Definitely The Owner".into()),
-                    claim_metadata: IdentityClaimMetadata::slack_profile(Some(EmailAddress::from(
-                        owner_email.clone(),
-                    ))),
-                    provenance: IdentityProvenance::SlackProfileClaim,
+                    claim_metadata: IdentityClaimMetadata::provider_profile(Some(
+                        EmailIdentity::parse(EmailAddress::from(owner_email.clone()))
+                            .unwrap()
+                            .qualify_default(),
+                    )),
+                    provenance: IdentityProvenance::ProviderProfileClaim,
                 },
             )
             .await

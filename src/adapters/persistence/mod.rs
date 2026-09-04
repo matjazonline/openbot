@@ -142,6 +142,105 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn clean_schema_contains_only_the_canonical_message_spine() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+
+        let retired_tables: Vec<String> = sqlx::query_scalar(
+            r#"SELECT table_name
+                 FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = ANY($1)
+                ORDER BY table_name"#,
+        )
+        .bind(["email_messages", "email_outbox"])
+        .fetch_all(&pool)
+        .await
+        .expect("the table catalog is readable");
+        assert!(
+            retired_tables.is_empty(),
+            "retired tables remain: {retired_tables:?}"
+        );
+
+        let retired_columns: Vec<String> = sqlx::query_scalar(
+            r#"SELECT table_name || '.' || column_name
+                 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND (table_name, column_name) IN (
+                      ('thread_messages', 'email_message_id'),
+                      ('threads', 'external_thread_key'),
+                      ('background_tasks', 'source_email_message_id'),
+                      ('background_tasks', 'source_message_id')
+                  )
+                ORDER BY table_name, column_name"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the column catalog is readable");
+        assert!(
+            retired_columns.is_empty(),
+            "retired columns remain: {retired_columns:?}"
+        );
+
+        let canonical_columns: Vec<(String, String, String, String)> = sqlx::query_as(
+            r#"SELECT table_name, column_name, is_nullable, udt_name
+                 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND ((table_name = 'thread_messages' AND column_name = 'message_id')
+                    OR (table_name = 'background_tasks' AND column_name = 'source_message_uuid'))
+                ORDER BY table_name, column_name"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the canonical columns are inspectable");
+        assert_eq!(
+            canonical_columns,
+            vec![
+                (
+                    "background_tasks".into(),
+                    "source_message_uuid".into(),
+                    "YES".into(),
+                    "uuid".into(),
+                ),
+                (
+                    "thread_messages".into(),
+                    "message_id".into(),
+                    "NO".into(),
+                    "uuid".into(),
+                ),
+            ],
+            "canonical message UUID columns must have their final nullability",
+        );
+
+        let required_constraints: Vec<String> = sqlx::query_scalar(
+            r#"SELECT conname
+                 FROM pg_constraint
+                WHERE conname = ANY($1)
+                ORDER BY conname"#,
+        )
+        .bind([
+            "background_tasks_company_source_message_key",
+            "background_tasks_single_source_check",
+            "background_tasks_source_message_fk",
+            "thread_messages_message_fk",
+        ])
+        .fetch_all(&pool)
+        .await
+        .expect("the canonical constraints are inspectable");
+        assert_eq!(
+            required_constraints,
+            vec![
+                "background_tasks_company_source_message_key".to_owned(),
+                "background_tasks_single_source_check".to_owned(),
+                "background_tasks_source_message_fk".to_owned(),
+                "thread_messages_message_fk".to_owned(),
+            ],
+            "canonical message/task constraints must be installed",
+        );
+    }
+
+    #[tokio::test]
     async fn a_row_defaulted_from_a_non_utc_session_reads_back_as_the_same_instant() {
         let Some(pool) = test_pool().await else {
             return;

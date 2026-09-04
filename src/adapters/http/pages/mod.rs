@@ -35,10 +35,15 @@ use crate::entities::{
     value_objects::{AvatarUrl, EmailAddress, ModelName},
 };
 use crate::services::memory_provider::ConfiguredMemoryProviders;
-use crate::use_cases::{
-    channel::{InboundEmailResult, parse_platform_address},
-    user::{AccountChangeKind, PendingChange},
-};
+use crate::use_cases::user::{AccountChangeKind, PendingChange};
+
+fn parse_platform_address(
+    value: &str,
+    app_domain_name: &str,
+) -> Option<(crate::entities::value_objects::CompanySlug, String)> {
+    crate::adapters::protocols::email::EmailChannelSelectorParser::new(app_domain_name)
+        .parse_platform_address(value)
+}
 
 mod agent_library_multi_select;
 mod agent_settings;

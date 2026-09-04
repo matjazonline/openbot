@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entities::cursor::ThreadCursor;
-use crate::entities::{transport::PrincipalId, value_objects::EmailAddress};
+use crate::entities::transport::{PrincipalId, QualifiedIdentity, TransportKind};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Thread {
@@ -19,7 +19,19 @@ pub struct Thread {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ThreadParticipantProjection {
-    pub email_addresses: Vec<EmailAddress>,
+    pub identities: Vec<QualifiedIdentity>,
+}
+
+impl ThreadParticipantProjection {
+    /// Subjects usable by one transport's adapter, without putting provider-shaped fields on the
+    /// canonical thread.
+    pub fn subjects_for(&self, transport: TransportKind) -> Vec<&str> {
+        self.identities
+            .iter()
+            .filter(|identity| identity.transport() == transport)
+            .map(|identity| identity.subject().as_str())
+            .collect()
+    }
 }
 
 impl Thread {

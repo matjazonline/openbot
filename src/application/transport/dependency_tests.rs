@@ -4,79 +4,9 @@
 //! layer describes the ports it needs; adapters implement them." That rule is invisible to the
 //! compiler -- everything is one crate -- so it is asserted here instead, over the source itself.
 //!
-//! The test does two things. It fails outright on any *new* upward import, and it holds a frozen
-//! list of the ones that already exist, so the remaining work is enumerated rather than implied.
-//! An entry that has been fixed must be deleted from the list: a stale exception fails the test
-//! just as loudly as a new violation, which is what keeps the list shrinking.
+//! Step 11 closed the temporary exception list. Every upward production import now fails.
 
 use std::{fs, path::Path};
-
-/// An import in `src/application` that points outward, and the step that removes it.
-struct KnownException {
-    file: &'static str,
-    /// The exact fragment matched, so an exception cannot quietly cover a second violation in the
-    /// same file.
-    fragment: &'static str,
-    removed_by: &'static str,
-}
-
-/// The upward imports that remain, each with the plan step that deletes it.
-///
-/// Every entry here is a port trait or a protocol helper declared in `src/adapters` and consumed
-/// by the application. Step 7 moved the mail parser, attachment storage and identity
-/// normalization into the email adapter, and step 9 moved the *delivery* queue: `DeliveryQueue`
-/// lives beside its worker in `src/application/transport/queue.rs`, and the email renderer and
-/// sender implement application ports rather than declaring them.
-///
-/// What is left is the `TaskPersistence` trait -- the other queue, which step 11 moves the same
-/// way -- and the address classification the internal relay still asks an email parser for.
-const KNOWN_EXCEPTIONS: &[KnownException] = &[
-    KnownException {
-        file: "use_cases/thread/mod.rs",
-        fragment: "adapters::persistence::task::TaskPersistence",
-        removed_by: "step 11: the task queue port moves next to the worker that claims it",
-    },
-    KnownException {
-        file: "use_cases/thread/mod.rs",
-        fragment: "adapters::protocols::email::{",
-        removed_by: "step 11: the internal relay stops classifying addresses for itself",
-    },
-    KnownException {
-        file: "use_cases/thread/dispatch.rs",
-        fragment: "adapters::persistence::task::{",
-        removed_by: "step 11: the dispatch commit moves with the task queue port",
-    },
-    KnownException {
-        file: "use_cases/schedule.rs",
-        fragment: "adapters::persistence::{schedule::SchedulePersistence, task::TaskPersistence}",
-        removed_by: "step 11: schedules reach the task queue through an application port",
-    },
-    KnownException {
-        file: "use_cases/approval.rs",
-        fragment: "adapters::persistence::{",
-        removed_by: "step 11: approvals reach the task queue through an application port",
-    },
-    KnownException {
-        file: "use_cases/channel.rs",
-        fragment: "adapters::protocols::email::EmailChannelSelectorParser",
-        removed_by: "step 11: outreach and reply Cc stop asking whether an address is ours",
-    },
-    KnownException {
-        file: "services/agent_runner.rs",
-        fragment: "adapters::persistence::task::TaskPersistence",
-        removed_by: "step 11: the task queue port moves next to the worker that claims it",
-    },
-    KnownException {
-        file: "services/task_worker.rs",
-        fragment: "adapters::persistence::task::{",
-        removed_by: "step 11: the task queue port moves next to this worker",
-    },
-    KnownException {
-        file: "services/outreach_tool.rs",
-        fragment: "adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence}",
-        removed_by: "step 11: the task queue port moves next to the worker that claims it",
-    },
-];
 
 /// Import fragments the application layer may never contain.
 ///
@@ -156,24 +86,17 @@ fn the_application_layer_imports_no_adapter_framework_or_provider_type() {
     );
 
     let mut unexpected = Vec::new();
-    let mut matched_exceptions = vec![false; KNOWN_EXCEPTIONS.len()];
-
     for (file, source) in &sources {
         for (number, line) in source.lines().enumerate() {
             let Some(forbidden) = FORBIDDEN.iter().find(|forbidden| line.contains(*forbidden))
             else {
                 continue;
             };
-            match KNOWN_EXCEPTIONS.iter().position(|exception| {
-                exception.file == file.as_str() && line.contains(exception.fragment)
-            }) {
-                Some(index) => matched_exceptions[index] = true,
-                None => unexpected.push(format!(
-                    "{file}:{}: '{forbidden}' in `{}`",
-                    number + 1,
-                    line.trim()
-                )),
-            }
+            unexpected.push(format!(
+                "{file}:{}: '{forbidden}' in `{}`",
+                number + 1,
+                line.trim()
+            ));
         }
     }
 
@@ -183,32 +106,6 @@ fn the_application_layer_imports_no_adapter_framework_or_provider_type() {
          client. Move the port into `src/application` and let the adapter implement it:\n  {}",
         unexpected.join("\n  ")
     );
-
-    let stale: Vec<_> = KNOWN_EXCEPTIONS
-        .iter()
-        .zip(&matched_exceptions)
-        .filter(|(_, matched)| !**matched)
-        .map(|(exception, _)| format!("{}: {}", exception.file, exception.fragment))
-        .collect();
-    assert!(
-        stale.is_empty(),
-        "these upward imports are gone; delete their entries from KNOWN_EXCEPTIONS so the list \
-         keeps shrinking:\n  {}",
-        stale.join("\n  ")
-    );
-}
-
-/// The exceptions are a work list, not a policy. Each one has to say which step retires it.
-#[test]
-fn every_remaining_upward_import_names_the_step_that_removes_it() {
-    for exception in KNOWN_EXCEPTIONS {
-        assert!(
-            exception.removed_by.starts_with("step "),
-            "{}: '{}' has no owning step",
-            exception.file,
-            exception.fragment
-        );
-    }
 }
 
 #[cfg(test)]

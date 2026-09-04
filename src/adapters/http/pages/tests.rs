@@ -293,7 +293,13 @@ fn mailbox_thread(channel_id: Uuid) -> Thread {
         subject: "Question <script>".to_string(),
         participant_principal_ids: Vec::new(),
         participant_projection: crate::entities::thread::ThreadParticipantProjection {
-            email_addresses: vec!["person@example.com".into()],
+            identities: vec![
+                crate::adapters::protocols::email::EmailIdentity::parse(
+                    "person@example.com".into(),
+                )
+                .unwrap()
+                .qualify_default(),
+            ],
         },
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -2963,9 +2969,13 @@ fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
 
     let delegated = Thread {
         participant_projection: crate::entities::thread::ThreadParticipantProjection {
-            email_addresses: vec![EmailAddress::from(format!(
-                "research@acme.{MAILBOX_APP_DOMAIN}"
-            ))],
+            identities: vec![
+                crate::adapters::protocols::email::EmailIdentity::parse(EmailAddress::from(
+                    format!("research@acme.{MAILBOX_APP_DOMAIN}"),
+                ))
+                .unwrap()
+                .qualify_default(),
+            ],
         },
         ..mailbox_thread(channel.id)
     };
@@ -3008,9 +3018,13 @@ fn the_column_marks_a_delegated_thread_without_being_told() {
     let channel = mailbox_channel(company.id);
     let delegated = Thread {
         participant_projection: crate::entities::thread::ThreadParticipantProjection {
-            email_addresses: vec![EmailAddress::from(format!(
-                "research@acme.{MAILBOX_APP_DOMAIN}"
-            ))],
+            identities: vec![
+                crate::adapters::protocols::email::EmailIdentity::parse(EmailAddress::from(
+                    format!("research@acme.{MAILBOX_APP_DOMAIN}"),
+                ))
+                .unwrap()
+                .qualify_default(),
+            ],
         },
         ..mailbox_thread(channel.id)
     };

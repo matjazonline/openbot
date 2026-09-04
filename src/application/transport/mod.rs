@@ -33,12 +33,12 @@ pub use compose::{
     email_context,
 };
 pub use delivery::{
-    CanonicalContentV1, ContentDigest, ContextMismatch, DELIVERY_ENVELOPE_VERSION,
-    DeliveryCandidate, DeliveryContext, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
-    DeliveryKey, DeliveryPlanRequest, EmailDeliveryContext, EmailRelayTrace, FailureDetail,
-    MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES, PartIndex, PartKey, PartTransition, PayloadError,
-    ProviderSendOutcome, RenderedPart, StandaloneDeliveryEnvelope, TransportPayload,
-    plan_deliveries,
+    CanonicalContentV1, ContentDigest, ContextMismatch, ConversationAnchor,
+    DELIVERY_ENVELOPE_VERSION, DeliveryCandidate, DeliveryContext, DeliveryDestination,
+    DeliveryEnvelope, DeliveryIntent, DeliveryKey, DeliveryPlanRequest, EmailDeliveryContext,
+    EmailRelayTrace, EmailThreading, FailureDetail, MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES,
+    PartIndex, PartKey, PartTransition, PayloadError, ProviderSendOutcome, RenderedPart,
+    StandaloneDeliveryEnvelope, TransportPayload, plan_deliveries,
 };
 pub use inbox::{
     AuthenticatedInboundEvent, ClaimedInboundEvent, DuplicateInboundDecoder,

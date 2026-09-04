@@ -11,9 +11,9 @@ use lettre::{
 };
 
 use crate::{
+    adapters::protocols::email::{MailHeader, MailMessage, MailTransport},
     app_error::{AppError, AppResult},
     infra::config::{AppConfig, is_loopback_host},
-    services::outbound_dispatcher::{MailHeader, MailMessage, MailTransport},
 };
 
 #[derive(Clone, Debug)]

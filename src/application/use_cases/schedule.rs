@@ -1,10 +1,10 @@
-use chrono::Utc;
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{schedule::SchedulePersistence, task::TaskPersistence},
     app_error::{AppError, AppResult},
     entities::{
         channel::Channel,
@@ -13,12 +13,13 @@ use crate::{
         message::{MessageDirection, MessageRole},
         participant::{IdentityClaimMetadata, IdentityProvenance},
         schedule::{
-            ChannelSchedule, ScheduleDeliveryMode, ScheduleRunAs, ScheduleRunAsChoices,
-            ScheduleType, ScheduleWrite, ScheduledRunPayload,
+            ChannelSchedule, ClaimedScheduleRun, ScheduleDeliveryMode, ScheduleRun, ScheduleRunAs,
+            ScheduleRunAsChoices, ScheduleType, ScheduleWrite, ScheduledRunPayload,
         },
         task::{NewTask, TaskSource},
         value_objects::EmailAddress,
     },
+    task_queue::TaskPersistence,
     use_cases::{
         channel::ChannelPersistence,
         company::{CompanyPersistence, managed_company},
@@ -26,6 +27,66 @@ use crate::{
         thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence, qualified_email_identity},
     },
 };
+
+#[async_trait]
+pub trait SchedulePersistence: Send + Sync {
+    async fn create(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+        write: ScheduleWrite,
+    ) -> AppResult<ChannelSchedule>;
+    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
+    async fn list_by_channel_id(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Vec<ChannelSchedule>>;
+    async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<ChannelSchedule>>;
+    async fn update(
+        &self,
+        existing: &ChannelSchedule,
+        channel_id: Uuid,
+        write: ScheduleWrite,
+    ) -> AppResult<ChannelSchedule>;
+    async fn delete(&self, id: Uuid) -> AppResult<()>;
+    async fn set_enabled(&self, id: Uuid, enabled: bool) -> AppResult<bool>;
+    async fn claim_and_advance_due_schedules(
+        &self,
+        worker_id: Uuid,
+        lock_expires_at: DateTime<Utc>,
+        limit: i64,
+    ) -> AppResult<Vec<ClaimedScheduleRun>>;
+    async fn record_run_task(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<bool>;
+    async fn record_run_error(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        error: &str,
+    ) -> AppResult<bool>;
+    async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
+    async fn release_failed_claim(&self, schedule: &ChannelSchedule, error: &str) -> AppResult<()>;
+    async fn clear_last_error(&self, id: Uuid) -> AppResult<()>;
+    async fn list_schedule_runs(
+        &self,
+        schedule_id: Uuid,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<ScheduleRun>>;
+    async fn schedule_run_contains_thread(
+        &self,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        thread_id: Uuid,
+    ) -> AppResult<bool>;
+}
 
 /// The `background_tasks.task_type` a schedule run is queued under. Named once here because the
 /// worker dispatches on it and the runs query filters by it.
@@ -707,9 +768,8 @@ impl ScheduleUseCases {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-    use crate::entities::transport::PrincipalId;
+    use crate::entities::transport::{PrincipalId, TransportKind};
     use crate::entities::{
         channel::{Channel, ChannelAccessMode},
         company::{Company, CompanyAccess, CompanyTeamAccount},
@@ -718,6 +778,7 @@ mod tests {
         task::{BackgroundTask, TaskStatus},
         value_objects::ChannelSlug,
     };
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
     use crate::use_cases::company::CompanyWrite;
     use crate::use_cases::participant::test_support::email_allowlist_grants;
     use crate::use_cases::thread::test_support::InMemoryThreads;
@@ -1861,16 +1922,22 @@ mod tests {
 
         let messages = fixture.thread_persistence.messages();
         let prompt = messages.first().expect("the run opens with its prompt");
-        assert_eq!(prompt.author.email_address(), Some(member_email.clone()));
+        assert_eq!(
+            prompt
+                .author
+                .identity
+                .as_ref()
+                .map(|identity| identity.subject().as_str()),
+            Some(member_email.as_str())
+        );
         assert_eq!(prompt.role, MessageRole::Human);
 
         let threads = fixture.thread_persistence.threads();
         assert!(
             threads[0]
                 .participant_projection
-                .email_addresses
-                .iter()
-                .any(|email| email.eq_ignore_case(&member_email)),
+                .subjects_for(TransportKind::Email)
+                .contains(&member_email.as_str()),
             "the member a run acts as belongs on its thread"
         );
 
