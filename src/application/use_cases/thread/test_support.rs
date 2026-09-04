@@ -476,6 +476,25 @@ impl ThreadPersistence for InMemoryThreads {
             .and_then(|association| self.read(&store, association)))
     }
 
+    async fn find_thread_for_message(
+        &self,
+        channel_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<Thread>> {
+        let store = self.store.lock().unwrap();
+        let thread_ids: Vec<Uuid> = store
+            .associations
+            .iter()
+            .filter(|association| association.message_id == message_id)
+            .map(|association| association.thread_id)
+            .collect();
+        Ok(store
+            .threads
+            .iter()
+            .find(|thread| thread.channel_id == channel_id && thread_ids.contains(&thread.id))
+            .cloned())
+    }
+
     async fn get_message_protocol_extension(
         &self,
         _company_id: Uuid,
@@ -833,6 +852,7 @@ fn thread_message_view(message: &Message) -> ThreadMessageView {
         id: message.id,
         canonical_id: message.canonical_id,
         thread_id: message.thread_id,
+        task_id: None,
         author: AuthorView {
             principal_id: message.author.principal_id,
             label: message.author.label.clone(),

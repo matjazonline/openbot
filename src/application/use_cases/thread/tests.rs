@@ -5080,3 +5080,146 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
         "external untrusted email must not be allowed to inject into a thread via header"
     );
 }
+
+#[tokio::test]
+async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
+    let company_id = Uuid::new_v4();
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: Uuid::new_v4(),
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        enable_llm_spam_guardrail: None,
+        avatar_url: None,
+        memory_provider: None,
+        created_at: Utc::now(),
+    }]));
+
+    let channel_id = Uuid::new_v4();
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Support".to_string(),
+            description: None,
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
+            agent_ids: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }]),
+    });
+
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
+    let task_persistence = Arc::new(MockTaskPersistence::default());
+
+    let thread_use_cases = ThreadUseCases::for_test(
+        thread_persistence.clone(),
+        channel_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+        task_persistence.clone(),
+        internal_test_config(),
+    );
+
+    // 1. Compose a new thread canonical message
+    let author = qualified_email_identity("user@example.com").unwrap();
+    let compose_ingress = CanonicalMessageIngress::new(
+        company_id,
+        channel_id,
+        author.clone(),
+        "Initial inquiry",
+        IngressOrigin::TrustedApplication,
+    )
+    .with_subject("Need help");
+
+    let first = thread_use_cases
+        .ingest_canonical(compose_ingress)
+        .await
+        .unwrap();
+    assert!(first.accepted);
+    let thread = first.thread.expect("first message creates a thread");
+    let thread_id = thread.id;
+    assert_eq!(thread.subject, "Need help");
+
+    let first_msg_id = first
+        .inbound_message
+        .expect("inbound message exists")
+        .canonical_id;
+
+    // 2. Reply to that thread using target_thread_id
+    let reply_ingress = CanonicalMessageIngress::new(
+        company_id,
+        channel_id,
+        author.clone(),
+        "Second turn continuing conversation",
+        IngressOrigin::TrustedApplication,
+    )
+    .with_target_thread(thread_id);
+
+    let second = thread_use_cases
+        .ingest_canonical(reply_ingress)
+        .await
+        .unwrap();
+    assert!(second.accepted);
+    assert_eq!(
+        second.thread.expect("reply succeeds").id,
+        thread_id,
+        "reply with target_thread_id must stay in the same thread"
+    );
+
+    // 3. Reply targeting specific message turn via reply_to_message_id (without explicit target_thread_id)
+    let reply_msg_ingress = CanonicalMessageIngress::new(
+        company_id,
+        channel_id,
+        author.clone(),
+        "Third turn replying to turn 1",
+        IngressOrigin::TrustedApplication,
+    )
+    .with_reply_to_message(first_msg_id);
+
+    let third = thread_use_cases
+        .ingest_canonical(reply_msg_ingress)
+        .await
+        .unwrap();
+    assert!(third.accepted);
+    assert_eq!(
+        third.thread.expect("reply succeeds").id,
+        thread_id,
+        "reply with reply_to_message_id alone must resolve to the parent message's thread"
+    );
+
+    // 4. Quiet message (FileOnly)
+    let quiet_ingress = CanonicalMessageIngress::new(
+        company_id,
+        channel_id,
+        author,
+        "Quiet note for history",
+        IngressOrigin::TrustedApplication,
+    )
+    .with_target_thread(thread_id)
+    .with_disposition(MessageDisposition::FileOnly);
+
+    let quiet_result = thread_use_cases
+        .ingest_canonical(quiet_ingress)
+        .await
+        .unwrap();
+    assert!(quiet_result.accepted);
+    assert!(
+        quiet_result.task_id.is_none(),
+        "FileOnly must not create an agent task"
+    );
+}

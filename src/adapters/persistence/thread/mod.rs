@@ -557,6 +557,25 @@ impl ThreadPersistence for PostgresPersistence {
         db.map(Message::try_from).transpose()
     }
 
+    async fn find_thread_for_message(
+        &self,
+        channel_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<Thread>> {
+        let query = format!(
+            r#"{THREAD_SELECT}
+               JOIN thread_messages AS association ON association.thread_id = thread.id
+               WHERE association.channel_id = $1 AND association.message_id = $2"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(message_id.as_uuid())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.map(Thread::try_from).transpose()
+    }
+
     async fn get_message_protocol_extension(
         &self,
         company_id: Uuid,

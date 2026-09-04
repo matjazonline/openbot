@@ -382,6 +382,7 @@ impl EmailIngressAdapter {
                 } else {
                     None
                 },
+                reply_to_message_id: None,
                 is_auto_reply: parsed.is_auto_reply,
                 is_forwarded: parsed.is_forwarded,
             },

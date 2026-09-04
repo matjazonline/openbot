@@ -29,13 +29,13 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    adapters::protocols::email::parser::RawInboundPayload,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
         channel::Channel,
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
+        message::CanonicalMessageId,
         task::ThreadActivity,
         thread::Thread,
         user::{User, Viewer},
@@ -45,17 +45,21 @@ use crate::{
         config::AppConfig,
         events::{MailboxEvent, MailboxEvents},
     },
+    transport::MessageDisposition,
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
-        thread::{ReplyDelivery, ThreadUseCases},
+        thread::{
+            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
+            qualified_email_identity,
+        },
         user::UserUseCases,
     },
 };
 
 use super::{
-    channel::{ThreadListQuery, ThreadListResponse, load_thread_page, reply_headers_for_thread},
+    channel::{ThreadListQuery, ThreadListResponse, load_thread_page},
     live_updates::{Wake, channel_wake_ups, thread_wake_ups},
 };
 
@@ -135,6 +139,7 @@ pub struct ReplyForm {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub thread_id: Uuid,
+    pub reply_to_message_id: Option<Uuid>,
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
@@ -145,15 +150,6 @@ pub struct ReplyForm {
 /// How the "deliver by email" toggle arrives on both send forms.
 fn delivery_requested(deliver: Option<&str>) -> bool {
     matches!(deliver, Some("true") | Some("on"))
-}
-
-/// Quiet messages use the same explicit context-only marker accepted by inbound email.
-fn message_body(text_body: &str, quiet: bool) -> String {
-    if quiet {
-        format!("[[quiet]] {text_body}")
-    } else {
-        text_body.to_string()
-    }
 }
 
 /// Delivering means the agent's reply is really emailed; otherwise it stays in the mailbox.
@@ -943,20 +939,23 @@ async fn create_thread(
         ));
     }
 
-    let payload = RawInboundPayload {
-        to: address.to_string(),
-        from: sender_email.clone(),
-        subject: Some(subject.clone()),
-        text: Some(message_body(&text_body, quiet)),
-        ..Default::default()
-    };
-    let ingest = match crate::adapters::http::routes::channel::compose_and_ingest(
-        &thread_use_cases,
-        payload,
-        delivery_mode(deliver),
+    let author = qualified_email_identity(sender_email.as_str())?;
+    let ingress = CanonicalMessageIngress::new(
+        company.id,
+        channel.id,
+        author,
+        &text_body,
+        IngressOrigin::TrustedApplication,
     )
-    .await
-    {
+    .with_subject(&subject)
+    .with_reply_delivery(delivery_mode(deliver))
+    .with_disposition(if quiet {
+        MessageDisposition::FileOnly
+    } else {
+        MessageDisposition::Answer
+    });
+
+    let ingest = match thread_use_cases.ingest_canonical(ingress).await {
         Ok(ingest) => ingest,
         Err(err) => return Ok(compose_error(format!("Failed to send message: {err}"))),
     };
@@ -1091,38 +1090,32 @@ async fn send_reply(
         return Ok(reply_error("A message is required.".to_string()));
     }
 
-    // Continue the current thread explicitly via threading headers, looking up the newest
-    // RFC Message-ID available in the thread's history for mail clients if delivered.
-    let reply_context = thread_use_cases
-        .latest_email_reply_context(thread.id)
-        .await?;
-    let in_reply_to = match reply_context
-        .as_ref()
-        .and_then(|context| context.rfc_message_id.as_ref())
-    {
-        Some(id) => Some(id.as_str().to_string()),
-        None => thread_use_cases
-            .latest_thread_rfc_message_id(thread.id)
-            .await?
-            .map(|id| id.as_str().to_string()),
+    let reply_to_message_id = match form.reply_to_message_id {
+        Some(id) => Some(CanonicalMessageId::new(id)),
+        None => thread_use_cases.latest_thread_message_id(thread.id).await?,
     };
 
-    let payload = RawInboundPayload {
-        to: address.to_string(),
-        from: sender_email.clone(),
-        subject: Some(thread.reply_subject()),
-        text: Some(message_body(&text_body, quiet)),
-        headers: reply_headers_for_thread(thread.id, in_reply_to.as_deref()),
-        ..Default::default()
-    };
-
-    let ingest = match crate::adapters::http::routes::channel::compose_and_ingest(
-        &thread_use_cases,
-        payload,
-        delivery_mode(deliver),
+    let author = qualified_email_identity(sender_email.as_str())?;
+    let mut ingress = CanonicalMessageIngress::new(
+        company.id,
+        channel.id,
+        author,
+        &text_body,
+        IngressOrigin::TrustedApplication,
     )
-    .await
-    {
+    .with_target_thread(thread.id)
+    .with_reply_delivery(delivery_mode(deliver))
+    .with_disposition(if quiet {
+        MessageDisposition::FileOnly
+    } else {
+        MessageDisposition::Answer
+    });
+
+    if let Some(reply_to) = reply_to_message_id {
+        ingress = ingress.with_reply_to_message(reply_to);
+    }
+
+    let ingest = match thread_use_cases.ingest_canonical(ingress).await {
         Ok(ingest) => ingest,
         Err(err) => return Ok(reply_error(format!("Failed to send message: {err}"))),
     };

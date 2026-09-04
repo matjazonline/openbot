@@ -428,6 +428,16 @@ impl ThreadUseCases {
             return Ok(Some(thread));
         }
 
+        if let Some(reply_to_id) = draft.directives.reply_to_message_id
+            && let Some(thread) = self
+                .thread_persistence
+                .find_thread_for_message(candidate.channel.id, reply_to_id)
+                .await?
+            && thread.channel_id == candidate.channel.id
+        {
+            return Ok(Some(thread));
+        }
+
         if let Some(thread_id) = self
             .correlation_store
             .thread_for_thread_keys(candidate.binding_id, &draft.reply_thread_keys)
@@ -622,6 +632,7 @@ impl ThreadUseCases {
         }
         if sender.is_party_to(thread)
             || draft.directives.target_thread_id.is_some()
+            || draft.directives.reply_to_message_id.is_some()
             || outreach.is_some()
         {
             return Ok(Ok(None));

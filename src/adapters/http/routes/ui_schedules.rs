@@ -26,24 +26,30 @@ use crate::{
         auth::{AuthError, AuthenticatedUser},
         pages,
         routes::{
-            channel::reply_headers_for_thread,
             live_updates::channel_wake_ups,
             schedule::UiScheduleForm,
             ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
         },
     },
-    adapters::protocols::email::parser::RawInboundPayload,
     app_error::{AppError, AppResult},
     entities::{
         company::Company,
+        message::CanonicalMessageId,
         schedule::{ScheduleRun, ScheduleRunAsChoices},
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     infra::events::MailboxEvents,
+    transport::MessageDisposition,
     use_cases::{
-        agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
-        schedule::ScheduleUseCases, thread::ReplyDelivery, thread::ThreadUseCases,
+        agent::AgentUseCases,
+        channel::ChannelUseCases,
+        company::CompanyUseCases,
+        schedule::ScheduleUseCases,
+        thread::{
+            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
+            qualified_email_identity,
+        },
         user::UserUseCases,
     },
 };
@@ -109,6 +115,7 @@ pub struct CompanyScopedQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReplyForm {
     pub reply_text: String,
+    pub reply_to_message_id: Option<Uuid>,
 }
 
 struct SchedulesWorkspace {
@@ -574,26 +581,17 @@ async fn reply_in_thread(
 
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let sender = EmailAddress::from(account.email.as_str());
-    let address = channel.inbound_address(&company.slug, &workspace.config.app_domain_name);
 
-    // A reply here takes the same route as one sent from the mailbox: writing the row directly
-    // would store a message no agent ever answers, and with no threading headers on it.
-    // Continue the current schedule thread explicitly via threading headers.
-    let reply_context = workspace
-        .thread_use_cases
-        .latest_email_reply_context(thread_id)
-        .await?;
-    let in_reply_to = match reply_context
-        .as_ref()
-        .and_then(|context| context.rfc_message_id.as_ref())
-    {
-        Some(id) => Some(id.as_str().to_string()),
-        None => workspace
-            .thread_use_cases
-            .latest_thread_rfc_message_id(thread_id)
-            .await?
-            .map(|id| id.as_str().to_string()),
+    let reply_to_message_id = match form.reply_to_message_id {
+        Some(id) => Some(CanonicalMessageId::new(id)),
+        None => {
+            workspace
+                .thread_use_cases
+                .latest_thread_message_id(thread_id)
+                .await?
+        }
     };
+
     let history = workspace
         .thread_use_cases
         .get_thread_history(thread_id)
@@ -603,21 +601,24 @@ async fn reply_in_thread(
         .map(|message| reply_subject(&message.subject))
         .unwrap_or_else(|| reply_subject(&schedule.subject_template));
 
-    let payload = RawInboundPayload {
-        to: address.to_string(),
-        from: sender.to_string(),
-        subject: Some(subject.clone()),
-        text: Some(form.reply_text.clone()),
-        headers: reply_headers_for_thread(thread_id, in_reply_to.as_deref()),
-        ..Default::default()
-    };
-
-    let ingest = crate::adapters::http::routes::channel::compose_and_ingest(
-        &workspace.thread_use_cases,
-        payload,
-        ReplyDelivery::InAppOnly,
+    let author = qualified_email_identity(sender.as_str())?;
+    let mut ingress = CanonicalMessageIngress::new(
+        company.id,
+        channel.id,
+        author,
+        form.reply_text,
+        IngressOrigin::TrustedApplication,
     )
-    .await?;
+    .with_target_thread(thread_id)
+    .with_subject(&subject)
+    .with_reply_delivery(ReplyDelivery::InAppOnly)
+    .with_disposition(MessageDisposition::Answer);
+
+    if let Some(reply_to) = reply_to_message_id {
+        ingress = ingress.with_reply_to_message(reply_to);
+    }
+
+    let ingest = workspace.thread_use_cases.ingest_canonical(ingress).await?;
 
     if ingest.thread.is_none() {
         let reason = ingest

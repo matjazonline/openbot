@@ -32,13 +32,19 @@ use std::{
 };
 
 use tracing::{info, instrument, warn};
+use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::value_objects::ThreadIndexParseError,
+    entities::{
+        correlation::CorrelationId,
+        message::{AttachmentMetadata, CanonicalMessageId},
+        transport::QualifiedIdentity,
+        value_objects::ThreadIndexParseError,
+    },
     transport::{
         BoundedVec, InboundCommitOutcome, InboundDraft, InboundRouting, MAX_ATTACHMENTS,
-        ReplyDelivery,
+        MessageDisposition, ReplyDelivery,
     },
     use_cases::thread::{
         ChannelMatch, InboundIngestResult, ThreadUseCases, ingest::commit::CommitPlan,
@@ -50,6 +56,97 @@ pub use policy::{IngestRejection, IngressOrigin};
 
 /// The one task type this pipeline produces.
 pub(super) const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
+
+/// A protocol-agnostic, canonical message ingress intent.
+///
+/// Direct application entry points (UI reply/compose, schedulers, internal tools,
+/// non-email transports) construct this to submit a message to a channel without
+/// synthesizing or parsing MIME/RFC email strings and headers.
+#[derive(Debug, Clone)]
+pub struct CanonicalMessageIngress {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    /// Explicit target thread, if continuing an existing conversation.
+    pub target_thread_id: Option<Uuid>,
+    /// Specific message turn being answered, if this is a direct reply.
+    pub reply_to_message_id: Option<CanonicalMessageId>,
+    /// The qualified identity of the author (e.g. email, user, or platform).
+    pub author: QualifiedIdentity,
+    /// Optional conversation/thread subject. If `None` on a reply, inherits from the thread.
+    pub subject: Option<String>,
+    /// The text body of the message.
+    pub text_body: String,
+    /// Canonical attachment metadata already stored or associated with the message.
+    pub attachments: Vec<AttachmentMetadata>,
+    /// Whether the response from an agent should be delivered externally or kept in-app.
+    pub reply_delivery: ReplyDelivery,
+    /// Whether to run an agent (`Answer`) or record context only (`FileOnly`).
+    pub disposition: MessageDisposition,
+    /// The authenticated origin of the request.
+    pub origin: IngressOrigin,
+    /// Optional correlation id, preserved if this is part of an existing chain.
+    pub correlation_id: Option<CorrelationId>,
+}
+
+impl CanonicalMessageIngress {
+    pub fn new(
+        company_id: Uuid,
+        channel_id: Uuid,
+        author: QualifiedIdentity,
+        text_body: impl Into<String>,
+        origin: IngressOrigin,
+    ) -> Self {
+        Self {
+            company_id,
+            channel_id,
+            target_thread_id: None,
+            reply_to_message_id: None,
+            author,
+            subject: None,
+            text_body: text_body.into(),
+            attachments: Vec::new(),
+            reply_delivery: ReplyDelivery::Send,
+            disposition: MessageDisposition::Answer,
+            origin,
+            correlation_id: None,
+        }
+    }
+
+    pub fn with_target_thread(mut self, thread_id: Uuid) -> Self {
+        self.target_thread_id = Some(thread_id);
+        self
+    }
+
+    pub fn with_reply_to_message(mut self, message_id: CanonicalMessageId) -> Self {
+        self.reply_to_message_id = Some(message_id);
+        self
+    }
+
+    pub fn with_subject(mut self, subject: impl Into<String>) -> Self {
+        self.subject = Some(subject.into());
+        self
+    }
+
+    pub fn with_attachments(mut self, attachments: Vec<AttachmentMetadata>) -> Self {
+        self.attachments = attachments;
+        self
+    }
+
+    pub fn with_reply_delivery(mut self, delivery: ReplyDelivery) -> Self {
+        self.reply_delivery = delivery;
+        self
+    }
+
+    pub fn with_disposition(mut self, disposition: MessageDisposition) -> Self {
+        self.disposition = disposition;
+        self
+    }
+
+    pub fn with_correlation_id(mut self, correlation_id: CorrelationId) -> Self {
+        self.correlation_id = Some(correlation_id);
+        self
+    }
+}
 
 /// One inbound message offered to the application, whatever transport carried it.
 ///

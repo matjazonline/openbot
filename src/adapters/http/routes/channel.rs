@@ -1217,6 +1217,7 @@ pub(crate) fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
 }
 
 /// Threading headers that target an explicit thread while keeping any RFC reply-to reference.
+#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn reply_headers_for_thread(
     thread_id: Uuid,
     in_reply_to: Option<&str>,

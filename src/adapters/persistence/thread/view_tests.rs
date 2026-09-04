@@ -395,3 +395,97 @@ async fn a_message_is_not_readable_through_a_thread_that_does_not_hold_it() {
 
     fixture.cleanup().await;
 }
+
+#[tokio::test]
+async fn a_message_view_resolves_its_associated_task_id() {
+    let Some(fixture) = Fixture::new("view_task_id").await else {
+        return;
+    };
+
+    let correlation_id = crate::entities::correlation::CorrelationId::new();
+    let msg_write = MessageWrite::internal(
+        fixture.thread.id,
+        agent_author(&fixture).await,
+        "Audit",
+        "Body with task",
+        MessageDirection::Inbound,
+        MessageRole::Human,
+        correlation_id,
+    );
+    let stored = fixture
+        .persistence
+        .create_message(&msg_write)
+        .await
+        .unwrap();
+
+    let task_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO background_tasks (
+            id, company_id, channel_id, thread_id, source_message_uuid,
+            correlation_id, task_type, status, payload
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'email_agent_dispatch', 'completed', '{}')"#,
+    )
+    .bind(task_id)
+    .bind(fixture.company_id)
+    .bind(fixture.channel_id)
+    .bind(fixture.thread.id)
+    .bind(stored.canonical_id.as_uuid())
+    .bind(correlation_id.as_uuid())
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+
+    let views = fixture
+        .persistence
+        .list_thread_message_views(fixture.thread.id)
+        .await
+        .unwrap();
+    let view = views
+        .iter()
+        .find(|v| v.canonical_id == stored.canonical_id)
+        .expect("message present");
+    assert_eq!(view.task_id, Some(task_id));
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn find_thread_for_message_resolves_thread_and_scopes_by_channel() {
+    let Some(fixture) = Fixture::new("find_thread_msg").await else {
+        return;
+    };
+
+    let msg_write = MessageWrite::internal(
+        fixture.thread.id,
+        agent_author(&fixture).await,
+        "Audit",
+        "Body for thread finding",
+        MessageDirection::Inbound,
+        MessageRole::Human,
+        crate::entities::correlation::CorrelationId::new(),
+    );
+    let stored = fixture
+        .persistence
+        .create_message(&msg_write)
+        .await
+        .unwrap();
+
+    let found = fixture
+        .persistence
+        .find_thread_for_message(fixture.channel_id, stored.canonical_id)
+        .await
+        .unwrap();
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().id, fixture.thread.id);
+
+    // Mismatched channel returns None
+    let other_channel_id = Uuid::new_v4();
+    let foreign = fixture
+        .persistence
+        .find_thread_for_message(other_channel_id, stored.canonical_id)
+        .await
+        .unwrap();
+    assert!(foreign.is_none());
+
+    fixture.cleanup().await;
+}

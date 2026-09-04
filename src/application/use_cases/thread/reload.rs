@@ -233,6 +233,7 @@ impl ThreadUseCases {
                 disposition: MessageDisposition::Answer,
                 source_channel_id: None,
                 target_thread_id: Some(payload.thread_id),
+                reply_to_message_id: None,
                 is_auto_reply: false,
                 is_forwarded: payload.is_forwarded,
             },
