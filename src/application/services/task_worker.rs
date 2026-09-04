@@ -866,10 +866,7 @@ impl TaskWorker {
         if task.task_type == SCHEDULED_AGENT_RUN_TASK {
             let dispatch = Box::pin(
                 self.thread_use_cases
-                    .execute_claimed_scheduled_agent_task_and_dispatch(
-                        task,
-                        lease,
-                    ),
+                    .execute_claimed_scheduled_agent_task_and_dispatch(task, lease),
             )
             .await
             .map_err(|error| match error {
@@ -1191,10 +1188,10 @@ mod tests {
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::correlation::CorrelationId;
     use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
     use crate::entities::value_objects::MessageId;
-    use crate::entities::correlation::CorrelationId;
     use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
     use crate::transport::NewDelivery;
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
@@ -2078,7 +2075,10 @@ mod tests {
     async fn test_task_worker_stop_and_resume_flow() {
         let task_persistence = Arc::new(MockTaskPersistence::default());
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let company_persistence = Arc::new(MockCompanyPersistence { company: None, ..Default::default() });
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            company: None,
+            ..Default::default()
+        });
         let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
 
         let config = Arc::new(AppConfig {
@@ -2703,7 +2703,7 @@ mod tests {
     #[tokio::test]
     async fn a_successful_scheduled_run_records_execution_parameters_and_result() {
         use crate::services::test_support::{
-            scripted_agent_config, scripted_llm, LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER,
+            LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, scripted_agent_config, scripted_llm,
         };
         let _llm = scripted_llm(vec![LlmTurn::text("Audit complete: all good.")]).await;
 

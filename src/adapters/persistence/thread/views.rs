@@ -370,6 +370,30 @@ pub(super) async fn latest_email_reply_context(
     }))
 }
 
+/// The newest RFC Message-ID in a thread, looking back past turns with no email headers.
+pub(super) async fn latest_thread_rfc_message_id(
+    pool: &PgPool,
+    thread_id: Uuid,
+) -> AppResult<Option<MessageId>> {
+    let row: Option<String> = sqlx::query_scalar(
+        r#"SELECT email.rfc_message_id
+             FROM thread_messages AS association
+             JOIN email_message_metadata AS email
+               ON (email.company_id, email.message_id) =
+                  (association.company_id, association.message_id)
+            WHERE association.thread_id = $1
+              AND email.rfc_message_id IS NOT NULL
+            ORDER BY association.created_at DESC, association.id DESC
+            LIMIT 1"#,
+    )
+    .bind(thread_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(row.map(MessageId::from))
+}
+
 #[derive(sqlx::FromRow, Debug)]
 struct MessageAuditDb {
     id: Uuid,

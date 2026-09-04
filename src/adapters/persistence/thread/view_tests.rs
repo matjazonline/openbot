@@ -149,6 +149,55 @@ async fn the_reply_context_carries_the_headers_mail_arrived_with() {
     fixture.cleanup().await;
 }
 
+#[tokio::test]
+async fn latest_thread_rfc_message_id_reaches_past_turns_without_headers() {
+    let Some(fixture) = Fixture::new("view_rfc_fallback").await else {
+        return;
+    };
+    let rfc = format!("<initial-{}@partner.test>", fixture.suffix);
+
+    fixture
+        .persistence
+        .create_message(&inbound_email(
+            fixture.thread.id,
+            email_metadata(&rfc),
+            "First turn with email metadata",
+        ))
+        .await
+        .unwrap();
+
+    let author = agent_author(&fixture).await;
+    fixture
+        .persistence
+        .create_message(&internal_message(
+            fixture.thread.id,
+            "Second turn without email headers",
+            author,
+        ))
+        .await
+        .unwrap();
+
+    let latest_context = fixture
+        .persistence
+        .latest_email_reply_context(fixture.thread.id)
+        .await
+        .unwrap()
+        .expect("thread has messages");
+    assert_eq!(latest_context.rfc_message_id, None);
+
+    let fallback_rfc = fixture
+        .persistence
+        .latest_thread_rfc_message_id(fixture.thread.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        fallback_rfc.as_ref().map(|id| id.as_str()),
+        Some(rfc.as_str())
+    );
+
+    fixture.cleanup().await;
+}
+
 /// A thread is appended to by everyone who can reach the channel, so the newest-N window is a
 /// bound rather than a preference -- and it is the *newest* N, because a page and a prompt both
 /// want the end of a conversation.

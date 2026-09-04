@@ -171,6 +171,8 @@ pub struct IngressDirectives {
     pub disposition: MessageDisposition,
     /// The channel this message provably came from, when a trusted internal transport carried it.
     pub source_channel_id: Option<Uuid>,
+    /// Explicit thread target requested by a trusted caller (e.g. reply from `/ui`).
+    pub target_thread_id: Option<Uuid>,
     /// Whether the message announced itself as machine-generated -- a vacation reply, a bounce.
     ///
     /// Here rather than in [`EmailIngressFacts`] because it is a *content* marker, not a verdict:
@@ -194,6 +196,7 @@ impl Default for IngressDirectives {
             trace_channels: BoundedVec::empty(),
             disposition: MessageDisposition::Answer,
             source_channel_id: None,
+            target_thread_id: None,
             is_auto_reply: false,
             is_forwarded: false,
         }

@@ -377,6 +377,11 @@ impl EmailIngressAdapter {
                 trace_channels: BoundedVec::parse("trace channels", parsed.trace_channels.clone())?,
                 disposition,
                 source_channel_id: parsed.channel_id_header,
+                target_thread_id: if matches!(trust, EmailIngressTrust::Application) {
+                    parsed.thread_id_header
+                } else {
+                    None
+                },
                 is_auto_reply: parsed.is_auto_reply,
                 is_forwarded: parsed.is_forwarded,
             },

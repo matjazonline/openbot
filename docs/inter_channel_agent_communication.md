@@ -140,12 +140,12 @@ Use `same_company_channels` for coordinator agents that must not contact third p
 
 ## Tool Call
 
-Agent A calls Agent B through a channel selector. The current email binding accepts its
-platform-address syntax at the tool boundary:
+Agent A calls Agent B through a channel selector. The outreach tool accepts same-company
+channel selectors in `target_channels`:
 
 ```json
 {
-  "target_emails": ["agent-b@acme.mailagents.example"],
+  "target_channels": ["supplier"],
   "subject": "Acquire supplier capacity data",
   "body": "Contact the supplier and return available quantity and earliest delivery date."
 }
@@ -154,29 +154,35 @@ platform-address syntax at the tool boundary:
 `completion_threshold_percent` defaults to 100 and `timeout_hours` to `default_timeout_hours`, so a delegated request omits both. Spelling them out explicitly produces an identical idempotency key.
 
 Agent A finds that channel by calling `list_company_agents` first, which returns one entry per
-callable sibling channel. The current directory projection exposes the initial email binding:
+callable sibling channel with its `channel` selector:
 
 ```json
 {
   "agents": [
     {
-      "address": "agent-b@acme.mailagents.example",
+      "channel": "supplier",
+      "channel_id": "00000000-0000-0000-0000-000000000000",
       "channel_name": "Supplier Desk",
       "agent_name": "VendorResearchAgent",
-      "description": "Answers supplier capacity and delivery-date questions."
+      "description": "Answers supplier capacity and delivery-date questions.",
+      "interfaces": [
+        {
+          "transport": "email",
+          "label": "supplier@acme.mailagents.example"
+        }
+      ]
     }
   ],
   "count": 1
 }
 ```
 
-`description` comes from the agent's Description field on its settings page. The directory applies exactly the same eligibility rules as the send path, so it can never advertise a channel the tool would then refuse.
+`description` comes from the agent's Description field on its settings page. The directory applies exactly the same eligibility rules as the send path, so it can never advertise a channel the tool would then refuse. Pass the returned `channel` selector to `target_channels`. Platform channel email addresses must not be passed to `target_emails` (which is reserved for external email contacts and rejects platform channel addresses).
 
 An internal target must satisfy all of these conditions after selector parsing and canonical
 channel resolution:
 
-- It resolves to a direct channel selector (the initial email adapter accepts
-  `<channel>@<company>.<application-domain>`).
+- It resolves to a direct channel selector (e.g. `supplier` or `acme/supplier`).
 - It belongs to the caller's company.
 - It is not the caller's own channel.
 - It has at least one configured agent.

@@ -3180,6 +3180,30 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
     assert!(!html.contains("<live@test.com>"), "{html}");
 }
 
+#[test]
+fn each_message_bubble_links_to_tasks_in_list_view() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let message = mailbox_message(thread.id, "A message.");
+
+    let html = message_bubble_chat(
+        &message,
+        None,
+        None,
+        MessageScope {
+            company_id: company.id,
+            channel_id: channel.id,
+        },
+    );
+
+    assert!(html.contains(&format!(
+        r#"href="/ui/tasks?company_id={}&amp;view=list""#,
+        company.id
+    )));
+    assert!(html.contains(">tasks</a>"));
+}
+
 /// The pane names the interface every key belongs to. A bare `Message-ID` identifies nothing: the
 /// same text is one outbound message on the sending channel's binding and one inbound message on
 /// the receiving channel's.

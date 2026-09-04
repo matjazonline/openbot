@@ -4882,3 +4882,201 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
         "a failed run must queue no email"
     );
 }
+
+#[tokio::test]
+async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
+    let company_id = Uuid::new_v4();
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: Uuid::new_v4(),
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        enable_llm_spam_guardrail: None,
+        avatar_url: None,
+        memory_provider: None,
+        created_at: Utc::now(),
+    }]));
+
+    let channel_id = Uuid::new_v4();
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Support".to_string(),
+            description: None,
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
+            agent_ids: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }]),
+    });
+
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
+    let task_persistence = Arc::new(MockTaskPersistence::default());
+
+    let thread_use_cases = ThreadUseCases::for_test(
+        thread_persistence.clone(),
+        channel_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+        task_persistence.clone(),
+        internal_test_config(),
+    );
+
+    let first = thread_use_cases
+        .ingest_test_email_as(
+            RawInboundPayload {
+                to: "support@acme.mailagents.com".to_string(),
+                from: "user@example.com".to_string(),
+                subject: Some("Hello".to_string()),
+                text: Some("Question 1".to_string()),
+                ..Default::default()
+            },
+            IngressOrigin::TrustedApplication,
+        )
+        .await
+        .unwrap();
+    let thread_id = first.thread.expect("first message creates a thread").id;
+
+    // Agent replies in-app (internal correlation, no RFC Message-ID)
+    thread_use_cases
+        .save_message(&MessageWrite::internal(
+            thread_id,
+            MessageAuthorWrite::Platform,
+            "Re: Hello".to_string(),
+            "Agent answer".to_string(),
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            CorrelationId::new(),
+        ))
+        .await
+        .unwrap();
+
+    // Now a reply is sent from the UI targeting that thread
+    let reply = thread_use_cases
+        .ingest_test_email_as(
+            RawInboundPayload {
+                to: "support@acme.mailagents.com".to_string(),
+                from: "user@example.com".to_string(),
+                subject: Some("Re: Hello".to_string()),
+                text: Some("Follow-up question".to_string()),
+                headers: crate::adapters::http::routes::channel::reply_headers_for_thread(
+                    thread_id, None,
+                ),
+                ..Default::default()
+            },
+            IngressOrigin::TrustedApplication,
+        )
+        .await
+        .unwrap();
+
+    assert!(reply.accepted);
+    let reply_thread_id = reply.thread.expect("reply succeeds").id;
+    assert_eq!(
+        reply_thread_id, thread_id,
+        "reply must continue the current thread, not create a new one"
+    );
+}
+
+#[tokio::test]
+async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
+    let company_id = Uuid::new_v4();
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: Uuid::new_v4(),
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        enable_llm_spam_guardrail: None,
+        avatar_url: None,
+        memory_provider: None,
+        created_at: Utc::now(),
+    }]));
+
+    let channel_id = Uuid::new_v4();
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Support".to_string(),
+            description: None,
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
+            agent_ids: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }]),
+    });
+
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
+    let task_persistence = Arc::new(MockTaskPersistence::default());
+
+    let thread_use_cases = ThreadUseCases::for_test(
+        thread_persistence.clone(),
+        channel_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+        task_persistence.clone(),
+        internal_test_config(),
+    );
+
+    let first = thread_use_cases
+        .ingest_test_email(RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "legit@example.com".to_string(),
+            subject: Some("Hello".to_string()),
+            text: Some("Question 1".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let thread_id = first.thread.expect("first message creates a thread").id;
+
+    // External stranger tries to inject using X-MailAgents-Thread-Id header
+    let attacker = thread_use_cases
+        .ingest_test_email(RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "attacker@outside.com".to_string(),
+            subject: Some("Spoof".to_string()),
+            text: Some("Injecting text".to_string()),
+            headers: Some(format!("X-MailAgents-Thread-Id: {thread_id}\n")),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let attacker_thread_id = attacker
+        .thread
+        .expect("attacker creates a separate thread")
+        .id;
+    assert_ne!(
+        attacker_thread_id, thread_id,
+        "external untrusted email must not be allowed to inject into a thread via header"
+    );
+}

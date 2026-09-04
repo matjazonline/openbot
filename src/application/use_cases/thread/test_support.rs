@@ -794,6 +794,27 @@ impl ThreadPersistence for InMemoryThreads {
         }))
     }
 
+    async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>> {
+        let store = self.store.lock().unwrap();
+        let mut associations: Vec<_> = store
+            .associations
+            .iter()
+            .filter(|association| association.thread_id == thread_id)
+            .collect();
+        associations.sort_by_key(|a| (a.created_at, a.id));
+        for association in associations.into_iter().rev() {
+            if let Some(canonical) = store
+                .canonical
+                .iter()
+                .find(|canonical| canonical.id == association.message_id)
+                && let Some(email) = canonical.email.as_ref()
+            {
+                return Ok(Some(email.rfc_message_id.clone()));
+            }
+        }
+        Ok(None)
+    }
+
     async fn get_message_audit(
         &self,
         _company_id: Uuid,

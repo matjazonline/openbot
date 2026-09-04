@@ -2316,7 +2316,7 @@ pub fn message_bubble_chat(
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
-                    <div class="chat-footer font-mono text-[11px] opacity-40">{subject}{diagnostics}</div>
+                    <div class="chat-footer font-mono text-[11px] opacity-40">{subject}{diagnostics}{tasks}</div>
                 </div>
         "##,
         side = if is_viewer { "chat-end" } else { "chat-start" },
@@ -2332,8 +2332,20 @@ pub fn message_bubble_chat(
         created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
         diagnostics = diagnostics_link(message, scope),
+        tasks = tasks_link(scope),
         body = body,
         attachments = attachment_chips(message, scope),
+    )
+}
+
+/// A direct link into the company's Tasks workspace in list view.
+fn tasks_link(scope: MessageScope) -> String {
+    format!(
+        r##" · <a class="link link-hover"
+                    title="Tasks list"
+                    data-action="navigate-workspace"
+                    href="/ui/tasks?company_id={company_id}&amp;view=list">tasks</a>"##,
+        company_id = scope.company_id,
     )
 }
 

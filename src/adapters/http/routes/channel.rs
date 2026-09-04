@@ -1216,6 +1216,20 @@ pub(crate) fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
     ))
 }
 
+/// Threading headers that target an explicit thread while keeping any RFC reply-to reference.
+pub(crate) fn reply_headers_for_thread(
+    thread_id: Uuid,
+    in_reply_to: Option<&str>,
+) -> Option<String> {
+    let mut headers = format!("X-MailAgents-Thread-Id: {thread_id}\n");
+    if let Some(reply_to) = in_reply_to.map(str::trim).filter(|s| !s.is_empty()) {
+        headers.push_str(&format!(
+            "In-Reply-To: {reply_to}\nReferences: {reply_to}\n"
+        ));
+    }
+    Some(headers)
+}
+
 struct OpenSimulatedThreadContext {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,

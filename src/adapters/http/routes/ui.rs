@@ -55,7 +55,7 @@ use crate::{
 };
 
 use super::{
-    channel::{ThreadListQuery, ThreadListResponse, load_thread_page, reply_headers},
+    channel::{ThreadListQuery, ThreadListResponse, load_thread_page, reply_headers_for_thread},
     live_updates::{Wake, channel_wake_ups, thread_wake_ups},
 };
 
@@ -1091,24 +1091,28 @@ async fn send_reply(
         return Ok(reply_error("A message is required.".to_string()));
     }
 
-    // Threading is by header, so the reply hangs off the newest message the thread already has --
-    // and only a message mail actually carried has a `Message-ID` to thread onto. A schedule
-    // prompt, a system note or a Slack turn has none, and the reply then starts its own mail
-    // conversation rather than being given a header nobody sent.
+    // Continue the current thread explicitly via threading headers, looking up the newest
+    // RFC Message-ID available in the thread's history for mail clients if delivered.
     let reply_context = thread_use_cases
         .latest_email_reply_context(thread.id)
         .await?;
-    let in_reply_to = reply_context
+    let in_reply_to = match reply_context
         .as_ref()
         .and_then(|context| context.rfc_message_id.as_ref())
-        .map(|id| id.as_str());
+    {
+        Some(id) => Some(id.as_str().to_string()),
+        None => thread_use_cases
+            .latest_thread_rfc_message_id(thread.id)
+            .await?
+            .map(|id| id.as_str().to_string()),
+    };
 
     let payload = RawInboundPayload {
         to: address.to_string(),
         from: sender_email.clone(),
         subject: Some(thread.reply_subject()),
         text: Some(message_body(&text_body, quiet)),
-        headers: reply_headers(in_reply_to),
+        headers: reply_headers_for_thread(thread.id, in_reply_to.as_deref()),
         ..Default::default()
     };
 

@@ -232,6 +232,7 @@ impl ThreadUseCases {
                 // A task exists only for a message that asked for an answer.
                 disposition: MessageDisposition::Answer,
                 source_channel_id: None,
+                target_thread_id: Some(payload.thread_id),
                 is_auto_reply: false,
                 is_forwarded: payload.is_forwarded,
             },

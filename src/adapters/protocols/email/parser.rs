@@ -56,6 +56,7 @@ pub struct ParsedEmail {
     pub is_auto_reply: bool,
     pub is_forwarded: bool,
     pub channel_id_header: Option<Uuid>,
+    pub thread_id_header: Option<Uuid>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
     pub spf_status: AuthVerdict,
@@ -73,6 +74,7 @@ struct ParsedHeaders {
     thread_index: Option<String>,
     is_auto_reply: bool,
     channel_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
     hop_count: u32,
     trace_channels: Vec<Uuid>,
     is_context_only: bool,
@@ -170,6 +172,7 @@ impl EmailParser {
             thread_index: raw_thread_index,
             is_auto_reply: is_auto_reply_from_headers,
             channel_id: channel_id_header,
+            thread_id: thread_id_header,
             hop_count,
             trace_channels,
             is_context_only: is_context_from_headers,
@@ -291,6 +294,7 @@ impl EmailParser {
             is_auto_reply,
             is_forwarded,
             channel_id_header,
+            thread_id_header,
             hop_count,
             trace_channels,
             spf_status: payload.spf,
@@ -314,6 +318,7 @@ impl EmailParser {
         let mut thread_index: Option<String> = None;
         let mut is_auto_reply = false;
         let mut channel_id_header = None;
+        let mut thread_id_header = None;
         let mut hop_count = 0u32;
         let mut trace_channels = Vec::new();
         let mut is_context_only = false;
@@ -359,6 +364,9 @@ impl EmailParser {
             } else if lower.starts_with("x-mailagents-channel-id:") {
                 let val = line["x-mailagents-channel-id:".len()..].trim();
                 channel_id_header = Uuid::from_str(val).ok();
+            } else if lower.starts_with("x-mailagents-thread-id:") {
+                let val = line["x-mailagents-thread-id:".len()..].trim();
+                thread_id_header = Uuid::from_str(val).ok();
             } else if lower.starts_with("x-mailagents-hop-count:") {
                 let val = line["x-mailagents-hop-count:".len()..].trim();
                 hop_count = val.parse().unwrap_or(0);
@@ -413,6 +421,7 @@ impl EmailParser {
             thread_index,
             is_auto_reply,
             channel_id: channel_id_header,
+            thread_id: thread_id_header,
             hop_count,
             trace_channels,
             is_context_only,

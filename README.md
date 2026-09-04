@@ -77,7 +77,7 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up anything else. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. A schedule loop fires due recurring runs every 2 seconds, and a maintenance loop reaps expired task leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up anything else. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. Both inbound message dispatches (`email_agent_dispatch`) and recurring scheduled runs (`scheduled_agent_run`) execute through the unified `ThreadUseCases` dispatch path, sharing idempotency checking, multi-agent pipeline execution, approval and outreach gates, and delivery planning. A schedule loop fires due recurring runs every 2 seconds, and a maintenance loop reaps expired task leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
 - **Delivery Worker (`DeliveryWorker`):** A queue of its own, because a delivery outlives the task that produced it and plenty of deliveries have no task behind them. It claims up to 20 deliveries every 500ms, orders the batch round-robin across companies so one tenant's burst cannot fill it, and for each delivery walks its frozen parts through the registered transport. Every write is fenced on the execution the claim minted. A sweep every 30 seconds charges an attempt to leases that expired and dead-letters deliveries whose predecessor can never land.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
 - **Shutdown:** `Ctrl+C` or SIGTERM stops admission, cancels in-flight provider work, records leased durable tasks as retryable, and joins the task worker, SMTP listener, mailbox listener, memory worker, and runtime sampler within the bounded drain window.
@@ -151,25 +151,33 @@ flowchart TD
     REAP -->|attempts left| PENDING
     REAP -->|attempts exhausted| DEAD
 
-    subgraph Execute[Claimed task execution]
-        LOAD[Decode the payload and reload<br/>the channel's current configuration]
-        IDEMPOTENT{Outbound reply<br/>already saved?}
+    subgraph Execute[Claimed task execution — one dispatch for both task types]
+        KIND{Task type}
+        LOAD[Decode the inbound payload and reload<br/>the channel's current configuration]
+        SLOAD[Load the schedule's company and channel<br/>and the agent at position 0]
+        IDEMPOTENT{An outbound reply after<br/>this prompt already saved?}
         REUSE[Associate the saved reply<br/>with any thread still missing it]
+        SREUSE[Reuse the stored answer and queue<br/>its mail on its own — the send is what failed]
         AGENTS[Run each matched channel agent<br/>in pipeline order, memory recalled per turn]
+        SAGENT[Run the channel's first agent on the<br/>schedule's prompt, memory recalled into it]
         HITL{Approval or outreach<br/>requested?}
-        PLAN[Freeze the reply and its delivery parts<br/>idempotency key derived from the task]
+        PLAN[Freeze the reply and its delivery parts<br/>keyed on the task, a schedule's mail<br/>anchored on its own run slot]
         COMMIT_RUN[Fenced transaction<br/>reply message, thread associations,<br/>deliveries and audit payload]
         MEM[Persist memories after the commit]
         RESULT{Run outcome}
 
-        LOAD --> IDEMPOTENT
-        IDEMPOTENT -->|yes| REUSE
-        IDEMPOTENT -->|no| AGENTS --> HITL
+        KIND -->|email_agent_dispatch| LOAD --> IDEMPOTENT
+        KIND -->|scheduled_agent_run| SLOAD --> IDEMPOTENT
+        IDEMPOTENT -->|yes, inbound| REUSE
+        IDEMPOTENT -->|yes, scheduled| SREUSE
+        IDEMPOTENT -->|no, inbound| AGENTS --> HITL
+        IDEMPOTENT -->|no, scheduled| SAGENT --> HITL
         HITL -->|no| PLAN --> COMMIT_RUN --> MEM --> RESULT
         REUSE --> RESULT
+        SREUSE --> RESULT
     end
 
-    PROCESSING --> LOAD
+    PROCESSING --> KIND
     PROCESSING -. lease renewed every 5 minutes .-> PROCESSING
     RESULT -->|replied, or nothing to answer| COMPLETED
     RESULT -->|failed, timed out, interrupted, lease lost| RETRY{Attempts exhausted?}
@@ -232,7 +240,7 @@ flowchart TD
     COMMIT_RUN -->|the agent reply| OUT_PENDING
     AGENTS -. outreach question .-> OUT_PENDING
     APPROVAL -. approval request mail .-> OUT_PENDING
-    SCHED -. scheduled run mail .-> OUT_PENDING
+    SREUSE -. mail for an answer already stored .-> OUT_PENDING
     PART -. addressed to another channel of this company .-> RELAY
 
     subgraph Shutdown[Shutdown]
@@ -248,9 +256,10 @@ flowchart TD
     GIVEBACK -.-> OUT_PENDING
 ```
 
-### 3.5 Company Tasks HTMX Dashboard
+### 3.5 Company Tasks HTMX Dashboard & Workspace
+- **Tasks Workspace (`/ui/tasks`):** Unified tasks workspace accessible from the mailbox shell, navigation rail, and message bubbles (`view=list`). Features a keyset-paginated task list, correlation-chain Kanban board (`view=board`) with live SSE updates (`/ui/tasks/events`), task detail inspection (`/ui/tasks/{task_id}`), and correlation chain inspector (`/ui/tasks/chains/{correlation_id}`).
 - **Web Dashboard (`/companies/{id}/tasks`):** Interactive HTMX interface allowing company owners to monitor tasks, filter by workflow or status (`pending`, `processing`, `completed`, `failed`, `dead_letter`, `stopped`), and sort by time.
-- **Stop / Resume Controls:** Allows manual task cancellation (dispatches a stop notification email to thread participants) or task resumption.
+- **Stop / Resume Controls:** Allows manual task cancellation (dispatches a stop notification email to thread participants) or task resumption across both interfaces.
 
 ### 3.6 Multi-Stage Spam & Content Security Engine
 - **Workflow & Participant Resolution:** Upon email arrival, the target `Company` and `Workflow` are resolved from the recipient address (`workflow-slug@company-slug.domain.com`).
@@ -349,8 +358,9 @@ Inbound Email (SMTP / Webhook)
 - **Thread History Integration:** Messages ingested in context-only mode are saved to database thread history. Subsequent normal messages sent to the channel trigger the agent, which reads the full thread context including all quiet notes.
 
 ### 3.9 Mailbox UI (`/ui`)
-- **Three-Column Reader (daisyUI + HTMX):** `/ui` renders the company's channels as a mail-style sidebar, the selected channel's threads in the middle column (keyset pagination, "Load older threads"), and the selected thread's messages as chat bubbles on the right. Each column is swapped independently over HTMX and the selection is reflected in the URL (`/ui?company_id=…&channel_id=…&thread_id=…`), so a refresh or a shared link restores the same view.
+- **Three-Column Reader (daisyUI + HTMX):** `/ui` renders the company's channels as a mail-style sidebar, the selected channel's threads in the middle column (keyset pagination, "Load older threads"), and the selected thread's messages as chat bubbles on the right. Each column is swapped independently over HTMX and the selection is reflected in the URL (`/ui?company_id=…&channel_id=…&thread_id=…`), so a refresh or a shared link restores the same view. Each message bubble includes a direct link into the company's Tasks workspace in list view (`/ui/tasks?company_id=…&view=list`).
 - **Compose (New Thread):** Enabled only once a channel is selected. The composed message is fed through the normal inbound path addressed to `channel-slug@company-slug.domain` as the signed-in user, so participant rules, spam checks and agents apply unchanged. The "deliver agent reply by email" toggle selects `SimulationMode::Run` (real dispatch) over the default `RunTest` (in-app only); a rejected message re-renders the form with the channel's rejection reason.
+- **Reply in Thread:** In-thread replies from `/ui` and `/ui/schedules` explicitly target the current conversation thread via `X-MailAgents-Thread-Id` headers (honored exclusively for trusted application ingress), while looking back past turns with no email headers (such as agent turns or schedule prompts) to preserve the newest RFC `Message-ID` for email threading when delivered.
 - **Coexistence:** All existing pages (channels, agents, tasks, simulator) are untouched and reachable from the icon rail; the mailbox is an additional read/compose surface over the same use cases.
 
 ### 3.10 Credential Encryption & Rotation

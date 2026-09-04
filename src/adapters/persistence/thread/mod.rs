@@ -59,7 +59,7 @@ use crate::{
         participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
         thread::{Thread, ThreadParticipantProjection},
         transport::{PrincipalId, TransportKind},
-        value_objects::{EmailAddress, ThreadIndex},
+        value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
     transport::{DeliveryCreation, NewDelivery, ThreadPrincipalIntent},
     use_cases::{
@@ -682,6 +682,10 @@ impl ThreadPersistence for PostgresPersistence {
         thread_id: Uuid,
     ) -> AppResult<Option<EmailReplyContext>> {
         views::latest_email_reply_context(&self.pool, thread_id).await
+    }
+
+    async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>> {
+        views::latest_thread_rfc_message_id(&self.pool, thread_id).await
     }
 
     async fn get_message_audit(

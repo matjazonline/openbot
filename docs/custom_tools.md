@@ -107,15 +107,15 @@ One transaction creates:
 - the channel-to-agent assignment; and
 - the idempotency record for the current task and normalized request.
 
-The returned JSON contains `created`, `agent_id`, `channel_id`, `name`, `slug`, and the canonical `address`. Repeating the same normalized request in the same task returns the original pair with `created: false`. It does not create a duplicate or overwrite a resource with a conflicting slug.
+The returned JSON contains `created`, `agent_id`, `channel_id`, `channel`, `name`, `slug`, `interfaces`, and `warnings`. Repeating the same normalized request in the same task returns the original pair with `created: false`. It does not create a duplicate or overwrite a resource with a conflicting slug.
 
 Both resources record `created_by` provenance for the parent agent, source channel, and source task. They otherwise remain ordinary persistent resources: owners may edit or delete them, and future agent runs can discover them through `list_company_agents`.
 
-Creation and delegation are deliberately separate. After provisioning, pass the returned address to `outreach_and_await_quorum`:
+Creation and delegation are deliberately separate. After provisioning, pass the returned `channel` selector to `outreach_and_await_quorum` in `target_channels`:
 
 ```json
 {
-  "target_emails": ["contract-researcher@acme.mailagents.example"],
+  "target_channels": ["contract-researcher"],
   "subject": "Review limitation-of-liability terms",
   "body": "Compare sections 8 and 12 and report any conflicting caps."
 }
@@ -129,6 +129,7 @@ The model calls the tool with:
 
 ```json
 {
+  "target_channels": ["supplier"],
   "target_emails": [
     "alice@supplier.example",
     "bob@supplier.example",
@@ -143,13 +144,14 @@ The model calls the tool with:
 
 | Field | Type | Requirements |
 |---|---|---|
-| `target_emails` | string array | 1 to `max_targets` addresses permitted by `allowed_target_scope`; duplicates are normalized and removed |
+| `target_channels` | string array, optional | Same-company agent channels to delegate to (as `channel` from `list_company_agents`, e.g. `supplier` or `company/channel`) |
+| `target_emails` | string array, optional | External email addresses; 1 to `max_targets` total targets across `target_channels` and `target_emails`; duplicates are normalized and removed. Platform channel addresses are refused here — use `target_channels` |
 | `completion_threshold_percent` | number, optional | Greater than 0 and at most 100. Omitted means 100 |
 | `timeout_hours` | integer, optional | 1 to `max_timeout_hours`. Omitted means `default_timeout_hours` |
 | `subject` | string | 1 to 300 characters after trimming |
 | `body` | string | 1 to 20,000 characters after trimming |
 
-Platform addresses under the configured application domain cannot be outreach targets under the default `external_only` policy. `same_company_channels` permits direct agent-channel addresses in the current company and delivers them through trusted internal transport instead of SMTP. Each target receives a separate message and is never exposed to the other targets through `To` or `CC`.
+Platform addresses under the configured application domain cannot be outreach targets in `target_emails` under any policy — name them in `target_channels` instead. `same_company_channels` permits direct agent-channel selectors in the current company and delivers them through trusted internal transport instead of SMTP. Each target receives a separate message and is never exposed to the other targets through `To` or `CC`.
 
 The required response count is:
 
@@ -180,11 +182,11 @@ The quorum tool also covers single-recipient delegation. Use one target and a 10
 }
 ```
 
-Both optional fields may be omitted, which is the short form a delegated request should use:
+Both optional fields may be omitted, which is the short form a delegated request should use. For delegating to a same-company agent channel:
 
 ```json
 {
-  "target_emails": ["billing@acme.mailagents.example"],
+  "target_channels": ["billing"],
   "subject": "Invoice clarification",
   "body": "Please confirm the tax amount on invoice INV-1042."
 }

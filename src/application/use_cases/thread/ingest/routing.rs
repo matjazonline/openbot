@@ -418,6 +418,16 @@ impl ThreadUseCases {
         candidate: &ChannelCandidate,
         draft: &InboundDraft,
     ) -> AppResult<Option<Thread>> {
+        if let Some(target_thread_id) = draft.directives.target_thread_id
+            && let Some(thread) = self
+                .thread_persistence
+                .get_thread_by_id(target_thread_id)
+                .await?
+            && thread.channel_id == candidate.channel.id
+        {
+            return Ok(Some(thread));
+        }
+
         if let Some(thread_id) = self
             .correlation_store
             .thread_for_thread_keys(candidate.binding_id, &draft.reply_thread_keys)
@@ -604,14 +614,17 @@ impl ThreadUseCases {
         sender: ThreadSender<'_>,
         outreach: &Option<OutreachReplyMatch>,
     ) -> AppResult<Result<Option<OutreachReplyMatch>, IngestRejection>> {
-        if sender.is_party_to(thread) || outreach.is_some() {
-            return Ok(Ok(None));
-        }
         if let Some(matched) = self
             .correlated_outreach_reply(&candidate.channel, thread.id, draft, sender)
             .await?
         {
             return Ok(Ok(Some(matched)));
+        }
+        if sender.is_party_to(thread)
+            || draft.directives.target_thread_id.is_some()
+            || outreach.is_some()
+        {
+            return Ok(Ok(None));
         }
 
         warn!(

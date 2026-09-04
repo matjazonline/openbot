@@ -26,7 +26,7 @@ use crate::{
         auth::{AuthError, AuthenticatedUser},
         pages,
         routes::{
-            channel::reply_headers,
+            channel::reply_headers_for_thread,
             live_updates::channel_wake_ups,
             schedule::UiScheduleForm,
             ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
@@ -578,16 +578,22 @@ async fn reply_in_thread(
 
     // A reply here takes the same route as one sent from the mailbox: writing the row directly
     // would store a message no agent ever answers, and with no threading headers on it.
-    // Only a message mail actually carried has a `Message-ID` to thread onto; the schedule's own
-    // prompt has none, so the first reply starts the mail conversation.
+    // Continue the current schedule thread explicitly via threading headers.
     let reply_context = workspace
         .thread_use_cases
         .latest_email_reply_context(thread_id)
         .await?;
-    let in_reply_to = reply_context
+    let in_reply_to = match reply_context
         .as_ref()
         .and_then(|context| context.rfc_message_id.as_ref())
-        .map(|id| id.as_str());
+    {
+        Some(id) => Some(id.as_str().to_string()),
+        None => workspace
+            .thread_use_cases
+            .latest_thread_rfc_message_id(thread_id)
+            .await?
+            .map(|id| id.as_str().to_string()),
+    };
     let history = workspace
         .thread_use_cases
         .get_thread_history(thread_id)
@@ -602,7 +608,7 @@ async fn reply_in_thread(
         from: sender.to_string(),
         subject: Some(subject.clone()),
         text: Some(form.reply_text.clone()),
-        headers: reply_headers(in_reply_to),
+        headers: reply_headers_for_thread(thread_id, in_reply_to.as_deref()),
         ..Default::default()
     };
 

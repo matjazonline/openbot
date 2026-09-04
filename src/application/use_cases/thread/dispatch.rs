@@ -21,7 +21,7 @@ use crate::{
     entities::{
         agent::Agent,
         approval::ApprovalSubject,
-        channel::{Channel, ParticipantAccess, PUBLIC_PARTICIPANT},
+        channel::{Channel, PUBLIC_PARTICIPANT, ParticipantAccess},
         company::Company,
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
@@ -363,13 +363,17 @@ impl ThreadUseCases {
             .company_persistence
             .get_by_id(payload.company_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Company {} not found", payload.company_id)))?;
+            .ok_or_else(|| {
+                AppError::NotFound(format!("Company {} not found", payload.company_id))
+            })?;
 
         let channel = self
             .channel_persistence
             .get_by_id(payload.channel_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Channel {} not found", payload.channel_id)))?;
+            .ok_or_else(|| {
+                AppError::NotFound(format!("Channel {} not found", payload.channel_id))
+            })?;
 
         let first_agent_id = channel
             .agent_ids
@@ -382,12 +386,9 @@ impl ThreadUseCases {
             .agent_persistence
             .as_ref()
             .ok_or_else(|| AppError::Internal("Agent persistence is unavailable.".to_string()))?;
-        let agent = agents
-            .get_by_id(first_agent_id)
-            .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!("Active agent {first_agent_id} was not found."))
-            })?;
+        let agent = agents.get_by_id(first_agent_id).await?.ok_or_else(|| {
+            AppError::NotFound(format!("Active agent {first_agent_id} was not found."))
+        })?;
 
         // Idempotency Guard: Check if an outbound reply for this prompt message was already sent
         if let Some(existing) = self
@@ -473,10 +474,8 @@ impl ThreadUseCases {
             .trace(task.correlation_id, Some(task.id));
 
         if let Some(agent_persistence) = self.agent_persistence() {
-            runner = runner.agent_directory(
-                agent_persistence.clone(),
-                self.binding_persistence.clone(),
-            );
+            runner =
+                runner.agent_directory(agent_persistence.clone(), self.binding_persistence.clone());
         }
         if let Some(provisioning) = self.agent_channel_provisioning.clone() {
             runner = runner.agent_channel_tool(
@@ -546,11 +545,8 @@ impl ThreadUseCases {
             .collect::<Vec<_>>();
         let email_sent = !deliveries.is_empty();
 
-        let execution_parameters = build_execution_parameters(
-            Some(&params),
-            Some(&agent),
-            &payload.prompt,
-        );
+        let execution_parameters =
+            build_execution_parameters(Some(&params), Some(&agent), &payload.prompt);
         let execution_result = build_execution_result(
             &output.content,
             email_sent,
@@ -644,11 +640,8 @@ impl ThreadUseCases {
         };
 
         let body = super::agent_response_body(answer);
-        let content = CanonicalContent::parse(
-            reply_subject(&payload.subject),
-            body,
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?;
+        let content = CanonicalContent::parse(reply_subject(&payload.subject), body)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
 
         let composed = self
             .deliveries
