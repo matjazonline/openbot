@@ -23,6 +23,7 @@ use crate::application::transport::{
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskStatus;
 use crate::entities::transport::{DeliveryId, DeliveryPurpose, TransportKind};
+use crate::infra::config::ResendApiConfig;
 use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, delegating_agent_config, scripted_llm,
 };
@@ -40,8 +41,7 @@ fn loop_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
-        resend_inbound: None,
-        resend_outbound: None,
+        resend_api: ResendApiConfig::default(),
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -268,7 +268,9 @@ async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.
     let sender = EmailSender::new(
-        Arc::new(crate::adapters::protocols::email::DisabledMailTransport),
+        crate::adapters::protocols::email::DeploymentMailTransports::only(Arc::new(
+            crate::adapters::protocols::email::DisabledMailTransport,
+        )),
         threads.clone(),
     );
 

@@ -1621,15 +1621,26 @@ const RAIL_ICON: &str = "h-6 w-6";
 
 /// The header at the top of every `/ui` sidebar (first column): the workspace title and its one-line description.
 pub(crate) fn sidebar_header(title: &str, subtitle: &str) -> String {
+    sidebar_header_with_action(title, subtitle, "")
+}
+
+/// A [`sidebar_header`] with the workspace's own control — a "new record" button, say — sitting
+/// beside the title. The action is markup rather than a struct because every workspace that has
+/// one has exactly one, and it is the only thing about the header that differs.
+pub(crate) fn sidebar_header_with_action(title: &str, subtitle: &str, action: &str) -> String {
     format!(
         r##"
             <div class="workspace-heading border-b border-base-300 px-4 py-5">
-                <h2 class="text-base font-semibold leading-tight">{title}</h2>
+                <div class="flex items-start gap-2">
+                    <h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">{title}</h2>
+                    {action}
+                </div>
                 <p class="mt-1 text-xs leading-relaxed opacity-60">{subtitle}</p>
             </div>
         "##,
         title = escape_html_text(title),
         subtitle = escape_html_text(subtitle),
+        action = action,
     )
 }
 

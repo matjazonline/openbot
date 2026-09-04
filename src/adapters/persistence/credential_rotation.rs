@@ -10,7 +10,10 @@ use super::{
 };
 use crate::{
     app_error::{AppError, AppResult},
-    entities::transport::{IntegrationCredentialKind, TransportKind},
+    entities::{
+        company_resend_api::ResendApiCredentialKind,
+        transport::{IntegrationCredentialKind, TransportKind},
+    },
 };
 
 const CREDENTIAL_BATCH_SIZE: i64 = 100;
@@ -69,10 +72,17 @@ enum CredentialTable {
     ModelConnections,
     /// `integration_credentials.envelope` — `enc:v2`, rotated by rewrapping the data key.
     IntegrationCredentials,
+    /// `company_resend_api_integrations.api_key` and `.signing_secret` — two `enc:v2` columns of one
+    /// row, walked as the two credentials they are.
+    CompanyResendApiIntegrations,
 }
 
 impl CredentialTable {
-    const ALL: &'static [Self] = &[Self::ModelConnections, Self::IntegrationCredentials];
+    const ALL: &'static [Self] = &[
+        Self::ModelConnections,
+        Self::IntegrationCredentials,
+        Self::CompanyResendApiIntegrations,
+    ];
 }
 
 /// Where one credential lives, in the terms its own table keys it by.
@@ -89,6 +99,12 @@ enum CredentialKey {
         company_id: Uuid,
         installation_id: Uuid,
         credential_kind: String,
+    },
+    /// Two secrets share one row, so the kind is part of the key -- and, being the column name, it
+    /// is also what says which column a rotation writes back to.
+    CompanyResendApiCredential {
+        company_id: Uuid,
+        kind: ResendApiCredentialKind,
     },
 }
 
@@ -108,6 +124,13 @@ struct ModelConnectionRow {
     company_id: Uuid,
     provider: String,
     api_key: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct CompanyResendApiCredentialRow {
+    company_id: Uuid,
+    kind: String,
+    envelope: String,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -161,6 +184,37 @@ impl TryFrom<IntegrationCredentialRow> for InventoryRow {
                 company_id: row.company_id,
                 installation_id: row.installation_id,
                 credential_kind: row.credential_kind,
+            },
+            stored: row.envelope,
+        })
+    }
+}
+
+impl TryFrom<CompanyResendApiCredentialRow> for InventoryRow {
+    type Error = AppError;
+
+    /// The kind comes back as the column the value was read from, so an unknown one means the
+    /// unpivot below and [`ResendApiCredentialKind`] have drifted apart -- schema drift, not a bad
+    /// credential, and failing the scan is the honest answer.
+    fn try_from(row: CompanyResendApiCredentialRow) -> AppResult<Self> {
+        let kind = ResendApiCredentialKind::ALL
+            .iter()
+            .copied()
+            .find(|kind| kind.as_str() == row.kind)
+            .ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Invalid company_resend_api_integrations credential kind: {}",
+                    row.kind
+                ))
+            })?;
+        Ok(Self {
+            format: CredentialFormat::Envelope(CredentialContext::company_resend_api_credential(
+                row.company_id,
+                kind,
+            )),
+            key: CredentialKey::CompanyResendApiCredential {
+                company_id: row.company_id,
+                kind,
             },
             stored: row.envelope,
         })
@@ -405,6 +459,29 @@ async fn store_rotated_credential(
             .execute(&mut **transaction)
             .await
         }
+        CredentialKey::CompanyResendApiCredential { company_id, kind } => {
+            // The column is chosen by the kind rather than interpolated from it: a column name
+            // cannot be a bind parameter, and a `match` is what keeps that from becoming a format
+            // string over a value read out of the database.
+            let statement = match kind {
+                ResendApiCredentialKind::ApiKey => {
+                    r#"UPDATE company_resend_api_integrations AS integration
+                       SET api_key = $2, updated_at = CURRENT_TIMESTAMP
+                       WHERE integration.company_id = $1 AND integration.api_key = $3"#
+                }
+                ResendApiCredentialKind::SigningSecret => {
+                    r#"UPDATE company_resend_api_integrations AS integration
+                       SET signing_secret = $2, updated_at = CURRENT_TIMESTAMP
+                       WHERE integration.company_id = $1 AND integration.signing_secret = $3"#
+                }
+            };
+            sqlx::query(statement)
+                .bind(company_id)
+                .bind(rotated)
+                .bind(&row.stored)
+                .execute(&mut **transaction)
+                .await
+        }
     }
     .map_err(AppError::from)?
     .rows_affected();
@@ -477,7 +554,57 @@ async fn fetch_credential_batch(
         CredentialTable::IntegrationCredentials => {
             fetch_integration_credential_batch(connection, cursor).await
         }
+        CredentialTable::CompanyResendApiIntegrations => {
+            fetch_company_resend_api_credential_batch(connection, cursor).await
+        }
     }
+}
+
+/// One bounded batch of company Resend secrets, unpivoted so that one row's two columns are two
+/// credentials.
+///
+/// Unpivoting in SQL rather than emitting two inventory rows per fetched row is what keeps the
+/// batch bound a bound: `(company_id, kind)` is a keyset over exactly the values being classified.
+async fn fetch_company_resend_api_credential_batch(
+    connection: &mut PgConnection,
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    const SELECT: &str = "SELECT credential.company_id, credential.kind, credential.envelope
+                            FROM (
+                                SELECT company_id, 'api_key' AS kind, api_key AS envelope
+                                  FROM company_resend_api_integrations
+                                 UNION ALL
+                                SELECT company_id, 'signing_secret', signing_secret
+                                  FROM company_resend_api_integrations
+                            ) AS credential";
+    const ORDER: &str = "ORDER BY credential.company_id, credential.kind";
+    let rows = match cursor {
+        Some(CredentialKey::CompanyResendApiCredential { company_id, kind }) => {
+            sqlx::query_as::<_, CompanyResendApiCredentialRow>(&format!(
+                "{SELECT}
+                  WHERE (credential.company_id, credential.kind) > ($1, $2)
+                  {ORDER}
+                  LIMIT $3"
+            ))
+            .bind(company_id)
+            .bind(kind.as_str())
+            .bind(CREDENTIAL_BATCH_SIZE)
+            .fetch_all(&mut *connection)
+            .await
+        }
+        _ => {
+            sqlx::query_as::<_, CompanyResendApiCredentialRow>(&format!(
+                "{SELECT} {ORDER} LIMIT $1"
+            ))
+            .bind(CREDENTIAL_BATCH_SIZE)
+            .fetch_all(&mut *connection)
+            .await
+        }
+    };
+    rows.map_err(AppError::from)?
+        .into_iter()
+        .map(InventoryRow::try_from)
+        .collect()
 }
 
 async fn fetch_model_connection_batch(

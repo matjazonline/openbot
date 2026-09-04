@@ -309,6 +309,70 @@ impl ObjectKey {
     }
 }
 
+// The opaque last segment of one company's Resend webhook URL, e.g. the `9f2c...` in
+// `https://example.com/webhooks/email/resend_api/9f2c...`.
+//
+// Distinct from every other identifier a webhook could be addressed by -- and from `CompanySlug`
+// in particular -- because it is the one string that says which tenant an unauthenticated request
+// belongs to. Deliberately carries no company name: it is registered in a Resend dashboard the
+// application does not control, and a token survives a rename that a slug would not.
+string_newtype!(ResendApiWebhookToken);
+
+impl ResendApiWebhookToken {
+    /// The exact length the column's own check constraint enforces.
+    pub const LENGTH: usize = 32;
+
+    /// A fresh token: 122 bits of randomness, spelled as the 32 lowercase hex digits the column
+    /// accepts. Generated rather than derived from anything about the company, so knowing a
+    /// tenant tells an attacker nothing about the URL its mail arrives on.
+    pub fn generate() -> Self {
+        Self(uuid::Uuid::new_v4().simple().to_string())
+    }
+
+    /// What a URL path segment means. `None` for anything this application would not have
+    /// written, so a malformed segment is refused before it reaches a query.
+    pub fn parse(value: &str) -> Option<Self> {
+        let trimmed = value.trim();
+        (trimmed.len() == Self::LENGTH
+            && trimmed
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()))
+        .then(|| Self(trimmed.to_string()))
+    }
+}
+
+// The `authserv-id` an `Authentication-Results` header must carry for its verdicts to be believed,
+// e.g. `resend.com`.
+//
+// A newtype because it travels beside [`ResendApiWebhookToken`] as a sibling field of the same
+// integration, and because it has a comparison rule of its own: the header names it
+// case-insensitively, and re-deciding that at each reader is how a forged header becomes a pass.
+string_newtype!(AuthservId);
+
+impl AuthservId {
+    /// The longest value the column stores.
+    pub const MAX_BYTES: usize = 255;
+
+    /// One `authserv-id` token, trimmed. Rejects the whitespace-bearing values that could never
+    /// match a header, rather than storing one that silently authenticates nothing.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("An authserv-id is required.".to_string());
+        }
+        if trimmed.len() > Self::MAX_BYTES {
+            return Err(format!(
+                "An authserv-id may be at most {} characters.",
+                Self::MAX_BYTES
+            ));
+        }
+        if trimmed.chars().any(char::is_whitespace) {
+            return Err("An authserv-id is one token, such as resend.com.".to_string());
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+}
+
 // The public URL an uploaded object is served from. Becomes an [`AvatarUrl`] only by going through
 // [`AvatarUrl::parse`], so a misconfigured base URL cannot put a non-`http` scheme in an `<img>`.
 string_newtype!(ObjectUrl);

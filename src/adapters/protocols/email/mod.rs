@@ -26,8 +26,8 @@ pub use authentication::{
 pub use egress::{EmailRenderer, EmailSender, OUTBOUND_EMAIL_VERSION, OutboundEmailV1};
 pub use ingress::{EmailIngressAdapter, EmailIngressError, EmailIngressTrust, VerifiedEmailAuth};
 pub use mail::{
-    DisabledMailTransport, MailHeader, MailMessage, MailSendOutcome, MailTransport,
-    SmtpConfirmationSender,
+    CompanyMailTransports, DeploymentMailTransports, DisabledMailTransport, MailHeader,
+    MailMessage, MailSendOutcome, MailTransport, SmtpConfirmationSender,
 };
 pub use selector::{
     EmailChannelSelection, EmailChannelSelectorParser, EmailDeliveryHints, EmailDeliveryMode,

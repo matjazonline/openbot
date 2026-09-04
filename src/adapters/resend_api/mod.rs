@@ -10,6 +10,7 @@
 //! takes two further provider calls; that is why the route stores the event and answers, and the
 //! work happens in [`inbound`] under the inbound worker's lease.
 
+pub mod accounts;
 pub mod client;
 pub mod inbound;
 pub mod signature;
@@ -17,7 +18,8 @@ pub mod signature;
 pub mod test_support;
 pub mod transport;
 
-pub use client::{ReceivedEmail, ReqwestResendClient, ResendApi, ResendError};
-pub use inbound::ResendInboundDecoder;
+pub use accounts::{CompanyResendApiAccount, CompanyResendApiClients, ResendApiCompanyTransports};
+pub use client::{ReceivedEmail, ReqwestResendApiClient, ResendApi, ResendApiError};
+pub use inbound::ResendApiInboundDecoder;
 pub use signature::{decode_signing_secret, verify_svix_signature_at};
-pub use transport::ResendMailTransport;
+pub use transport::ResendApiMailTransport;

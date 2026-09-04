@@ -18,7 +18,7 @@ use axum::{
     extract::{FromRequestParts, Path, Query},
     http::request::Parts,
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use serde::Deserialize;
 use tracing::instrument;
@@ -43,6 +43,7 @@ use crate::{
         channel::ChannelUseCases,
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         company_invite::CompanyInviteUseCases,
+        company_resend_api::{CompanyResendApiUseCases, SubmittedResendApiIntegration},
         memory::MemoryUseCases,
         user::UserUseCases,
     },
@@ -66,6 +67,14 @@ pub fn router() -> Router<AppState> {
         .route(
             "/ui/companies/{company_id}/memory/retry",
             post(retry_memory),
+        )
+        .route(
+            "/ui/companies/{company_id}/resend_api",
+            put(save_resend_api).delete(disconnect_resend_api),
+        )
+        .route(
+            "/ui/companies/{company_id}/resend_api/token",
+            post(rotate_resend_api_token),
         )
 }
 
@@ -136,6 +145,7 @@ struct Workspace {
     channel_use_cases: Arc<ChannelUseCases>,
     agent_use_cases: Arc<AgentUseCases>,
     invite_use_cases: Arc<CompanyInviteUseCases>,
+    resend_api_use_cases: Arc<CompanyResendApiUseCases>,
     user_use_cases: Arc<UserUseCases>,
     memory_use_cases: Arc<MemoryUseCases>,
     config: Arc<AppConfig>,
@@ -156,6 +166,7 @@ impl FromRequestParts<AppState> for Workspace {
             channel_use_cases: state.channel_use_cases.clone(),
             agent_use_cases: state.agent_use_cases.clone(),
             invite_use_cases: state.company_invite_use_cases.clone(),
+            resend_api_use_cases: state.company_resend_api_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             memory_use_cases: state.memory_use_cases.clone(),
             config: state.config.clone(),
@@ -228,6 +239,14 @@ impl Workspace {
         } else {
             Vec::new()
         };
+        // Owners only, on the same terms as the model credentials above: the panel is where two
+        // provider secrets are entered, and a member's pane renders none of that.
+        let resend_api_section = if editable {
+            self.resend_api_section(company.id, None, None, None)
+                .await?
+        } else {
+            String::new()
+        };
         Ok(pages::company_edit_pane_with_memory(
             &pages::CompanyEditPane {
                 company,
@@ -237,10 +256,38 @@ impl Workspace {
                 draft,
                 error,
                 editable,
+                resend_api_section: &resend_api_section,
                 body: pages::CompanyPaneBody::Settings,
             },
             memory.as_ref(),
             self.memory_use_cases.configured(),
+        ))
+    }
+
+    /// The Resend panel as it stands right now, with whatever the last write left to say.
+    ///
+    /// One renderer for all four responses that draw it -- the pane, a save, a rotation and a
+    /// disconnect -- so the panel cannot show one thing on a full load and another after a write.
+    async fn resend_api_section(
+        &self,
+        company_id: Uuid,
+        draft: Option<&pages::CompanyResendApiDraft<'_>>,
+        error: Option<&str>,
+        notice: Option<&str>,
+    ) -> AppResult<String> {
+        let integration = self
+            .resend_api_use_cases
+            .integration(self.user_id, company_id)
+            .await?;
+        Ok(pages::company_resend_api_section(
+            &pages::CompanyResendApiSection {
+                company_id,
+                integration: integration.as_ref(),
+                base_url: &self.config.public_base_url(),
+                draft,
+                error,
+                notice,
+            },
         ))
     }
 
@@ -258,6 +305,8 @@ impl Workspace {
             draft: None,
             error: None,
             editable,
+            // The Team tab renders no settings at all, and the Resend panel is settings.
+            resend_api_section: "",
             body: pages::CompanyPaneBody::Team(&team),
         }))
     }
@@ -604,6 +653,110 @@ async fn retry_memory(
     Ok(Html(
         workspace
             .settings_pane(&company, counts, None, None, true)
+            .await?,
+    ))
+}
+
+/// What the Resend panel submits. Both secrets are optional because blank means "keep the stored
+/// one", and `enabled` is absent entirely when its checkbox is cleared.
+#[derive(Debug, Deserialize)]
+pub struct ResendApiForm {
+    #[serde(default)]
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub signing_secret: Option<String>,
+    #[serde(default)]
+    pub authserv_id: String,
+    #[serde(default)]
+    pub enabled: Option<String>,
+}
+
+impl ResendApiForm {
+    fn submitted(self) -> SubmittedResendApiIntegration {
+        SubmittedResendApiIntegration {
+            api_key: self.api_key,
+            signing_secret: self.signing_secret,
+            authserv_id: self.authserv_id,
+            // An unchecked checkbox submits nothing at all, so absence is the "off" it means.
+            enabled: self.enabled.is_some(),
+        }
+    }
+}
+
+/// PUT /ui/companies/{company_id}/resend_api - Connect or update this company's Resend account.
+///
+/// A refusal comes back as the panel with the message above it and the typed `authserv-id` still
+/// in place, never as a bare error: the two credential fields are already blank by design, so
+/// re-rendering costs the operator nothing but the two secrets they were entering anyway.
+#[instrument(skip(workspace, form))]
+async fn save_resend_api(
+    workspace: Workspace,
+    Path(company_id): Path<Uuid>,
+    Form(form): Form<ResendApiForm>,
+) -> AppResult<Html<String>> {
+    // Taken before the form is consumed, so a refusal can put back what was typed. Neither
+    // credential appears here: those fields render blank whatever happens.
+    let authserv_id = form.authserv_id.trim().to_string();
+    let draft = pages::CompanyResendApiDraft {
+        authserv_id: &authserv_id,
+        enabled: form.enabled.is_some(),
+    };
+    match workspace
+        .resend_api_use_cases
+        .save(workspace.user_id, company_id, form.submitted())
+        .await
+    {
+        Ok(_) => Ok(Html(
+            workspace
+                .resend_api_section(company_id, None, None, Some("Resend settings saved."))
+                .await?,
+        )),
+        Err(error) => Ok(Html(
+            workspace
+                .resend_api_section(company_id, Some(&draft), Some(&error.to_string()), None)
+                .await?,
+        )),
+    }
+}
+
+/// POST /ui/companies/{company_id}/resend_api/token - Issue a fresh webhook URL for this company.
+#[instrument(skip(workspace))]
+async fn rotate_resend_api_token(
+    workspace: Workspace,
+    Path(company_id): Path<Uuid>,
+) -> AppResult<Html<String>> {
+    workspace
+        .resend_api_use_cases
+        .rotate_webhook_token(workspace.user_id, company_id)
+        .await?;
+    Ok(Html(
+        workspace
+            .resend_api_section(
+                company_id,
+                None,
+                None,
+                Some("A new webhook URL was issued. Update the endpoint in Resend now: deliveries to the old URL are already being refused."),
+            )
+            .await?,
+    ))
+}
+
+/// DELETE /ui/companies/{company_id}/resend_api - Forget this company's Resend account.
+#[instrument(skip(workspace))]
+async fn disconnect_resend_api(
+    workspace: Workspace,
+    Path(company_id): Path<Uuid>,
+) -> AppResult<Html<String>> {
+    let removed = workspace
+        .resend_api_use_cases
+        .disconnect(workspace.user_id, company_id)
+        .await?;
+    let notice = removed.then_some(
+        "Resend was disconnected. This company's mail now goes out over the deployment relay.",
+    );
+    Ok(Html(
+        workspace
+            .resend_api_section(company_id, None, None, notice)
             .await?,
     ))
 }

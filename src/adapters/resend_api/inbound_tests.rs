@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::*;
 use crate::{
-    adapters::resend::{
+    adapters::resend_api::{
         client::{RawReference, ReceivedEmail},
         test_support::FakeResendApi,
     },
@@ -10,8 +10,8 @@ use crate::{
         auth::AuthVerdict,
         correlation::CorrelationId,
         transport::{ExternalEventKey, InboundEventId},
+        value_objects::AuthservId,
     },
-    infra::config::ResendInboundConfig,
     transport::{
         InboundContentType, InboundEventPayload, InboundPayloadDigest, IngressPolicyFacts,
         SafeHeaderFacts,
@@ -24,13 +24,17 @@ const EVENT_KEY: &str = "56761188-7520-42d8-8898-ff6fc54ce618";
 fn config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         app_domain_name: "localhost".to_string(),
-        resend_inbound: Some(ResendInboundConfig {
-            signing_secret: secrecy::SecretString::from("whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"),
-            webhook_max_age_secs: 300,
-            authserv_id: AUTHSERV.to_string(),
-        }),
         ..AppConfig::for_test()
     })
+}
+
+/// The company account the mail is read through: a scripted API and the `authserv-id` of the
+/// Resend account that received it.
+fn account(api: FakeResendApi) -> CompanyResendApiAccount {
+    CompanyResendApiAccount {
+        api: Arc::new(api),
+        authserv_id: AuthservId::new(AUTHSERV),
+    }
 }
 
 /// Read one mail through the phase under test.
@@ -42,7 +46,7 @@ async fn read(
     config: &AppConfig,
     event: &InboundEventRecord,
 ) -> Result<(InboundMessage, PendingEmailAttachments), Failure> {
-    super::read_mail(&api, config, event, EVENT_KEY).await
+    super::read_mail(&account(api), config, event, EVENT_KEY).await
 }
 
 fn event(payload: serde_json::Value) -> InboundEventRecord {
@@ -98,7 +102,8 @@ fn raw_mime(authentication_results: &str) -> Vec<u8> {
     .into_bytes()
 }
 
-const RESEND_PASS: &str = "Authentication-Results: resend.com; spf=pass; dkim=pass; dmarc=pass\r\n";
+const RESEND_API_PASS: &str =
+    "Authentication-Results: resend.com; spf=pass; dkim=pass; dmarc=pass\r\n";
 
 /// The whole provider exchange, scripted to succeed.
 fn fetching(authentication_results: &str) -> FakeResendApi {
@@ -110,7 +115,7 @@ fn fetching(authentication_results: &str) -> FakeResendApi {
 #[tokio::test]
 async fn a_received_mail_carries_its_event_key_and_correlation_id_into_the_commit() {
     let event = received_event();
-    let (inbound, _) = read(fetching(RESEND_PASS), &config(), &event)
+    let (inbound, _) = read(fetching(RESEND_API_PASS), &config(), &event)
         .await
         .expect("the mail reads");
 
@@ -127,7 +132,7 @@ async fn a_received_mail_carries_its_event_key_and_correlation_id_into_the_commi
 #[tokio::test]
 async fn the_verdicts_come_from_the_configured_authserv_id_and_nowhere_else() {
     let event = received_event();
-    let (inbound, _) = read(fetching(RESEND_PASS), &config(), &event)
+    let (inbound, _) = read(fetching(RESEND_API_PASS), &config(), &event)
         .await
         .expect("the mail reads");
 
@@ -170,7 +175,7 @@ async fn the_recipient_is_the_address_the_mail_was_received_for() {
     email.received_for = vec!["support@acme.localhost".to_string()];
     let api = FakeResendApi::new()
         .retrieving(Ok(email))
-        .with_raw(Ok(raw_mime(RESEND_PASS)));
+        .with_raw(Ok(raw_mime(RESEND_API_PASS)));
     let event = received_event();
 
     let (inbound, _) = read(api, &config(), &event).await.expect("the mail reads");
@@ -186,28 +191,28 @@ async fn the_recipient_is_the_address_the_mail_was_received_for() {
 async fn a_transient_provider_failure_asks_again_and_a_definite_one_does_not() {
     for (error, expect_retry) in [
         (
-            ResendError::RateLimited {
+            ResendApiError::RateLimited {
                 retry_after: None,
                 detail: "slow down".to_string(),
             },
             true,
         ),
         (
-            ResendError::Unavailable {
+            ResendApiError::Unavailable {
                 detail: "connection reset".to_string(),
             },
             true,
         ),
         (
-            ResendError::Refused {
+            ResendApiError::Refused {
                 status: 404,
                 detail: "no such email".to_string(),
             },
             false,
         ),
-        (ResendError::TooLarge { limit: 16 }, false),
+        (ResendApiError::TooLarge { limit: 16 }, false),
         (
-            ResendError::Malformed {
+            ResendApiError::Malformed {
                 detail: "not json".to_string(),
             },
             false,
@@ -231,7 +236,7 @@ async fn a_transient_provider_failure_asks_again_and_a_definite_one_does_not() {
 async fn a_download_that_exceeds_the_message_bound_is_terminal_rather_than_retried() {
     let api = FakeResendApi::new()
         .retrieving(Ok(received_email()))
-        .with_raw(Err(ResendError::TooLarge {
+        .with_raw(Err(ResendApiError::TooLarge {
             limit: crate::adapters::protocols::email::parser::MAX_INBOUND_MESSAGE_BYTES,
         }));
     let event = received_event();
@@ -244,7 +249,7 @@ async fn a_download_that_exceeds_the_message_bound_is_terminal_rather_than_retri
 }
 
 #[tokio::test]
-async fn a_mail_resend_will_not_hand_over_the_bytes_of_is_terminal() {
+async fn a_mail_resend_api_will_not_hand_over_the_bytes_of_is_terminal() {
     let mut email = received_email();
     email.raw = None;
     let event = received_event();
@@ -262,20 +267,24 @@ async fn a_mail_resend_will_not_hand_over_the_bytes_of_is_terminal() {
     assert!(!failure.retry);
 }
 
+/// The verdicts follow the *company's* account, not the deployment's. A mail carrying the header
+/// of a different Resend account than the one that received it authenticates nothing.
 #[tokio::test]
-async fn an_event_stored_before_resend_inbound_was_switched_off_is_terminal() {
-    let config = Arc::new(AppConfig {
-        resend_inbound: None,
-        ..AppConfig::for_test()
-    });
+async fn only_the_receiving_companys_authserv_id_is_believed() {
+    let elsewhere = CompanyResendApiAccount {
+        api: Arc::new(fetching(RESEND_API_PASS)),
+        authserv_id: AuthservId::new("mx.another-tenant.example"),
+    };
     let event = received_event();
 
-    let Err(failure) = read(fetching(RESEND_PASS), &config, &event).await else {
-        panic!("no configured authserv-id means nothing may be authenticated");
-    };
+    let (inbound, _) = super::read_mail(&elsewhere, &config(), &event, EVENT_KEY)
+        .await
+        .expect("the mail reads");
 
-    assert!(!failure.retry);
-    assert_eq!(failure.class, InboundEventErrorClass::UnsupportedTransport);
+    let IngressPolicyFacts::Email(facts) = inbound.draft.policy else {
+        panic!("an inbound mail carries email policy facts");
+    };
+    assert_ne!(facts.dmarc, AuthVerdict::Pass);
 }
 
 #[test]

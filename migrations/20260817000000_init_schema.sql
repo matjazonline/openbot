@@ -202,6 +202,58 @@ CREATE UNIQUE INDEX company_model_connections_one_default_idx
     ON company_model_connections (company_id)
     WHERE is_default;
 
+-- The Resend account one company sends through and receives into.
+--
+-- Resend is a per-tenant integration rather than a deployment one: the key that posts a company's
+-- mail is the same key that fetches the mail its webhook announces, so both directions are one
+-- row and a company with no row here simply has no Resend. There is deliberately no deployment
+-- fallback -- a shared key would let one tenant's mail be read with another's credential.
+CREATE TABLE company_resend_api_integrations (
+    company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    -- The last path segment of this company's webhook URL, and the only thing that names the
+    -- tenant an unauthenticated request belongs to. Opaque and rotatable on purpose: the slug
+    -- would leak the tenant to anyone who sees the URL in a Resend dashboard, and would break the
+    -- registered endpoint on a rename. Finding the row is not authenticating it -- the signature
+    -- is still checked against this row's secret.
+    webhook_token TEXT NOT NULL UNIQUE,
+    -- Both `enc:v2` envelopes, each bound to (company, credential kind) as associated data, so a
+    -- ciphertext moved between companies or between these two columns fails to open rather than
+    -- yielding the original secret.
+    api_key TEXT NOT NULL,
+    signing_secret TEXT NOT NULL,
+    -- The `authserv-id` this company's Resend account stamps into Authentication-Results. Per
+    -- company because it is a property of the receiving account, and reading a verdict written by
+    -- anyone else is how a forged header becomes a pass.
+    authserv_id TEXT NOT NULL,
+    -- Off refuses the webhook and the send while keeping the credentials, so an operator can stop
+    -- a misbehaving integration without re-entering two secrets to start it again.
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Exactly what `ResendApiWebhookToken::generate` produces. A token shorter than this is not one
+    -- this application wrote, and the check is what keeps a hand-edited row from weakening the
+    -- only identifier the webhook route has.
+    CONSTRAINT company_resend_api_integrations_webhook_token_check CHECK (
+        webhook_token ~ '^[a-z0-9]{32}$'
+    ),
+    -- enc:v2:<kek version>:<dek nonce>:<wrapped dek>:<data nonce>:<ciphertext+tag>
+    CONSTRAINT company_resend_api_integrations_api_key_check CHECK (
+        api_key ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
+        AND octet_length(api_key) <= 8192
+    ),
+    CONSTRAINT company_resend_api_integrations_signing_secret_check CHECK (
+        signing_secret ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
+        AND octet_length(signing_secret) <= 8192
+    ),
+    -- One `authserv-id` token, such as `resend.com`: no whitespace, because the parser reads the
+    -- first token of the header and a value with a space in it could never match one.
+    CONSTRAINT company_resend_api_integrations_authserv_id_check CHECK (
+        btrim(authserv_id) <> ''
+        AND authserv_id !~ '[[:space:]]'
+        AND octet_length(authserv_id) <= 255
+    )
+);
+
 CREATE TABLE company_invites (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,

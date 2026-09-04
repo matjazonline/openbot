@@ -88,6 +88,52 @@ pub trait MailTransport: Send + Sync {
     async fn send(&self, message: MailMessage) -> MailSendOutcome;
 }
 
+/// Which transport one company's mail goes out through.
+///
+/// Sending is per tenant because the provider account can be: a company that has connected its own
+/// Resend account sends through that account's key, and one that has not sends through the
+/// deployment's relay. Resolving happens per delivery rather than once at startup for the same
+/// reason the credential is a row -- a company connecting Resend must not need a restart to start
+/// using it.
+///
+/// The resolver returns an `AppResult` rather than falling back on error: failing to read which
+/// account a company sends through is not the same as "this company has no account", and quietly
+/// sending a tenant's mail from the deployment's own domain because a query failed is a silent
+/// misdelivery rather than a retryable one.
+///
+/// `None` names the deployment itself rather than a tenant -- a confirmation code or an approval
+/// link is not sent on any company's behalf, and has no provider account of its own to go through.
+#[async_trait]
+pub trait CompanyMailTransports: Send + Sync {
+    async fn transport_for(
+        &self,
+        company_id: Option<uuid::Uuid>,
+    ) -> AppResult<Arc<dyn MailTransport>>;
+}
+
+/// Every company through one transport: the deployment relay.
+///
+/// What a deployment with no per-company provider accounts uses, and what the tests that care
+/// about the mail rather than about whose account it left through use.
+pub struct DeploymentMailTransports(Arc<dyn MailTransport>);
+
+impl DeploymentMailTransports {
+    /// Every company, and the deployment itself, through this one transport.
+    pub fn only(transport: Arc<dyn MailTransport>) -> Arc<dyn CompanyMailTransports> {
+        Arc::new(Self(transport))
+    }
+}
+
+#[async_trait]
+impl CompanyMailTransports for DeploymentMailTransports {
+    async fn transport_for(
+        &self,
+        _company_id: Option<uuid::Uuid>,
+    ) -> AppResult<Arc<dyn MailTransport>> {
+        Ok(self.0.clone())
+    }
+}
+
 /// A transport that logs and drops, used when no relay is configured and by focused tests.
 pub struct DisabledMailTransport;
 

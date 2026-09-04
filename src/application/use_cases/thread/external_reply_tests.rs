@@ -21,6 +21,7 @@ use crate::entities::message::MessageRole;
 use crate::entities::task::{TaskLeaseRef, TaskStatus};
 use crate::entities::transport::{DeliveryId, TransportKind};
 use crate::entities::value_objects::MessageId;
+use crate::infra::config::ResendApiConfig;
 use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, ScriptedLlm, scripted_agent_config, scripted_llm,
 };
@@ -43,8 +44,7 @@ fn external_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
-        resend_inbound: None,
-        resend_outbound: None,
+        resend_api: ResendApiConfig::default(),
         hydradb: None,
         hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
@@ -365,7 +365,10 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
     );
 
     let transport = recording_transport();
-    let sender = EmailSender::new(transport.clone(), threads.clone());
+    let sender = EmailSender::new(
+        crate::adapters::protocols::email::DeploymentMailTransports::only(transport.clone()),
+        threads.clone(),
+    );
 
     Fixture {
         persistence,

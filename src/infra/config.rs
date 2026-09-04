@@ -139,10 +139,8 @@ pub struct AppConfig {
     pub operator_emails: Vec<EmailAddress>,
     /// Authenticated SendGrid inbound webhook configuration. `None` disables the route.
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
-    /// Authenticated Resend inbound webhook configuration. `None` disables the route.
-    pub resend_inbound: Option<ResendInboundConfig>,
-    /// Resend API credentials for outbound mail. `None` leaves SMTP as the mail transport.
-    pub resend_outbound: Option<ResendOutboundConfig>,
+    /// How this deployment reaches Resend, for the companies that have configured an account.
+    pub resend_api: ResendApiConfig,
     /// Deployment-wide provider credentials. A provider absent here cannot be selected by any
     /// company, and a company already pointing at it degrades to no-memory rather than failing.
     pub hydradb: Option<MemoryProviderHttpConfig>,
@@ -261,134 +259,88 @@ pub struct SendGridInboundConfig {
     pub webhook_max_age_secs: u64,
 }
 
-/// The largest signing secret this deployment will accept. Svix issues 24 random bytes; the bound
-/// exists so a pasted file cannot become a key.
-pub const MAX_RESEND_SIGNING_SECRET_BYTES: usize = 256;
 /// The largest `Retry-After` a Resend 429 can push a delivery out by. Beyond this the queue's own
 /// backoff is the better answer, because a provider asking for an hour is reporting an outage.
-pub const MAX_RESEND_RETRY_AFTER_SECS: u64 = 900;
+pub const MAX_RESEND_API_RETRY_AFTER_SECS: u64 = 900;
 pub const DEFAULT_RESEND_API_BASE_URL: &str = "https://api.resend.com";
-pub const DEFAULT_RESEND_REQUEST_TIMEOUT_SECS: u64 = 30;
-pub const MAX_RESEND_REQUEST_TIMEOUT_SECS: u64 = 120;
+pub const DEFAULT_RESEND_API_REQUEST_TIMEOUT_SECS: u64 = 30;
+pub const MAX_RESEND_API_REQUEST_TIMEOUT_SECS: u64 = 120;
+pub const DEFAULT_RESEND_API_WEBHOOK_MAX_AGE_SECS: u64 = 300;
 
-/// The authenticated Resend inbound webhook. `None` disables the route, which then answers 404.
+/// How this deployment talks to Resend, for whichever companies have configured an account.
 ///
-/// `authserv_id` is load-bearing rather than cosmetic. Resend is this deployment's MX, so it is the
-/// only party that saw the connecting IP and the only one that can assert an SPF/DKIM/DMARC
-/// verdict. A sender can put an `Authentication-Results` header claiming anything into their own
-/// message, so the decoder accepts verdicts only from the header this id names.
-#[derive(Clone)]
-pub struct ResendInboundConfig {
-    pub signing_secret: SecretString,
-    pub webhook_max_age_secs: u64,
-    pub authserv_id: String,
-}
-
-/// Credentials for sending through the Resend HTTP API. `None` leaves SMTP as the mail transport.
-#[derive(Clone)]
-pub struct ResendOutboundConfig {
-    pub api_key: SecretString,
+/// No credential lives here. The API key and the webhook signing secret belong to a company, not
+/// to the deployment -- see `company_resend_api_integrations` -- and a deployment-wide key would be a
+/// key with which one tenant's mail could be fetched under another tenant's account. What is left
+/// is the dial settings, which genuinely are the same for every tenant: where the API lives, how
+/// long one of its requests may take, and how old a signed webhook may be before it is a replay.
+///
+/// Always present, and every field has a default, so there is no "Resend is configured" state at
+/// this level any more: the answer to that question is a row, per company.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResendApiConfig {
     pub base_url: String,
     pub request_timeout: StdDuration,
+    pub webhook_max_age_secs: u64,
 }
 
-impl ResendInboundConfig {
-    fn from_env() -> Option<Self> {
+impl Default for ResendApiConfig {
+    fn default() -> Self {
+        Self {
+            base_url: DEFAULT_RESEND_API_BASE_URL.to_string(),
+            request_timeout: StdDuration::from_secs(DEFAULT_RESEND_API_REQUEST_TIMEOUT_SECS),
+            webhook_max_age_secs: DEFAULT_RESEND_API_WEBHOOK_MAX_AGE_SECS,
+        }
+    }
+}
+
+impl ResendApiConfig {
+    fn from_env() -> Self {
         Self::from_values(
-            env::var("RESEND_INBOUND_ENABLED").ok().as_deref(),
-            non_empty_var("RESEND_WEBHOOK_SIGNING_SECRET"),
-            non_empty_var("RESEND_WEBHOOK_MAX_AGE_SECS"),
-            non_empty_var("RESEND_AUTHSERV_ID"),
+            non_empty_var("RESEND_API_BASE_URL"),
+            non_empty_var("RESEND_API_REQUEST_TIMEOUT_SECS"),
+            non_empty_var("RESEND_API_WEBHOOK_MAX_AGE_SECS"),
         )
     }
 
     /// Split out from [`Self::from_env`] so the validation is testable without mutating the
     /// process environment, the way `MemoryProviderHttpConfig::from_values` is.
     fn from_values(
-        enabled: Option<&str>,
-        signing_secret: Option<String>,
-        max_age_secs: Option<String>,
-        authserv_id: Option<String>,
-    ) -> Option<Self> {
-        let enabled: bool = enabled
-            .unwrap_or("false")
-            .trim()
-            .parse()
-            .expect("RESEND_INBOUND_ENABLED must be true or false");
-        if !enabled {
-            return None;
-        }
-        let signing_secret = signing_secret
-            .expect("RESEND_WEBHOOK_SIGNING_SECRET is required when RESEND_INBOUND_ENABLED=true");
-        let authserv_id =
-            authserv_id.expect("RESEND_AUTHSERV_ID is required when RESEND_INBOUND_ENABLED=true");
-        assert!(
-            signing_secret.len() <= MAX_RESEND_SIGNING_SECRET_BYTES,
-            "RESEND_WEBHOOK_SIGNING_SECRET exceeds the maximum supported credential length"
-        );
-        // Decoded here rather than at the first webhook, so a mistyped secret fails the deploy
-        // instead of turning every inbound mail into a 401 nobody is watching.
-        assert!(
-            crate::adapters::resend::decode_signing_secret(&signing_secret).is_some(),
-            "RESEND_WEBHOOK_SIGNING_SECRET must be a base64 Svix secret, with or without its \
-             `whsec_` prefix"
-        );
-        assert!(
-            !authserv_id.contains(char::is_whitespace),
-            "RESEND_AUTHSERV_ID is one authserv-id token, such as `resend.com`"
-        );
-        let webhook_max_age_secs = max_age_secs.map_or(300, |value| {
-            let seconds: u64 = value
-                .parse()
-                .expect("RESEND_WEBHOOK_MAX_AGE_SECS must be a positive integer");
-            assert!(seconds > 0, "RESEND_WEBHOOK_MAX_AGE_SECS must be positive");
-            seconds
-        });
-        Some(Self {
-            signing_secret: SecretString::from(signing_secret),
-            webhook_max_age_secs,
-            authserv_id,
-        })
-    }
-}
-
-impl ResendOutboundConfig {
-    fn from_env() -> Option<Self> {
-        Self::from_values(
-            non_empty_var("RESEND_API_KEY"),
-            non_empty_var("RESEND_API_BASE_URL"),
-            non_empty_var("RESEND_REQUEST_TIMEOUT_SECS"),
-        )
-    }
-
-    fn from_values(
-        api_key: Option<String>,
         base_url: Option<String>,
         request_timeout: Option<String>,
-    ) -> Option<Self> {
-        // The API key alone selects this transport: the other two have defaults that are right for
-        // every deployment, so demanding all three would be ceremony rather than safety.
-        let api_key = api_key?;
-        let base_url = base_url.unwrap_or_else(|| DEFAULT_RESEND_API_BASE_URL.to_string());
+        webhook_max_age_secs: Option<String>,
+    ) -> Self {
+        let defaults = Self::default();
+        let base_url = base_url.unwrap_or(defaults.base_url);
         let parsed_url = url::Url::parse(&base_url)
             .unwrap_or_else(|_| panic!("RESEND_API_BASE_URL must be an absolute https URL"));
         assert!(
             parsed_url.scheme() == "https" && parsed_url.host().is_some(),
             "RESEND_API_BASE_URL must be an absolute https URL"
         );
-        let request_timeout = request_timeout.map_or(
-            StdDuration::from_secs(DEFAULT_RESEND_REQUEST_TIMEOUT_SECS),
-            |value| parse_positive_seconds("RESEND_REQUEST_TIMEOUT_SECS", value),
-        );
+        let request_timeout = request_timeout.map_or(defaults.request_timeout, |value| {
+            parse_positive_seconds("RESEND_API_REQUEST_TIMEOUT_SECS", value)
+        });
         assert!(
-            request_timeout.as_secs() <= MAX_RESEND_REQUEST_TIMEOUT_SECS,
-            "RESEND_REQUEST_TIMEOUT_SECS must be at most {MAX_RESEND_REQUEST_TIMEOUT_SECS}"
+            request_timeout.as_secs() <= MAX_RESEND_API_REQUEST_TIMEOUT_SECS,
+            "RESEND_API_REQUEST_TIMEOUT_SECS must be at most {MAX_RESEND_API_REQUEST_TIMEOUT_SECS}"
         );
-        Some(Self {
-            api_key: SecretString::from(api_key),
+        let webhook_max_age_secs =
+            webhook_max_age_secs.map_or(defaults.webhook_max_age_secs, |value| {
+                let seconds: u64 = value
+                    .parse()
+                    .expect("RESEND_API_WEBHOOK_MAX_AGE_SECS must be a positive integer");
+                assert!(
+                    seconds > 0,
+                    "RESEND_API_WEBHOOK_MAX_AGE_SECS must be positive"
+                );
+                seconds
+            });
+        Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             request_timeout,
-        })
+            webhook_max_age_secs,
+        }
     }
 }
 
@@ -569,6 +521,25 @@ impl AppConfig {
             && self.smtp_from_address != "noreply@localhost"
     }
 
+    /// The absolute origin this deployment is reached at, e.g. `https://example.com`.
+    ///
+    /// For the values that have to be *given* to somebody outside the browser -- a webhook URL
+    /// pasted into a provider's dashboard, above all -- rather than linked from a page, where a
+    /// relative path would do.
+    ///
+    /// The scheme follows [`AppConfig::secure_cookies`] rather than a second environment variable:
+    /// both answer the one question of whether this deployment is served over TLS, and two
+    /// settings that can disagree is how a page comes to show a URL nobody can reach.
+    pub fn public_base_url(&self) -> String {
+        let domain = self.app_domain_name.trim().trim_end_matches('/');
+        let host = domain
+            .strip_prefix("https://")
+            .or_else(|| domain.strip_prefix("http://"))
+            .unwrap_or(domain);
+        let scheme = if self.secure_cookies { "https" } else { "http" };
+        format!("{scheme}://{host}")
+    }
+
     /// Is this the address of a system operator, and so entitled to the cross-company rollup?
     pub fn is_operator(&self, email: &EmailAddress) -> bool {
         self.operator_emails
@@ -675,8 +646,7 @@ impl AppConfig {
             webhook_max_age_secs: sendgrid_webhook_max_age_secs,
         });
 
-        let resend_inbound = ResendInboundConfig::from_env();
-        let resend_outbound = ResendOutboundConfig::from_env();
+        let resend_api = ResendApiConfig::from_env();
 
         let max_spam_score: f64 = env::var("MAX_SPAM_SCORE")
             .unwrap_or_else(|_| "5.0".to_string())
@@ -757,8 +727,7 @@ impl AppConfig {
             gcs,
             operator_emails,
             sendgrid_inbound,
-            resend_inbound,
-            resend_outbound,
+            resend_api,
             hydradb,
             hindsight,
         }
@@ -803,8 +772,7 @@ impl AppConfig {
             gcs: None,
             operator_emails: Vec::new(),
             sendgrid_inbound: None,
-            resend_inbound: None,
-            resend_outbound: None,
+            resend_api: ResendApiConfig::default(),
             hydradb: None,
             hindsight: None,
         }

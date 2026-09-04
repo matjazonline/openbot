@@ -49,7 +49,10 @@ use uuid::Uuid;
 
 use crate::{
     app_error::AppError,
-    entities::transport::{IntegrationCredentialKind, TransportKind},
+    entities::{
+        company_resend_api::ResendApiCredentialKind,
+        transport::{IntegrationCredentialKind, TransportKind},
+    },
 };
 
 const ENVELOPE_PREFIX: &str = "enc:v2";
@@ -115,6 +118,21 @@ impl CredentialContext {
                 installation_id.as_bytes().to_vec(),
                 transport.as_str().as_bytes().to_vec(),
                 credential_kind.as_str().as_bytes().to_vec(),
+            ],
+        }
+    }
+
+    /// The context for one company's Resend secret.
+    ///
+    /// The row is keyed by company alone, so the kind is what carries the weight here: it is the
+    /// only thing stopping the API key column and the signing secret column from being swapped
+    /// into each other and still opening.
+    pub fn company_resend_api_credential(company_id: Uuid, kind: ResendApiCredentialKind) -> Self {
+        Self {
+            scope: "company_resend_api_credential",
+            fields: vec![
+                company_id.as_bytes().to_vec(),
+                kind.as_str().as_bytes().to_vec(),
             ],
         }
     }

@@ -22,7 +22,10 @@ use crate::{
             AuthenticationResults, EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
             ingress::PendingEmailAttachments, parse_raw_mime_to_payload,
         },
-        resend::client::{ReceivedEmail, ResendApi, ResendError},
+        resend_api::{
+            accounts::{CompanyResendApiAccount, CompanyResendApiClients},
+            client::{ReceivedEmail, ResendApi, ResendApiError},
+        },
         storage::FileStorage,
     },
     entities::transport::{InboundEventErrorClass, InboundEventIgnoreReason, TransportKind},
@@ -54,22 +57,26 @@ struct ReceivedEventData {
     email_id: String,
 }
 
-pub struct ResendInboundDecoder {
-    api: Arc<dyn ResendApi>,
+pub struct ResendApiInboundDecoder {
+    /// The client is built per event, from the credential of the company the event belongs to.
+    /// The mail behind a webhook is fetched with the *receiving* account's key, so a decoder
+    /// holding one deployment-wide client would be a decoder that could read one tenant's mail
+    /// with another tenant's authority.
+    clients: Arc<CompanyResendApiClients>,
     config: Arc<AppConfig>,
     thread_use_cases: Arc<ThreadUseCases>,
     file_storage: Option<Arc<dyn FileStorage>>,
 }
 
-impl ResendInboundDecoder {
+impl ResendApiInboundDecoder {
     pub fn new(
-        api: Arc<dyn ResendApi>,
+        clients: Arc<CompanyResendApiClients>,
         config: Arc<AppConfig>,
         thread_use_cases: Arc<ThreadUseCases>,
         file_storage: Option<Arc<dyn FileStorage>>,
     ) -> Self {
         Self {
-            api,
+            clients,
             config,
             thread_use_cases,
             file_storage,
@@ -106,7 +113,7 @@ async fn fetch_raw_mime(
 }
 
 #[async_trait]
-impl InboundEventDecoder for ResendInboundDecoder {
+impl InboundEventDecoder for ResendApiInboundDecoder {
     fn transport(&self) -> TransportKind {
         TransportKind::Email
     }
@@ -119,7 +126,7 @@ impl InboundEventDecoder for ResendInboundDecoder {
     }
 }
 
-impl ResendInboundDecoder {
+impl ResendApiInboundDecoder {
     /// The decode, with one exit for every failure.
     ///
     /// Split from the trait method so each step can use `?` rather than nesting; the trait method
@@ -133,8 +140,21 @@ impl ResendInboundDecoder {
                 InboundEventIgnoreReason::UnsupportedEvent,
             ));
         };
-        let (inbound, attachments) =
-            read_mail(self.api.as_ref(), &self.config, event, &email_id).await?;
+        // Whose account this event arrived into. A company that has disconnected Resend, or
+        // switched it off, since the event was stored has no key to fetch the mail with -- and
+        // this deployment has no other key it would be right to use.
+        let account = self
+            .clients
+            .account_for(event.company_id)
+            .await
+            .map_err(Failure::from_app)?
+            .ok_or_else(|| {
+                Failure::terminal(
+                    InboundEventErrorClass::UnsupportedTransport,
+                    "this company has no enabled Resend integration".to_string(),
+                )
+            })?;
+        let (inbound, attachments) = read_mail(&account, &self.config, event, &email_id).await?;
 
         let preflight = self
             .thread_use_cases
@@ -180,25 +200,17 @@ impl ResendInboundDecoder {
 /// will check need a scripted API and a configuration, and nothing else -- no thread store, no
 /// channel, no tenant.
 async fn read_mail(
-    api: &dyn ResendApi,
+    account: &CompanyResendApiAccount,
     config: &AppConfig,
     event: &InboundEventRecord,
     email_id: &str,
 ) -> Result<(InboundMessage, PendingEmailAttachments), Failure> {
-    let Some(inbound_config) = config.resend_inbound.as_ref() else {
-        // The route that stored this event has since been switched off. Retrying would fail
-        // the same way, and silently ingesting under no configured authserv-id would be worse.
-        return Err(Failure::terminal(
-            InboundEventErrorClass::UnsupportedTransport,
-            "Resend inbound is not configured on this deployment".to_string(),
-        ));
-    };
-    let (email, raw_mime) = fetch_raw_mime(api, email_id).await?;
+    let (email, raw_mime) = fetch_raw_mime(account.api.as_ref(), email_id).await?;
 
     // The verdicts are the receiving MTA's, and only the one this deployment named may make
     // them. A message whose top `Authentication-Results` is missing, or belongs to anyone
     // else, arrives with every verdict `Unknown`, and `guard_ingress` refuses it below.
-    let results = AuthenticationResults::from_raw_mime(&raw_mime, &inbound_config.authserv_id);
+    let results = AuthenticationResults::from_raw_mime(&raw_mime, &account.authserv_id);
     // `received_for` is the address Resend accepted the mail *for*, which is the platform
     // address even when a mailing list rewrote `To:`. It is the routing fact; `to` is what the
     // message claims.
@@ -300,13 +312,13 @@ impl Failure {
     /// The retry decision is the provider error's own: a rate limit or an outage will read
     /// differently in a minute, and a 404 for an email id or a body this build cannot parse will
     /// not. Deciding it here from a status code would be the same table written twice.
-    fn from_provider(what: &str, error: ResendError) -> Self {
+    fn from_provider(what: &str, error: ResendApiError) -> Self {
         let retry = error.is_transient();
         let class = match &error {
-            ResendError::RateLimited { .. } => InboundEventErrorClass::RateLimited,
-            ResendError::Unavailable { .. } => InboundEventErrorClass::ProviderFault,
-            ResendError::Refused { .. } => InboundEventErrorClass::Routing,
-            ResendError::TooLarge { .. } | ResendError::Malformed { .. } => {
+            ResendApiError::RateLimited { .. } => InboundEventErrorClass::RateLimited,
+            ResendApiError::Unavailable { .. } => InboundEventErrorClass::ProviderFault,
+            ResendApiError::Refused { .. } => InboundEventErrorClass::Routing,
+            ResendApiError::TooLarge { .. } | ResendApiError::Malformed { .. } => {
                 InboundEventErrorClass::InvalidPayload
             }
         };

@@ -590,14 +590,17 @@ The same canonical path as above, entered differently. Worth its own trace becau
 things the SMTP listener knows for free -- the connecting IP, and the mail itself -- are not
 available at the moment the request arrives.
 
-1. **Authentication boundary:** `POST /webhooks/email/resend` verifies the Svix headers (`svix-id`,
-   `svix-timestamp`, `svix-signature`) as an HMAC-SHA256 over `{id}.{timestamp}.{raw body}` inside
-   a replay window, over the exact bytes and before anything parses them.
-2. **Tenant, and only the tenant:** the route resolves a company from the platform address the mail
-   was received for, because `inbound_events.company_id` is not nullable. A recipient that resolves
-   to no company is acknowledged and dropped rather than bounced: nothing has authenticated the
-   sender yet, so a bounce would be backscatter. Which channel, which ACL and whether the mail
-   authenticates are all decided later, with the message in hand.
+1. **Tenant, then authentication:** Resend is configured per company, so the endpoint is too:
+   `POST /webhooks/email/resend_api/{token}` carries a 32-character opaque token minted when that
+   company connected its account. The token selects the row -- and therefore the tenant and the
+   signing secret -- and nothing more; a token this deployment never issued, or one whose
+   integration is switched off, is a 404 with no query behind it.
+2. **Authentication boundary:** the request is then verified against *that company's* signing
+   secret: the Svix headers (`svix-id`, `svix-timestamp`, `svix-signature`) as an HMAC-SHA256 over
+   `{id}.{timestamp}.{raw body}` inside a replay window, over the exact bytes and before anything
+   parses them. A valid token with a wrong signature is refused exactly as an unsigned request is.
+   Which channel, which ACL and whether the mail authenticates are all decided later, with the
+   message in hand.
 3. **Durable placement:** the exact bytes go to `inbound_events` keyed by the *Resend mail id*, not
    the Svix delivery id, so a redelivery and a duplicate webhook for one mail collapse onto one
    row. The route then answers 2xx. It makes no provider call: the `email.received` payload carries
@@ -605,11 +608,15 @@ available at the moment the request arrives.
    them inline would earn a webhook timeout and a redelivery of half-done work.
 4. **Decode under lease:** the inbound worker claims the row and the email decoder fetches
    `GET /emails/receiving/{id}`, then the signed raw-MIME URL it names, bounded by the same 20 MiB
-   the SMTP listener enforces. One representation yields body, headers and attachments, so no two
+   the SMTP listener enforces. Both calls are made with the *receiving company's* API key, read
+   from `company_resend_api_integrations` at that moment; a company that has disconnected or disabled
+   its integration since the event was stored fails the event terminally rather than having its
+   mail fetched under somebody else's authority. One representation yields body, headers and attachments, so no two
    sources can disagree.
 5. **Authentication verdicts:** only the receiving MTA saw the connecting IP, so SPF cannot be
    re-derived here. The verdicts come from the *first* `Authentication-Results` header whose
-   `authserv-id` equals the configured value -- the trusted-upstream exception in
+   `authserv-id` equals the one stored for that company's own Resend account -- the
+   trusted-upstream exception in
    `src/adapters/smtp/AGENTS.md`, whose safety rests entirely on reading that one header and no
    other. Anything else leaves every verdict `Unknown` and `guard_ingress` refuses the message.
 6. **Canonical commit:** from here it is step 2 onward of the trace above, unchanged. The decoder
@@ -621,7 +628,10 @@ available at the moment the request arrives.
    404, an expired URL or a body past the bound is terminal, because asking again asks the same
    question. Outbound, the rendered `Message-ID` is replayed as the `Idempotency-Key`, so an
    ambiguous send is retryable rather than dead-lettered -- the one place a provider API can be
-   less conservative than SMTP submission, which has no such key.
+   less conservative than SMTP submission, which has no such key. Outbound also resolves per
+   delivery: a company with an enabled integration sends through its own Resend account, and one
+   without sends over the deployment's SMTP relay, as do platform notices, which belong to no
+   tenant.
 
 ### Slack inbound and reply
 

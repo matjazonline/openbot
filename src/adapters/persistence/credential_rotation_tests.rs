@@ -42,6 +42,15 @@ async fn isolated_connection() -> Option<PgConnection> {
                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                PRIMARY KEY (company_id, installation_id, credential_kind)
            ) ON COMMIT PRESERVE ROWS"#,
+        r#"CREATE TEMPORARY TABLE company_resend_api_integrations (
+               company_id UUID PRIMARY KEY,
+               webhook_token TEXT NOT NULL,
+               api_key TEXT NOT NULL,
+               signing_secret TEXT NOT NULL,
+               authserv_id TEXT NOT NULL,
+               enabled BOOLEAN NOT NULL DEFAULT TRUE,
+               updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+           ) ON COMMIT PRESERVE ROWS"#,
     ] {
         connection
             .execute(statement)
@@ -90,6 +99,36 @@ async fn insert_integration_credential(
     .await
     .expect("the integration credential fixture is insertable");
     (installation_id, context)
+}
+
+/// One company's Resend row: two sealed secrets in two columns, as the product stores them.
+async fn insert_resend_api_integration(
+    connection: &mut PgConnection,
+    cipher: &CredentialCipher,
+    company_id: Uuid,
+    api_key: &str,
+    signing_secret: &str,
+) {
+    let seal = |kind, secret: &str| {
+        cipher
+            .seal_envelope(
+                &CredentialContext::company_resend_api_credential(company_id, kind),
+                &SecretString::from(secret.to_string()),
+            )
+            .unwrap()
+    };
+    sqlx::query(
+        r#"INSERT INTO company_resend_api_integrations
+               (company_id, webhook_token, api_key, signing_secret, authserv_id)
+           VALUES ($1, $2, $3, $4, 'resend.com')"#,
+    )
+    .bind(company_id)
+    .bind(Uuid::new_v4().simple().to_string())
+    .bind(seal(ResendApiCredentialKind::ApiKey, api_key))
+    .bind(seal(ResendApiCredentialKind::SigningSecret, signing_secret))
+    .execute(connection)
+    .await
+    .expect("the Resend integration fixture is insertable");
 }
 
 async fn insert_credential(
@@ -407,4 +446,96 @@ async fn stored_envelope(
     .fetch_one(connection)
     .await
     .expect("the integration credential is readable")
+}
+
+/// The Resend row is the third table in the inventory, and its two columns are two credentials.
+/// A rotation that converged on the other two while leaving every tenant's provider key on a
+/// retired version would report itself complete, which is exactly the failure this pins down.
+#[tokio::test]
+async fn rotation_covers_both_resend_api_columns_of_one_row() {
+    let Some(mut connection) = isolated_connection().await else {
+        return;
+    };
+    let (old_writer, rotator) = rotation_ciphers();
+    let company_id = Uuid::new_v4();
+    insert_resend_api_integration(
+        &mut connection,
+        &old_writer,
+        company_id,
+        "re_api_key",
+        "whsec_signing",
+    )
+    .await;
+
+    let status = credential_status_on_connection(&mut connection, &rotator)
+        .await
+        .unwrap();
+    assert_eq!(status.total_rows, 2, "one row holds two credentials");
+    assert_eq!(status.old_rows, 2);
+
+    let report = rotate_locked(&mut connection, &rotator).await.unwrap();
+    assert!(report.complete);
+    assert_eq!(report.rotated, 2);
+
+    // Each column rotated in place, still opening under its own context: rewrapping the API key
+    // into the signing secret's column would be a swap this assertion would catch.
+    for (kind, expected) in [
+        (ResendApiCredentialKind::ApiKey, "re_api_key"),
+        (ResendApiCredentialKind::SigningSecret, "whsec_signing"),
+    ] {
+        let stored: String = sqlx::query_scalar(&format!(
+            "SELECT {} FROM company_resend_api_integrations WHERE company_id = $1",
+            kind.as_str()
+        ))
+        .bind(company_id)
+        .fetch_one(&mut connection)
+        .await
+        .expect("the rotated credential is readable");
+        assert_eq!(
+            rotator
+                .open_envelope(
+                    &CredentialContext::company_resend_api_credential(company_id, kind),
+                    &stored
+                )
+                .unwrap()
+                .expose_secret(),
+            expected,
+            "{kind:?}"
+        );
+    }
+}
+
+/// The keyset for this table is `(company_id, kind)`, not the row's primary key alone: a cursor
+/// that only carried the company would step over the second column of every row it visited.
+#[tokio::test]
+async fn the_resend_api_keyset_walks_both_columns_of_every_row() {
+    let Some(mut connection) = isolated_connection().await else {
+        return;
+    };
+    let (old_writer, rotator) = rotation_ciphers();
+    for index in 0..60_u16 {
+        insert_resend_api_integration(
+            &mut connection,
+            &old_writer,
+            Uuid::from_u128(u128::from(index) + 1),
+            "re_api_key",
+            "whsec_signing",
+        )
+        .await;
+    }
+
+    let first_batch = fetch_credential_batch(
+        &mut connection,
+        CredentialTable::CompanyResendApiIntegrations,
+        None,
+    )
+    .await
+    .unwrap();
+    // 120 credentials, taken a bounded batch at a time rather than two per fetched row.
+    assert_eq!(first_batch.len(), CREDENTIAL_BATCH_SIZE as usize);
+
+    let report = rotate_locked(&mut connection, &rotator).await.unwrap();
+    assert!(report.complete);
+    assert_eq!(report.rotated, 120);
+    assert_eq!(report.final_status.active_rows, 120);
 }

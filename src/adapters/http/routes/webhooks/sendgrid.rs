@@ -392,7 +392,7 @@ mod tests {
     use crate::{
         app_error::AppResult,
         entities::{channel::Channel, company::Company},
-        infra::config::AppConfig,
+        infra::config::{AppConfig, ResendApiConfig},
         use_cases::{
             channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
             company::{CompanyPersistence, CompanyWrite},
@@ -1166,8 +1166,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
-            resend_inbound: None,
-            resend_outbound: None,
+            resend_api: ResendApiConfig::default(),
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
@@ -1322,6 +1321,21 @@ mod tests {
                         companies: Mutex::new(vec![]),
                     }),
                     Arc::new(MockCompanyInvitePersistence {}),
+                ),
+            ),
+            // The same lazy pool again: a SendGrid request never touches a Resend integration.
+            company_resend_api_use_cases: Arc::new(
+                crate::use_cases::company_resend_api::CompanyResendApiUseCases::new(Arc::new(
+                    crate::adapters::persistence::PostgresPersistence::new(
+                        sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                            .expect("valid lazy pool url"),
+                    ),
+                )),
+            ),
+            company_resend_api_accounts: Arc::new(
+                crate::adapters::persistence::PostgresPersistence::new(
+                    sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                        .expect("valid lazy pool url"),
                 ),
             ),
             channel_use_cases: channel_use_cases.clone(),

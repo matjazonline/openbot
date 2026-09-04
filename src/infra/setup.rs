@@ -4,7 +4,9 @@ use crate::{
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::email::{EmailRenderer, EmailSender, MailTransport, SmtpConfirmationSender},
-        resend::{ReqwestResendClient, ResendApi, ResendInboundDecoder, ResendMailTransport},
+        resend_api::{
+            CompanyResendApiClients, ResendApiCompanyTransports, ResendApiInboundDecoder,
+        },
         smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
@@ -34,6 +36,7 @@ use crate::{
         channel::ChannelUseCases,
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
+        company_resend_api::CompanyResendApiUseCases,
         memory::MemoryUseCases,
         schedule::ScheduleUseCases,
         thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
@@ -47,27 +50,11 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
     let agent_run_timeout = agent_run_timeout_from_env();
 
-    // One client for both directions. The outbound credential is what buys the inbound calls too:
-    // reading a received mail is an authenticated API request, so a deployment that receives
-    // through Resend but sends over SMTP still needs the key configured.
-    let resend_api: Option<Arc<dyn ResendApi>> = match config.resend_outbound.as_ref() {
-        Some(outbound) => Some(Arc::new(
-            ReqwestResendClient::from_config(outbound)
-                .map_err(|error| anyhow::anyhow!("Could not build the Resend client: {error}"))?,
-        )),
-        None => None,
-    };
-    // Config-selected rather than either/or in code: a deployment with no Resend key keeps the
-    // relay it has, including the loopback one the local stack runs on.
-    let mail_transport: Arc<dyn MailTransport> = match resend_api.clone() {
-        Some(api) => {
-            tracing::info!("Sending mail through the Resend API");
-            Arc::new(ResendMailTransport::new(api))
-        }
-        None => {
-            LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?
-        }
-    };
+    // The relay every company that has *not* connected a provider account of its own sends
+    // through, and the one every platform notice sends through whatever its tenants have
+    // configured -- a confirmation code belongs to the deployment, not to a company.
+    let deployment_mail_transport: Arc<dyn MailTransport> =
+        LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
 
     let sessions = Arc::new(SessionAuthority::new(&config));
 
@@ -143,11 +130,20 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             account_changes: postgres_arc.clone(),
             codes: Arc::new(SmtpConfirmationSender::new(
                 config.clone(),
-                mail_transport.clone(),
+                deployment_mail_transport.clone(),
             )),
             config: config.clone(),
         });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
+    let company_resend_api_use_cases =
+        Arc::new(CompanyResendApiUseCases::new(postgres_arc.clone()));
+    // One resolver, shared by the three places that act as a company at Resend: the delivery
+    // worker sending its mail, the decoder fetching the mail its webhook announced, and nothing
+    // else. It holds the HTTP pool; the credentials stay in the database until each call.
+    let resend_api_clients = Arc::new(CompanyResendApiClients::new(
+        postgres_arc.clone(),
+        config.resend_api.clone(),
+    )?);
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
     let channel_use_cases = Arc::new(
@@ -215,29 +211,20 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_memory(memory_coordinator),
     );
 
-    // A decoder is registered only for a transport whose route can actually enqueue an event.
-    // Registering the email decoder without Resend inbound configured would advertise a reader for
-    // rows nothing writes; leaving it out when Resend *is* configured would leave every stored
-    // event unclaimed, so both halves are the same condition.
-    let mut inbound_decoders = InboundEventDecoderRegistry::new();
-    if config.resend_inbound.is_some() {
-        let api = resend_api.clone().ok_or_else(|| {
-            anyhow::anyhow!(
-                "RESEND_INBOUND_ENABLED=true requires RESEND_API_KEY: the mail behind a webhook is \
-                 fetched with an authenticated API call"
-            )
+    // Registered unconditionally now that Resend is configured per company: any tenant may connect
+    // an account at any time, and a decoder that was left out at boot would leave that company's
+    // stored events unclaimed until the next deploy. A decoder for a company with no account
+    // fails the event terminally rather than silently, which is the honest answer.
+    let inbound_decoders = InboundEventDecoderRegistry::new()
+        .register(Arc::new(ResendApiInboundDecoder::new(
+            resend_api_clients.clone(),
+            config.clone(),
+            thread_use_cases.clone(),
+            file_storage.clone(),
+        )))
+        .map_err(|error| {
+            anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
         })?;
-        inbound_decoders = inbound_decoders
-            .register(Arc::new(ResendInboundDecoder::new(
-                api,
-                config.clone(),
-                thread_use_cases.clone(),
-                file_storage.clone(),
-            )))
-            .map_err(|error| {
-                anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
-            })?;
-    }
     let inbound_event_wakeups = InboundEventWakeups::new();
     let inbound_event_worker = Arc::new(
         InboundEventWorker::new(
@@ -261,7 +248,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
                 // The same renderer instance the producers freeze parts with, so a queued part and
                 // a re-render can never disagree about the deployment's own domain.
                 email_renderer,
-                Arc::new(EmailSender::new(mail_transport, thread_use_cases.clone())),
+                Arc::new(EmailSender::new(
+                    Arc::new(ResendApiCompanyTransports::new(
+                        resend_api_clients.clone(),
+                        deployment_mail_transport.clone(),
+                    )),
+                    thread_use_cases.clone(),
+                )),
             )
             .map_err(|error| anyhow::anyhow!("Could not register the email transport: {error}"))?,
     );
@@ -281,6 +274,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
+        company_resend_api_use_cases,
+        company_resend_api_accounts: postgres_arc.clone(),
         channel_use_cases,
         schedule_use_cases,
         agent_use_cases: Arc::new(agent_use_cases),

@@ -4132,6 +4132,7 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         draft: None,
         error: None,
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4198,6 +4199,7 @@ fn rejected_company_edit_gets_key_status_only_from_stored_metadata() {
         draft: Some(&draft),
         error: Some("save refused"),
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4224,6 +4226,7 @@ fn company_member_can_open_company_without_edit_controls_or_api_key() {
         draft: None,
         error: None,
         editable: false,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4247,6 +4250,7 @@ fn the_company_form_picks_a_picture_and_saves_it_with_the_rest_of_the_settings()
         draft: None,
         error: None,
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4286,6 +4290,7 @@ fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
         draft: Some(&draft),
         error: Some("Slug is taken"),
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4328,6 +4333,7 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         draft: Some(&draft),
         error: Some("Slug is taken"),
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Settings,
     });
 
@@ -4450,6 +4456,7 @@ fn the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon() 
         draft: None,
         error: None,
         editable: true,
+        resend_api_section: "",
         body: CompanyPaneBody::Team(&tab),
     });
 
@@ -5310,10 +5317,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         activity: no_activity(),
         detail_html: "",
     });
-    assert!(
-        mailbox_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Mailbox</h2>"##)
-    );
+    assert!(mailbox_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Mailbox</h2>"##
+    ));
 
     let channels_html = channel_settings_page(&ChannelSettingsPage {
         user: &user,
@@ -5326,10 +5332,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(
-        channels_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Channels</h2>"##)
-    );
+    assert!(channels_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Channels</h2>"##
+    ));
 
     let agents_html = agent_settings_page(&AgentSettingsPage {
         user: &user,
@@ -5343,9 +5348,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(
-        agents_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Agents</h2>"##)
-    );
+    assert!(agents_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Agents</h2>"##
+    ));
 
     let schedules_html = schedules_page(&SchedulesPage {
         user: &user,
@@ -5357,10 +5362,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         runs_html: "",
         pane_html: "",
     });
-    assert!(
-        schedules_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Schedules</h2>"##)
-    );
+    assert!(schedules_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Schedules</h2>"##
+    ));
 
     let tasks_filter = TaskFilter::new(None, None, false, None, None);
     let tasks_html = task_monitor_page(&TaskMonitorPage {
@@ -5376,9 +5380,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(
-        tasks_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Tasks</h2>"##)
-    );
+    assert!(tasks_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Tasks</h2>"##
+    ));
 
     let deliveries_filter = delivery_filter();
     let deliveries_html = deliveries_page(&DeliveriesPage {
@@ -5394,10 +5398,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(
-        deliveries_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Deliveries</h2>"##)
-    );
+    assert!(deliveries_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Deliveries</h2>"##
+    ));
 
     let dashboard_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -5406,10 +5409,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(
-        dashboard_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Dashboard</h2>"##)
-    );
+    assert!(dashboard_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Dashboard</h2>"##
+    ));
 
     let dashboard_global_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -5418,10 +5420,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(
-        dashboard_global_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Dashboard</h2>"##)
-    );
+    assert!(dashboard_global_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Dashboard</h2>"##
+    ));
 
     let companies_html = company_settings_page(&CompanySettingsPage {
         user: &user,
@@ -5432,10 +5433,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         rail_company: Some(&company),
         pane_html: "",
     });
-    assert!(
-        companies_html
-            .contains(r##"<h2 class="text-base font-semibold leading-tight">Companies</h2>"##)
-    );
+    assert!(companies_html.contains(
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Companies</h2>"##
+    ));
 }
 
 fn profile_account() -> User {

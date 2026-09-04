@@ -4,6 +4,6 @@ pub mod memory;
 pub mod monitoring;
 pub mod persistence;
 pub mod protocols;
-pub mod resend;
+pub mod resend_api;
 pub mod smtp;
 pub mod storage;

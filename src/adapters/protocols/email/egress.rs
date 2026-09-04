@@ -38,8 +38,8 @@ use crate::{
 };
 
 use super::{
-    EmailChannelSelectorParser, EmailRecipientDestination, MailHeader, MailMessage,
-    MailSendOutcome, MailTransport,
+    CompanyMailTransports, EmailChannelSelectorParser, EmailRecipientDestination, MailHeader,
+    MailMessage, MailSendOutcome,
 };
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
@@ -452,20 +452,24 @@ fn reply_subject(subject: &str) -> String {
 }
 
 /// Posts one frozen part: in process when the recipient is one of this deployment's own channels,
-/// and over SMTP otherwise.
+/// and through the sending company's own transport otherwise.
 ///
-/// The transport is shared, not built per message: one `lettre` relay holds its TLS configuration,
-/// its timeouts and its connection reuse, and constructing a new one per send would discard all
-/// three and open a fresh TLS handshake for every mail.
+/// Transports are resolved, not built per message: a `lettre` relay holds its TLS configuration,
+/// its timeouts and its connection reuse, and a provider client holds its connection pool, so
+/// constructing either per send would discard all of that and open a fresh handshake for every
+/// mail. What varies per delivery is only *which* of them this company sends through.
 pub struct EmailSender {
-    transport: Arc<dyn MailTransport>,
+    transports: Arc<dyn CompanyMailTransports>,
     internal: Arc<dyn InternalMailRelay>,
 }
 
 impl EmailSender {
-    pub fn new(transport: Arc<dyn MailTransport>, internal: Arc<dyn InternalMailRelay>) -> Self {
+    pub fn new(
+        transports: Arc<dyn CompanyMailTransports>,
+        internal: Arc<dyn InternalMailRelay>,
+    ) -> Self {
         Self {
-            transport,
+            transports,
             internal,
         }
     }
@@ -529,7 +533,26 @@ impl TransportSender for EmailSender {
         }
         let message_id = email.message_id.clone();
 
-        match self.transport.send(email.into_mail_message()).await {
+        // Which account this company sends through. A read failure is retryable and nothing else:
+        // the alternative -- sending through the deployment relay because the lookup failed --
+        // puts one tenant's mail out under another sender identity.
+        let transport = match self.transports.transport_for(delivery.company_id()).await {
+            Ok(transport) => transport,
+            Err(error) => {
+                warn!(
+                    delivery_id = %delivery.id,
+                    correlation_id = %delivery.correlation_id,
+                    %error,
+                    "Could not resolve the transport a company sends through"
+                );
+                return ProviderSendOutcome::Retryable {
+                    class: FailureClass::Internal,
+                    detail: detail(&error.to_string()),
+                };
+            }
+        };
+
+        match transport.send(email.into_mail_message()).await {
             // The `Message-ID` this renderer chose is the provider's key unless the provider says
             // otherwise: it is the value a recipient's `References:` header will name when they
             // reply, and it is what an inbound reply resolves back to this thread through. SMTP

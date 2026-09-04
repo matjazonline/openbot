@@ -18,7 +18,9 @@ is the request signature -- an HMAC over the exact bytes, inside a replay window
 is the `authserv-id`, and that part is easy to get wrong: a sender composes the message, so a
 message can arrive already carrying `Authentication-Results: <your provider>; dmarc=pass`. Read only
 the **first** such header -- a receiving MTA prepends its own above whatever the message arrived
-with -- and require its `authserv-id` to equal a configured value. Scanning for any header that
+with -- and require its `authserv-id` to equal the value stored for the account that received the
+mail. Configured *per tenant*, in `company_resend_api_integrations`: a deployment-wide id would let one
+company's provider account assert verdicts on another company's mail. Scanning for any header that
 claims a pass authenticates every forgery it is shown. A missing, unparsable, or foreign header
 leaves every verdict `Unknown`, which the ingress guard already refuses.
 

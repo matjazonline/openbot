@@ -64,19 +64,24 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
-            <div class="border-t border-base-300 p-2">
-                <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
-                    hx-get="/ui/schedules/new?company_id={company_id}"
-                    hx-target="#schedule-pane" hx-swap="outerHTML" hx-sync="#schedule-pane:replace"
-                    hx-push-url="/ui/schedules?company_id={company_id}&new=1">{plus_glyph} New Schedule</button>
-            </div>
         </aside>
         <div id="schedules-workspace"{empty} class="ui-pane-detail ui-split flex flex-1 min-w-0">
             {runs_html}
             {pane_html}
         </div>
         "##,
-        header = sidebar_header("Schedules", "Cron triggers and automated agent runs."),
+        header = sidebar_header_with_action(
+            "Schedules",
+            "Cron triggers and automated agent runs.",
+            &format!(
+                r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
+                    hx-get="/ui/schedules/new?company_id={company_id}"
+                    hx-target="#schedule-pane" hx-swap="outerHTML" hx-sync="#schedule-pane:replace"
+                    hx-push-url="/ui/schedules?company_id={company_id}&new=1">{plus_glyph} New Schedule</button>"##,
+                company_id = company.id,
+                plus_glyph = icon(Icon::Plus, BUTTON_ICON),
+            ),
+        ),
         // With no schedule resolved there is nothing on the right to show, so a phone opens on
         // the list. The create form arrives with one still selected, and is a detail worth
         // opening on.
@@ -86,8 +91,6 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
             ""
         },
         list_html = list_html,
-        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
-        company_id = company.id,
         runs_html = page.runs_html,
         pane_html = page.pane_html,
     );

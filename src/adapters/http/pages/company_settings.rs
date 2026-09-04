@@ -181,6 +181,10 @@ pub struct CompanyEditPane<'a> {
     pub error: Option<&'a str>,
     /// Only owners may change company-level configuration.
     pub editable: bool,
+    /// The Resend panel, already rendered — see [`company_resend_api_section`]. It is written by its
+    /// own requests and arrives pre-rendered for the same reason the team tab does: this pane's
+    /// job is to give it somewhere to sit, not to know what a provider account is.
+    pub resend_api_section: &'a str,
     /// Which tab the pane is open on, and — for the team — what it is showing.
     pub body: CompanyPaneBody<'a>,
 }
@@ -407,10 +411,12 @@ fn company_settings_body(
                             hx-push-url="/ui/companies">Delete Company</button>
                     </div>
                 </form>
+                {resend_api_section}
             </div>
         "##,
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
+        resend_api_section = pane.resend_api_section,
         workspace_links = workspace_links(company_id, pane.counts),
         fields = company_fields(&draft, configured),
         memory_status = memory_status(pane.company.id, memory, configured),

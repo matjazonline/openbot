@@ -7,25 +7,27 @@ use axum::{
 };
 use base64::Engine;
 use ring::hmac;
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use super::*;
 use crate::{
-    adapters::{monitoring::InMemoryMonitor, resend::signature::decode_signing_secret},
+    adapters::{monitoring::InMemoryMonitor, resend_api::signature::decode_signing_secret},
     app_error::AppResult,
     entities::{
-        company::{Company, CompanyAccess},
+        company_resend_api::{ResendApiAccountCredentials, ResendApiInboundCredentials},
         transport::InboundEventId,
+        value_objects::AuthservId,
     },
-    infra::config::ResendInboundConfig,
     transport::InboundEventStoreOutcome,
-    use_cases::company::{CompanyPersistence, CompanyWrite},
 };
 
 const SECRET: &str = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
-const COMPANY_SLUG: &str = "acme";
+/// Another tenant's secret, structurally valid and wrong.
+const OTHER_SECRET: &str = "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+const UNKNOWN_TOKEN: &str = "ffffffffffffffffffffffffffffffff";
 
 /// Records what a verified webhook decided to store.
 #[derive(Default)]
@@ -53,138 +55,84 @@ impl InboundEventInbox for RecordingInbox {
     }
 }
 
-/// One company, found by slug. Every other method is a path these tests do not reach.
-struct OneCompany {
-    company: Option<Company>,
+/// One company's integration, found by its token -- and nothing found by any other token.
+struct OneIntegration {
+    company_id: Uuid,
+    token: String,
+    signing_secret: String,
+    enabled: bool,
 }
 
 #[async_trait]
-impl CompanyPersistence for OneCompany {
-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-        Ok(self
-            .company
-            .as_ref()
-            .filter(|company| company.slug.as_str() == slug)
-            .cloned())
-    }
-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!("the webhook never creates a company")
-    }
-    async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
-        unimplemented!("the webhook resolves by slug")
-    }
-    async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-        unimplemented!("the webhook has no user")
-    }
-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!("the webhook never writes a company")
-    }
-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
-        unimplemented!("the webhook never deletes a company")
-    }
-    async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
-        unimplemented!("the webhook resolves no team")
-    }
-    async fn list_company_team_accounts(
+impl CompanyResendApiAccounts for OneIntegration {
+    async fn inbound_credentials(
         &self,
-        _company_id: Uuid,
-    ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-        unimplemented!("the webhook resolves no team")
+        token: &ResendApiWebhookToken,
+    ) -> AppResult<Option<ResendApiInboundCredentials>> {
+        // Disabled reads as absent, the way the store's own `AND enabled` does.
+        if !self.enabled || token.as_str() != self.token {
+            return Ok(None);
+        }
+        Ok(Some(ResendApiInboundCredentials {
+            company_id: self.company_id,
+            signing_secret: SecretString::from(self.signing_secret.clone()),
+        }))
     }
-    async fn list_model_connections(
-        &self,
-        _company_id: Uuid,
-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-        unimplemented!("the webhook runs no agent")
-    }
-    async fn model_api_key(
-        &self,
-        _company_id: Uuid,
-        _provider: &crate::entities::value_objects::ModelProvider,
-    ) -> AppResult<Option<String>> {
-        unimplemented!("the webhook runs no agent")
-    }
-    async fn replace_model_connections_for_user(
-        &self,
-        _user_id: Uuid,
-        _company_id: Uuid,
-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-    ) -> AppResult<()> {
-        unimplemented!("the webhook never writes a connection")
-    }
-    async fn company_access(
-        &self,
-        _user_id: Uuid,
-        _company_id: Uuid,
-    ) -> AppResult<Option<CompanyAccess>> {
-        unimplemented!("the webhook is not a signed-in route")
-    }
-}
 
-fn company() -> Company {
-    Company {
-        channel_defaults: Default::default(),
-        id: Uuid::new_v4(),
-        user_id: Uuid::new_v4(),
-        name: "Acme Corp".to_string(),
-        slug: COMPANY_SLUG.into(),
-        enable_llm_spam_guardrail: None,
-        avatar_url: None,
-        memory_provider: None,
-        created_at: chrono::Utc::now(),
+    async fn account_credentials(
+        &self,
+        _company_id: Uuid,
+    ) -> AppResult<Option<ResendApiAccountCredentials>> {
+        unimplemented!("the webhook makes no provider call")
     }
 }
 
 struct Harness {
-    state: ResendWebhookState,
+    state: ResendApiWebhookState,
     inbox: Arc<RecordingInbox>,
+    company_id: Uuid,
 }
 
 impl Harness {
-    /// A deployment with Resend inbound switched on and one company that owns `acme.localhost`.
-    fn enabled() -> Self {
-        Self::new(
-            Some(ResendInboundConfig {
-                signing_secret: SecretString::from(SECRET),
-                webhook_max_age_secs: 300,
-                authserv_id: "resend.com".to_string(),
-            }),
-            Some(company()),
-        )
+    /// A company that has connected Resend, reachable at [`TOKEN`].
+    fn connected() -> Self {
+        Self::new(true)
     }
 
-    fn new(inbound: Option<ResendInboundConfig>, company: Option<Company>) -> Self {
+    fn new(enabled: bool) -> Self {
         let inbox = Arc::new(RecordingInbox::default());
+        let company_id = Uuid::new_v4();
         let config = Arc::new(AppConfig {
             app_domain_name: "localhost".to_string(),
-            resend_inbound: inbound,
             ..AppConfig::for_test()
         });
         Self {
-            state: ResendWebhookState {
+            state: ResendApiWebhookState {
                 config,
-                companies: Arc::new(CompanyUseCases::new(Arc::new(OneCompany { company }))),
+                accounts: Arc::new(OneIntegration {
+                    company_id,
+                    token: TOKEN.to_string(),
+                    signing_secret: SECRET.to_string(),
+                    enabled,
+                }),
                 inbox: inbox.clone(),
                 wakeups: InboundEventWakeups::new(),
                 monitoring: Arc::new(InMemoryMonitor::new()),
             },
             inbox,
+            company_id,
         }
     }
 
-    async fn post(&self, body: &str, headers: Vec<(&str, String)>) -> StatusCode {
+    async fn post_to(&self, token: &str, body: &str, headers: Vec<(&str, String)>) -> StatusCode {
         let mut request = Request::builder()
             .method("POST")
-            .uri("/webhooks/email/resend")
+            .uri(format!("{RESEND_API_WEBHOOK_PATH}/{token}"))
             .header("content-type", "application/json");
         for (name, value) in headers {
             request = request.header(name, value);
         }
-        Router::new()
-            .route(
-                "/webhooks/email/resend",
-                axum::routing::post(resend_inbound_webhook),
-            )
+        test_router()
             .with_state(self.state.clone())
             .oneshot(request.body(Body::from(body.to_string())).unwrap())
             .await
@@ -192,7 +140,11 @@ impl Harness {
             .status()
     }
 
-    /// A correctly signed delivery of `body`.
+    async fn post(&self, body: &str, headers: Vec<(&str, String)>) -> StatusCode {
+        self.post_to(TOKEN, body, headers).await
+    }
+
+    /// A correctly signed delivery of `body` to this company's own endpoint.
     async fn post_signed(&self, body: &str) -> StatusCode {
         self.post(body, signed_headers("msg_1", body, SECRET)).await
     }
@@ -216,6 +168,18 @@ impl Harness {
             })
             .collect()
     }
+}
+
+/// The handler under its real path, over the sub-state alone rather than a whole `AppState`.
+///
+/// Mounted from `RESEND_API_WEBHOOK_PATH` -- the same constant the router and the settings page use --
+/// so a change to the path shape cannot pass these tests while breaking the URL operators paste
+/// into Resend.
+fn test_router() -> Router<ResendApiWebhookState> {
+    Router::new().route(
+        &format!("{RESEND_API_WEBHOOK_PATH}/{{token}}"),
+        axum::routing::post(resend_api_inbound_webhook),
+    )
 }
 
 fn signed_headers(id: &str, body: &str, secret: &str) -> Vec<(&'static str, String)> {
@@ -251,29 +215,53 @@ fn received_event(email_id: &str, received_for: &str) -> String {
 }
 
 #[tokio::test]
-async fn the_route_does_not_exist_when_resend_inbound_is_not_configured() {
-    let harness = Harness::new(None, Some(company()));
+async fn a_token_no_company_holds_has_no_endpoint() {
+    let harness = Harness::connected();
     let body = received_event("email-1", "support@acme.localhost");
 
+    for token in [
+        // Nobody's token.
+        UNKNOWN_TOKEN,
+        // Not a token this application would ever have issued: refused without a lookup.
+        "not-a-token",
+        "0123456789ABCDEF0123456789ABCDEF",
+    ] {
+        assert_eq!(
+            harness
+                .post_to(token, &body, signed_headers("msg_1", &body, SECRET))
+                .await,
+            StatusCode::NOT_FOUND,
+            "{token}"
+        );
+    }
+    assert!(harness.stored().is_empty());
+}
+
+#[tokio::test]
+async fn a_switched_off_integration_has_no_endpoint_either() {
+    let harness = Harness::new(false);
+    let body = received_event("email-1", "support@acme.localhost");
+
+    // The same 404 an unknown token gets, deliberately: whether a token exists is not something
+    // this endpoint tells an unauthenticated caller.
     assert_eq!(harness.post_signed(&body).await, StatusCode::NOT_FOUND);
     assert!(harness.stored().is_empty());
 }
 
 #[tokio::test]
 async fn an_unsigned_or_wrongly_signed_request_stores_nothing() {
-    let harness = Harness::enabled();
+    let harness = Harness::connected();
     let body = received_event("email-1", "support@acme.localhost");
 
     assert_eq!(
         harness.post(&body, Vec::new()).await,
         StatusCode::UNAUTHORIZED
     );
+    // A valid token proves nothing on its own: signed with another company's secret, this is the
+    // same refusal as no signature at all.
     assert_eq!(
         harness
-            .post(
-                &body,
-                signed_headers("msg_1", &body, "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-            )
+            .post(&body, signed_headers("msg_1", &body, OTHER_SECRET))
             .await,
         StatusCode::UNAUTHORIZED
     );
@@ -290,8 +278,8 @@ async fn an_unsigned_or_wrongly_signed_request_stores_nothing() {
 }
 
 #[tokio::test]
-async fn a_signed_received_event_is_stored_under_its_tenant_and_keyed_by_the_mail() {
-    let harness = Harness::enabled();
+async fn a_signed_received_event_is_stored_under_the_tenant_the_token_names() {
+    let harness = Harness::connected();
     let body = received_event("email-1", "support@acme.localhost");
 
     assert_eq!(harness.post_signed(&body).await, StatusCode::OK);
@@ -300,6 +288,8 @@ async fn a_signed_received_event_is_stored_under_its_tenant_and_keyed_by_the_mai
     assert_eq!(stored.len(), 1);
     let event = &stored[0];
     assert_eq!(event.transport, TransportKind::Email);
+    // The tenant is the one whose endpoint this was, not one derived from an address in the body.
+    assert_eq!(event.company_id, harness.company_id);
     // Email is a deployment transport: naming an installation here would fail the schema's own
     // coherence check.
     assert_eq!(event.installation_id, None);
@@ -309,8 +299,30 @@ async fn a_signed_received_event_is_stored_under_its_tenant_and_keyed_by_the_mai
 }
 
 #[tokio::test]
+async fn the_recipient_in_the_body_does_not_decide_the_tenant() {
+    let harness = Harness::connected();
+    // Every address here belongs to somebody else, or to nobody. The endpoint is what says whose
+    // mail this is, so the event still lands under this company.
+    let body = serde_json::json!({
+        "type": "email.received",
+        "data": {
+            "email_id": "email-1",
+            "from": "someone@example.com",
+            "to": ["list@example.com"],
+            "received_for": ["support@stranger.localhost"]
+        }
+    })
+    .to_string();
+
+    assert_eq!(harness.post_signed(&body).await, StatusCode::OK);
+    let stored = harness.stored();
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].company_id, harness.company_id);
+}
+
+#[tokio::test]
 async fn the_stored_facts_name_the_delivery_and_never_the_signature() {
-    let harness = Harness::enabled();
+    let harness = Harness::connected();
     let body = received_event("email-1", "support@acme.localhost");
     harness.post_signed(&body).await;
 
@@ -330,7 +342,7 @@ async fn the_stored_facts_name_the_delivery_and_never_the_signature() {
 
 #[tokio::test]
 async fn a_redelivery_of_the_same_mail_is_accepted_and_stored_once() {
-    let harness = Harness::enabled();
+    let harness = Harness::connected();
     let body = received_event("email-1", "support@acme.localhost");
 
     assert_eq!(harness.post_signed(&body).await, StatusCode::OK);
@@ -346,7 +358,7 @@ async fn a_redelivery_of_the_same_mail_is_accepted_and_stored_once() {
 
 #[tokio::test]
 async fn every_other_event_type_is_acknowledged_and_dropped() {
-    let harness = Harness::enabled();
+    let harness = Harness::connected();
     for event_type in [
         "email.delivered",
         "email.bounced",
@@ -370,49 +382,8 @@ async fn every_other_event_type_is_acknowledged_and_dropped() {
 }
 
 #[tokio::test]
-async fn a_recipient_belonging_to_no_company_is_acknowledged_and_dropped() {
-    let harness = Harness::enabled();
-    for recipient in [
-        // A platform address whose company slug is nobody's.
-        "support@stranger.localhost",
-        // Not a platform address at all.
-        "someone@example.com",
-    ] {
-        let body = received_event("email-1", recipient);
-        // Deliberately not a bounce: nothing has authenticated this sender yet, so answering the
-        // envelope address would be backscatter.
-        assert_eq!(
-            harness.post_signed(&body).await,
-            StatusCode::OK,
-            "{recipient}"
-        );
-    }
-    assert!(harness.stored().is_empty());
-}
-
-#[tokio::test]
-async fn the_tenant_comes_from_what_the_mail_was_received_for_not_from_what_it_claims() {
-    let harness = Harness::enabled();
-    // `to` names an address this deployment does not serve -- a mailing list rewrote it. The
-    // routing fact is the address Resend accepted the mail for.
-    let body = serde_json::json!({
-        "type": "email.received",
-        "data": {
-            "email_id": "email-1",
-            "from": "someone@example.com",
-            "to": ["list@example.com"],
-            "received_for": ["support@acme.localhost"]
-        }
-    })
-    .to_string();
-
-    assert_eq!(harness.post_signed(&body).await, StatusCode::OK);
-    assert_eq!(harness.stored().len(), 1);
-}
-
-#[tokio::test]
 async fn a_body_past_the_inbox_bound_is_refused_before_it_is_parsed() {
-    let harness = Harness::enabled();
+    let harness = Harness::connected();
     let oversized = format!(
         r#"{{"type":"email.received","data":{{"email_id":"email-1","subject":"{}"}}}}"#,
         "x".repeat(MAX_REQUEST_BODY_BYTES)
@@ -433,11 +404,9 @@ fn the_request_bound_is_the_bound_the_inbox_itself_enforces() {
 }
 
 #[test]
-fn a_configured_secret_is_decodable_at_startup() {
-    let config = ResendInboundConfig {
-        signing_secret: SecretString::from(SECRET),
-        webhook_max_age_secs: 300,
-        authserv_id: "resend.com".to_string(),
-    };
-    assert!(decode_signing_secret(config.signing_secret.expose_secret()).is_some());
+fn a_stored_authserv_id_is_one_token() {
+    // The decoder reads the first field of `Authentication-Results` and compares it to this, so a
+    // value with a space in it could never match. Refused where it is entered, not where it fails.
+    assert!(AuthservId::parse("resend.com").is_ok());
+    assert!(AuthservId::parse("resend.com is").is_err());
 }

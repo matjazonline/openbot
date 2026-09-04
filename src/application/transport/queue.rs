@@ -215,6 +215,18 @@ pub struct DeliveryAttribution {
 }
 
 impl DeliveryRecord {
+    /// Which company this delivery is being sent on behalf of, when it is being sent on behalf of
+    /// one at all.
+    ///
+    /// `None` is a platform notice -- a confirmation code, an approval link -- which belongs to
+    /// the deployment rather than to a tenant, and so goes out over the deployment's own relay.
+    pub const fn company_id(&self) -> Option<Uuid> {
+        match self.attribution {
+            Some(attribution) => Some(attribution.company_id),
+            None => None,
+        }
+    }
+
     /// Whether this attempt is the delivery's last. Read to decide whether a failure dead-letters
     /// now or comes back once more.
     pub const fn attempts_exhausted(&self) -> bool {

@@ -10,35 +10,18 @@ use base64::Engine;
 use ring::hmac;
 use secrecy::{ExposeSecret, SecretString};
 
+// The decode lives with the credential it belongs to, so the check a settings form makes before
+// storing a secret and the check this module makes before trusting one are the same function.
+pub use crate::entities::company_resend_api::decode_signing_secret;
+
 /// The header naming one delivery attempt. Stored with the event so a redelivery is recognisable.
 pub const SVIX_ID_HEADER: &str = "svix-id";
 pub const SVIX_TIMESTAMP_HEADER: &str = "svix-timestamp";
 pub const SVIX_SIGNATURE_HEADER: &str = "svix-signature";
 
-/// The prefix Svix writes on a signing secret. The key is what follows it, base64-decoded.
-const SECRET_PREFIX: &str = "whsec_";
-
 /// The longest `svix-id` this endpoint will store. `inbound_events.external_event_key` is bounded
 /// at 512 bytes and a delivery id is a short token; anything longer is not one.
 const MAX_SVIX_ID_BYTES: usize = 128;
-
-/// The signing key behind a configured secret, or `None` when the secret is not one.
-///
-/// Separate from verification so startup can reject a mistyped secret rather than discovering it
-/// one 401 at a time, and so the base64 decode happens once per process rather than per request.
-pub fn decode_signing_secret(secret: &str) -> Option<Vec<u8>> {
-    let encoded = secret
-        .trim()
-        .strip_prefix(SECRET_PREFIX)
-        .unwrap_or(secret.trim());
-    if encoded.is_empty() {
-        return None;
-    }
-    base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .ok()
-        .filter(|key| !key.is_empty())
-}
 
 /// The delivery id a verified request carried.
 #[derive(Debug, Clone, PartialEq, Eq)]

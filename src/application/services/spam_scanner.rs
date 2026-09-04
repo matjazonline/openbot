@@ -346,8 +346,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
-            resend_inbound: None,
-            resend_outbound: None,
+            resend_api: crate::infra::config::ResendApiConfig::default(),
             hydradb: None,
             hindsight: None,
             refresh_token_ttl: time::Duration::days(30),

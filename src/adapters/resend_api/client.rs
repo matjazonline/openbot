@@ -14,19 +14,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     adapters::protocols::email::parser::MAX_INBOUND_MESSAGE_BYTES,
-    infra::config::{MAX_RESEND_RETRY_AFTER_SECS, ResendOutboundConfig},
+    infra::config::{MAX_RESEND_API_RETRY_AFTER_SECS, ResendApiConfig},
 };
 
 /// The largest JSON body this adapter will read from the API. Generous for a retrieve response
 /// carrying an HTML body inline, and far below the raw-MIME cap that governs the CDN download.
-pub const MAX_RESEND_JSON_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_RESEND_API_JSON_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 /// Connecting is not transferring: a provider that has not answered the TCP handshake in this long
 /// is down, and waiting the full request timeout for that verdict wastes a worker slot.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// What the Resend API said, in the terms a caller has to decide with.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum ResendError {
+pub enum ResendApiError {
     /// The provider refused, and will refuse the identical request again: a malformed address, an
     /// unverified sending domain, a revoked key, an email id that does not exist.
     #[error("resend refused the request ({status}): {detail}")]
@@ -45,7 +45,7 @@ pub enum ResendError {
     Malformed { detail: String },
 }
 
-impl ResendError {
+impl ResendApiError {
     /// Whether asking again could plausibly answer differently. Definite refusals and oversized or
     /// malformed bodies will read the same way on the fifth attempt.
     pub fn is_transient(&self) -> bool {
@@ -59,7 +59,7 @@ impl ResendError {
 /// plain-text body and nothing downstream of it composes HTML, so offering an `html` field here
 /// would be a parameter no caller can fill.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct ResendSendRequest {
+pub struct ResendApiSendRequest {
     pub from: String,
     pub to: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -75,7 +75,7 @@ pub struct ResendSendRequest {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct ResendSendResponse {
+pub struct ResendApiSendResponse {
     pub id: String,
 }
 
@@ -105,42 +105,54 @@ pub struct RawReference {
 /// The Resend calls this deployment makes.
 ///
 /// A trait so the delivery transport and the inbound decoder can both be tested against a fake
-/// that answers with a chosen [`ResendError`]; the repository carries no HTTP-mocking crate and
+/// that answers with a chosen [`ResendApiError`]; the repository carries no HTTP-mocking crate and
 /// hand-written doubles in `test_support` are what `src/AGENTS.md` asks for.
 #[async_trait]
 pub trait ResendApi: Send + Sync {
     async fn send_email(
         &self,
-        request: &ResendSendRequest,
-    ) -> Result<ResendSendResponse, ResendError>;
+        request: &ResendApiSendRequest,
+    ) -> Result<ResendApiSendResponse, ResendApiError>;
 
-    async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendError>;
+    async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendApiError>;
 
     /// The raw MIME behind a signed CDN URL, bounded by [`MAX_INBOUND_MESSAGE_BYTES`].
-    async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendError>;
+    async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendApiError>;
 }
 
-/// The one process-wide Resend client. `reqwest::Client` owns the connection pool and the TLS
-/// configuration, so building one per request would discard both.
-pub struct ReqwestResendClient {
+/// One company's Resend client.
+///
+/// The credential is per company, but the `reqwest::Client` behind it is not and must not be:
+/// it owns the connection pool and the TLS configuration, and building one per tenant -- or worse,
+/// per request -- would open a fresh handshake for every mail. So the HTTP client is built once
+/// by [`ReqwestResendApiClient::shared_http`] and cloned, which shares that pool, while the key that
+/// authorizes each call travels per instance.
+pub struct ReqwestResendApiClient {
     client: Client,
     base_url: String,
     api_key: SecretString,
 }
 
-impl ReqwestResendClient {
-    pub fn from_config(config: &ResendOutboundConfig) -> Result<Self, ResendError> {
-        Ok(Self {
-            client: Client::builder()
-                .connect_timeout(CONNECT_TIMEOUT.min(config.request_timeout))
-                .timeout(config.request_timeout)
-                .build()
-                .map_err(|error| ResendError::Unavailable {
-                    detail: error.to_string(),
-                })?,
+impl ReqwestResendApiClient {
+    /// The one HTTP client every Resend call in this process is made through.
+    pub fn shared_http(config: &ResendApiConfig) -> Result<Client, ResendApiError> {
+        Client::builder()
+            .connect_timeout(CONNECT_TIMEOUT.min(config.request_timeout))
+            .timeout(config.request_timeout)
+            .build()
+            .map_err(|error| ResendApiError::Unavailable {
+                detail: error.to_string(),
+            })
+    }
+
+    /// One company's client over the shared pool. Cloning a `reqwest::Client` shares its
+    /// connections rather than copying them, which is what makes this cheap enough to do per send.
+    pub fn new(http: &Client, config: &ResendApiConfig, api_key: SecretString) -> Self {
+        Self {
+            client: http.clone(),
             base_url: config.base_url.trim_end_matches('/').to_string(),
-            api_key: config.api_key.clone(),
-        })
+            api_key,
+        }
     }
 
     fn request(&self, method: Method, path: &str) -> reqwest::RequestBuilder {
@@ -151,27 +163,27 @@ impl ReqwestResendClient {
 }
 
 #[async_trait]
-impl ResendApi for ReqwestResendClient {
+impl ResendApi for ReqwestResendApiClient {
     async fn send_email(
         &self,
-        request: &ResendSendRequest,
-    ) -> Result<ResendSendResponse, ResendError> {
+        request: &ResendApiSendRequest,
+    ) -> Result<ResendApiSendResponse, ResendApiError> {
         let mut builder = self.request(Method::POST, "/emails").json(request);
         if let Some(key) = request.idempotency_key.as_deref() {
             builder = builder.header("Idempotency-Key", key);
         }
         let response = builder.send().await.map_err(classify_transport)?;
-        let bytes = bounded_body(response, MAX_RESEND_JSON_RESPONSE_BYTES).await?;
-        serde_json::from_slice(&bytes).map_err(|error| ResendError::Malformed {
+        let bytes = bounded_body(response, MAX_RESEND_API_JSON_RESPONSE_BYTES).await?;
+        serde_json::from_slice(&bytes).map_err(|error| ResendApiError::Malformed {
             detail: error.to_string(),
         })
     }
 
-    async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendError> {
+    async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendApiError> {
         // The id goes into a path segment, so anything that is not one is refused here rather than
         // sent as a request that could address something else.
         if !is_path_segment(email_id) {
-            return Err(ResendError::Refused {
+            return Err(ResendApiError::Refused {
                 status: StatusCode::BAD_REQUEST.as_u16(),
                 detail: "a received-email id must be a plain identifier".to_string(),
             });
@@ -181,20 +193,20 @@ impl ResendApi for ReqwestResendClient {
             .send()
             .await
             .map_err(classify_transport)?;
-        let bytes = bounded_body(response, MAX_RESEND_JSON_RESPONSE_BYTES).await?;
-        serde_json::from_slice(&bytes).map_err(|error| ResendError::Malformed {
+        let bytes = bounded_body(response, MAX_RESEND_API_JSON_RESPONSE_BYTES).await?;
+        serde_json::from_slice(&bytes).map_err(|error| ResendApiError::Malformed {
             detail: error.to_string(),
         })
     }
 
-    async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendError> {
+    async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendApiError> {
         // The URL comes from an authenticated API response, but it is still a value from outside:
         // an http:// or file:// download_url would send a signed request somewhere unintended.
-        let parsed = url::Url::parse(url).map_err(|error| ResendError::Malformed {
+        let parsed = url::Url::parse(url).map_err(|error| ResendApiError::Malformed {
             detail: error.to_string(),
         })?;
         if parsed.scheme() != "https" {
-            return Err(ResendError::Malformed {
+            return Err(ResendApiError::Malformed {
                 detail: "a raw-mail download URL must be https".to_string(),
             });
         }
@@ -215,7 +227,7 @@ impl ResendApi for ReqwestResendClient {
 async fn bounded_body(
     mut response: reqwest::Response,
     limit: usize,
-) -> Result<Vec<u8>, ResendError> {
+) -> Result<Vec<u8>, ResendApiError> {
     let status = response.status();
     if !status.is_success() {
         let retry_after = retry_after_of(&response);
@@ -234,7 +246,7 @@ async fn bounded_body(
         .content_length()
         .is_some_and(|length| length > limit as u64)
     {
-        return Err(ResendError::TooLarge { limit });
+        return Err(ResendApiError::TooLarge { limit });
     }
     let capacity = response
         .content_length()
@@ -244,7 +256,7 @@ async fn bounded_body(
     let mut bytes = Vec::with_capacity(capacity);
     while let Some(chunk) = response.chunk().await.map_err(classify_transport)? {
         if bytes.len().saturating_add(chunk.len()) > limit {
-            return Err(ResendError::TooLarge { limit });
+            return Err(ResendApiError::TooLarge { limit });
         }
         bytes.extend_from_slice(&chunk);
     }
@@ -261,7 +273,7 @@ fn retry_after_of(response: &reqwest::Response) -> Option<Duration> {
         .parse()
         .ok()?;
     Some(Duration::from_secs(
-        seconds.min(MAX_RESEND_RETRY_AFTER_SECS),
+        seconds.min(MAX_RESEND_API_RETRY_AFTER_SECS),
     ))
 }
 
@@ -274,30 +286,30 @@ pub fn classify_status(
     status: StatusCode,
     retry_after: Option<Duration>,
     detail: String,
-) -> ResendError {
+) -> ResendApiError {
     match status {
-        StatusCode::TOO_MANY_REQUESTS => ResendError::RateLimited {
+        StatusCode::TOO_MANY_REQUESTS => ResendApiError::RateLimited {
             retry_after,
             detail,
         },
-        StatusCode::REQUEST_TIMEOUT => ResendError::Unavailable { detail },
-        _ if status.is_client_error() => ResendError::Refused {
+        StatusCode::REQUEST_TIMEOUT => ResendApiError::Unavailable { detail },
+        _ if status.is_client_error() => ResendApiError::Refused {
             status: status.as_u16(),
             detail,
         },
-        _ => ResendError::Unavailable { detail },
+        _ => ResendApiError::Unavailable { detail },
     }
 }
 
-pub fn classify_transport(error: reqwest::Error) -> ResendError {
+pub fn classify_transport(error: reqwest::Error) -> ResendApiError {
     // A body this adapter refused to read is not the provider being unavailable, and retrying it
     // would produce the same oversized response.
     if error.is_decode() {
-        return ResendError::Malformed {
+        return ResendApiError::Malformed {
             detail: error.to_string(),
         };
     }
-    ResendError::Unavailable {
+    ResendApiError::Unavailable {
         detail: error.to_string(),
     }
 }
@@ -325,7 +337,7 @@ mod tests {
             !classify_status(StatusCode::UNPROCESSABLE_ENTITY, None, String::new()).is_transient()
         );
         assert!(!classify_status(StatusCode::NOT_FOUND, None, String::new()).is_transient());
-        assert!(!ResendError::TooLarge { limit: 1 }.is_transient());
+        assert!(!ResendApiError::TooLarge { limit: 1 }.is_transient());
     }
 
     #[test]
@@ -339,7 +351,7 @@ mod tests {
 
     #[test]
     fn a_send_request_serializes_without_its_idempotency_key_or_empty_fields() {
-        let request = ResendSendRequest {
+        let request = ResendApiSendRequest {
             from: "Support <support@acme.example>".to_string(),
             to: vec!["someone@example.com".to_string()],
             cc: Vec::new(),

@@ -8,16 +8,21 @@
 //! under the inbound worker's fenced lease.
 //!
 //! What it does decide is the tenant, because `inbound_events.company_id` is not nullable and a
-//! stored event has to belong to somebody. That is the platform address grammar and one lookup;
-//! everything else -- which channel, whether the sender may write to it, whether the mail
-//! authenticates -- happens in the decoder with the mail in hand.
+//! stored event has to belong to somebody. The URL says which: every company registers an endpoint
+//! ending in its own opaque token, and that token is what the row's signing secret is then found
+//! by. Nothing else -- which channel, whether the sender may write to it, whether the mail
+//! authenticates -- is decided here; that happens in the decoder with the mail in hand.
+//!
+//! Finding a row is not authenticating a request. The token only selects *whose* secret this
+//! request must be proved against; an unsigned or wrongly signed request with a valid token is
+//! refused exactly as one with no token at all.
 
 use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
     Router,
     body::to_bytes,
-    extract::{FromRef, State},
+    extract::{FromRef, Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::post,
@@ -27,19 +32,19 @@ use serde::Deserialize;
 use tracing::{instrument, warn};
 
 use crate::{
-    adapters::{
-        http::app_state::AppState, protocols::email::EmailChannelSelectorParser,
-        resend::signature::verify_svix_signature_at,
-    },
+    adapters::{http::app_state::AppState, resend_api::signature::verify_svix_signature_at},
     domain::monitoring::MonitoringService,
-    entities::{correlation::CorrelationId, transport::TransportKind},
+    entities::{
+        company_resend_api::RESEND_API_WEBHOOK_PATH, correlation::CorrelationId,
+        transport::TransportKind, value_objects::ResendApiWebhookToken,
+    },
     infra::config::AppConfig,
     services::inbound_event_worker::InboundEventWakeups,
     transport::{
         AuthenticatedInboundEvent, InboundContentType, InboundEventInbox, InboundEventPayload,
         MAX_INBOUND_EVENT_PAYLOAD_BYTES, SafeHeaderFacts,
     },
-    use_cases::company::CompanyUseCases,
+    use_cases::company_resend_api::CompanyResendApiAccounts,
 };
 
 /// The largest request body this endpoint reads.
@@ -50,26 +55,25 @@ use crate::{
 const MAX_REQUEST_BODY_BYTES: usize = MAX_INBOUND_EVENT_PAYLOAD_BYTES;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/webhooks/email/resend", post(resend_inbound_webhook))
+    // Built from the same constant the settings page renders its copyable URL from, so the
+    // endpoint an operator is told to register is the endpoint this deployment serves.
+    Router::new().route(
+        &format!("{RESEND_API_WEBHOOK_PATH}/{{token}}"),
+        post(resend_api_inbound_webhook),
+    )
 }
 
 /// The parts of the envelope this boundary reads. The rest waits for the decoder.
 #[derive(Debug, Clone, Deserialize)]
-struct ResendWebhookEnvelope {
+struct ResendApiWebhookEnvelope {
     #[serde(rename = "type")]
     event_type: String,
-    data: ResendWebhookData,
+    data: ResendApiWebhookData,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct ResendWebhookData {
+struct ResendApiWebhookData {
     email_id: String,
-    /// The addresses Resend accepted this mail *for*. Present on `email.received`; the `to` list
-    /// is the fallback, and is what the message claims rather than what was delivered.
-    #[serde(default)]
-    received_for: Vec<String>,
-    #[serde(default)]
-    to: Vec<String>,
 }
 
 /// Everything this route needs, and nothing else.
@@ -77,19 +81,19 @@ struct ResendWebhookData {
 /// A named sub-state rather than five `State` extractors, so the tests can drive the handler with
 /// five in-memory doubles instead of assembling the whole application.
 #[derive(Clone)]
-pub struct ResendWebhookState {
+pub struct ResendApiWebhookState {
     pub config: Arc<AppConfig>,
-    pub companies: Arc<CompanyUseCases>,
+    pub accounts: Arc<dyn CompanyResendApiAccounts>,
     pub inbox: Arc<dyn InboundEventInbox>,
     pub wakeups: InboundEventWakeups,
     pub monitoring: Arc<dyn MonitoringService>,
 }
 
-impl FromRef<AppState> for ResendWebhookState {
+impl FromRef<AppState> for ResendApiWebhookState {
     fn from_ref(state: &AppState) -> Self {
         Self {
             config: state.config.clone(),
-            companies: state.company_use_cases.clone(),
+            accounts: state.company_resend_api_accounts.clone(),
             inbox: state.inbound_event_inbox.clone(),
             wakeups: state.inbound_event_wakeups.clone(),
             monitoring: state.monitoring.clone(),
@@ -97,21 +101,35 @@ impl FromRef<AppState> for ResendWebhookState {
     }
 }
 
-#[instrument(skip_all, fields(provider = "resend"))]
-async fn resend_inbound_webhook(
-    State(ResendWebhookState {
+#[instrument(skip_all, fields(provider = "resend_api"))]
+async fn resend_api_inbound_webhook(
+    State(ResendApiWebhookState {
         config,
-        companies,
+        accounts,
         inbox,
         wakeups,
         monitoring,
-    }): State<ResendWebhookState>,
+    }): State<ResendApiWebhookState>,
+    Path(token): Path<String>,
     headers: HeaderMap,
     body: axum::body::Body,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let Some(inbound_config) = config.resend_inbound.as_ref() else {
-        return Err(StatusCode::NOT_FOUND);
-    };
+    // A malformed segment is not a token this application ever issued, so it is refused without a
+    // query: the shape check is free, and a lookup on arbitrary path text is not.
+    let token = ResendApiWebhookToken::parse(&token).ok_or(StatusCode::NOT_FOUND)?;
+    // Whose secret this request must be proved against. A company that has switched its
+    // integration off has no endpoint, which is the same 404 an unknown token gets -- the two are
+    // deliberately indistinguishable from outside.
+    let credentials = accounts
+        .inbound_credentials(&token)
+        .await
+        .map_err(|error| {
+            warn!(%error, "Could not resolve the company a Resend webhook token names");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let company_id = credentials.company_id;
+
     let body = to_bytes(body, MAX_REQUEST_BODY_BYTES)
         .await
         .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
@@ -121,40 +139,23 @@ async fn resend_inbound_webhook(
     let delivery = verify_svix_signature_at(
         &headers,
         &body,
-        &inbound_config.signing_secret,
-        inbound_config.webhook_max_age_secs,
+        &credentials.signing_secret,
+        config.resend_api.webhook_max_age_secs,
         now.timestamp().max(0).unsigned_abs(),
     )?;
 
-    let envelope: ResendWebhookEnvelope =
+    let envelope: ResendApiWebhookEnvelope =
         serde_json::from_slice(&body).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
     if envelope.event_type != "email.received" {
         // Deliveries, bounces, opens and complaints all arrive here. Answering 2xx is what stops
         // Svix retrying an event this deployment has nothing to do with.
         monitoring.increment_counter(
-            "resend_webhook_ignored_total",
+            "resend_api_webhook_ignored_total",
             1,
             &[("reason", "unsupported_event")],
         );
         return Ok(StatusCode::OK);
     }
-
-    let Some(company_id) = resolve_company(&config, &companies, &envelope.data).await? else {
-        // No tenant, so no row: `inbound_events.company_id` is not nullable, and inventing one to
-        // hold an unaddressed mail would put a stranger's message in somebody's account.
-        //
-        // Deliberately not bounced, and this is where the Resend path differs from SMTP. The
-        // listener refuses an unknown recipient only *after* it has verified the sender against
-        // the connecting IP; here the sender is still entirely unauthenticated -- the verdicts
-        // live in the mail, which has not been fetched -- so a bounce would be backscatter aimed
-        // at whoever the envelope named.
-        monitoring.increment_counter(
-            "resend_webhook_ignored_total",
-            1,
-            &[("reason", "unknown_recipient")],
-        );
-        return Ok(StatusCode::OK);
-    };
 
     // The Resend email id, not the `svix-id`: `inbound_events` is unique on
     // `(transport, external_event_key)`, so keying on the mail collapses a Svix redelivery *and* a
@@ -192,37 +193,6 @@ async fn resend_inbound_webhook(
     Ok(StatusCode::OK)
 }
 
-/// Which tenant this mail was delivered to, from the platform address it was accepted for.
-///
-/// Only the address grammar and one slug lookup. A mail naming several recipients is stored once
-/// under the first tenant that resolves: the decoder resolves every recipient properly, with the
-/// message in hand, and duplicating the event per recipient here would duplicate the mail.
-async fn resolve_company(
-    config: &AppConfig,
-    companies: &CompanyUseCases,
-    data: &ResendWebhookData,
-) -> Result<Option<uuid::Uuid>, StatusCode> {
-    let parser = EmailChannelSelectorParser::new(&config.app_domain_name);
-    for address in data.received_for.iter().chain(data.to.iter()) {
-        let Some((company_slug, _)) = parser.parse_platform_address(address) else {
-            continue;
-        };
-        // Propagated rather than skipped: a database error here is not "no such company", and
-        // treating it as one would drop a real message and answer 200 to say it was handled.
-        let company = companies
-            .get_company_by_slug(company_slug.as_str())
-            .await
-            .map_err(|error| {
-                warn!(%error, "Could not resolve the company a Resend event was addressed to");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-        if let Some(company) = company {
-            return Ok(Some(company.id));
-        }
-    }
-    Ok(None)
-}
-
 /// The names the delivery identity is stored under.
 ///
 /// Underscored rather than the wire spelling because `SafeHeaderFacts` requires `[a-z0-9_]` names,
@@ -251,5 +221,5 @@ fn safe_header_facts(svix_id: &str, svix_timestamp: &str) -> SafeHeaderFacts {
 }
 
 #[cfg(test)]
-#[path = "resend_tests.rs"]
+#[path = "resend_api_tests.rs"]
 mod tests;

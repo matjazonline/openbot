@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     adapters::{
         protocols::email::{MailHeader, MailMessage},
-        resend::{client::ResendSendResponse, test_support::FakeResendApi},
+        resend_api::{client::ResendApiSendResponse, test_support::FakeResendApi},
     },
     entities::value_objects::EmailAddress,
 };
@@ -38,7 +38,7 @@ fn mail() -> MailMessage {
 
 async fn send_with(api: FakeResendApi) -> (MailSendOutcome, Arc<FakeResendApi>) {
     let api = Arc::new(api);
-    let outcome = ResendMailTransport::new(api.clone()).send(mail()).await;
+    let outcome = ResendApiMailTransport::new(api.clone()).send(mail()).await;
     (outcome, api)
 }
 
@@ -104,7 +104,7 @@ async fn a_rendered_header_never_overwrites_one_built_from_a_typed_field() {
         value: "<somewhere-else@example.com>".to_string(),
     });
     let api = Arc::new(FakeResendApi::new().accepting("resend-id-1"));
-    ResendMailTransport::new(api.clone()).send(forged).await;
+    ResendApiMailTransport::new(api.clone()).send(forged).await;
 
     assert_eq!(
         api.only_send()
@@ -121,7 +121,7 @@ async fn a_display_name_that_could_change_the_envelope_is_dropped_rather_than_se
     let mut spoofed = mail();
     spoofed.from_name = Some("Acme <evil@elsewhere.example>".to_string());
     let api = Arc::new(FakeResendApi::new().accepting("resend-id-1"));
-    ResendMailTransport::new(api.clone()).send(spoofed).await;
+    ResendApiMailTransport::new(api.clone()).send(spoofed).await;
 
     assert_eq!(api.only_send().from, "support@acme.localhost");
 }
@@ -134,7 +134,7 @@ async fn a_definite_refusal_is_terminal_and_names_which_kind_it_was() {
         (403, FailureClass::Authentication),
         (404, FailureClass::DestinationUnavailable),
     ] {
-        let (outcome, _) = send_with(FakeResendApi::new().sending(Err(ResendError::Refused {
+        let (outcome, _) = send_with(FakeResendApi::new().sending(Err(ResendApiError::Refused {
             status,
             detail: "no".to_string(),
         })))
@@ -148,10 +148,12 @@ async fn a_definite_refusal_is_terminal_and_names_which_kind_it_was() {
 
 #[tokio::test]
 async fn a_rate_limit_carries_the_wait_the_provider_asked_for() {
-    let (outcome, _) = send_with(FakeResendApi::new().sending(Err(ResendError::RateLimited {
-        retry_after: Some(Duration::from_secs(30)),
-        detail: "slow down".to_string(),
-    })))
+    let (outcome, _) = send_with(
+        FakeResendApi::new().sending(Err(ResendApiError::RateLimited {
+            retry_after: Some(Duration::from_secs(30)),
+            detail: "slow down".to_string(),
+        })),
+    )
     .await;
 
     assert!(matches!(
@@ -165,9 +167,11 @@ async fn a_rate_limit_carries_the_wait_the_provider_asked_for() {
 
 #[tokio::test]
 async fn an_ambiguous_request_is_retryable_because_the_idempotency_key_is_replayed() {
-    let (outcome, _) = send_with(FakeResendApi::new().sending(Err(ResendError::Unavailable {
-        detail: "operation timed out".to_string(),
-    })))
+    let (outcome, _) = send_with(
+        FakeResendApi::new().sending(Err(ResendApiError::Unavailable {
+            detail: "operation timed out".to_string(),
+        })),
+    )
     .await;
 
     assert!(
@@ -181,10 +185,10 @@ async fn an_unreadable_answer_stays_ambiguous_despite_the_idempotency_key() {
     // The key makes a *repeat* safe. It says nothing about whether an answer this build could not
     // read was an acceptance, so this arm must not become a blind retry.
     for error in [
-        ResendError::Malformed {
+        ResendApiError::Malformed {
             detail: "not json".to_string(),
         },
-        ResendError::TooLarge { limit: 16 },
+        ResendApiError::TooLarge { limit: 16 },
     ] {
         let (outcome, _) = send_with(FakeResendApi::new().sending(Err(error))).await;
         assert!(
@@ -200,11 +204,11 @@ async fn a_platform_notice_with_no_message_id_records_the_providers_own_id() {
     notice.message_id = None;
     notice.in_reply_to = None;
     notice.references = Vec::new();
-    let api = Arc::new(FakeResendApi::new().sending(Ok(ResendSendResponse {
+    let api = Arc::new(FakeResendApi::new().sending(Ok(ResendApiSendResponse {
         id: "56761188-7520-42d8-8898-ff6fc54ce618".to_string(),
     })));
 
-    let outcome = ResendMailTransport::new(api.clone()).send(notice).await;
+    let outcome = ResendApiMailTransport::new(api.clone()).send(notice).await;
 
     assert_eq!(
         outcome,

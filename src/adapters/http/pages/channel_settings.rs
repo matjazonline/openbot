@@ -211,19 +211,22 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
-            <div class="border-t border-base-300 p-2">
-                <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
-                    hx-get="/ui/channels/new?company_id={company_id}"
-                    hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
-                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>
-            </div>
         </aside>
         {pane_html}
         "##,
-        header = sidebar_header("Channels", "Inbound addresses and their routing rules."),
-        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
+        header = sidebar_header_with_action(
+            "Channels",
+            "Inbound addresses and their routing rules.",
+            &format!(
+                r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
+                    hx-get="/ui/channels/new?company_id={company_id}"
+                    hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
+                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>"##,
+                company_id = company.id,
+                plus_glyph = icon(Icon::Plus, BUTTON_ICON),
+            ),
+        ),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
-        company_id = company.id,
         pane_html = page.pane_html,
     );
 

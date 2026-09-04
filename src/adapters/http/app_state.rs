@@ -19,9 +19,16 @@ use crate::{
     },
     transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
     use_cases::{
-        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, delivery::DeliveryReader,
-        memory::MemoryUseCases, schedule::ScheduleUseCases, thread::ThreadUseCases,
+        agent::AgentUseCases,
+        approval::ApprovalUseCases,
+        channel::ChannelUseCases,
+        company::CompanyUseCases,
+        company_invite::CompanyInviteUseCases,
+        company_resend_api::{CompanyResendApiAccounts, CompanyResendApiUseCases},
+        delivery::DeliveryReader,
+        memory::MemoryUseCases,
+        schedule::ScheduleUseCases,
+        thread::ThreadUseCases,
         user::UserUseCases,
     },
 };
@@ -34,6 +41,11 @@ pub struct AppState {
     pub user_use_cases: Arc<UserUseCases>,
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
+    /// One company's Resend account, as its owner configures it.
+    pub company_resend_api_use_cases: Arc<CompanyResendApiUseCases>,
+    /// The same integrations as the runtime reads them: credentials by company and by webhook
+    /// token, with no way back to a write.
+    pub company_resend_api_accounts: Arc<dyn CompanyResendApiAccounts>,
     pub channel_use_cases: Arc<ChannelUseCases>,
     pub schedule_use_cases: Arc<ScheduleUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,

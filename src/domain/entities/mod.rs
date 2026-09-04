@@ -5,6 +5,7 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod company_member;
+pub mod company_resend_api;
 pub mod correlation;
 pub mod creation;
 pub mod cursor;

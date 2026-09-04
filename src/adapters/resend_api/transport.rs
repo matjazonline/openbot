@@ -14,7 +14,7 @@ use tracing::warn;
 use crate::{
     adapters::{
         protocols::email::{MailMessage, MailSendOutcome, MailTransport},
-        resend::client::{ResendApi, ResendError, ResendSendRequest},
+        resend_api::client::{ResendApi, ResendApiError, ResendApiSendRequest},
     },
     entities::{
         transport::{ExternalMessageKey, FailureClass},
@@ -34,18 +34,18 @@ const MAX_IDEMPOTENCY_KEY_BYTES: usize = 256;
 const RESERVED_HEADERS: [&str; 4] = ["message-id", "in-reply-to", "references", "subject"];
 
 /// Posts one mail to `POST /emails`.
-pub struct ResendMailTransport {
+pub struct ResendApiMailTransport {
     api: Arc<dyn ResendApi>,
 }
 
-impl ResendMailTransport {
+impl ResendApiMailTransport {
     pub fn new(api: Arc<dyn ResendApi>) -> Self {
         Self { api }
     }
 }
 
 #[async_trait]
-impl MailTransport for ResendMailTransport {
+impl MailTransport for ResendApiMailTransport {
     async fn send(&self, mail: MailMessage) -> MailSendOutcome {
         let message_id = mail.message_id.clone();
         let request = build_request(mail);
@@ -55,11 +55,11 @@ impl MailTransport for ResendMailTransport {
             },
             // A definite refusal: a malformed address, an unverified sending domain, a revoked
             // key. Re-sending the identical body earns the identical answer.
-            Err(ResendError::Refused { status, detail }) => MailSendOutcome::Rejected {
+            Err(ResendApiError::Refused { status, detail }) => MailSendOutcome::Rejected {
                 class: refusal_class(status),
                 detail: format!("resend refused the send ({status}): {detail}"),
             },
-            Err(ResendError::RateLimited {
+            Err(ResendApiError::RateLimited {
                 retry_after,
                 detail,
             }) => MailSendOutcome::RateLimited {
@@ -70,13 +70,13 @@ impl MailTransport for ResendMailTransport {
             // a dropped connection or a timeout may all have been acted on -- but the retry
             // replays the same `Idempotency-Key`, which is what turns "may have been sent" from a
             // duplicate risk into a request the provider will recognise and not send twice.
-            Err(ResendError::Unavailable { detail }) => MailSendOutcome::Retryable {
+            Err(ResendApiError::Unavailable { detail }) => MailSendOutcome::Retryable {
                 class: FailureClass::ProviderFault,
                 detail,
             },
             // The request was accepted or refused and we could not read which. Nothing about an
             // idempotency key makes an unreadable answer safe to act on, so this stays ambiguous.
-            Err(error @ (ResendError::TooLarge { .. } | ResendError::Malformed { .. })) => {
+            Err(error @ (ResendApiError::TooLarge { .. } | ResendApiError::Malformed { .. })) => {
                 MailSendOutcome::Unknown {
                     class: FailureClass::ProviderFault,
                     detail: error.to_string(),
@@ -118,7 +118,7 @@ fn refusal_class(status: u16) -> FailureClass {
 /// field for them and because `EmailRenderer` has already decided their exact contents -- the
 /// `References` chain that ends at `In-Reply-To`, the `Re:` that appears exactly once. Nothing
 /// here re-derives any of it.
-fn build_request(mail: MailMessage) -> ResendSendRequest {
+fn build_request(mail: MailMessage) -> ResendApiSendRequest {
     let mut headers: BTreeMap<String, String> = BTreeMap::new();
     if let Some(message_id) = mail.message_id.as_ref() {
         headers.insert("Message-ID".to_string(), message_id.to_string());
@@ -150,7 +150,7 @@ fn build_request(mail: MailMessage) -> ResendSendRequest {
         headers.insert(header.name, header.value);
     }
 
-    ResendSendRequest {
+    ResendApiSendRequest {
         from: match mail.from_name.as_deref().map(str::trim).filter(|name| {
             // A display name carrying a quote or an angle bracket would change which address this
             // parses as. Dropping the name costs cosmetics; keeping it costs the envelope.

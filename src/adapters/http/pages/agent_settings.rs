@@ -224,22 +224,22 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
-            <div class="border-t border-base-300 p-2">
-                <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
-                    hx-get="/ui/agents/new?company_id={company_id}"
-                    hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
-                    hx-push-url="/ui/agents?company_id={company_id}&new=1">{plus_glyph} New Agent</button>
-            </div>
         </aside>
         {pane_html}
         "##,
-        header = sidebar_header(
+        header = sidebar_header_with_action(
             "Agents",
-            "AI responders, system prompts and model overrides."
+            "AI responders, system prompts and model overrides.",
+            &format!(
+                r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
+                    hx-get="/ui/agents/new?company_id={company_id}"
+                    hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
+                    hx-push-url="/ui/agents?company_id={company_id}&new=1">{plus_glyph} New Agent</button>"##,
+                company_id = company.id,
+                plus_glyph = icon(Icon::Plus, BUTTON_ICON),
+            ),
         ),
-        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
-        company_id = company.id,
         pane_html = page.pane_html,
     );
 

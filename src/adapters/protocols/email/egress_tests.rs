@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use super::*;
+use crate::adapters::protocols::email::DeploymentMailTransports;
 use crate::adapters::protocols::email::test_support::{RecordingTransport, RefusingTransport};
 use crate::{
     entities::{
@@ -403,7 +404,7 @@ fn a_renderer_refuses_a_context_for_another_transport() {
 #[tokio::test]
 async fn a_failed_submission_is_ambiguous_rather_than_retried() {
     let sender = EmailSender::new(
-        Arc::new(RefusingTransport),
+        DeploymentMailTransports::only(Arc::new(RefusingTransport)),
         Arc::new(NeverInternal::default()),
     );
     let parts = renderer()
@@ -426,7 +427,10 @@ async fn a_failed_submission_is_ambiguous_rather_than_retried() {
 #[tokio::test]
 async fn a_delivered_mail_reports_the_message_id_it_went_out_under() {
     let transport = Arc::new(RecordingTransport::default());
-    let sender = EmailSender::new(transport.clone(), Arc::new(NeverInternal::default()));
+    let sender = EmailSender::new(
+        DeploymentMailTransports::only(transport.clone()),
+        Arc::new(NeverInternal::default()),
+    );
     let parts = renderer()
         .render(&envelope(EmailDeliveryContext {
             relay: None,
@@ -450,7 +454,7 @@ async fn a_delivered_mail_reports_the_message_id_it_went_out_under() {
 #[tokio::test]
 async fn an_unreadable_payload_is_terminal() {
     let sender = EmailSender::new(
-        Arc::new(RecordingTransport::default()),
+        DeploymentMailTransports::only(Arc::new(RecordingTransport::default())),
         Arc::new(NeverInternal::default()),
     );
     let alien = RenderedPart {
@@ -485,7 +489,7 @@ async fn a_recipient_of_our_own_is_relayed_rather_than_posted() {
     let relay = Arc::new(NeverInternal {
         disposition: Mutex::new(RelayDisposition::Relayed),
     });
-    let sender = EmailSender::new(transport.clone(), relay);
+    let sender = EmailSender::new(DeploymentMailTransports::only(transport.clone()), relay);
     let parts = renderer()
         .render(&envelope(context("other@acme.mailagents.test")))
         .unwrap();
@@ -507,7 +511,10 @@ async fn an_internal_refusal_is_terminal() {
             "Max inter-channel hop count reached".into(),
         )),
     });
-    let sender = EmailSender::new(Arc::new(RecordingTransport::default()), relay);
+    let sender = EmailSender::new(
+        DeploymentMailTransports::only(Arc::new(RecordingTransport::default())),
+        relay,
+    );
     let parts = renderer()
         .render(&envelope(context("other@acme.mailagents.test")))
         .unwrap();
