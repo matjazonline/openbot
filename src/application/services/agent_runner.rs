@@ -1062,6 +1062,12 @@ impl<'a> AgentRunner<'a> {
             full_prompt,
             history_message_count,
             internal_requires_approval: internal_requires_approval(&config),
+            outreach_policy_config: config
+                .get("tool_security")
+                .and_then(|ts| ts.get("tools"))
+                .and_then(|t| t.get(OUTREACH_TOOL_ID))
+                .and_then(|o| o.get("config"))
+                .cloned(),
             suspended: Arc::new(AtomicBool::new(false)),
         };
 
@@ -1236,6 +1242,7 @@ struct AgentTask {
     history_message_count: usize,
     /// Tool policy for internal delegation, read from the merged agent config.
     internal_requires_approval: bool,
+    outreach_policy_config: Option<serde_json::Value>,
     /// Set by the approval handler or outreach tool when the run parks awaiting a human/other agent.
     suspended: Arc<AtomicBool>,
 }
@@ -1397,13 +1404,17 @@ impl AgentTask {
                     },
                 )));
             }
-            builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
+            let mut tool = OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,
                 deliveries,
                 context,
                 self.suspended.clone(),
-            )));
+            );
+            if let Some(ref policy) = self.outreach_policy_config {
+                tool = tool.with_policy_config(policy.clone());
+            }
+            builder = builder.tool(Arc::new(tool));
         }
         if let Some((persistence, context)) = self.agent_channel_tool.clone() {
             builder = builder.tool(Arc::new(CreateAgentChannelTool::new(persistence, context)));
@@ -2295,6 +2306,7 @@ mod tests {
             full_prompt: "Kaksen je odpovedni rok?".to_string(),
             history_message_count: 0,
             internal_requires_approval: true,
+            outreach_policy_config: None,
             suspended: Arc::new(AtomicBool::new(false)),
         };
 

@@ -198,6 +198,11 @@ impl Tool for ListCompanyAgentsTool {
         let max_results = ctx
             .custom_config
             .get("max_results")
+            .or_else(|| {
+                ctx.custom_config
+                    .get("config")
+                    .and_then(|c| c.get("max_results"))
+            })
             .and_then(Value::as_u64)
             .and_then(|value| usize::try_from(value).ok())
             .unwrap_or(50);

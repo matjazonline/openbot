@@ -114,6 +114,7 @@ pub struct OutreachAndAwaitQuorumTool {
     deliveries: DeliveryComposer,
     context: OutreachToolContext,
     suspended: Arc<AtomicBool>,
+    policy_config: Option<Value>,
 }
 
 impl OutreachAndAwaitQuorumTool {
@@ -130,7 +131,13 @@ impl OutreachAndAwaitQuorumTool {
             deliveries,
             context,
             suspended,
+            policy_config: None,
         }
+    }
+
+    pub fn with_policy_config(mut self, config: Value) -> Self {
+        self.policy_config = Some(config);
+        self
     }
 }
 
@@ -180,7 +187,13 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Err(error) => return ToolResult::error(format!("Invalid input: {error}")),
         };
 
-        let limits = OutreachLimits::from_config(&ctx.custom_config);
+        let effective_config = self
+            .policy_config
+            .as_ref()
+            .filter(|c| !c.is_null() && c.as_object().is_some_and(|m| !m.is_empty()))
+            .unwrap_or(&ctx.custom_config);
+
+        let limits = OutreachLimits::from_config(effective_config);
         let email_renderer = match self.deliveries.renderer(TransportKind::Email) {
             Ok(renderer) => renderer,
             Err(error) => return ToolResult::error(error.to_string()),
@@ -188,8 +201,8 @@ impl Tool for OutreachAndAwaitQuorumTool {
         let resolved = match resolve_targets(
             &input,
             TargetPolicy {
-                max_targets: config_usize(&ctx.custom_config, "max_targets", 50),
-                scope: match configured_target_scope(&ctx.custom_config) {
+                max_targets: config_usize(effective_config, "max_targets", 50),
+                scope: match configured_target_scope(effective_config) {
                     Ok(scope) => scope,
                     Err(error) => return ToolResult::error(error),
                 },
@@ -543,11 +556,16 @@ impl NormalizedOutreachTarget {
 }
 
 fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String> {
-    match config
+    let scope_val = config
         .get("allowed_target_scope")
+        .or_else(|| {
+            config
+                .get("config")
+                .and_then(|c| c.get("allowed_target_scope"))
+        })
         .and_then(Value::as_str)
-        .unwrap_or("external_only")
-    {
+        .unwrap_or("external_only");
+    match scope_val {
         "external_only" => Ok(AllowedTargetScope::ExternalOnly),
         "same_company_channels" => Ok(AllowedTargetScope::SameCompanyChannels),
         "any" => Ok(AllowedTargetScope::Any),
@@ -670,6 +688,7 @@ fn push_unique(targets: &mut Vec<NormalizedOutreachTarget>, target: NormalizedOu
 fn config_usize(config: &Value, key: &str, default: usize) -> usize {
     config
         .get(key)
+        .or_else(|| config.get("config").and_then(|c| c.get(key)))
         .and_then(Value::as_u64)
         .and_then(|value| usize::try_from(value).ok())
         .unwrap_or(default)
@@ -678,6 +697,7 @@ fn config_usize(config: &Value, key: &str, default: usize) -> usize {
 fn config_u32(config: &Value, key: &str, default: u32) -> u32 {
     config
         .get(key)
+        .or_else(|| config.get("config").and_then(|c| c.get(key)))
         .and_then(Value::as_u64)
         .and_then(|value| u32::try_from(value).ok())
         .unwrap_or(default)

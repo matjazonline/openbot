@@ -15,6 +15,8 @@ pub mod ingress;
 pub mod mail;
 pub mod parser;
 mod selector;
+#[cfg(test)]
+pub mod test_support;
 mod types;
 
 pub use egress::{EmailRenderer, EmailSender, OUTBOUND_EMAIL_VERSION, OutboundEmailV1};

@@ -87,28 +87,39 @@ Email clients append the entire historical thread below newly typed text. Feedin
 ```mermaid
 flowchart TD
     subgraph Ingress[Inbound ingestion]
-        SG[SendGrid webhook]
-        SMTP[SMTP server]
-        RUN[Protected Run or RunTest simulation]
-        NORMALIZE[Parse and normalize email<br/>authenticate, authorize, scan, resolve channels]
-        ACCEPT{Ingestion result}
-        REJECT[Reject or bounce<br/>no background task]
-        QUIET[Persist context-only message<br/>no background task]
-        SAVE[Persist thread and inbound message]
-        ENQUEUE[Enqueue email_agent_dispatch<br/>duplicate-safe by source Message-ID]
+        SMTP[SMTP listener<br/>envelope and DMARC verdicts]
+        SG[SendGrid webhook<br/>raw MIME reverified here]
+        APP[Mailbox or simulation compose<br/>authenticated by the signed-in principal]
+        RELAY[Internal channel relay<br/>in-process, never leaves the building]
+        PROVIDER[Signed provider webhook]
+        INBOX[(inbound_events<br/>durable inbox, fast acknowledgement)]
+        IEW[Inbound event worker<br/>claims 8, 120s lease, 90s deadline<br/>4 at once, 2 per company, 1 per installation]
+        PRE[Preflight<br/>ingress guard, address resolution, principal ACLs,<br/>thread and turn policy — nothing written]
+        VERDICT{Preflight verdict}
+        REJECT[Rejected<br/>refused in-session or bounced<br/>no message, no thread, no task]
+        UPLOAD[Store attachments<br/>content addressed, before any row exists]
+        COMMIT[One transaction<br/>threads, canonical message, associations,<br/>outreach transitions, task, frozen deliveries]
+        OUTCOME{Commit outcome}
+        DUPLICATE[Redelivery<br/>returns the first ids and enqueues nothing]
+        FILED[Filed only<br/>context-only message or outreach reply<br/>no task]
+        QUEUED[Task enqueued<br/>email_agent_dispatch]
 
-        SG --> NORMALIZE
-        SMTP --> NORMALIZE
-        RUN --> NORMALIZE
-        NORMALIZE --> ACCEPT
-        ACCEPT -->|rejected| REJECT
-        ACCEPT -->|context-only| QUIET
-        ACCEPT -->|accepted| SAVE --> ENQUEUE
+        SMTP --> PRE
+        SG --> PRE
+        APP --> PRE
+        RELAY --> PRE
+        PROVIDER --> INBOX --> IEW --> PRE
+        PRE --> VERDICT
+        VERDICT -->|rejected| REJECT
+        VERDICT -->|accepted| UPLOAD --> COMMIT --> OUTCOME
+        OUTCOME -->|duplicate| DUPLICATE
+        OUTCOME -->|filed| FILED
+        OUTCOME -->|answered| QUEUED
     end
 
     subgraph TaskQueue[Durable task queue]
-        PENDING[(pending<br/>run_at controls availability)]
-        PROCESSING[(processing<br/>worker ID and 15-minute lease)]
+        PENDING[(pending<br/>run_at gates availability)]
+        PROCESSING[(processing<br/>worker id and 15-minute lease)]
         COMPLETED[(completed)]
         DEAD[(dead_letter)]
         APPROVAL[(pending_approval)]
@@ -116,66 +127,61 @@ flowchart TD
         STOPPED[(stopped)]
     end
 
-    ENQUEUE --> PENDING
+    QUEUED --> PENDING
 
-    subgraph Worker[TaskWorker poll loops]
-        TASK_TICK[Task loop<br/>every 500ms]
-        CLAIM[Atomically claim tasks for free worker slots<br/>FOR UPDATE SKIP LOCKED]
-        MAINT_TICK[Maintenance loop<br/>every 30s]
-        REAP[Reap expired task leases]
-        QUORUM[Check up to 100 due quorum waits]
+    subgraph Worker[TaskWorker — three independent loops]
+        TASK_TICK[Task loop every 500ms<br/>refills free execution slots, 4 by default]
+        CLAIM[Claim pending rows only<br/>round-robin across companies<br/>FOR UPDATE SKIP LOCKED]
+        SCHED_TICK[Schedule loop every 2s]
+        SCHED[Claim and advance due schedules<br/>60s materialization lease]
+        MAINT_TICK[Maintenance loop every 30s]
+        REAP[Reap expired task leases<br/>charges an attempt and backs off]
+        QUORUM[Decide due quorum waits]
+        CENSUS[Publish the stuck-work census]
 
         TASK_TICK --> CLAIM
-        MAINT_TICK --> REAP --> QUORUM
-    end
-
-    subgraph Deliveries[DeliveryWorker poll loop]
-        DEL_TICK[Delivery loop<br/>every 500ms]
-        DEL_STEP[Claim up to 20 deliveries<br/>round-robin across companies]
-        DEL_SWEEP[Sweep expired leases and orphaned dependencies<br/>every 30s]
-
-        DEL_TICK --> DEL_STEP
+        SCHED_TICK --> SCHED
+        MAINT_TICK --> REAP --> QUORUM --> CENSUS
     end
 
     PENDING -->|due| CLAIM
-    PROCESSING -->|lease expired| CLAIM
     CLAIM --> PROCESSING
+    SCHED -->|scheduled_agent_run| PENDING
+    PROCESSING -->|lease expired| REAP
+    REAP -->|attempts left| PENDING
+    REAP -->|attempts exhausted| DEAD
 
     subgraph Execute[Claimed task execution]
-        LOAD[Deserialize payload as InboundIngestResult<br/>and hydrate current configuration]
-        IDEMPOTENT{Saved outbound reply<br/>already exists?}
-        PRIOR_OK[Reuse saved reply across target threads]
-        PRIOR_ERROR[Return the saved agent failure]
-        AGENTS[Execute matched channel agents<br/>including sequential pipelines]
-        HITL{Approval or third-party<br/>pause requested?}
-        RENEW[Renew lease immediately before dispatch]
-        DISPATCH[Send deterministic task reply<br/>task:task_id:agent-reply]
-        PERSIST[Save outbound messages<br/>and execution result in task payload]
-        RESULT{Execution result}
+        LOAD[Decode the payload and reload<br/>the channel's current configuration]
+        IDEMPOTENT{Outbound reply<br/>already saved?}
+        REUSE[Associate the saved reply<br/>with any thread still missing it]
+        AGENTS[Run each matched channel agent<br/>in pipeline order, memory recalled per turn]
+        HITL{Approval or outreach<br/>requested?}
+        PLAN[Freeze the reply and its delivery parts<br/>idempotency key derived from the task]
+        COMMIT_RUN[Fenced transaction<br/>reply message, thread associations,<br/>deliveries and audit payload]
+        MEM[Persist memories after the commit]
+        RESULT{Run outcome}
 
         LOAD --> IDEMPOTENT
-        IDEMPOTENT -->|successful reply| PRIOR_OK
-        IDEMPOTENT -->|saved failure reply| PRIOR_ERROR
+        IDEMPOTENT -->|yes| REUSE
         IDEMPOTENT -->|no| AGENTS --> HITL
-        HITL -->|no| RENEW --> DISPATCH --> PERSIST --> RESULT
-        PRIOR_OK --> RESULT
-        PRIOR_ERROR --> RESULT
+        HITL -->|no| PLAN --> COMMIT_RUN --> MEM --> RESULT
+        REUSE --> RESULT
     end
 
     PROCESSING --> LOAD
-    PROCESSING -. background heartbeat every 5 minutes .-> PROCESSING
-    RESULT -->|success and lease still owned| COMPLETED
-    RESULT -->|error| RETRY{Next retry reaches max?}
-    RETRY -->|no: delay 60s, then 120s| PENDING
-    RETRY -->|yes: third failed attempt| DEAD
-    RENEW -->|lease lost| RETRY
+    PROCESSING -. lease renewed every 5 minutes .-> PROCESSING
+    RESULT -->|replied, or nothing to answer| COMPLETED
+    RESULT -->|failed, timed out, interrupted, lease lost| RETRY{Attempts exhausted?}
+    RETRY -->|no — 30s doubled per attempt, so 60s then 120s| PENDING
+    RETRY -->|yes — third attempt, or a terminal failure| DEAD
 
-    subgraph Pauses[Approval, waiting, and manual control]
-        APPROVAL_ACTION{Approval action}
+    subgraph Pauses[Approval, waiting and manual control]
+        APPROVAL_ACTION{Approval link action}
+        REPLY[Authorized third-party reply recorded]
+        TIMEOUT[Quorum expired below its threshold]
         STOP[Manual stop]
         RESUME[Manual resume]
-        REPLY[Authorized third-party reply]
-        TIMEOUT[Quorum timeout below threshold]
 
         APPROVAL --> APPROVAL_ACTION
         APPROVAL_ACTION -->|approve, default, or proceed partial| PENDING
@@ -188,52 +194,58 @@ flowchart TD
     end
 
     HITL -->|approval required| APPROVAL
-    HITL -->|wait for replies| WAITING
+    HITL -->|awaiting replies| WAITING
     QUORUM -. finds due waits .-> TIMEOUT
-    PROCESSING -. stop clears lease; in-flight call is fenced later .-> STOP
     PENDING -.-> STOP
+    PROCESSING -. a stop clears the lease and fences the in-flight run out .-> STOP
     APPROVAL -.-> STOP
     WAITING -.-> STOP
 
     subgraph Delivery[Generic delivery queue]
-        OUT_PENDING[(pending)]
-        OUT_RETRYABLE[(retryable<br/>backed off)]
+        OUT_PENDING[(pending<br/>held until its dependency lands)]
+        OUT_RETRYABLE[(retryable<br/>available_at backoff)]
         OUT_SENDING[(sending<br/>2-minute lease)]
-        OUT_SENT[(delivered)]
+        OUT_DELIVERED[(delivered)]
         OUT_UNKNOWN[(outcome_unknown<br/>never auto-retried)]
-        OUT_FAILED[(dead_letter after 5 attempts)]
-        OUT_RETRY{Provider outcome}
+        OUT_DEAD[(dead_letter)]
+        DEL_TICK[Delivery loop every 500ms]
+        DEL_CLAIM[Claim up to 20<br/>at most 4 per company]
+        PART[Per frozen part: fence the start,<br/>call the provider, fence the result]
+        SENT{Provider outcome}
+        DEL_SWEEP[Sweep every 30s<br/>expired leases and orphaned dependencies]
 
-        OUT_PENDING -->|worker claim| OUT_SENDING --> OUT_RETRY
-        OUT_RETRYABLE -->|available_at reached| OUT_SENDING
-        OUT_RETRY -->|every part delivered| OUT_SENT
-        OUT_RETRY -->|definitely refused| OUT_RETRYABLE
-        OUT_RETRY -->|acceptance ambiguous| OUT_UNKNOWN
-        OUT_RETRY -->|terminal, or fifth attempt| OUT_FAILED
+        DEL_TICK --> DEL_CLAIM
+        OUT_PENDING -->|dependency delivered| DEL_CLAIM
+        OUT_RETRYABLE -->|available_at reached| DEL_CLAIM
+        DEL_CLAIM --> OUT_SENDING --> PART --> SENT
+        SENT -->|every part delivered| OUT_DELIVERED
+        SENT -->|definitely refused| OUT_RETRYABLE
+        SENT -->|acceptance ambiguous| OUT_UNKNOWN
+        SENT -->|terminal, or the fifth attempt| OUT_DEAD
+        DEL_SWEEP -. expired before the request started .-> OUT_RETRYABLE
+        DEL_SWEEP -. expired after it started .-> OUT_UNKNOWN
+        DEL_SWEEP -. dependency gone terminal .-> OUT_DEAD
     end
 
-    APPROVAL -->|queue approval notification| OUT_PENDING
-    DEL_STEP -. drives .-> OUT_PENDING
-    DEL_SWEEP -. charges an attempt .-> OUT_SENDING
-
-    subgraph Direct[Direct simulation path]
-        DIRECT_CLAIM[Claim the newly enqueued task directly<br/>with a separate 15-minute lease]
-        DIRECT_EXEC[Execute immediately<br/>no periodic lease heartbeat]
-    end
-
-    RUN -. after enqueue .-> DIRECT_CLAIM
-    PENDING --> DIRECT_CLAIM --> DIRECT_EXEC --> LOAD
+    PRE -. system address answered .-> OUT_PENDING
+    REJECT -->|bounce| OUT_PENDING
+    COMMIT_RUN -->|the agent reply| OUT_PENDING
+    AGENTS -. outreach question .-> OUT_PENDING
+    APPROVAL -. approval request mail .-> OUT_PENDING
+    SCHED -. scheduled run mail .-> OUT_PENDING
+    PART -. addressed to another channel of this company .-> RELAY
 
     subgraph Shutdown[Shutdown]
-        CTRL[Ctrl+C]
-        SIGNAL[Broadcast shutdown]
-        WORKER_EXIT[Worker exits at outer loop boundary]
-        SMTP_EXIT[SMTP listener stops accepting]
+        CTRL[Ctrl+C or SIGTERM]
+        BROADCAST[Broadcast stop<br/>20s drain grace, then abort]
+        DRAIN[Task, delivery, inbound-event, memory,<br/>SMTP, mailbox and sampler loops stop claiming]
+        GIVEBACK[In-flight tasks recorded retryable and<br/>unsent deliveries released, both claimable again]
 
-        CTRL --> SIGNAL
-        SIGNAL --> WORKER_EXIT
-        SIGNAL --> SMTP_EXIT
+        CTRL --> BROADCAST --> DRAIN --> GIVEBACK
     end
+
+    GIVEBACK -.-> PENDING
+    GIVEBACK -.-> OUT_PENDING
 ```
 
 ### 3.5 Company Tasks HTMX Dashboard

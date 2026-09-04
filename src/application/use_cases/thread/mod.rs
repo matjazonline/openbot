@@ -111,6 +111,10 @@ mod tests;
 #[path = "inter_channel_tests.rs"]
 mod inter_channel_tests;
 
+#[cfg(test)]
+#[path = "external_reply_tests.rs"]
+mod external_reply_tests;
+
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
 /// Apply the product footer shared by agent replies before they become canonical content.

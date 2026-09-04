@@ -582,16 +582,25 @@ impl SchedulePersistence for PostgresPersistence {
     ) -> AppResult<Vec<ScheduleRun>> {
         let schedule_id_str = schedule_id.to_string();
         let rows = sqlx::query_as::<_, ScheduleRunDb>(
-            r#"SELECT t.id AS thread_id, task.id AS task_id, t.channel_id, t.subject,
+            r#"SELECT thread.id AS thread_id, task.id AS task_id, thread.channel_id, thread.subject,
                       task.status AS task_status, task.lock_expires_at,
-                      (SELECT clean_text_body FROM thread_messages tm WHERE tm.thread_id = t.id AND tm.direction = 'outbound' ORDER BY tm.created_at DESC, tm.id DESC LIMIT 1) AS latest_response,
-                      (SELECT COUNT(*)::bigint FROM thread_messages tm WHERE tm.thread_id = t.id) AS message_count,
-                      t.created_at, t.updated_at
+                      (SELECT message.clean_text_body
+                       FROM thread_messages AS association
+                       JOIN messages AS message
+                         ON (message.company_id, message.id) = (association.company_id, association.message_id)
+                       WHERE association.thread_id = thread.id
+                         AND message.direction = 'outbound'
+                       ORDER BY association.created_at DESC, association.id DESC
+                       LIMIT 1) AS latest_response,
+                      (SELECT COUNT(*)::bigint
+                       FROM thread_messages AS association
+                       WHERE association.thread_id = thread.id) AS message_count,
+                      thread.created_at, thread.updated_at
                FROM background_tasks AS task
-               JOIN threads AS t ON t.id = task.thread_id
+               JOIN threads AS thread ON thread.id = task.thread_id
                WHERE task.task_type = 'scheduled_agent_run'
                  AND task.payload->>'schedule_id' = $1
-               ORDER BY t.created_at DESC, t.id DESC
+               ORDER BY thread.created_at DESC, thread.id DESC
                OFFSET $2 LIMIT $3"#,
         )
         .bind(&schedule_id_str)
@@ -1051,6 +1060,10 @@ mod tests {
         )
         .await
         .unwrap();
+        use crate::entities::correlation::CorrelationId;
+        use crate::entities::message::{MessageDirection, MessageRole};
+        use crate::use_cases::thread::{MessageAuthorWrite, MessageWrite};
+
         assert!(
             SchedulePersistence::schedule_run_contains_thread(
                 &persistence,
@@ -1073,6 +1086,56 @@ mod tests {
             .unwrap(),
             "a task cannot authorize the thread under a different schedule"
         );
+
+        // Verify list_schedule_runs returns runs, message counts, and latest outbound responses
+        let prompt_msg = MessageWrite::internal(
+            first_thread.id,
+            MessageAuthorWrite::Platform,
+            "Audit prompt",
+            "Please run morning check",
+            MessageDirection::Inbound,
+            MessageRole::System,
+            CorrelationId::new(),
+        );
+        ThreadPersistence::create_message(&persistence, &prompt_msg)
+            .await
+            .unwrap();
+
+        let response_msg = MessageWrite::internal(
+            first_thread.id,
+            MessageAuthorWrite::Platform,
+            "Audit response",
+            "Audit complete: 0 errors found.",
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            CorrelationId::new(),
+        );
+        ThreadPersistence::create_message(&persistence, &response_msg)
+            .await
+            .unwrap();
+
+        let runs = SchedulePersistence::list_schedule_runs(&persistence, one_off.id, 0, 10)
+            .await
+            .unwrap();
+        assert_eq!(
+            runs.len(),
+            2,
+            "both durable and manual runs should be listed"
+        );
+        let first_run = runs
+            .iter()
+            .find(|r| r.thread_id == first_thread.id)
+            .expect("first thread run must be in results");
+        assert_eq!(first_run.message_count, 2);
+        assert_eq!(
+            first_run.latest_response.as_deref(),
+            Some("Audit complete: 0 errors found.")
+        );
+
+        let paged_runs = SchedulePersistence::list_schedule_runs(&persistence, one_off.id, 0, 1)
+            .await
+            .unwrap();
+        assert_eq!(paged_runs.len(), 1, "offset/limit paging should work");
 
         // A poison materialization is handed back with persisted backoff, rather than filling the
         // next batch and driving the worker's zero-delay backlog path forever.

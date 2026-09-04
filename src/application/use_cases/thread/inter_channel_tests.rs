@@ -15,16 +15,19 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::adapters::protocols::email::{EmailRenderer, EmailSender};
+use crate::application::transport::{
+    CanonicalContent, ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryKey,
+    DeliveryRequest, EmailDeliveryContext, EmailRelayTrace, NewDelivery, ProviderSendOutcome,
+    RenderedPart, TransportSender, ports::TransportRenderers,
+};
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskStatus;
 use crate::entities::transport::{DeliveryId, DeliveryPurpose, TransportKind};
+use crate::services::test_support::{
+    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, delegating_agent_config, scripted_llm,
+};
 use crate::task_queue::{CreateOutreachRequest, OutreachTargetRequest};
 use crate::transport::EmailThreading;
-use crate::transport::{
-    CanonicalContent, ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryRequest,
-    EmailDeliveryContext, EmailRelayTrace, NewDelivery, ProviderSendOutcome, TransportSender,
-    ports::TransportRenderers,
-};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
@@ -137,7 +140,7 @@ impl Fixture {
     }
 }
 
-async fn fixture(pool: sqlx::PgPool) -> Fixture {
+async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
     let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
     let suffix = Uuid::new_v4().simple().to_string();
     let owner_email = format!("loop_owner_{suffix}@example.com");
@@ -163,6 +166,25 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
     .await
     .expect("the company is created");
 
+    if agent_llm.is_some() {
+        CompanyPersistence::replace_model_connections_for_user(
+            persistence.as_ref(),
+            owner.id,
+            company.id,
+            vec![
+                crate::use_cases::company::CompanyModelConnectionWrite::new(
+                    SCRIPTED_PROVIDER,
+                    Some("scripted-key".to_string()),
+                    vec![SCRIPTED_MODEL.to_string()],
+                    true,
+                )
+                .expect("the scripted provider and model are permitted"),
+            ],
+        )
+        .await
+        .expect("the company model connection is stored");
+    }
+
     let mut channels = Vec::new();
     for (name, slug, description) in [
         ("Coordinator", "coordinator", "Fields customer requests."),
@@ -179,6 +201,9 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
                 name: name.to_string(),
                 slug: format!("{slug}-agent"),
                 description: Some(description.to_string()),
+                provider: agent_llm.map(|_| SCRIPTED_PROVIDER.to_string()),
+                model: agent_llm.map(|_| SCRIPTED_MODEL.to_string()),
+                config_json: agent_llm.map(delegating_agent_config),
                 ..AgentWrite::default()
             },
         )
@@ -209,6 +234,14 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
             .register(Arc::new(EmailRenderer::new(&config.app_domain_name)))
             .expect("one renderer registers"),
     );
+    let deliveries = DeliveryComposer::new(renderers.clone(), persistence.clone());
+    let approvals = Arc::new(ApprovalUseCases::new(
+        persistence.clone(),
+        persistence.clone(),
+        persistence.clone(),
+        deliveries.clone(),
+        config.clone(),
+    ));
     let threads = Arc::new(
         ThreadUseCases::new(
             ThreadStores {
@@ -227,7 +260,8 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
             renderers.clone(),
             config,
         )
-        .with_agent_persistence(persistence.clone()),
+        .with_agent_persistence(persistence.clone())
+        .with_approval_use_cases(approvals),
     );
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.
@@ -235,7 +269,6 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
         Arc::new(crate::adapters::protocols::email::DisabledMailTransport),
         threads.clone(),
     );
-    let deliveries = DeliveryComposer::new(renderers, persistence.clone());
 
     let channel_b = channels.pop().expect("the supplier channel exists");
     let channel_a = channels.pop().expect("the coordinator channel exists");
@@ -447,7 +480,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     let Some(pool) = test_pool().await else {
         return;
     };
-    let fx = fixture(pool).await;
+    let fx = fixture(pool, None).await;
     let address_a = fx.address(&fx.channel_a);
     let address_b = fx.address(&fx.channel_b);
 
@@ -601,6 +634,260 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     .await
     .expect("A's thread is readable");
     assert_eq!(in_a, 1, "B's answer belongs in A's original thread");
+
+    CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
+        .await
+        .expect("the fixture company is removed");
+}
+
+/// One mail a producer already committed, read back as a sender is handed it.
+struct CommittedDelivery {
+    id: DeliveryId,
+    part: RenderedPart,
+    idempotency_key: DeliveryKey,
+}
+
+impl Fixture {
+    /// Claim a queued task the way the worker does, and hand back the lease dispatch is fenced on.
+    async fn claim(&self, task_id: Uuid) -> crate::entities::task::TaskLeaseRef {
+        let claimed = TaskPersistence::claim_task(
+            self.persistence.as_ref(),
+            task_id,
+            Uuid::new_v4(),
+            Utc::now() + chrono::Duration::minutes(5),
+        )
+        .await
+        .expect("the task is claimable");
+        assert!(claimed, "the fixture's own task must be claimable");
+
+        let task = TaskPersistence::get_task_by_id(self.persistence.as_ref(), task_id)
+            .await
+            .expect("the task loads")
+            .expect("the task exists");
+        crate::entities::task::TaskLeaseRef::of(&task).expect("a claimed task holds a lease")
+    }
+
+    /// The one mail queued on a channel, read back from the queue as a sender is handed it.
+    ///
+    /// The tool writes its delivery inside the transaction that parks the task, so a test driving
+    /// a real agent cannot hold the `NewDelivery` the way `compose_hop` hands one over -- it has
+    /// to read back what was committed.
+    async fn queued_delivery_on(&self, channel_id: Uuid) -> CommittedDelivery {
+        let rows = sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT id, idempotency_key FROM message_deliveries WHERE channel_id = $1",
+        )
+        .bind(channel_id)
+        .fetch_all(&self.pool)
+        .await
+        .expect("the delivery rows are readable");
+        assert_eq!(
+            rows.len(),
+            1,
+            "expected exactly one queued mail on the channel"
+        );
+        let (delivery_id, idempotency_key) = rows.into_iter().next().expect("one row");
+
+        let (part_key, payload, digest) = sqlx::query_as::<_, (String, serde_json::Value, String)>(
+            "SELECT part_key, payload, content_digest FROM message_delivery_parts
+                  WHERE delivery_id = $1 ORDER BY part_index LIMIT 1",
+        )
+        .bind(delivery_id)
+        .fetch_one(&self.pool)
+        .await
+        .expect("the part row is readable");
+
+        CommittedDelivery {
+            id: DeliveryId::from(delivery_id),
+            part: RenderedPart {
+                index: crate::transport::PartIndex::new(0),
+                key: crate::transport::PartKey::parse(part_key)
+                    .expect("a stored part key is within its bound"),
+                payload: serde_json::from_value(payload).expect("the stored payload decodes"),
+                digest: crate::transport::ContentDigest::parse(digest)
+                    .expect("a stored digest is well formed"),
+            },
+            idempotency_key: DeliveryKey::parse(idempotency_key)
+                .expect("a stored delivery key is within its bound"),
+        }
+    }
+
+    /// Post one already-committed delivery, and settle it. The queue transition is written
+    /// directly for the reason `deliver` gives.
+    async fn deliver_committed(&self, delivery: &CommittedDelivery) -> MessageId {
+        let mut record = self.record_of(delivery.id).await;
+        record.idempotency_key = delivery.idempotency_key.clone();
+        let provider_key = match self.sender.send(&record, &delivery.part).await {
+            ProviderSendOutcome::Delivered { provider_key } => {
+                provider_key.expect("an email delivery names the Message-ID it went out under")
+            }
+            other => panic!("a same-company hop must be relayed internally, got {other:?}"),
+        };
+
+        sqlx::query(
+            "UPDATE message_delivery_parts
+                SET status = 'delivered', provider_message_key = $2,
+                    request_started_at = CURRENT_TIMESTAMP, delivered_at = CURRENT_TIMESTAMP
+              WHERE delivery_id = $1",
+        )
+        .bind(delivery.id.as_uuid())
+        .bind(provider_key.as_str())
+        .execute(&self.pool)
+        .await
+        .expect("the part records what the provider said");
+        sqlx::query(
+            "UPDATE message_deliveries SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP
+              WHERE id = $1",
+        )
+        .bind(delivery.id.as_uuid())
+        .execute(&self.pool)
+        .await
+        .expect("the delivery settles");
+
+        MessageId::from(provider_key.as_str().to_string())
+    }
+}
+
+/// The same loop as above, with the delegation actually chosen by a model.
+///
+/// The test above calls `create_outreach_and_pause` with the arguments the tool would have built,
+/// which leaves the tool itself -- its input schema, its target policy, its approval gate, and the
+/// transaction it commits -- outside the covered path. Here a scripted model calls
+/// `outreach_and_await_quorum` by name and the tool does the rest, so the invariants are reached
+/// the way a real run reaches them.
+#[tokio::test]
+async fn an_agent_that_calls_the_outreach_tool_is_resumed_by_the_answer() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    // Two turns: the tool call, then the follow-up the runtime makes with the tool's result in
+    // hand. The suspension is read from the flag the tool set, after `execute` returns.
+    let mut llm = scripted_llm(vec![
+        LlmTurn::tool_call(
+            crate::services::outreach_tool::OUTREACH_TOOL_ID,
+            serde_json::json!({
+                "target_channels": ["supplier"],
+                "subject": "Acquire supplier capacity data",
+                "body": "Return the earliest delivery date.",
+            }),
+        ),
+        LlmTurn::text("Awaiting supplier response."),
+    ])
+    .await;
+    let fx = fixture(pool, Some(&llm.base_url)).await;
+    let address_a = fx.address(&fx.channel_a);
+
+    // M0: the human writes to A.
+    let m0 = fx
+        .threads
+        .ingest_test_email(inbound(
+            &fx.owner_email,
+            &address_a,
+            "<m0-agent@example.com>",
+            "Delivery date?",
+        ))
+        .await
+        .expect("the inbound message is ingested");
+    assert!(m0.accepted, "M0 rejected: {:?}", m0.reason());
+    let thread_a = m0.thread.clone().expect("M0 opens a thread on A");
+    let task_a = m0.task_id.expect("M0 enqueues a dispatch task for A");
+
+    // A's agent runs and chooses to delegate. Everything from the tool call onward is production.
+    let lease = fx.claim(task_a).await;
+    let outcome = fx
+        .threads
+        .execute_claimed_agent_task_and_dispatch(
+            &m0,
+            ReplyDelivery::Send,
+            lease,
+            m0.correlation_id().expect("an accepted ingest has a chain"),
+        )
+        .await
+        .expect("the scripted agent delegates");
+    let requests = llm.observed();
+    assert!(
+        matches!(outcome, DispatchOutcome::Suspended),
+        "delegating must park A's task rather than answer, got {outcome:?}"
+    );
+    assert_eq!(
+        requests.len(),
+        2,
+        "the delegation must take the tool call turn and the follow-up turn, took {}",
+        requests.len()
+    );
+    // The tool really executed: its own result came back to the model. Without this the pair of
+    // calls above could just as well be a refused call and a retry.
+    assert_eq!(
+        requests[1]["messages"]
+            .as_array()
+            .and_then(|messages| messages.last())
+            .and_then(|message| message["role"].as_str()),
+        Some("tool"),
+        "the second call must carry the tool's own result back to the model"
+    );
+    assert_eq!(
+        fx.status_of(task_a).await,
+        TaskStatus::WaitingForThirdPartyReply
+    );
+
+    // The outreach row exists because the tool wrote it, not because the test did.
+    let outreaches: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM task_outreaches WHERE task_id = $1")
+            .bind(task_a)
+            .fetch_one(&fx.pool)
+            .await
+            .expect("the outreach rows are readable");
+    assert_eq!(outreaches, 1, "the tool must create exactly one outreach");
+
+    // M1: A -> B through the real sender, relayed in process.
+    let queued = fx.queued_delivery_on(fx.channel_a.id).await;
+    let m1_message_id = fx.deliver_committed(&queued).await;
+
+    let thread_b = fx
+        .thread_on(fx.channel_b.id)
+        .await
+        .expect("M1 opens a thread on B");
+    assert_ne!(thread_b.id, thread_a.id, "B must get its own thread");
+    let b_tasks = fx.tasks_for(fx.channel_b.id).await;
+    assert_eq!(b_tasks.len(), 1, "M1 enqueues exactly one task for B");
+
+    // M4: B answers A, quoting M1. Composed rather than run through a second scripted agent: what
+    // this test adds is the delegation, and B's answer is already the subject of the test above.
+    let hop_to_a = Hop {
+        source: &fx.channel_b,
+        recipient: &address_a,
+        subject: "Re: Acquire supplier capacity data",
+        body: "Earliest delivery is 14 March.",
+        in_reply_to: m1_message_id.clone(),
+        references: vec![m1_message_id.clone()],
+        hop_count: 1,
+        trace_channels: vec![fx.channel_a.id],
+        task_id: Some(b_tasks[0].id),
+        source_key: format!("task:{}:reply", b_tasks[0].id),
+        purpose: DeliveryPurpose::Reply,
+    };
+    let (answer, answer_to_a) = fx.compose_hop(hop_to_a, thread_b.id).await;
+    crate::use_cases::thread::ThreadPersistence::create_message_with_deliveries(
+        fx.persistence.as_ref(),
+        &answer,
+        std::slice::from_ref(&answer_to_a),
+    )
+    .await
+    .expect("B's answer and its delivery land together");
+    fx.deliver(&answer_to_a).await;
+
+    assert_eq!(
+        fx.status_of(task_a).await,
+        TaskStatus::Pending,
+        "B's answer must resume the task the tool parked"
+    );
+    let a_tasks = fx.tasks_for(fx.channel_a.id).await;
+    assert_eq!(
+        a_tasks.len(),
+        1,
+        "B's answer must not create a second task for A, found {:?}",
+        a_tasks.iter().map(|t| t.status).collect::<Vec<_>>()
+    );
+    assert_eq!(a_tasks[0].id, task_a);
 
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await

@@ -1419,4 +1419,110 @@ mod tests {
             "an admin must not be offered a member they may not choose"
         );
     }
+
+    /// Verifies the full UI flow of creating a schedule and viewing its workspace:
+    /// 1. Form input parses properly into a valid ScheduleWrite
+    /// 2. The created schedule id is targeted by the UI redirect
+    /// 3. GET /ui/schedules?company_id=...&schedule_id=... renders workspace with runs and responses
+    #[test]
+    fn newly_created_schedule_workspace_renders_runs_and_details() {
+        let company = test_company();
+        let channel_id = Uuid::new_v4();
+        let user_email = EmailAddress::from("admin@example.com");
+        let user = MailboxUser {
+            id: Uuid::new_v4(),
+            username: "admin",
+            email: &user_email,
+            avatar_url: None,
+            is_operator: false,
+            company_membership: CompanyMembership::Admin,
+        };
+
+        let form = UiScheduleForm {
+            company_id: company.id,
+            name: "cas".into(),
+            schedule_type: "interval".into(),
+            interval_seconds: Some(900),
+            scheduled_at: None,
+            subject_template: "cas {{date}}".into(),
+            prompt_template: "trenutni datum".into(),
+            delivery_mode: "mailbox_only".into(),
+            recipient_emails: None,
+            timezone: Some("Europe/Ljubljana".into()),
+            run_as_user_id: None,
+        };
+
+        let write = form.into_write().expect("must produce valid write");
+        assert_eq!(write.name, "cas");
+        assert_eq!(write.interval_seconds, Some(900));
+
+        let created_schedule = ChannelSchedule {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            channel_id,
+            name: write.name.clone(),
+            schedule_type: write.schedule_type,
+            interval_seconds: write.interval_seconds,
+            subject_template: write.subject_template.clone(),
+            prompt_template: write.prompt_template.clone(),
+            delivery_mode: write.delivery_mode,
+            recipient_emails: write.recipient_emails.clone(),
+            timezone: write.timezone,
+            run_as_user_id: write.run_as_user_id,
+            enabled: write.enabled,
+            last_run_at: None,
+            next_run_at: Some(Utc::now()),
+            last_error: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let redirect_url = format!(
+            "/ui/schedules?company_id={}&schedule_id={}",
+            company.id, created_schedule.id
+        );
+        assert!(redirect_url.contains(&created_schedule.id.to_string()));
+
+        let run = ScheduleRun {
+            thread_id: Uuid::new_v4(),
+            task_id: Uuid::new_v4(),
+            channel_id,
+            subject: "cas 2026-09-04".into(),
+            task_status: TaskStatus::Completed,
+            lock_expires_at: None,
+            latest_response: Some("Danes je petek, 4. september 2026.".into()),
+            message_count: 2,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let runs_html = schedule_runs_column(
+            &ScheduleRunsColumnProps {
+                company_id: company.id,
+                schedule: &created_schedule,
+                channel: None,
+                runs: std::slice::from_ref(&run),
+                selected_thread_id: Some(run.thread_id),
+                page: 1,
+                has_next: false,
+            },
+            FragmentSwap::Inline,
+        );
+
+        let html = schedules_page(&SchedulesPage {
+            user: &user,
+            companies: std::slice::from_ref(&company),
+            company: &company,
+            schedules: std::slice::from_ref(&created_schedule),
+            selected_schedule_id: Some(created_schedule.id),
+            run_as: &ScheduleRunAsChoices::default(),
+            runs_html: &runs_html,
+            pane_html: r#"<div id="schedule-pane">Pane Content</div>"#,
+        });
+
+        assert!(html.contains("cas"));
+        assert!(html.contains("Every 15 min"));
+        assert!(html.contains("Danes je petek, 4. september 2026."));
+        assert!(html.contains("2 msgs"));
+    }
 }

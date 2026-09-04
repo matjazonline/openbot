@@ -16,3 +16,6 @@ pub mod prompt_fence;
 pub mod runtime_metrics;
 pub mod spam_scanner;
 pub mod task_worker;
+
+#[cfg(test)]
+pub mod test_support;

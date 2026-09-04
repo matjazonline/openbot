@@ -1,4 +1,3 @@
-use crate::use_cases::agent::AgentWrite;
 use std::{collections::HashSet, sync::Arc};
 
 use axum::{
@@ -17,13 +16,14 @@ use crate::{
     infra::config::AppConfig,
     use_cases::{
         agent::AgentUseCases,
-        channel::{ChannelUseCases, ChannelWrite},
+        channel::ChannelUseCases,
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         user::UserUseCases,
     },
 };
 
 use super::{
+    agent::{AgentInstructionRequest, ModelOverrides, create_agent_from_instructions},
     channel::slugify,
     ui::{load_account, workspace_user},
 };
@@ -193,13 +193,9 @@ async fn channel_step(
     .into_response())
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
+#[allow(clippy::too_many_arguments)]
 async fn create_channel(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
@@ -256,92 +252,53 @@ async fn create_channel(
         .into_response());
     }
 
-    let channel_specs = selected_library_agents
-        .iter()
-        .map(|agent| (agent.name.clone(), agent.slug.clone(), agent.id))
-        .collect::<Vec<_>>();
-    let mut custom_agent = None;
+    let mut created_channels = Vec::new();
+    let mut created_agent_ids = Vec::new();
 
     if !custom_name.is_empty() {
-        let system_prompt = match agent_use_cases
-            .generate_system_prompt(user.id, company_id, custom_instructions, None, None)
-            .await
-        {
-            Ok(prompt) => prompt,
-            Err(err) => {
-                return Ok(Html(pages::onboarding_channel_page(
-                    &mailbox_user,
-                    &company,
-                    &library_agents,
-                    Some(&format!("Could not prepare the agent instructions: {err}")),
-                ))
-                .into_response());
-            }
-        };
         let slug = slugify(custom_name);
-        custom_agent = Some((
-            AgentWrite {
-                name: custom_name.to_string(),
-                slug: slug.clone(),
-                system_prompt: Some(system_prompt),
-                ..AgentWrite::default()
+        match create_agent_from_instructions(
+            &agent_use_cases,
+            AgentInstructionRequest {
+                user_id: user.id,
+                company_id,
+                name: custom_name,
+                slug: &slug,
+                instructions: custom_instructions,
+                overrides: ModelOverrides::default(),
+                run_timeout_secs: None,
+                avatar_url: None,
             },
-            ChannelWrite {
-                name: custom_name.to_string(),
-                slug,
-                enabled: true,
-                add_3rd_party: true,
-                ..ChannelWrite::default()
-            },
-        ));
-    }
-
-    let mut created_channels = Vec::new();
-    let mut custom_agent_id = None;
-    if let Some((agent, channel)) = custom_agent {
-        match channel_use_cases
-            .create_channel_with_agent(user.id, company_id, agent, channel, false)
-            .await
+        )
+        .await
         {
-            Ok(channel) => {
-                custom_agent_id = channel
-                    .agent_ids
-                    .as_ref()
-                    .and_then(|ids| ids.first().copied());
-                created_channels.push(channel);
+            Ok(provisioned) => {
+                created_agent_ids.push(provisioned.agent.id);
+                created_channels.push(provisioned.channel);
             }
             Err(err) => {
                 return Ok(Html(pages::onboarding_channel_page(
                     &mailbox_user,
                     &company,
                     &library_agents,
-                    Some(&format!("Could not create the channel and agent: {err}")),
+                    Some(&err),
                 ))
                 .into_response());
             }
         }
     }
-    for (name, slug, agent_id) in channel_specs {
-        let write = ChannelWrite {
-            name,
-            slug,
-            agent_ids: Some(vec![agent_id]),
-            enabled: true,
-            add_3rd_party: true,
-            ..ChannelWrite::default()
-        };
-        match channel_use_cases
-            .create_channel(user.id, company_id, write, false)
+
+    for library_agent in selected_library_agents {
+        match agent_use_cases
+            .create_agent_from_library(user.id, company_id, library_agent.id)
             .await
         {
-            Ok(channel) => created_channels.push(channel),
+            Ok(provisioned) => {
+                created_agent_ids.push(provisioned.agent.id);
+                created_channels.push(provisioned.channel);
+            }
             Err(err) => {
-                for channel in created_channels {
-                    let _ = channel_use_cases
-                        .delete_channel(user.id, company_id, channel.id)
-                        .await;
-                }
-                if let Some(agent_id) = custom_agent_id {
+                for agent_id in created_agent_ids {
                     let _ = agent_use_cases
                         .delete_agent(user.id, company_id, agent_id)
                         .await;
@@ -350,12 +307,13 @@ async fn create_channel(
                     &mailbox_user,
                     &company,
                     &library_agents,
-                    Some(&format!("Could not create the channels: {err}")),
+                    Some(&format!("Could not create agent from library: {err}")),
                 ))
                 .into_response());
             }
         }
     }
+
     let channel = created_channels
         .first()
         .expect("at least one channel was requested");

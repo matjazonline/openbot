@@ -34,19 +34,25 @@ Record every plan captured, before and after, in this file.
 
 `list_schedule_runs` (`src/adapters/persistence/schedule.rs:661`):
 
-    SELECT t.id AS thread_id, task.id AS task_id, t.channel_id, t.subject,
+    SELECT thread.id AS thread_id, task.id AS task_id, thread.channel_id, thread.subject,
            task.status AS task_status, task.lock_expires_at,
-           (SELECT clean_text_body FROM thread_messages tm
-              WHERE tm.thread_id = t.id AND tm.direction = 'outbound'
-              ORDER BY tm.created_at DESC, tm.id DESC LIMIT 1) AS latest_response,
-           (SELECT COUNT(*)::bigint FROM thread_messages tm
-              WHERE tm.thread_id = t.id) AS message_count,
-           t.created_at, t.updated_at
+           (SELECT message.clean_text_body
+            FROM thread_messages AS association
+            JOIN messages AS message
+              ON (message.company_id, message.id) = (association.company_id, association.message_id)
+            WHERE association.thread_id = thread.id
+              AND message.direction = 'outbound'
+            ORDER BY association.created_at DESC, association.id DESC
+            LIMIT 1) AS latest_response,
+           (SELECT COUNT(*)::bigint
+            FROM thread_messages AS association
+            WHERE association.thread_id = thread.id) AS message_count,
+           thread.created_at, thread.updated_at
       FROM background_tasks AS task
-      JOIN threads AS t ON t.id = task.thread_id
+      JOIN threads AS thread ON thread.id = task.thread_id
      WHERE task.task_type = 'scheduled_agent_run'
        AND task.payload->>'schedule_id' = $1
-     ORDER BY t.created_at DESC, t.id DESC
+     ORDER BY thread.created_at DESC, thread.id DESC
      OFFSET $2 LIMIT $3
 
 At 15 rows per page (`PAGE_SIZE`, `routes/ui_schedules.rs:246`) this is 30 extra probes per page

@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use super::*;
+use crate::adapters::protocols::email::test_support::{RecordingTransport, RefusingTransport};
 use crate::{
     entities::{
         message::CanonicalMessageId,
@@ -441,7 +442,7 @@ async fn a_delivered_mail_reports_the_message_id_it_went_out_under() {
         ),
         other => panic!("a working relay delivers: {other:?}"),
     }
-    assert_eq!(transport.sent.lock().unwrap().len(), 1);
+    assert_eq!(transport.sent().len(), 1);
 }
 
 /// A payload this build cannot read is terminal, not retryable: it will not become readable on the
@@ -492,7 +493,7 @@ async fn a_recipient_of_our_own_is_relayed_rather_than_posted() {
     let outcome = sender.send(&record(), &parts[0]).await;
     assert!(matches!(outcome, ProviderSendOutcome::Delivered { .. }));
     assert!(
-        transport.sent.lock().unwrap().is_empty(),
+        transport.sent().is_empty(),
         "an internal hop must not leave the building"
     );
 }
@@ -543,28 +544,6 @@ fn record() -> DeliveryRecord {
         idempotency_key: DeliveryKey::parse("reply:task:abc:email:customer@example.com").unwrap(),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,
-    }
-}
-
-#[derive(Default)]
-struct RecordingTransport {
-    sent: Mutex<Vec<MailMessage>>,
-}
-
-#[async_trait]
-impl MailTransport for RecordingTransport {
-    async fn send(&self, message: MailMessage) -> AppResult<()> {
-        self.sent.lock().unwrap().push(message);
-        Ok(())
-    }
-}
-
-struct RefusingTransport;
-
-#[async_trait]
-impl MailTransport for RefusingTransport {
-    async fn send(&self, _message: MailMessage) -> AppResult<()> {
-        Err(AppError::Internal("the relay closed the connection".into()))
     }
 }
 
