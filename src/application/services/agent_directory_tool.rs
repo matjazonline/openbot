@@ -19,7 +19,9 @@ use serde_json::Value;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub const AGENT_DIRECTORY_TOOL_ID: &str = "list_company_agents";
+/// Re-exported from the tool catalogue, which owns the id: the entry a picker offers and the
+/// tool that answers to it must be the same string.
+pub use crate::entities::tool_catalogue::AGENT_DIRECTORY_TOOL_ID;
 
 /// Who is asking, established by the server from the task execution context.
 ///

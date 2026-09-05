@@ -23,12 +23,19 @@ Behaviour after this phase is byte-identical for every existing agent: `spec.gra
 
 Paste the `AgentRunner::execute` / `AgentTask::run` / `build_agent` numbers here before starting:
 
+Measured on arm64/macOS, debug, at the end of phase 2 (`./scripts/stack-frames.sh target/debug/mail_agents 1`).
+Phase 2 added no level to the run chain: its one new `async` level is
+`AiAgentsApprovalShim::request_approval` on the approval callback, at 1 KiB, and that callback is
+not on this path.
+
 | Frame | Before | After |
 |---|---|---|
-| `AgentRunner::execute` | | |
-| `AgentTask::run` → `AgentHarness::run` | | |
-| `build_agent` | | |
-| whole task chain | 347 KiB (as of the last measurement in `src/AGENTS.md`) | |
+| `AgentRunner::execute` | 25 KiB | |
+| `AgentTask::run` → `AgentHarness::run` | 22 KiB | |
+| `build_agent` | 174 KiB | |
+| `build_with_tools` | 72 KiB | |
+| `builder_with_provider` | 48 KiB | |
+| whole task chain | 351 KiB — `run_task` 16 + `run_agents` 42 + `execute` 25 + `run` 22 + `build_agent` 174 + `build_with_tools` 72 (the 347 KiB in `src/AGENTS.md` is the same path, measured before this branch) | |
 
 ## Module layout
 

@@ -34,9 +34,8 @@ use crate::{
     },
     services::{
         agent_channel_tool::AgentChannelToolContext,
-        agent_runner::{
-            AgentExecutionDisposition, AgentRunner, ResolvedAgentParams, resolve_agent_params,
-        },
+        agent_runner::{AgentRunner, ResolvedAgentParams, resolve_agent_params},
+        harness::AgentExecutionDisposition,
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outreach_tool::OutreachToolContext,
     },

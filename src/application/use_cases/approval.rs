@@ -1182,8 +1182,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_simulated_server_restart_with_agent_approval_handler() {
-        use crate::services::agent_runner::AgentApprovalHandler;
-        use ai_agents::hitl::{ApprovalHandler, ApprovalRequest, ApprovalTrigger};
+        use crate::services::harness::{
+            AgentApprovalHandler, ApprovalAsk, ApprovalTrigger, ApprovalVerdict, HarnessApprovals,
+        };
+
+        // One deploy attempt, asked twice: the same trigger from two process lifetimes must hash
+        // to the same step key or the second instance re-asks a human who already answered.
+        let deploy_args = serde_json::json!({ "cmd": "deploy_prod" });
+        let deploy_attempt = || ApprovalAsk {
+            trigger: ApprovalTrigger::Tool {
+                name: "command",
+                args: &deploy_args,
+            },
+            message: "Execute deployment script",
+            context: &serde_json::Value::Null,
+        };
 
         // Shared persistent database mock across server instances
         let shared_db = Arc::new(MockApprovalPersistence {
@@ -1218,15 +1231,15 @@ mod tests {
             delegation: None,
         };
 
-        // Tool trigger attempt on Server 1
-        let req1 = ApprovalRequest::new(
-            ApprovalTrigger::tool("command", serde_json::json!({"cmd": "deploy_prod"})),
-            "Execute deployment script",
-        );
-
         // Server 1 handles request -> No prior approval -> Pauses task and creates DB token
-        let res1 = handler1.request_approval(req1).await;
-        assert!(res1.is_rejected()); // Turn paused
+        let res1 = handler1
+            .decide(deploy_attempt())
+            .await
+            .expect("the first attempt is decided");
+        assert!(
+            matches!(res1, ApprovalVerdict::Rejected { .. }),
+            "the turn is paused, not approved"
+        );
 
         // Verify pending record created in shared DB
         let token = {
@@ -1276,14 +1289,12 @@ mod tests {
             delegation: None,
         };
 
-        let req2 = ApprovalRequest::new(
-            ApprovalTrigger::tool("command", serde_json::json!({"cmd": "deploy_prod"})),
-            "Execute deployment script",
-        );
-
         // Server 2 handles same trigger -> Checks DB -> Auto-passes as Approved!
-        let res2 = handler2.request_approval(req2).await;
-        assert!(res2.is_approved()); // Auto-passed! No duplicate email!
+        let res2 = handler2
+            .decide(deploy_attempt())
+            .await
+            .expect("the second attempt is decided");
+        assert_eq!(res2, ApprovalVerdict::Approved); // Auto-passed! No duplicate email!
 
         // Ensure no extra approval rows were created in DB
         let db_list2 = shared_db.approvals.lock().unwrap();

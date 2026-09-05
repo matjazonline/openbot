@@ -42,7 +42,9 @@ use std::sync::{
 };
 use uuid::Uuid;
 
-pub const OUTREACH_TOOL_ID: &str = "outreach_and_await_quorum";
+/// Re-exported from the tool catalogue, which owns the id: the entry a picker offers and the
+/// tool that answers to it must be the same string.
+pub use crate::entities::tool_catalogue::OUTREACH_TOOL_ID;
 
 #[derive(Debug, Clone)]
 pub struct OutreachToolContext {

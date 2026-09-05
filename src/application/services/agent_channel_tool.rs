@@ -28,7 +28,9 @@ use crate::{
     },
 };
 
-pub const CREATE_AGENT_CHANNEL_TOOL_ID: &str = "create_agent_channel";
+/// Re-exported from the tool catalogue, which owns the id: the entry a picker offers and the
+/// tool that answers to it must be the same string.
+pub use crate::entities::tool_catalogue::CREATE_AGENT_CHANNEL_TOOL_ID;
 
 #[derive(Debug, Clone)]
 pub struct AgentChannelToolContext {

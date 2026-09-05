@@ -377,6 +377,52 @@ impl AuthservId {
 // [`AvatarUrl::parse`], so a misconfigured base URL cannot put a non-`http` scheme in an `<img>`.
 string_newtype!(ObjectUrl);
 
+// The id of one grantable tool: an `ai-agents` built-in (`datetime`) or one of our own native
+// tools (`outreach_and_await_quorum`).
+//
+// A newtype because it is used as a map key and because it travels beside [`SkillSlug`] in every
+// skill instruction -- the argument-swap case `src/AGENTS.md` names. It deliberately has no
+// `parse`: a tool id is valid only by being *in* the catalogue, and
+// `entities::tool_catalogue::CatalogueTool::get` is that check.
+string_newtype!(ToolId);
+
+// A skill's stable identifier within its company, and the `id:` its compiled `ai-agents` YAML
+// `skills:` entry carries.
+string_newtype!(SkillSlug);
+
+impl SkillSlug {
+    /// The longest slug the column stores.
+    pub const MAX_CHARS: usize = 64;
+
+    /// Lowercase letters, digits and single-position hyphens, neither leading nor trailing.
+    ///
+    /// The same charset as `agents_slug_format`, and mirrored by the `skills_slug_format` CHECK,
+    /// so a value that parses always stores rather than failing at the database with a constraint
+    /// name in place of a message.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("A skill slug is required.".to_string());
+        }
+        if trimmed.chars().count() > Self::MAX_CHARS {
+            return Err(format!(
+                "A skill slug may be at most {} characters.",
+                Self::MAX_CHARS
+            ));
+        }
+        let charset_ok = trimmed
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-');
+        if !charset_ok || trimmed.starts_with('-') || trimmed.ends_with('-') {
+            return Err(
+                "A skill slug uses lowercase letters, digits and hyphens, such as triage-invoice."
+                    .to_string(),
+            );
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+}
+
 fn starts_with_ignore_case(value: &str, prefix: &str) -> bool {
     value
         .get(..prefix.len())
@@ -541,5 +587,38 @@ mod tests {
 
         // A folder written with slashes around it still produces one clean join.
         assert!(ObjectKey::generated("/pictures/", "jpg").starts_with("pictures/"));
+    }
+
+    #[test]
+    fn a_skill_slug_that_parses_is_one_the_column_accepts() {
+        for accepted in ["triage-invoice", "a", "v2", "read-the-2nd-invoice"] {
+            assert_eq!(
+                SkillSlug::parse(accepted).expect(accepted).as_str(),
+                accepted
+            );
+        }
+
+        // Trimmed, because a form submits what a person typed.
+        assert_eq!(SkillSlug::parse("  triage  ").unwrap(), "triage");
+
+        for refused in [
+            "",
+            "   ",
+            "-triage",
+            "triage-",
+            "Triage",
+            "triage invoice",
+            "triage_invoice",
+            "triage.invoice",
+            "triage/../etc",
+        ] {
+            assert!(
+                SkillSlug::parse(refused).is_err(),
+                "{refused:?} would fail the skills_slug_format CHECK"
+            );
+        }
+
+        assert!(SkillSlug::parse(&"a".repeat(SkillSlug::MAX_CHARS)).is_ok());
+        assert!(SkillSlug::parse(&"a".repeat(SkillSlug::MAX_CHARS + 1)).is_err());
     }
 }

@@ -1,6 +1,6 @@
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
-use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
+use crate::entities::approval::ApprovalSubject;
 use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageRole;
@@ -12,6 +12,11 @@ use crate::services::agent_channel_tool::{
 };
 use crate::services::agent_directory_tool::{AgentDirectoryContext, ListCompanyAgentsTool};
 use crate::services::agent_trace_hooks::{AgentTraceContext, AgentTraceHooks};
+use crate::services::harness::{
+    AgentApprovalHandler, AgentExecutionDisposition, AgentExecutionOutput, ApprovalAsk,
+    ApprovalTrigger, ApprovalVerdict, HarnessApprovals, InternalDelegationPolicy,
+    internal_requires_approval,
+};
 use crate::services::outreach_tool::{
     OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
 };
@@ -20,19 +25,16 @@ use crate::task_queue::TaskPersistence;
 use crate::transport::DeliveryComposer;
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::{
-    agent::AgentPersistence,
-    channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
-    integration::ChannelBindingPersistence,
+    agent::AgentPersistence, channel::ChannelPersistence, integration::ChannelBindingPersistence,
     thread::RecipientRole,
 };
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
-use sha2::{Digest, Sha256};
 use std::sync::{
     Arc, LazyLock,
     atomic::{AtomicBool, Ordering},
 };
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 static URL_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -58,22 +60,6 @@ pub fn estimate_tokens(text: &str) -> usize {
     } else {
         trimmed.len().div_ceil(4)
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct AgentExecutionOutput {
-    pub content: String,
-    pub token_usage: TokenUsage,
-    pub disposition: AgentExecutionDisposition,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentExecutionDisposition {
-    Completed,
-    Suspended,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -566,222 +552,53 @@ fn provider_config_from_agent_config(
     Ok((provider_config, base_url, tool_choice))
 }
 
-/// Everything needed to decide whether one outreach call is purely internal, and whether that
-/// earns it a pass on human approval.
+/// The `ai-agents` side of [`HarnessApprovals`].
 ///
-/// Approval is keyed by tool ID, so the outreach tool alone cannot distinguish "ask a colleague"
-/// from "mail a stranger". This carries the resolved answer instead: the recipients are classified
-/// against the channel directory, not taken on the model's word.
-#[derive(Clone)]
-pub struct InternalDelegationPolicy {
-    pub channel_persistence: Arc<dyn ChannelPersistence>,
-    pub company_id: Uuid,
-    pub source_channel_id: Uuid,
-    /// When false, a call whose recipients are *all* same-company agent channels skips the human.
-    /// Defaults to true, so behaviour is unchanged until an operator opts in.
-    pub requires_approval: bool,
-}
-
-/// Read `tool_security.tools.outreach_and_await_quorum.config.internal_requires_approval`.
+/// Translation only, in both directions: `ApprovalTrigger` becomes an [`ApprovalAsk`] and an
+/// [`ApprovalVerdict`] becomes an `ApprovalResult`. Every decision -- the delegation exemption,
+/// the step-key hash, the prior-decision lookup and the approval mail -- lives in
+/// [`AgentApprovalHandler`], so a second harness reuses it by writing its own thirty lines of
+/// this and nothing else.
 ///
-/// Absent, malformed, or non-boolean all mean `true`: this gates outbound mail, so anything other
-/// than an explicit `false` fails closed.
-fn internal_requires_approval(config: &serde_json::Value) -> bool {
-    config
-        .get("tool_security")
-        .and_then(|v| v.get("tools"))
-        .and_then(|v| v.get(OUTREACH_TOOL_ID))
-        .and_then(|v| v.get("config"))
-        .and_then(|v| v.get("internal_requires_approval"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(true)
-}
-
-pub struct AgentApprovalHandler {
-    pub approval_use_cases: Arc<ApprovalUseCases>,
-    pub context: ApprovalSubject,
-    pub suspended: Arc<AtomicBool>,
-    /// `None` when the run has no outreach tool, so nothing can be auto-approved.
-    pub delegation: Option<InternalDelegationPolicy>,
-}
-
-impl InternalDelegationPolicy {
-    /// Whether this trigger is an outreach call whose every recipient is a callable same-company
-    /// agent channel, and policy lets such a call skip the human.
-    ///
-    /// Every uncertain case answers `false`. An unresolvable recipient, a lookup failure, or a
-    /// recipient that is not a channel all fall through to the human rather than past the gate.
-    async fn approves_without_human(&self, trigger: &ai_agents::hitl::ApprovalTrigger) -> bool {
-        if self.requires_approval {
-            return false;
-        }
-        let ai_agents::hitl::ApprovalTrigger::Tool { name, args } = trigger else {
-            return false;
-        };
-        if name != OUTREACH_TOOL_ID {
-            return false;
-        }
-        let Some(targets) = args.get("target_channels").and_then(|v| v.as_array()) else {
-            return false;
-        };
-        if args
-            .get("target_emails")
-            .and_then(|value| value.as_array())
-            .is_some_and(|targets| !targets.is_empty())
-        {
-            return false;
-        }
-        // An empty list is not "all internal"; it is a malformed call.
-        if targets.is_empty() {
-            return false;
-        }
-
-        for target in targets {
-            let Some(value) = target.as_str() else {
-                return false;
-            };
-            let Ok(selector) = crate::entities::transport::ChannelSelector::parse(value) else {
-                return false;
-            };
-            let outcome = resolve_internal_target(
-                &selector,
-                self.company_id,
-                self.source_channel_id,
-                self.channel_persistence.as_ref(),
-            )
-            .await;
-            match outcome {
-                Ok(InternalTargetOutcome::Callable(_)) => {}
-                Ok(_) => return false,
-                Err(error) => {
-                    warn!(
-                        "Could not classify outreach recipient while deciding approval, \
-                         falling back to human approval: {}",
-                        error
-                    );
-                    return false;
-                }
-            }
-        }
-        true
-    }
+/// Moves to `src/adapters/harness/ai_agents/approval.rs` in phase 3, when it stops being the only
+/// `ai_agents` reference on this side of the port.
+struct AiAgentsApprovalShim {
+    approvals: Arc<dyn HarnessApprovals>,
 }
 
 #[async_trait::async_trait]
-impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
+impl ai_agents::hitl::ApprovalHandler for AiAgentsApprovalShim {
     async fn request_approval(
         &self,
         req: ai_agents::hitl::ApprovalRequest,
     ) -> ai_agents::hitl::ApprovalResult {
-        // Ahead of the approver check on purpose: delegating to a colleague needs no approver, and
-        // a coordinator channel with no configured participant must still be able to do it.
-        if let Some(policy) = self.delegation.as_ref()
-            && policy.approves_without_human(&req.trigger).await
-        {
-            info!("Outreach targets only same-company agent channels; approval not required");
-            return ai_agents::hitl::ApprovalResult::Approved;
-        }
-
-        if self.context.approver_email.trim().is_empty() {
-            return ai_agents::hitl::ApprovalResult::rejected_with_reason(
-                "No channel participant or company team member is configured to approve this action.",
-            );
-        }
-        let step_raw = match &req.trigger {
+        let trigger = match &req.trigger {
             ai_agents::hitl::ApprovalTrigger::Tool { name, args } => {
-                format!(
-                    "tool:{}:{}",
-                    name,
-                    serde_json::to_string(args).unwrap_or_default()
-                )
+                ApprovalTrigger::Tool { name, args }
             }
             ai_agents::hitl::ApprovalTrigger::Condition { name, matched } => {
-                format!("condition:{}:{}", name, matched)
+                ApprovalTrigger::Condition { name, matched }
             }
-            ai_agents::hitl::ApprovalTrigger::State { from, to } => {
-                format!("state:{:?}:{}", from, to)
-            }
+            ai_agents::hitl::ApprovalTrigger::State { from, to } => ApprovalTrigger::State {
+                from: from.as_deref(),
+                to,
+            },
+        };
+        let context = serde_json::to_value(&req.context).unwrap_or(serde_json::Value::Null);
+        let ask = ApprovalAsk {
+            trigger,
+            message: &req.message,
+            context: &context,
         };
 
-        let thread_str = self.context.thread_id.to_string();
-        let task_str = self
-            .context
-            .suspension
-            .map(|suspension| suspension.task_id().to_string())
-            .unwrap_or_default();
-        let step_key = format!(
-            "{:x}",
-            Sha256::digest(format!("{}:{}:{}", task_str, thread_str, step_raw).as_bytes())
-        );
-
-        // Check if DB already has approval or rejection
-        if let Ok(Some(status)) = self
-            .approval_use_cases
-            .check_step_approval(
-                self.context.company_id,
-                self.context.channel_id,
-                self.context.thread_id,
-                &step_key,
-            )
-            .await
-        {
-            match status {
-                ApprovalStatus::Approved => return ai_agents::hitl::ApprovalResult::Approved,
-                ApprovalStatus::Rejected => {
-                    return ai_agents::hitl::ApprovalResult::rejected_with_reason(
-                        "Approval previously rejected by human",
-                    );
-                }
-                _ => {}
+        match self.approvals.decide(ask).await {
+            Ok(ApprovalVerdict::Approved) => ai_agents::hitl::ApprovalResult::Approved,
+            Ok(ApprovalVerdict::Rejected { reason }) => {
+                ai_agents::hitl::ApprovalResult::rejected_with_reason(reason)
             }
-        }
-
-        // New HITL Step: Create DB record & send email with links
-        let action_title = match &req.trigger {
-            ai_agents::hitl::ApprovalTrigger::Tool { name, .. } => {
-                format!("Tool Execution: {}", name)
-            }
-            ai_agents::hitl::ApprovalTrigger::Condition { name, .. } => {
-                format!("Condition Approval: {}", name)
-            }
-            ai_agents::hitl::ApprovalTrigger::State { to, .. } => {
-                format!("State Transition: {}", to)
-            }
-        };
-
-        let action_summary = if !req.message.is_empty() {
-            req.message.clone()
-        } else {
-            step_raw.clone()
-        };
-
-        let payload = serde_json::json!({
-            "trigger": req.trigger,
-            "context": req.context
-        });
-
-        let res = self
-            .approval_use_cases
-            .create_and_send_approval_request(
-                &self.context,
-                ApprovalAction {
-                    step_key,
-                    action_type: req.trigger.trigger_type().to_string(),
-                    title: action_title,
-                    summary: action_summary,
-                    payload,
-                },
-            )
-            .await;
-
-        match res {
-            Ok(_) => {
-                self.suspended.store(true, Ordering::SeqCst);
-                ai_agents::hitl::ApprovalResult::rejected_with_reason(
-                    "Approval requested via email link; task paused waiting for human decision.",
-                )
-            }
-            Err(e) => ai_agents::hitl::ApprovalResult::rejected_with_reason(e.to_string()),
+            // Explicit rather than a `?`: an approval that could not be decided rejects, and
+            // `src/AGENTS.md` wants that choice written down instead of collapsed into a default.
+            Err(error) => ai_agents::hitl::ApprovalResult::rejected_with_reason(error.to_string()),
         }
     }
 }
@@ -1394,12 +1211,13 @@ impl AgentTask {
                     source_channel_id: outreach.context.channel_id,
                     requires_approval: self.internal_requires_approval,
                 });
-            builder = builder.approval_handler(Arc::new(AgentApprovalHandler {
+            let approvals: Arc<dyn HarnessApprovals> = Arc::new(AgentApprovalHandler {
                 approval_use_cases: use_cases,
                 context,
                 suspended: self.suspended.clone(),
                 delegation,
-            }));
+            });
+            builder = builder.approval_handler(Arc::new(AiAgentsApprovalShim { approvals }));
         }
 
         let provider_type = std::str::FromStr::from_str(&self.provider_name)
@@ -1566,8 +1384,6 @@ fn count_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::channel::Channel;
-    use crate::entities::value_objects::{ChannelSlug, CompanySlug};
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
@@ -2555,217 +2371,6 @@ system_prompt: Hello
             assert_eq!(is_to, expected_to);
             assert_eq!(is_cc, expected_cc);
         }
-    }
-
-    // --- internal delegation approval policy -------------------------------------------------
-
-    struct DirectoryStub {
-        channels: Vec<Channel>,
-    }
-
-    #[async_trait::async_trait]
-    impl ChannelPersistence for DirectoryStub {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _write: crate::use_cases::channel::ChannelWrite,
-        ) -> crate::app_error::AppResult<Channel> {
-            unimplemented!()
-        }
-        async fn get_by_id(&self, _id: Uuid) -> crate::app_error::AppResult<Option<Channel>> {
-            unimplemented!()
-        }
-        async fn get_by_company_slug_and_channel_slug(
-            &self,
-            _company_slug: &CompanySlug,
-            channel_slug: &ChannelSlug,
-        ) -> crate::app_error::AppResult<Option<Channel>> {
-            Ok(self
-                .channels
-                .iter()
-                .find(|c| &c.slug == channel_slug)
-                .cloned())
-        }
-        async fn list_by_company_id(
-            &self,
-            _company_id: Uuid,
-        ) -> crate::app_error::AppResult<Vec<Channel>> {
-            Ok(self.channels.clone())
-        }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _write: crate::use_cases::channel::ChannelWrite,
-        ) -> crate::app_error::AppResult<Channel> {
-            unimplemented!()
-        }
-        async fn delete(&self, _id: Uuid) -> crate::app_error::AppResult<()> {
-            unimplemented!()
-        }
-    }
-
-    fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
-        Channel {
-            owner_agent_id: None,
-            id: Uuid::new_v4(),
-            company_id,
-            name: slug.to_string(),
-            description: None,
-            slug: slug.into(),
-            alias_slugs: Vec::new(),
-            participant_emails: None,
-            access_mode: crate::entities::channel::ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
-            agent_ids: Some(vec![Uuid::new_v4()]),
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        }
-    }
-
-    fn policy(
-        channels: Vec<Channel>,
-        company_id: Uuid,
-        requires_approval: bool,
-    ) -> InternalDelegationPolicy {
-        InternalDelegationPolicy {
-            channel_persistence: Arc::new(DirectoryStub { channels }),
-            company_id,
-            source_channel_id: Uuid::new_v4(),
-            requires_approval,
-        }
-    }
-
-    fn outreach_trigger(channels: &[&str], emails: &[&str]) -> ai_agents::hitl::ApprovalTrigger {
-        ai_agents::hitl::ApprovalTrigger::Tool {
-            name: OUTREACH_TOOL_ID.to_string(),
-            args: serde_json::json!({
-                "target_channels": channels,
-                "target_emails": emails,
-            }),
-        }
-    }
-
-    #[tokio::test]
-    async fn an_all_internal_call_skips_the_human_when_policy_allows() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(
-            vec![agent_channel(company_id, "billing")],
-            company_id,
-            false,
-        );
-        assert!(
-            policy
-                .approves_without_human(&outreach_trigger(&["billing"], &[]))
-                .await
-        );
-    }
-
-    #[tokio::test]
-    async fn an_external_recipient_still_requires_the_human() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(
-            vec![agent_channel(company_id, "billing")],
-            company_id,
-            false,
-        );
-        assert!(
-            !policy
-                .approves_without_human(&outreach_trigger(&[], &["stranger@supplier.example"]))
-                .await
-        );
-    }
-
-    /// The case that justifies deciding per call instead of per tool: one stranger in the list
-    /// must pull the whole call back under approval.
-    #[tokio::test]
-    async fn a_mixed_call_requires_the_human() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(
-            vec![agent_channel(company_id, "billing")],
-            company_id,
-            false,
-        );
-        assert!(
-            !policy
-                .approves_without_human(&outreach_trigger(
-                    &["billing"],
-                    &["stranger@supplier.example"],
-                ))
-                .await
-        );
-    }
-
-    #[tokio::test]
-    async fn a_platform_address_with_no_such_channel_requires_the_human() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(
-            vec![agent_channel(company_id, "billing")],
-            company_id,
-            false,
-        );
-        assert!(
-            !policy
-                .approves_without_human(&outreach_trigger(&["ghost"], &[]))
-                .await
-        );
-    }
-
-    #[tokio::test]
-    async fn the_default_policy_never_skips_the_human() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(vec![agent_channel(company_id, "billing")], company_id, true);
-        assert!(
-            !policy
-                .approves_without_human(&outreach_trigger(&["billing"], &[]))
-                .await
-        );
-    }
-
-    #[tokio::test]
-    async fn an_empty_or_malformed_target_list_requires_the_human() {
-        let company_id = Uuid::new_v4();
-        let policy = policy(
-            vec![agent_channel(company_id, "billing")],
-            company_id,
-            false,
-        );
-        assert!(
-            !policy
-                .approves_without_human(&outreach_trigger(&[], &[]))
-                .await
-        );
-        assert!(
-            !policy
-                .approves_without_human(&ai_agents::hitl::ApprovalTrigger::Tool {
-                    name: OUTREACH_TOOL_ID.to_string(),
-                    args: serde_json::json!({}),
-                })
-                .await
-        );
-    }
-
-    #[test]
-    fn the_approval_flag_fails_closed_unless_explicitly_false() {
-        let explicit = serde_json::json!({
-            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
-                "config": { "internal_requires_approval": false } } } }
-        });
-        assert!(!internal_requires_approval(&explicit));
-
-        assert!(internal_requires_approval(&serde_json::json!({})));
-        let wrong_type = serde_json::json!({
-            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
-                "config": { "internal_requires_approval": "false" } } } }
-        });
-        assert!(internal_requires_approval(&wrong_type));
     }
 
     fn prompt_params() -> ResolvedAgentParams {

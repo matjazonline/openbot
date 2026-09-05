@@ -21,12 +21,28 @@
 //! truncates the body and the test sees a parse error instead of a request. This one frames the
 //! request properly -- headers, then `Content-Length` bytes -- and bounds what it will accept.
 
+use chrono::Utc;
 use serde_json::{Value, json};
+use std::sync::atomic::Ordering;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::mpsc,
 };
+use uuid::Uuid;
+
+use crate::app_error::AppResult;
+use crate::entities::{
+    channel::{Channel, ChannelAccessMode},
+    creation::CreationProvenance,
+    harness::HarnessKind,
+    task::TokenUsage,
+    value_objects::{ChannelSlug, CompanySlug},
+};
+use crate::services::harness::{
+    AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun,
+};
+use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 
 /// The largest request body the double will read before giving up.
 ///
@@ -289,4 +305,141 @@ pub fn scripted_agent_config(base_url: &str) -> Value {
             "max_tokens": 1024,
         }
     })
+}
+
+// -------------------------------------------------------------------------------------------
+// Shared doubles
+// -------------------------------------------------------------------------------------------
+
+/// A [`ChannelPersistence`] that answers only the two lookups a directory question needs.
+///
+/// Shared rather than re-declared per file: `src/AGENTS.md` puts hand-written mocks in one
+/// `test_support` module, and the internal-delegation policy, the directory tool and the harness
+/// approvals all ask the same two questions of a channel list.
+///
+/// The unanswered methods are `unimplemented!()` on purpose. A stub that returned a plausible
+/// empty value would let a test exercise a path nobody wrote a fixture for and pass.
+pub struct ChannelDirectoryStub {
+    pub channels: Vec<Channel>,
+}
+
+impl ChannelDirectoryStub {
+    pub fn new(channels: Vec<Channel>) -> Self {
+        Self { channels }
+    }
+}
+
+#[async_trait::async_trait]
+impl ChannelPersistence for ChannelDirectoryStub {
+    async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+        unimplemented!()
+    }
+
+    async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+        unimplemented!()
+    }
+
+    async fn get_by_company_slug_and_channel_slug(
+        &self,
+        _company_slug: &CompanySlug,
+        channel_slug: &ChannelSlug,
+    ) -> AppResult<Option<Channel>> {
+        Ok(self
+            .channels
+            .iter()
+            .find(|channel| &channel.slug == channel_slug)
+            .cloned())
+    }
+
+    async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+        Ok(self.channels.clone())
+    }
+
+    async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+        unimplemented!()
+    }
+
+    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+        unimplemented!()
+    }
+}
+
+/// A channel an agent answers on: enough of a [`Channel`] for a directory or delegation lookup to
+/// classify it as a callable sibling.
+pub fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
+    Channel {
+        owner_agent_id: None,
+        id: Uuid::new_v4(),
+        company_id,
+        name: slug.to_string(),
+        description: None,
+        slug: slug.into(),
+        alias_slugs: Vec::new(),
+        participant_emails: None,
+        access_mode: ChannelAccessMode::Team,
+        principal_grants: Vec::new(),
+        agent_ids: Some(vec![Uuid::new_v4()]),
+        enabled: true,
+        add_3rd_party: true,
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        created_by: CreationProvenance::system(),
+        created_at: Utc::now(),
+    }
+}
+
+/// An [`AgentHarness`] that answers without running anything.
+///
+/// For the tests that need a harness to *exist* -- registry wiring, dispatch resolution -- rather
+/// than one that thinks. Tests that need a real run point [`scripted_agent_config`] at
+/// [`ScriptedLlm`] and drive the actual harness.
+pub struct StubHarness {
+    kind: HarnessKind,
+    reply: String,
+    disposition: AgentExecutionDisposition,
+}
+
+impl StubHarness {
+    /// A harness of `kind` that completes with a fixed reply.
+    pub fn new(kind: HarnessKind) -> Self {
+        Self {
+            kind,
+            reply: "stub reply".to_string(),
+            disposition: AgentExecutionDisposition::Completed,
+        }
+    }
+
+    pub fn replying(mut self, reply: impl Into<String>) -> Self {
+        self.reply = reply.into();
+        self
+    }
+
+    /// A harness that parks instead of answering, for the caller-side suspension paths.
+    pub fn suspending(mut self) -> Self {
+        self.disposition = AgentExecutionDisposition::Suspended;
+        self
+    }
+}
+
+#[async_trait::async_trait]
+impl AgentHarness for StubHarness {
+    fn kind(&self) -> HarnessKind {
+        self.kind
+    }
+
+    async fn run(&self, run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
+        if self.disposition == AgentExecutionDisposition::Suspended {
+            run.suspended.store(true, Ordering::SeqCst);
+        }
+        Ok(AgentExecutionOutput {
+            content: self.reply.clone(),
+            token_usage: TokenUsage::default(),
+            disposition: self.disposition,
+            metadata: None,
+        })
+    }
 }
