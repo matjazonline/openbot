@@ -245,6 +245,20 @@ enum RunFailure {
     Terminal(String),
 }
 
+impl From<crate::app_error::AppError> for RunFailure {
+    fn from(error: crate::app_error::AppError) -> Self {
+        use crate::app_error::AppError;
+        match error {
+            AppError::Timeout(message) => Self::TimedOut(message),
+            AppError::BadRequest(message)
+            | AppError::NotFound(message)
+            | AppError::Conflict(message) => Self::Terminal(message),
+            AppError::InvalidCredentials => Self::Terminal("Invalid credentials".into()),
+            AppError::Database(message) | AppError::Internal(message) => Self::Retryable(message),
+        }
+    }
+}
+
 impl From<String> for RunFailure {
     fn from(message: String) -> Self {
         RunFailure::Retryable(message)
@@ -881,10 +895,7 @@ impl TaskWorker {
                     .execute_claimed_scheduled_agent_task_and_dispatch(task, lease),
             )
             .await
-            .map_err(|error| match error {
-                crate::app_error::AppError::Timeout(message) => RunFailure::TimedOut(message),
-                other => RunFailure::Retryable(other.to_string()),
-            })?;
+            .map_err(RunFailure::from)?;
 
             return Ok(match dispatch {
                 DispatchOutcome::Suspended => TaskExecutionOutcome::Suspended,
@@ -969,10 +980,7 @@ impl TaskWorker {
                 ),
         )
         .await
-        .map_err(|error| match error {
-            crate::app_error::AppError::Timeout(message) => RunFailure::TimedOut(message),
-            other => RunFailure::Retryable(other.to_string()),
-        })?;
+        .map_err(RunFailure::from)?;
 
         Ok(match dispatch {
             DispatchOutcome::Suspended => TaskExecutionOutcome::Suspended,
@@ -1220,6 +1228,26 @@ mod tests {
     };
     use tokio::sync::{Notify, Semaphore};
     use uuid::Uuid;
+
+    #[test]
+    fn application_errors_keep_their_retry_classification() {
+        assert!(matches!(
+            RunFailure::from(crate::app_error::AppError::Internal(
+                "provider unavailable".into()
+            )),
+            RunFailure::Retryable(_)
+        ));
+        assert!(matches!(
+            RunFailure::from(crate::app_error::AppError::BadRequest(
+                "invalid agent spec".into()
+            )),
+            RunFailure::Terminal(_)
+        ));
+        assert!(matches!(
+            RunFailure::from(crate::app_error::AppError::Timeout("deadline".into())),
+            RunFailure::TimedOut(_)
+        ));
+    }
 
     use crate::{
         app_error::AppResult,

@@ -61,7 +61,10 @@ fn trace_outcome(record: &ToolExecutionRecord) -> ToolTraceOutcome {
 #[async_trait]
 impl AgentHooks for AiAgentsTraceShim {
     async fn on_tool_start(&self, tool: &str, args: &Value) {
-        self.trace.tool_started(&ToolId::from(tool), args).await;
+        let argument_count = args.as_object().map_or(0, serde_json::Map::len);
+        self.trace
+            .tool_started(&ToolId::from(tool), argument_count)
+            .await;
     }
 
     async fn on_tool_complete(&self, _tool: &str, _result: &ToolResult, _duration_ms: u64) {
@@ -88,7 +91,6 @@ impl AgentHooks for AiAgentsTraceShim {
                 output_truncated: record.output_truncated,
                 policy: Some(policy.as_str()),
                 approval: approval.as_deref(),
-                cancellation_reason: record.cancellation_reason.as_deref(),
             })
             .await;
     }
@@ -98,11 +100,13 @@ impl AgentHooks for AiAgentsTraceShim {
     }
 
     async fn on_error(&self, error: &ai_agents::AgentError) {
-        self.trace.run_failed(&error.to_string()).await;
+        let _ = error;
+        self.trace.run_failed().await;
     }
 
     async fn on_handoff(&self, from: &str, to: &str, reason: &str) {
-        self.trace.handoff(from, to, reason).await;
+        let _ = reason;
+        self.trace.handoff(from, to).await;
     }
 
     async fn on_delegate_complete(&self, agent_id: &str, state: &str, duration_ms: u64) {

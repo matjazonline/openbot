@@ -86,6 +86,7 @@ async fn a_run_with_no_configured_harness_fails_instead_of_choosing_one() {
         error.to_string().contains("No agent harness is configured"),
         "unexpected error: {error}"
     );
+    assert!(matches!(error, AppError::BadRequest(_)));
 }
 
 /// A run that reached a harness and failed there is recorded and reported -- with the company's
@@ -105,6 +106,7 @@ async fn a_failed_run_is_reported_without_the_credential_that_caused_it() {
 
     assert!(!error.to_string().contains("company-api-key"), "{error}");
     assert!(error.to_string().contains("[REDACTED]"), "{error}");
+    assert!(matches!(error, AppError::Internal(_)));
 }
 
 /// A run with no task, no outreach context and no provisioning port offers the harness nothing of
@@ -116,11 +118,7 @@ fn a_run_with_no_tool_context_offers_the_harness_no_native_tools() {
     let params = ResolvedAgentParams::new(Some(&company), None).expect("params resolve");
     let runner = AgentRunner::new("Hello world", &params);
 
-    assert!(
-        runner
-            .tool_host(&Arc::new(std::sync::atomic::AtomicBool::new(false)))
-            .is_none()
-    );
+    assert!(runner.tool_host().is_none());
 }
 
 /// The whole seam, once: the runner composes, the adapter compiles, the runtime resolves its own

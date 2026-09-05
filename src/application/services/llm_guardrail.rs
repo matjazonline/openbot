@@ -1,3 +1,4 @@
+use crate::app_error::{AppError, AppResult};
 use crate::domain::entities::company::Company;
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::value_objects::{ModelName, ModelProvider};
@@ -93,14 +94,16 @@ impl LlmSpamGuardrail {
 
 impl GuardrailCheck<'_> {
     /// Full Stage 3 LLM classification evaluation.
-    pub async fn evaluate(self) -> anyhow::Result<()> {
+    pub async fn evaluate(self) -> AppResult<()> {
         // Ahead of the enable flag on purpose. The flag decides whether a message is worth an LLM
         // call, not whether one carrying an outright injection marker may proceed; the pattern list
         // is offline and free, so there is no cost to trade away here.
         if let Some(reason) = LlmSpamGuardrail::static_pattern_check(self.prompt_text) {
             warn!("Stage 3 LLM Guardrail blocked prompt via pattern match: {reason}");
             LlmSpamGuardrail::count_rejection(self.monitoring, "pattern_match");
-            anyhow::bail!("LLM Guardrail rejected message: {reason}");
+            return Err(AppError::BadRequest(format!(
+                "LLM Guardrail rejected message: {reason}"
+            )));
         }
 
         let is_enabled = self
@@ -122,7 +125,9 @@ impl GuardrailCheck<'_> {
         let Some(classifier) = self.classifier else {
             warn!("Stage 3 LLM Guardrail is enabled but no classifier is configured; rejecting");
             LlmSpamGuardrail::count_rejection(self.monitoring, "classifier_unavailable");
-            anyhow::bail!("LLM Guardrail rejected message: no classifier is configured");
+            return Err(AppError::BadRequest(
+                "LLM Guardrail rejected message: no classifier is configured".into(),
+            ));
         };
 
         let fence = UntrustedFence::new();
@@ -145,9 +150,9 @@ impl GuardrailCheck<'_> {
         let Some(decision) = LlmSpamGuardrail::parse_decision(output_str) else {
             warn!("Stage 3 LLM Guardrail returned no readable verdict; rejecting message");
             LlmSpamGuardrail::count_rejection(self.monitoring, "unparseable_verdict");
-            anyhow::bail!(
-                "LLM Guardrail rejected message: classifier returned no readable verdict"
-            );
+            return Err(AppError::BadRequest(
+                "LLM Guardrail rejected message: classifier returned no readable verdict".into(),
+            ));
         };
 
         if decision.is_spam {
@@ -173,7 +178,9 @@ impl GuardrailCheck<'_> {
                 });
             }
 
-            anyhow::bail!("LLM Guardrail rejected message: {reason_str}");
+            return Err(AppError::BadRequest(format!(
+                "LLM Guardrail rejected message: {reason_str}"
+            )));
         }
 
         Ok(())
@@ -189,7 +196,7 @@ mod tests {
     /// The classifier is deliberately absent: every assertion here is reached before an LLM call
     /// would be made, and wiring one would turn a regression into a test that talks to a live
     /// provider.
-    async fn check(config: &AppConfig, company: &Company, prompt: &str) -> anyhow::Result<()> {
+    async fn check(config: &AppConfig, company: &Company, prompt: &str) -> AppResult<()> {
         let provider = ModelProvider::canonical("google");
         let model = ModelName::canonical("gemini-2.5-flash");
         GuardrailCheck {

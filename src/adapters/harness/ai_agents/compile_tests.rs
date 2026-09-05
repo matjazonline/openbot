@@ -151,9 +151,9 @@ fn command_is_dropped_even_when_it_arrives_through_extra_config() {
     assert_eq!(output.refused_tools, [ToolId::from("command")]);
 }
 
-/// The eighteen built-ins that reach this host: arbitrary execution, the file families, the
-/// repository pair, diagnostics, an unbounded sleep inside a leased task, and a prompt for a
-/// terminal operator who does not exist in a mail server.
+/// The twenty built-ins that reach or depend on this host: arbitrary execution, the file families,
+/// the repository pair, diagnostics, an unbounded sleep inside a leased task, unrestricted HTTP,
+/// host-dependent web search, and a prompt for a terminal operator who does not exist here.
 #[test]
 fn every_host_access_builtin_is_dropped() {
     let excluded: Vec<&str> = UPSTREAM_BUILTIN_TOOL_IDS
@@ -162,8 +162,8 @@ fn every_host_access_builtin_is_dropped() {
         .collect();
     assert_eq!(
         excluded.len(),
-        18,
-        "the allowlist admits 12 of 30 built-ins"
+        20,
+        "the allowlist admits 10 of 30 built-ins"
     );
 
     for id in excluded {

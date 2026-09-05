@@ -39,7 +39,6 @@ fn run_of(spec: AgentCapabilitySpec, prompt: &str) -> AgentRun<'_> {
         approvals: None,
         tool_host: None,
         trace: None,
-        suspended: Arc::new(AtomicBool::new(false)),
     }
 }
 
@@ -65,6 +64,8 @@ async fn build_agent_wires_an_agent_from_a_production_shaped_config() -> AppResu
     let executor = Executor {
         compiled: &compiled,
         run: &run,
+        suspended: Arc::new(AtomicBool::new(false)),
+        callback_failure: Arc::new(std::sync::Mutex::new(None)),
     };
 
     let agent = executor.build_agent().await?;
@@ -92,6 +93,8 @@ async fn a_run_with_no_recipient_role_is_treated_as_addressed_directly() -> AppR
         let agent = Executor {
             compiled: &compiled,
             run: &run,
+            suspended: Arc::new(AtomicBool::new(false)),
+            callback_failure: Arc::new(std::sync::Mutex::new(None)),
         }
         .build_agent()
         .await?;

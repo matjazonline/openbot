@@ -11,7 +11,7 @@
 //! answer them without reaching back into a use case, and what keeps
 //! `ai_agents::hitl::ApprovalHandler` out of every file above the adapter.
 
-use std::sync::{Arc, atomic::AtomicBool};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -106,9 +106,6 @@ pub struct AgentRun<'a> {
     /// `None` when this run has no native tools to offer -- see [`HarnessToolHost::available`].
     pub tool_host: Option<Arc<dyn HarnessToolHost>>,
     pub trace: Option<Arc<dyn HarnessTrace>>,
-    /// Set by the approval handler or the outreach tool when the run parks awaiting a human or
-    /// another agent. The caller reads it to decide `Completed` vs `Suspended`.
-    pub suspended: Arc<AtomicBool>,
 }
 
 /// One way of running an agent.
@@ -212,12 +209,13 @@ impl ApprovalTrigger<'_> {
 
 /// The answer to one [`ApprovalAsk`].
 ///
-/// `Rejected` covers both "a human said no" and "a human has not answered yet" -- the run stops
-/// either way, and the difference is carried by the run's `suspended` flag rather than here,
-/// because that is what decides whether the durable task stays open.
+/// A pending decision is distinct from a rejection because only the former parks the durable
+/// task. Keeping that distinction in the result prevents an adapter-local side channel from
+/// becoming a second, contradictory source of run state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApprovalVerdict {
     Approved,
+    Pending { reason: String },
     Rejected { reason: String },
 }
 
@@ -225,6 +223,12 @@ impl ApprovalVerdict {
     /// Reject with `reason`, saving the `.to_string()` at each call site.
     pub fn rejected(reason: impl Into<String>) -> Self {
         Self::Rejected {
+            reason: reason.into(),
+        }
+    }
+
+    pub fn pending(reason: impl Into<String>) -> Self {
+        Self::Pending {
             reason: reason.into(),
         }
     }
@@ -310,6 +314,13 @@ pub struct NativeToolSafety {
 pub struct ToolInvocation {
     pub success: bool,
     pub output: serde_json::Value,
+    pub disposition: ToolInvocationDisposition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolInvocationDisposition {
+    Continue,
+    Suspended,
 }
 
 impl ToolInvocation {
@@ -318,6 +329,16 @@ impl ToolInvocation {
         Self {
             success: true,
             output,
+            disposition: ToolInvocationDisposition::Continue,
+        }
+    }
+
+    /// A tool that completed its durable work and parked the enclosing run.
+    pub fn suspended(output: serde_json::Value) -> Self {
+        Self {
+            success: true,
+            output,
+            disposition: ToolInvocationDisposition::Suspended,
         }
     }
 
@@ -327,7 +348,12 @@ impl ToolInvocation {
         Self {
             success: false,
             output: serde_json::Value::String(reason.into()),
+            disposition: ToolInvocationDisposition::Continue,
         }
+    }
+
+    pub const fn suspends_run(&self) -> bool {
+        matches!(self.disposition, ToolInvocationDisposition::Suspended)
     }
 
     /// The output as a model-facing string.
@@ -356,11 +382,11 @@ impl ToolInvocation {
 ///
 /// Nothing here carries arguments or outputs. They are whatever the sender wrote, and
 /// `src/AGENTS.md` rules out putting message bodies in spans; what crosses is the shape of the
-/// call, not its content. [`HarnessTrace::tool_started`] is the one exception and takes the
-/// arguments only so the implementation can record their *names*.
+/// call, not its content. Even argument names stay adapter-side: an open-object schema can make
+/// them sender-controlled content too.
 #[async_trait]
 pub trait HarnessTrace: Send + Sync {
-    async fn tool_started(&self, tool: &ToolId, args: &serde_json::Value);
+    async fn tool_started(&self, tool: &ToolId, argument_count: usize);
 
     /// One finished call, retries folded in. The authoritative callback: a harness may skip
     /// [`Self::tool_started`] entirely, so nothing may depend on having seen it.
@@ -370,13 +396,14 @@ pub trait HarnessTrace: Send + Sync {
     async fn approval_requested(&self, request_id: &str);
 
     /// Control passed to another agent.
-    async fn handoff(&self, from: &str, to: &str, reason: &str);
+    async fn handoff(&self, from: &str, to: &str);
 
     /// A delegated step finished, in the state it left behind.
     async fn delegate_finished(&self, agent: &str, state: &str, duration_ms: u64);
 
-    /// The run reported an error. `error` is already rendered, and already sanitized.
-    async fn run_failed(&self, error: &str);
+    /// The run reported an error. Details stay on the harness side, where its credential and
+    /// content redaction rules are available.
+    async fn run_failed(&self);
 }
 
 /// One finished tool call, in fields that are all identifiers, counts or closed-set labels -- so
@@ -397,7 +424,6 @@ pub struct ToolTraceRecord<'a> {
     pub policy: Option<&'a str>,
     /// How approval decided, when approval was checked at all.
     pub approval: Option<&'a str>,
-    pub cancellation_reason: Option<&'a str>,
 }
 
 /// Which runtime path asked for a call.

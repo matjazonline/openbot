@@ -157,6 +157,27 @@ fn a_rejection_carries_the_reason_it_was_built_with() {
 }
 
 #[test]
+fn a_pending_approval_is_not_a_human_rejection() {
+    assert_eq!(
+        ApprovalVerdict::pending("waiting for a decision"),
+        ApprovalVerdict::Pending {
+            reason: "waiting for a decision".to_string(),
+        }
+    );
+    assert_ne!(
+        ApprovalVerdict::pending("waiting"),
+        ApprovalVerdict::rejected("waiting")
+    );
+}
+
+#[test]
+fn a_suspending_tool_result_carries_one_unambiguous_disposition() {
+    let invocation = ToolInvocation::suspended(json!({ "status": "waiting" }));
+    assert!(invocation.success);
+    assert!(invocation.suspends_run());
+}
+
+#[test]
 fn every_trace_label_is_distinct_and_bounded() {
     let sources = [
         ToolTraceSource::Model,

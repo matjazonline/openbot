@@ -22,7 +22,7 @@ Which of the three a run can serve is decided by the contexts it was given: outr
 
 ## The platform allowlist
 
-Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Twelve of the runtime's thirty built-ins are on that list, plus the three above. The eighteen absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep` and `ask_user` — execute in this process, on this host, with no sandbox, and inbound mail is an untrusted prompt source.
+Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Eleven of the runtime's thirty built-ins are on that list, plus the three above. The nineteen absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep`, `ask_user`, and unrestricted `http` — execute in this process, on this host, with no sandbox, or expose unchecked host networking. Inbound mail is an untrusted prompt source. The bounded `web_fetch` and `web_search` tools remain available for public-web reads.
 
 The list has no environment override and no per-company escape. A grant naming anything else is dropped when the configuration is compiled, whichever route it arrived by, and logged with the agent it belonged to. Revisit it when — and only when — a sandboxed harness exists to run those tools in.
 

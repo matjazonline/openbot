@@ -29,10 +29,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Re-exported from the tool catalogue, which owns the id: the entry a picker offers and the
@@ -108,7 +105,6 @@ pub struct OutreachAndAwaitQuorumTool {
     /// their deliveries all land in one transaction.
     deliveries: DeliveryComposer,
     context: OutreachToolContext,
-    suspended: Arc<AtomicBool>,
     policy_config: Option<Value>,
 }
 
@@ -118,14 +114,12 @@ impl OutreachAndAwaitQuorumTool {
         channel_persistence: Arc<dyn ChannelPersistence>,
         deliveries: DeliveryComposer,
         context: OutreachToolContext,
-        suspended: Arc<AtomicBool>,
     ) -> Self {
         Self {
             persistence,
             channel_persistence,
             deliveries,
             context,
-            suspended,
             policy_config: None,
         }
     }
@@ -235,11 +229,6 @@ impl OutreachAndAwaitQuorumTool {
             }
         };
 
-        // Suspending parks the whole agent run until the replies arrive or the outreach times out.
-        if progress.suspended {
-            self.suspended.store(true, Ordering::SeqCst);
-        }
-
         let output = OutreachOutput {
             accepted: true,
             status: progress.status.as_str().to_string(),
@@ -256,6 +245,7 @@ impl OutreachAndAwaitQuorumTool {
             expires_at: progress.expires_at.to_rfc3339(),
         };
         match serde_json::to_value(&output) {
+            Ok(output) if progress.suspended => ToolInvocation::suspended(output),
             Ok(output) => ToolInvocation::success(output),
             Err(error) => {
                 ToolInvocation::failure(format!("Failed to serialize tool output: {error}"))

@@ -8,7 +8,10 @@
 //! Nothing in this file decides anything. Adding a fourth native tool means adding a declaration
 //! and a `HarnessToolHost` arm; it does not mean touching this module.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use ai_agents::{
     Tool, ToolResult,
@@ -25,11 +28,20 @@ pub struct NativeToolShim {
     /// Shared with the run rather than owned: the host is what holds the persistence handles and
     /// the task context, and every tool of one run dispatches through the same one.
     host: Arc<dyn HarnessToolHost>,
+    suspended: Arc<AtomicBool>,
 }
 
 impl NativeToolShim {
-    pub fn new(declaration: NativeToolDeclaration, host: Arc<dyn HarnessToolHost>) -> Self {
-        Self { declaration, host }
+    pub fn new(
+        declaration: NativeToolDeclaration,
+        host: Arc<dyn HarnessToolHost>,
+        suspended: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            declaration,
+            host,
+            suspended,
+        }
     }
 }
 
@@ -99,7 +111,12 @@ impl Tool for NativeToolShim {
     /// the one that applies whichever runtime is calling.
     async fn execute(&self, args: Value, _ctx: ToolExecutionContext) -> ToolResult {
         match self.host.invoke(&self.declaration.id, args).await {
-            Ok(invocation) if invocation.success => ToolResult::ok(invocation.render()),
+            Ok(invocation) if invocation.success => {
+                if invocation.suspends_run() {
+                    self.suspended.store(true, Ordering::SeqCst);
+                }
+                ToolResult::ok(invocation.render())
+            }
             // A tool that ran and said no: the model reads the reason and may try something else.
             Ok(invocation) => ToolResult::error(invocation.render()),
             // A tool that could not run at all. It is still reported to the model as a failed call
@@ -113,6 +130,8 @@ impl Tool for NativeToolShim {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::app_error::AppResult;
 
     use crate::services::agent_directory_tool::ListCompanyAgentsTool;
     use crate::services::outreach_tool::OutreachAndAwaitQuorumTool;
@@ -172,5 +191,46 @@ mod tests {
             safety_metadata(safety).side_effect_level,
             ToolSideEffectLevel::Destructive
         );
+    }
+
+    struct SuspendingHost {
+        declarations: Vec<NativeToolDeclaration>,
+    }
+
+    #[async_trait]
+    impl HarnessToolHost for SuspendingHost {
+        fn available(&self) -> &[NativeToolDeclaration] {
+            &self.declarations
+        }
+
+        async fn invoke(
+            &self,
+            _id: &crate::entities::value_objects::ToolId,
+            _args: Value,
+        ) -> AppResult<crate::services::harness::ToolInvocation> {
+            Ok(crate::services::harness::ToolInvocation::suspended(
+                serde_json::json!({ "status": "waiting" }),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_suspending_native_tool_parks_the_adapter_run() {
+        let declaration = ListCompanyAgentsTool::declaration();
+        let suspended = Arc::new(AtomicBool::new(false));
+        let host = Arc::new(SuspendingHost {
+            declarations: vec![declaration.clone()],
+        });
+        let shim = NativeToolShim::new(declaration.clone(), host, suspended.clone());
+
+        let result = shim
+            .execute(
+                Value::Null,
+                ToolExecutionContext::test(declaration.id.as_str()),
+            )
+            .await;
+
+        assert!(result.success);
+        assert!(suspended.load(Ordering::SeqCst));
     }
 }

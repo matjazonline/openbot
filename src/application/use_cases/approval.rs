@@ -1227,7 +1227,6 @@ mod tests {
         let handler1 = AgentApprovalHandler {
             approval_use_cases: server1_approval_use_cases,
             context: ctx1,
-            suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             delegation: None,
         };
 
@@ -1237,7 +1236,7 @@ mod tests {
             .await
             .expect("the first attempt is decided");
         assert!(
-            matches!(res1, ApprovalVerdict::Rejected { .. }),
+            matches!(res1, ApprovalVerdict::Pending { .. }),
             "the turn is paused, not approved"
         );
 
@@ -1285,7 +1284,6 @@ mod tests {
         let handler2 = AgentApprovalHandler {
             approval_use_cases: server2_approval_use_cases,
             context: ctx2,
-            suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             delegation: None,
         };
 

@@ -48,7 +48,12 @@ async fn an_all_internal_call_skips_the_human_when_policy_allows() {
     );
     let args = outreach_args(&["billing"], &[]);
 
-    assert!(policy.approves_without_human(&outreach(&args)).await);
+    assert!(
+        policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
@@ -61,7 +66,12 @@ async fn an_external_recipient_still_requires_the_human() {
     );
     let args = outreach_args(&[], &["stranger@supplier.example"]);
 
-    assert!(!policy.approves_without_human(&outreach(&args)).await);
+    assert!(
+        !policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
 }
 
 /// The case that justifies deciding per call instead of per tool: one stranger in the list must
@@ -76,7 +86,12 @@ async fn a_mixed_call_requires_the_human() {
     );
     let args = outreach_args(&["billing"], &["stranger@supplier.example"]);
 
-    assert!(!policy.approves_without_human(&outreach(&args)).await);
+    assert!(
+        !policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
@@ -89,7 +104,32 @@ async fn a_platform_address_with_no_such_channel_requires_the_human() {
     );
     let args = outreach_args(&["ghost"], &[]);
 
-    assert!(!policy.approves_without_human(&outreach(&args)).await);
+    assert!(
+        !policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn a_directory_failure_propagates_instead_of_becoming_a_human_request() {
+    let company_id = Uuid::new_v4();
+    let policy = InternalDelegationPolicy {
+        channel_persistence: Arc::new(
+            ChannelDirectoryStub::new(Vec::new()).failing_lookup("directory unavailable"),
+        ),
+        company_id,
+        source_channel_id: Uuid::new_v4(),
+        requires_approval: false,
+    };
+    let args = outreach_args(&["billing"], &[]);
+
+    let error = policy
+        .approves_without_human(&outreach(&args))
+        .await
+        .expect_err("an authorization lookup failure must be retryable");
+    assert!(matches!(error, crate::app_error::AppError::Database(_)));
 }
 
 #[tokio::test]
@@ -98,7 +138,12 @@ async fn the_default_policy_never_skips_the_human() {
     let policy = policy(vec![agent_channel(company_id, "billing")], company_id, true);
     let args = outreach_args(&["billing"], &[]);
 
-    assert!(!policy.approves_without_human(&outreach(&args)).await);
+    assert!(
+        !policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
@@ -111,13 +156,19 @@ async fn an_empty_or_malformed_target_list_requires_the_human() {
     );
 
     let empty = outreach_args(&[], &[]);
-    assert!(!policy.approves_without_human(&outreach(&empty)).await);
+    assert!(
+        !policy
+            .approves_without_human(&outreach(&empty))
+            .await
+            .unwrap()
+    );
 
     let no_targets_at_all = json!({});
     assert!(
         !policy
             .approves_without_human(&outreach(&no_targets_at_all))
             .await
+            .unwrap()
     );
 }
 
@@ -139,6 +190,7 @@ async fn only_the_outreach_tool_can_be_exempted() {
                 args: &args,
             })
             .await
+            .unwrap()
     );
     assert!(
         !policy
@@ -147,6 +199,7 @@ async fn only_the_outreach_tool_can_be_exempted() {
                 to: "sending",
             })
             .await
+            .unwrap()
     );
 }
 

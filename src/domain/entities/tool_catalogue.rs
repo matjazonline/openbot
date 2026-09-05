@@ -32,15 +32,15 @@ pub const AGENT_DIRECTORY_TOOL_ID: &str = "list_company_agents";
 /// leased task), and `ask_user` (blocks for a terminal operator who does not exist in a mail
 /// server). Revisit this list when -- and only when -- a sandboxed harness exists to run them in.
 ///
-/// `http` is the one entry here that reaches the network without an upstream guard: the pinned
-/// revision describes `web_fetch` and `web_search` as applying URL, redirect, DNS/IP, byte and
-/// output checks, while `http` is a plain request builder and is therefore a server-side request
-/// forgery primitive from the application host. Drop it here if that matters more than the reason
-/// an agent wants tools at all; do not add a second checkpoint elsewhere.
+/// `http` is excluded too: unlike `web_fetch`, the pinned implementation accepts arbitrary URLs,
+/// redirects, methods and headers without URL/DNS/IP or response-size checks. In this unsandboxed
+/// process that is an SSRF and resource-exhaustion primitive. `web_search` is host-dependent and
+/// has no provider here; allowing it would leave a latent network grant that silently becomes live
+/// if one is installed later, without `web_fetch`'s URL/DNS/IP protections.
 ///
 /// The drift test that proves each of these is still a built-in upstream lives in the harness
 /// adapter, where importing `ai_agents` is legitimate -- `src/domain/` must not.
-pub const ALLOWED_BUILTIN_TOOL_IDS: [&str; 12] = [
+pub const ALLOWED_BUILTIN_TOOL_IDS: [&str; 10] = [
     "calculator",
     "datetime",
     "echo",
@@ -50,9 +50,7 @@ pub const ALLOWED_BUILTIN_TOOL_IDS: [&str; 12] = [
     "template",
     "text",
     "todo",
-    "http",
     "web_fetch",
-    "web_search",
 ];
 
 /// Who implements a tool, which is also who is responsible for what it may reach.
@@ -141,22 +139,9 @@ pub const TOOL_CATALOGUE: &[CatalogueTool] = &[
         source: ToolSource::Builtin,
     },
     CatalogueTool {
-        id: "http",
-        label: "HTTP request",
-        description: "Call an external API over HTTP. Reaches the network from the mail server, \
-                      so grant it only to agents whose targets you trust.",
-        source: ToolSource::Builtin,
-    },
-    CatalogueTool {
         id: "web_fetch",
         label: "Fetch a web page",
         description: "Read one public URL, with redirect, address and response-size limits applied.",
-        source: ToolSource::Builtin,
-    },
-    CatalogueTool {
-        id: "web_search",
-        label: "Web search",
-        description: "Search the public web and return cited results.",
         source: ToolSource::Builtin,
     },
     CatalogueTool {
@@ -277,8 +262,8 @@ mod tests {
 
         assert_eq!(
             excluded.len(),
-            18,
-            "the allowlist admits 12 of 30 built-ins"
+            20,
+            "the allowlist admits 10 of 30 built-ins"
         );
 
         let filter = retain_grantable(&excluded);

@@ -32,8 +32,8 @@ pub use classifier::{ClassificationRequest, TextClassifier};
 pub use ports::{
     AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun, ApprovalAsk,
     ApprovalTrigger, ApprovalVerdict, EXECUTION_DIAGNOSTICS_KEY, HarnessApprovals, HarnessToolHost,
-    HarnessTrace, NativeToolDeclaration, NativeToolSafety, ToolInvocation, ToolTraceOutcome,
-    ToolTraceRecord, ToolTraceSource,
+    HarnessTrace, NativeToolDeclaration, NativeToolSafety, ToolInvocation,
+    ToolInvocationDisposition, ToolTraceOutcome, ToolTraceRecord, ToolTraceSource,
 };
 pub use redaction::sanitize_text;
 pub use registry::{HarnessRegistrationError, HarnessRegistry, UnsupportedHarness};

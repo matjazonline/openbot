@@ -22,7 +22,10 @@ mod tools;
 pub use classifier::AiAgentsTextClassifier;
 pub use compile::base_agent_config;
 
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 use ai_agents::{Agent, AgentBuilder};
 use async_trait::async_trait;
@@ -66,6 +69,8 @@ impl AgentHarness for AiAgentsHarness {
             .map(|host| host.available())
             .unwrap_or(&[]);
         let compiled = compile(&run.spec, run.api_key, native_tools)?;
+        let suspended = Arc::new(AtomicBool::new(false));
+        let callback_failure = Arc::new(Mutex::new(None));
 
         // A capability that vanishes without a log is a support ticket nobody can answer. Fields
         // rather than an interpolated sentence, and never the compiled YAML -- it carries the
@@ -85,16 +90,11 @@ impl AgentHarness for AiAgentsHarness {
             );
         }
 
-        if !compiled.yaml.is_empty() {
-            info!(
-                "Running agent with channel config YAML:\n{}",
-                sanitize_text(&compiled.yaml, Some(run.api_key))
-            );
-        }
-
         let executor = Executor {
             compiled: &compiled,
             run: &run,
+            suspended: suspended.clone(),
+            callback_failure: callback_failure.clone(),
         };
 
         // `build_agent` parses the agent config and wires every tool; it is the deepest point of
@@ -102,46 +102,56 @@ impl AgentHarness for AiAgentsHarness {
         let agent = Box::pin(executor.build_agent()).await?;
 
         info!(
-            "Calling agent.chat | provider: '{}', model: '{}', api key set: '{}', prompt: '{}'",
-            run.spec.provider,
-            run.spec.model,
-            !run.api_key.is_empty(),
-            sanitize_text(run.full_prompt, Some(run.api_key))
+            provider = %run.spec.provider,
+            model = %run.spec.model,
+            prompt_characters = run.full_prompt.chars().count(),
+            history_message_count = run.history_message_count,
+            "Calling agent runtime"
         );
 
         // The provider call descends into the `ai_agents` runtime, whose own `async fn` chain is
         // not ours to shrink. Boxing here caps what this side of the boundary contributes to it.
-        let response = Box::pin(agent.chat(run.full_prompt))
-            .await
-            .map_err(|error| AppError::Internal(error.to_string()))?;
-        info!(
-            "{}",
-            sanitize_text(&format!("{:?}", response), Some(run.api_key))
-        );
-
+        let response = Box::pin(agent.chat(run.full_prompt)).await;
+        if let Some(error) = callback_failure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+        {
+            return Err(error);
+        }
+        let response = response.map_err(|error| AppError::Internal(error.to_string()))?;
         let clean_content = sanitize_text(&response.content, Some(run.api_key));
         let counted = count_tokens(response.metadata.as_ref(), run.full_prompt, &clean_content);
 
         let clean_meta = response.metadata.as_ref().and_then(|meta| {
             let val = serde_json::to_value(meta).ok()?;
             let sanitized = sanitize_text(&val.to_string(), Some(run.api_key));
-            serde_json::from_str(&sanitized).ok().or(Some(val))
+            // A failed redaction round-trip must drop metadata, never fall back to the original
+            // value that may contain the credential redaction was meant to remove.
+            serde_json::from_str(&sanitized).ok()
         });
-        let observability_report = agent
-            .observability()
-            .map(|manager| serde_json::to_value(manager.generate_report()))
-            .transpose()
-            .map_err(|error| {
-                AppError::Internal(format!(
-                    "Could not render the observability report: {error}"
-                ))
-            })?;
+        let observability_report = agent.observability().and_then(|manager| {
+            match serde_json::to_value(manager.generate_report()) {
+                Ok(report) => Some(report),
+                Err(_) => {
+                    // Diagnostics must not turn a completed provider/tool run into a retry: that
+                    // could repeat external effects solely because optional telemetry failed.
+                    warn!("Could not render the agent observability report; omitting it");
+                    None
+                }
+            }
+        });
 
         let tool_names: Vec<String> = response
             .tool_calls
             .as_ref()
             .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
             .unwrap_or_default();
+        info!(
+            response_characters = clean_content.chars().count(),
+            tool_call_count = tool_names.len(),
+            "Agent runtime returned"
+        );
         let diagnostics = AgentExecutionDiagnostics {
             // Filled in by the caller, which owns the clock.
             duration_ms: 0,
@@ -162,7 +172,7 @@ impl AgentHarness for AiAgentsHarness {
         Ok(AgentExecutionOutput {
             content: clean_content,
             token_usage: TokenUsage::new(counted.prompt_tokens, counted.completion_tokens),
-            disposition: if run.suspended.load(Ordering::SeqCst) {
+            disposition: if suspended.load(Ordering::SeqCst) {
                 AgentExecutionDisposition::Suspended
             } else {
                 AgentExecutionDisposition::Completed
@@ -180,6 +190,8 @@ impl AgentHarness for AiAgentsHarness {
 struct Executor<'a> {
     compiled: &'a CompiledConfig,
     run: &'a AgentRun<'a>,
+    suspended: Arc<AtomicBool>,
+    callback_failure: Arc<Mutex<Option<AppError>>>,
 }
 
 impl Executor<'_> {
@@ -216,7 +228,11 @@ impl Executor<'_> {
         let mut builder = AgentBuilder::from_yaml(&self.compiled.yaml).map_err(build_error)?;
 
         if let Some(approvals) = self.run.approvals.clone() {
-            builder = builder.approval_handler(Arc::new(AiAgentsApprovalShim { approvals }));
+            builder = builder.approval_handler(Arc::new(AiAgentsApprovalShim {
+                approvals,
+                suspended: self.suspended.clone(),
+                failure: self.callback_failure.clone(),
+            }));
         }
 
         let provider_type =
@@ -256,6 +272,7 @@ impl Executor<'_> {
                 builder = builder.tool(Arc::new(NativeToolShim::new(
                     declaration.clone(),
                     host.clone(),
+                    self.suspended.clone(),
                 )));
             }
         }

@@ -27,7 +27,6 @@
 
 use chrono::Utc;
 use serde_json::{Value, json};
-use std::sync::atomic::Ordering;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -326,11 +325,20 @@ pub fn scripted_agent_config(base_url: &str) -> Value {
 /// empty value would let a test exercise a path nobody wrote a fixture for and pass.
 pub struct ChannelDirectoryStub {
     pub channels: Vec<Channel>,
+    lookup_error: Option<String>,
 }
 
 impl ChannelDirectoryStub {
     pub fn new(channels: Vec<Channel>) -> Self {
-        Self { channels }
+        Self {
+            channels,
+            lookup_error: None,
+        }
+    }
+
+    pub fn failing_lookup(mut self, message: impl Into<String>) -> Self {
+        self.lookup_error = Some(message.into());
+        self
     }
 }
 
@@ -349,6 +357,9 @@ impl ChannelPersistence for ChannelDirectoryStub {
         _company_slug: &CompanySlug,
         channel_slug: &ChannelSlug,
     ) -> AppResult<Option<Channel>> {
+        if let Some(message) = self.lookup_error.as_ref() {
+            return Err(crate::app_error::AppError::Database(message.clone()));
+        }
         Ok(self
             .channels
             .iter()
@@ -357,6 +368,9 @@ impl ChannelPersistence for ChannelDirectoryStub {
     }
 
     async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+        if let Some(message) = self.lookup_error.as_ref() {
+            return Err(crate::app_error::AppError::Database(message.clone()));
+        }
         Ok(self.channels.clone())
     }
 
@@ -446,12 +460,9 @@ impl AgentHarness for StubHarness {
         self.kind
     }
 
-    async fn run(&self, run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
+    async fn run(&self, _run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
         if let Some(failure) = self.failure.as_ref() {
             return Err(crate::app_error::AppError::Internal(failure.clone()));
-        }
-        if self.disposition == AgentExecutionDisposition::Suspended {
-            run.suspended.store(true, Ordering::SeqCst);
         }
         Ok(AgentExecutionOutput {
             content: self.reply.clone(),

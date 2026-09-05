@@ -23,7 +23,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -65,24 +64,16 @@ impl AgentTraceHooks {
     }
 }
 
-/// The argument *names* an object-shaped call carries. Names come from the tool's own JSON schema,
-/// not from the sender, so they say which variant of a call this was without quoting anybody.
-fn argument_keys(args: &Value) -> Vec<&str> {
-    args.as_object()
-        .map(|map| map.keys().map(String::as_str).collect())
-        .unwrap_or_default()
-}
-
 #[async_trait]
 impl HarnessTrace for AgentTraceHooks {
-    async fn tool_started(&self, tool: &ToolId, args: &Value) {
+    async fn tool_started(&self, tool: &ToolId, argument_count: usize) {
         info!(
             target: "trace::tool",
             correlation_id = %self.context.correlation_id,
             task_id = ?self.context.task_id,
             agent_id = ?self.context.agent_id,
             tool = %tool,
-            argument_keys = ?argument_keys(args),
+            argument_count,
             "Tool call started"
         );
     }
@@ -136,7 +127,6 @@ impl HarnessTrace for AgentTraceHooks {
                 // `Some("Denied")` in a log line is a Rust rendering, not a fact about the call.
                 policy = record.policy.unwrap_or("unreported"),
                 approval = record.approval.unwrap_or("not_checked"),
-                cancellation_reason = record.cancellation_reason.unwrap_or("none"),
                 "Tool call did not succeed"
             );
         }
@@ -152,25 +142,23 @@ impl HarnessTrace for AgentTraceHooks {
         );
     }
 
-    async fn run_failed(&self, error: &str) {
+    async fn run_failed(&self) {
         warn!(
             target: "trace::agent",
             correlation_id = %self.context.correlation_id,
             task_id = ?self.context.task_id,
             agent_id = ?self.context.agent_id,
-            error = %error,
             "Agent run reported an error"
         );
     }
 
-    async fn handoff(&self, from: &str, to: &str, reason: &str) {
+    async fn handoff(&self, from: &str, to: &str) {
         info!(
             target: "trace::agent",
             correlation_id = %self.context.correlation_id,
             task_id = ?self.context.task_id,
             from = %from,
             to = %to,
-            reason = %reason,
             "Control handed to another agent"
         );
     }
@@ -185,32 +173,5 @@ impl HarnessTrace for AgentTraceHooks {
             duration_ms = duration_ms,
             "Delegated step finished"
         );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-    use std::collections::HashSet;
-
-    #[test]
-    fn argument_names_are_reported_but_values_never_are() {
-        let args = json!({ "target_emails": ["someone@example.com"], "subject": "Invoice 41" });
-        // Order is serde_json's business, not ours; what matters is which names appear.
-        assert_eq!(
-            argument_keys(&args).into_iter().collect::<HashSet<_>>(),
-            HashSet::from(["target_emails", "subject"])
-        );
-        // The values are the sender's content, and nothing here can reach them.
-        let rendered = format!("{:?}", argument_keys(&args));
-        assert!(!rendered.contains("someone@example.com"));
-        assert!(!rendered.contains("Invoice 41"));
-    }
-
-    #[test]
-    fn a_non_object_argument_yields_no_names_rather_than_its_contents() {
-        assert!(argument_keys(&json!("a bare string")).is_empty());
-        assert!(argument_keys(&json!(null)).is_empty());
     }
 }

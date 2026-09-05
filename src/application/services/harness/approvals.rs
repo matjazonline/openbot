@@ -10,14 +10,11 @@
 //! [`ApprovalAsk`] and this decides it, which is what keeps the approval mail, the step-key hash
 //! and the delegation policy in one place no matter what is executing the agent.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::app_error::AppResult;
@@ -68,39 +65,40 @@ impl InternalDelegationPolicy {
     /// Whether this trigger is an outreach call whose every recipient is a callable same-company
     /// agent channel, and policy lets such a call skip the human.
     ///
-    /// Every uncertain case answers `false`. An unresolvable recipient, a lookup failure, or a
-    /// recipient that is not a channel all fall through to the human rather than past the gate.
-    async fn approves_without_human(&self, trigger: &ApprovalTrigger<'_>) -> bool {
+    /// Every uncertain value answers `false`. Persistence failures are different: they propagate
+    /// so the task can retry instead of being parked behind an approval request that may not have
+    /// been durably created.
+    async fn approves_without_human(&self, trigger: &ApprovalTrigger<'_>) -> AppResult<bool> {
         if self.requires_approval {
-            return false;
+            return Ok(false);
         }
         let ApprovalTrigger::Tool { name, args } = trigger else {
-            return false;
+            return Ok(false);
         };
         if *name != OUTREACH_TOOL_ID {
-            return false;
+            return Ok(false);
         }
         let Some(targets) = args.get("target_channels").and_then(|v| v.as_array()) else {
-            return false;
+            return Ok(false);
         };
         if args
             .get("target_emails")
             .and_then(|value| value.as_array())
             .is_some_and(|targets| !targets.is_empty())
         {
-            return false;
+            return Ok(false);
         }
         // An empty list is not "all internal"; it is a malformed call.
         if targets.is_empty() {
-            return false;
+            return Ok(false);
         }
 
         for target in targets {
             let Some(value) = target.as_str() else {
-                return false;
+                return Ok(false);
             };
             let Ok(selector) = ChannelSelector::parse(value) else {
-                return false;
+                return Ok(false);
             };
             let outcome = resolve_internal_target(
                 &selector,
@@ -108,28 +106,19 @@ impl InternalDelegationPolicy {
                 self.source_channel_id,
                 self.channel_persistence.as_ref(),
             )
-            .await;
+            .await?;
             match outcome {
-                Ok(InternalTargetOutcome::Callable(_)) => {}
-                Ok(_) => return false,
-                Err(error) => {
-                    warn!(
-                        "Could not classify outreach recipient while deciding approval, \
-                         falling back to human approval: {}",
-                        error
-                    );
-                    return false;
-                }
+                InternalTargetOutcome::Callable(_) => {}
+                _ => return Ok(false),
             }
         }
-        true
+        Ok(true)
     }
 }
 
 pub struct AgentApprovalHandler {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub context: ApprovalSubject,
-    pub suspended: Arc<AtomicBool>,
     /// `None` when the run has no outreach tool, so nothing can be auto-approved.
     pub delegation: Option<InternalDelegationPolicy>,
 }
@@ -140,7 +129,7 @@ impl HarnessApprovals for AgentApprovalHandler {
         // Ahead of the approver check on purpose: delegating to a colleague needs no approver, and
         // a coordinator channel with no configured participant must still be able to do it.
         if let Some(policy) = self.delegation.as_ref()
-            && policy.approves_without_human(&ask.trigger).await
+            && policy.approves_without_human(&ask.trigger).await?
         {
             info!("Outreach targets only same-company agent channels; approval not required");
             return Ok(ApprovalVerdict::Approved);
@@ -163,24 +152,15 @@ impl HarnessApprovals for AgentApprovalHandler {
                 self.context.thread_id,
                 &step_key,
             )
-            .await
+            .await?
         {
-            Ok(Some(ApprovalStatus::Approved)) => return Ok(ApprovalVerdict::Approved),
-            Ok(Some(ApprovalStatus::Rejected)) => {
+            Some(ApprovalStatus::Approved) => return Ok(ApprovalVerdict::Approved),
+            Some(ApprovalStatus::Rejected) => {
                 return Ok(ApprovalVerdict::rejected(
                     "Approval previously rejected by human",
                 ));
             }
-            Ok(_) => {}
-            // Deliberately not `?`: a lookup that fails has not decided anything, and the
-            // fallback below asks the human again rather than guessing. Re-asking is idempotent
-            // on the step key, so the cost of the fallback is one duplicate mail, never a grant.
-            Err(error) => warn!(
-                company_id = %self.context.company_id,
-                thread_id = %self.context.thread_id,
-                error = %error,
-                "Could not read a prior approval decision; requesting a fresh one"
-            ),
+            Some(ApprovalStatus::Pending | ApprovalStatus::Expired) | None => {}
         }
 
         let action_summary = if ask.message.is_empty() {
@@ -193,7 +173,8 @@ impl HarnessApprovals for AgentApprovalHandler {
             "context": ask.context,
         });
 
-        self.approval_use_cases
+        let approval = self
+            .approval_use_cases
             .create_and_send_approval_request(
                 &self.context,
                 ApprovalAction {
@@ -206,10 +187,15 @@ impl HarnessApprovals for AgentApprovalHandler {
             )
             .await?;
 
-        self.suspended.store(true, Ordering::SeqCst);
-        Ok(ApprovalVerdict::rejected(
-            "Approval requested via email link; task paused waiting for human decision.",
-        ))
+        Ok(match approval.status {
+            ApprovalStatus::Approved => ApprovalVerdict::Approved,
+            ApprovalStatus::Rejected => {
+                ApprovalVerdict::rejected("Approval previously rejected by human")
+            }
+            ApprovalStatus::Pending | ApprovalStatus::Expired => ApprovalVerdict::pending(
+                "Approval requested via email link; task paused waiting for human decision.",
+            ),
+        })
     }
 }
 

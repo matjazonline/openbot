@@ -15,11 +15,12 @@ pub use params::{
     DEFAULT_AGENT_NAME, DEFAULT_SYSTEM_PROMPT, ResolvedAgentParams, resolve_agent_params,
 };
 
-use std::sync::{Arc, atomic::AtomicBool};
+use std::sync::Arc;
 
 use tracing::info;
 use uuid::Uuid;
 
+use crate::app_error::{AppError, AppResult};
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::approval::ApprovalSubject;
 use crate::entities::company::Company;
@@ -257,7 +258,7 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
+    pub async fn execute(self) -> AppResult<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         let history_message_count = self.history.len();
         info!(
@@ -296,7 +297,6 @@ impl<'a> AgentRunner<'a> {
         }
 
         let harness = self.resolve_harness()?;
-        let suspended = Arc::new(AtomicBool::new(false));
         let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
         info!("Full prompt context length: {}", full_prompt.len());
 
@@ -306,10 +306,9 @@ impl<'a> AgentRunner<'a> {
             full_prompt: &full_prompt,
             history_message_count,
             recipient_role: self.recipient_role,
-            approvals: self.approvals(&suspended),
-            tool_host: self.tool_host(&suspended),
+            approvals: self.approvals(),
+            tool_host: self.tool_host(),
             trace: self.tracer(),
-            suspended,
         };
 
         // Keep the harness future inside the lease/timeout supervisor. Dropping this future drops
@@ -327,10 +326,11 @@ impl<'a> AgentRunner<'a> {
                 Ok(output)
             }
             Err(err) => {
-                let err_msg = sanitize_text(&err.to_string(), Some(key));
-                tracing::warn!("AI Agent execution failed ({err_msg})");
-                self.record_execution(duration_ms, None, Some(err_msg.clone()));
-                Err(anyhow::anyhow!("{err_msg}"))
+                let err = sanitize_error(err, key);
+                let error_type = error_type(&err);
+                tracing::warn!(error_type, "AI Agent execution failed");
+                self.record_execution(duration_ms, None, Some(error_type.to_string()));
+                Err(err)
             }
         }
     }
@@ -340,19 +340,24 @@ impl<'a> AgentRunner<'a> {
     /// A missing registry and an unregistered kind are both hard errors. Falling back to whatever
     /// else is registered would run the agent on a runtime with different tools and a different
     /// sandbox, and nothing in the reply would say so.
-    fn resolve_harness(&self) -> anyhow::Result<Arc<dyn AgentHarness>> {
+    fn resolve_harness(&self) -> AppResult<Arc<dyn AgentHarness>> {
         let kind = self.params.spec().harness;
         let registry = self.harnesses.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("No agent harness is configured for this deployment ({kind})")
+            AppError::BadRequest(format!(
+                "No agent harness is configured for this deployment ({kind})"
+            ))
         })?;
-        Ok(registry.require(kind)?.clone())
+        registry
+            .require(kind)
+            .map(Arc::clone)
+            .map_err(|error| AppError::BadRequest(error.to_string()))
     }
 
     /// Who decides the actions this run must not take on its own.
     ///
     /// `None` when the run has no approval subject: nothing about it can be approved, which is
     /// also the reason nothing about it may be auto-approved.
-    fn approvals(&self, suspended: &Arc<AtomicBool>) -> Option<Arc<dyn HarnessApprovals>> {
+    fn approvals(&self) -> Option<Arc<dyn HarnessApprovals>> {
         let (use_cases, context) = self
             .approval_use_cases
             .clone()
@@ -371,7 +376,6 @@ impl<'a> AgentRunner<'a> {
         Some(Arc::new(AgentApprovalHandler {
             approval_use_cases: use_cases,
             context,
-            suspended: suspended.clone(),
             delegation,
         }))
     }
@@ -380,7 +384,7 @@ impl<'a> AgentRunner<'a> {
     ///
     /// Registration is not a grant: what this returns is what the run *could* serve, and the
     /// harness intersects it with the capability spec's grant list.
-    fn tool_host(&self, suspended: &Arc<AtomicBool>) -> Option<Arc<dyn HarnessToolHost>> {
+    fn tool_host(&self) -> Option<Arc<dyn HarnessToolHost>> {
         let mut host = NativeToolHost::new();
 
         // All four or none: `AgentRunner::outreach_tool` sets them together, and a partial set
@@ -421,7 +425,6 @@ impl<'a> AgentRunner<'a> {
                 channel_persistence,
                 deliveries,
                 context,
-                suspended.clone(),
             );
             if let Some(policy) = self.tool_policy(OUTREACH_TOOL_ID) {
                 outreach = outreach.with_policy_config(policy);
@@ -486,6 +489,33 @@ impl<'a> AgentRunner<'a> {
             success: error_type.is_none(),
             error_type,
         });
+    }
+}
+
+/// Remove credentials without erasing the failure category the task worker uses to decide
+/// whether another attempt can help.
+fn sanitize_error(error: AppError, api_key: &str) -> AppError {
+    let clean = |message: String| sanitize_text(&message, Some(api_key));
+    match error {
+        AppError::Database(message) => AppError::Database(clean(message)),
+        AppError::InvalidCredentials => AppError::InvalidCredentials,
+        AppError::BadRequest(message) => AppError::BadRequest(clean(message)),
+        AppError::NotFound(message) => AppError::NotFound(clean(message)),
+        AppError::Conflict(message) => AppError::Conflict(clean(message)),
+        AppError::Timeout(message) => AppError::Timeout(clean(message)),
+        AppError::Internal(message) => AppError::Internal(clean(message)),
+    }
+}
+
+fn error_type(error: &AppError) -> &'static str {
+    match error {
+        AppError::Database(_) => "database",
+        AppError::InvalidCredentials => "invalid_credentials",
+        AppError::BadRequest(_) => "bad_request",
+        AppError::NotFound(_) => "not_found",
+        AppError::Conflict(_) => "conflict",
+        AppError::Timeout(_) => "timeout",
+        AppError::Internal(_) => "internal",
     }
 }
 

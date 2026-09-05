@@ -503,7 +503,7 @@ impl ThreadUseCases {
 
         let run_timeout = agent.run_timeout(self.agent_run_timeout);
         let output = match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
-            Ok(result) => result.map_err(AppError::from)?,
+            Ok(result) => result?,
             Err(_) => {
                 return Err(AppError::Timeout(format!(
                     "agent run exceeded the {}s limit",
@@ -964,7 +964,7 @@ impl ThreadUseCases {
                         .unwrap_or(self.agent_run_timeout);
                     // Boxed, not detached: dropping the `Timeout` still drops the provider call.
                     match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
-                        Ok(result) => result.map_err(AppError::from),
+                        Ok(result) => result,
                         Err(_) => Err(AppError::Timeout(format!(
                             "agent run exceeded the {}s limit",
                             run_timeout.as_secs()
