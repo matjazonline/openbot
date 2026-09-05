@@ -294,6 +294,7 @@ async fn create_agent_handler(
                     .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
+                ..AgentWrite::default()
             },
         )
         .await
@@ -418,6 +419,7 @@ async fn update_agent_handler(
                     .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
+                ..AgentWrite::default()
             },
         )
         .await
@@ -480,6 +482,7 @@ async fn create_agent_json(
                 memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
+                ..AgentWrite::default()
             },
         )
         .await?;
@@ -538,6 +541,7 @@ async fn update_agent_json(
                 memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
+                ..AgentWrite::default()
             },
         )
         .await?;
@@ -756,6 +760,9 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("You are a helpful agent.".to_string()),
             description: None,
+            harness_kind: crate::entities::harness::HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: Some(json!({ "temperature": 0.5 })),
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),

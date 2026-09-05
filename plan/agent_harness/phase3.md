@@ -146,23 +146,25 @@ Steps, in order — the order matters:
    rather than trying to reconcile two sources.
 3. **Build the tool grant:**
    ```rust
-   let mut wanted: Vec<ToolId> = spec.granted_tools.clone();
-   for skill in &spec.skills {
-       wanted.extend(skill.referenced_tool_ids());   // union — see below
-   }
-   wanted.extend(tool_host_available);               // the natives this run can actually serve
+   let mut wanted = configured_tool_ids(&config);    // legacy until phase 4 migrates it
+   wanted.extend(spec.required_tool_ids());          // direct + skill-implied grants
    let GrantFilter { granted, refused } = retain_grantable(&wanted);
+   let (granted, unavailable) = partition_native_tools_by_host_availability(
+       granted,
+       tool_host_available,
+   );
    config["tools"] = granted.iter().map(|id| json!(id.as_str())).collect();
    ```
-   **The union is not optional.** `declared_tool_ids` is built only from `tools:`
-   (`builder.rs:1190`) and `execute_tool_record_inner` checks every invocation against it
-   (`runtime.rs:4784`) — a skill's tool step included, because it arrives through
-   `impl ToolInvoker for RuntimeAgent`. A skill referencing `datetime` without `datetime` in
-   `tools:` fails mid-run with "not available in the current scope".
+   **The skill union is not optional.** The runtime checks the ordinary `tools:` scope for a skill's
+   tool step too, because it arrives through `impl ToolInvoker for RuntimeAgent`. A skill referencing
+   `datetime` without `datetime` in `tools:` fails mid-run with "not available in the current
+   scope". Host availability only removes a native grant that cannot run in this execution; it never
+   grants one. Emit only the `Simple(String)` `ToolEntry` form; we grant no MCP entries.
 
-   **The filter is not advisory.** `retain_grantable` is the platform's only enforcement point, and
-   it is sufficient because nothing else can reach an ungranted tool. Emit only the `Simple(String)`
-   `ToolEntry` form; we grant no MCP entries.
+   `retain_grantable` is the enforcement point for this ordinary list, not for every upstream
+   feature. The pinned builder separately adds grants from spawner management/orchestration and
+   persona evolution configuration. Phase 4 rejects/scrubs those paths and adds an assertion over
+   the built runtime's effective ids; do not weaken that to an assertion on this YAML list alone.
 4. **Build `skills:`** as inline `SkillDefinition`s:
    ```rust
    json!({

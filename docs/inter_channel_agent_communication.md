@@ -62,74 +62,48 @@ Grant `list_company_agents` alongside it so Agent A can discover Agent B as a ch
 instead of carrying adapter routing syntax in its prompt. An email address may be shown only as the
 initial email binding's display/delivery projection.
 
-The top-level `tools:` list is the grant itself, and it is the only thing that grants: the runtime
-builds its effective tool set from that list, so an agent that omits it is offered no tools at all
-no matter what `hitl` or `tool_security` say about them. Policy without a grant is inert.
+The agent stores `list_company_agents` and `outreach_and_await_quorum` in its typed
+`granted_tool_ids`. Before a run, the harness unions those grants with every tool selected skills
+invoke, intersects the result with the platform catalogue and the native tools available to the
+run, and logs refused or unavailable ids. See [Custom Agent Tools](custom_tools.md).
 
-What an agent asks for is an *input* to that list rather than the list itself. Before a run, the
-harness rebuilds `tools:` from the platform allowlist in `src/domain/entities/tool_catalogue.rs`,
-unions in every tool the agent's skills invoke, and drops anything the allowlist refuses or this
-particular run cannot serve — each drop logged with the agent it belonged to. See
-[Custom Agent Tools](custom_tools.md).
+A non-empty effective grant is compiled with the server-owned `llm.tool_choice: auto`, so the
+provider receives the tool declarations. Agent configuration cannot override the tool choice.
 
-A grant also has to reach the model. The runtime asks the provider for a tool choice and, given
-none, sends neither native tool definitions nor the prompt-protocol instructions -- a config that
-lists `tools:` and says nothing about `tool_choice` therefore runs with no tools, silently and
-without an error. The harness closes that gap when it compiles the configuration: any that grants at least one tool
-is given `llm.tool_choice: auto` unless it names a choice of its own, so the YAML below needs no
-`tool_choice` line. Set one explicitly only to depart from the default -- `required` to force a
-call, `none` to keep a grant on the books while turning it off.
-
-```yaml
-tools:
-  - name: list_company_agents
-  - name: outreach_and_await_quorum
-
-hitl:
-  tools:
-    outreach_and_await_quorum:
-      require_approval: true
-
-tool_security:
-  tools:
-    outreach_and_await_quorum:
-      timeout_ms: 10000
-      max_output_chars: 4000
-      config:
-        allowed_target_scope: same_company_channels
-        max_targets: 1
-        default_timeout_hours: 96
-        max_timeout_hours: 168
-        internal_requires_approval: false
+```json
+{
+  "granted_tool_ids": ["list_company_agents", "outreach_and_await_quorum"],
+  "native_tool_policy": {
+    "version": 1,
+    "outreach": {
+      "allowed_target_scope": "same_company_channels",
+      "max_targets": 1,
+      "default_timeout_hours": 96,
+      "max_timeout_hours": 168
+    }
+  }
+}
 ```
 
-Per-tool `config` blocks are read by `AgentRunner` straight off the agent's own configuration, at
-`tool_security.tools.<id>.config` -- the path shown above -- and handed to the tool. They are
-deliberately not read through the `ai-agents` tool-security engine, which is disabled by default
-and would hand every tool an empty config; repeating the same values anywhere else has no effect.
-Every key there has the same default inside the tool itself as the harness compiles into its own
-dialect, so an omitted value and a compiled one agree by construction.
-
-`require_approval: true` with `internal_requires_approval: false` is the combination that lets one agent mail strangers under approval while delegating to colleagues freely. Approval is keyed by tool ID, so the tool alone cannot tell the two apart; the server resolves every recipient against the channel directory before the approval gate and lets the call through only when all of them are callable same-company channels. A single external or unresolvable recipient pulls the whole call back under approval, and a persistence failure does the same.
+`AgentRunner` hands the typed policy directly to the native tool. Approval rules, execution
+timeouts, and output ceilings are not fields in this policy and remain server-owned. Internal
+delegation therefore requires approval just like external outreach unless the deployment changes
+its trusted server policy.
 
 Agent B should normally retain the external-only policy and approval requirements for third-party email:
 
-```yaml
-tools:
-  - name: outreach_and_await_quorum
-
-hitl:
-  tools:
-    outreach_and_await_quorum:
-      require_approval: true
-
-tool_security:
-  tools:
-    outreach_and_await_quorum:
-      config:
-        allowed_target_scope: external_only
-        max_targets: 50
-        max_timeout_hours: 72
+```json
+{
+  "granted_tool_ids": ["outreach_and_await_quorum"],
+  "native_tool_policy": {
+    "version": 1,
+    "outreach": {
+      "allowed_target_scope": "external_only",
+      "max_targets": 50,
+      "max_timeout_hours": 72
+    }
+  }
+}
 ```
 
 Supported target scopes are:
@@ -139,10 +113,6 @@ Supported target scopes are:
 | `external_only` | External email addresses only; this is the default |
 | `same_company_channels` | Canonical agent channels selected within the current company only |
 | `any` | External addresses and valid same-company agent channels |
-
-| Setting | Default | Effect |
-|---|---|---|
-| `internal_requires_approval` | `true` | When `false`, a call whose recipients are all callable same-company channels skips human approval. Any value other than an explicit `false` means `true`. |
 
 Use `same_company_channels` for coordinator agents that must not contact third parties directly.
 

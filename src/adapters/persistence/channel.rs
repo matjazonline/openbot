@@ -10,6 +10,7 @@ use crate::adapters::persistence::integration::email_binding::{
 use crate::adapters::persistence::participant::{
     create_agent_principal_on, resolve_or_create_external_identity_on,
 };
+use crate::adapters::persistence::{agent::insert_agent_on, skill::copy_library_skill_on};
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::{
     adapters::persistence::PostgresPersistence,
@@ -19,7 +20,7 @@ use crate::{
         channel::{Channel, ChannelAccessMode},
         creation::CreationProvenance,
         participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalCapability},
-        value_objects::{AvatarUrl, ChannelSlug, CompanySlug, EmailAddress},
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
@@ -376,14 +377,6 @@ impl ChannelPersistence for PostgresPersistence {
     ) -> AppResult<(Agent, Channel)> {
         let agent_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let run_timeout_secs = agent
-            .run_timeout_secs
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
-        let agent_created_by =
-            serde_json::to_value(agent.created_by.unwrap_or_else(CreationProvenance::system))
-                .map_err(|error| AppError::Internal(error.to_string()))?;
         let channel_created_by = serde_json::to_value(
             channel
                 .created_by
@@ -394,32 +387,7 @@ impl ChannelPersistence for PostgresPersistence {
         let (access_mode, participants) = channel_access(channel.participant_emails.clone());
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
-        sqlx::query(
-            r#"INSERT INTO agents
-               (id, company_id, name, slug, provider, model, system_prompt, description,
-                config_json, avatar_url, created_by, run_timeout_secs,
-                memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
-        )
-        .bind(agent_id)
-        .bind(company_id)
-        .bind(&agent.name)
-        .bind(&agent.slug)
-        .bind(&agent.provider)
-        .bind(&agent.model)
-        .bind(&agent.system_prompt)
-        .bind(&agent.description)
-        .bind(&agent.config_json)
-        .bind(agent.avatar_url.as_ref().map(AvatarUrl::as_str))
-        .bind(agent_created_by)
-        .bind(run_timeout_secs)
-        .bind(agent.memory_enabled)
-        .bind(agent.memory_persistence_mode.as_str())
-        .bind(agent.memory_recall_mode.as_str())
-        .bind(i16::from(agent.memory_max_results))
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
+        insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
 
         create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
 
@@ -645,127 +613,17 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
         agent: AgentWrite,
         channel: ChannelWrite,
     ) -> AppResult<(Agent, Channel)> {
-        let agent_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let run_timeout_secs = agent
-            .run_timeout_secs
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
-        let agent_created_by = serde_json::to_value(
-            agent
-                .created_by
-                .clone()
-                .unwrap_or_else(CreationProvenance::system),
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-        let channel_created_by = serde_json::to_value(
-            channel
-                .created_by
-                .clone()
-                .unwrap_or_else(CreationProvenance::system),
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-        let (access_mode, participants) = channel_access(channel.participant_emails.clone());
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        create_owned_agent_channel(self, company_id, agent, channel, None).await
+    }
 
-        let company_slug: String =
-            sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
-                .bind(company_id)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        let address = format!("{}@{}", channel.slug, company_slug);
-        sqlx::query(
-            r#"INSERT INTO agents
-               (id, company_id, name, slug, provider, model, system_prompt, description,
-                config_json, avatar_url, created_by, run_timeout_secs, memory_enabled,
-                memory_persistence_mode, memory_recall_mode, memory_max_results)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
-        )
-        .bind(agent_id)
-        .bind(company_id)
-        .bind(&agent.name)
-        .bind(&agent.slug)
-        .bind(&agent.provider)
-        .bind(&agent.model)
-        .bind(&agent.system_prompt)
-        .bind(&agent.description)
-        .bind(&agent.config_json)
-        .bind(agent.avatar_url.as_ref().map(AvatarUrl::as_str))
-        .bind(agent_created_by)
-        .bind(run_timeout_secs)
-        .bind(agent.memory_enabled)
-        .bind(agent.memory_persistence_mode.as_str())
-        .bind(agent.memory_recall_mode.as_str())
-        .bind(i16::from(agent.memory_max_results))
-        .execute(&mut *tx)
-        .await
-        .map_err(|error| owned_address_error(error, &address))?;
-
-        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-
-        sqlx::query(
-            r#"INSERT INTO channels (
-                    id, company_id, owner_agent_id, name, description, access_mode, enabled,
-                    add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
-                    retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                    persist_user_memory)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
-        )
-        .bind(channel_id)
-        .bind(company_id)
-        .bind(agent_id)
-        .bind(&channel.name)
-        .bind(&channel.description)
-        .bind(access_mode.as_str())
-        .bind(channel.enabled)
-        .bind(channel.add_3rd_party)
-        .bind(channel_created_by)
-        .bind(channel.retrieve_company_memory)
-        .bind(channel.retrieve_agent_memory)
-        .bind(channel.retrieve_user_memory)
-        .bind(channel.persist_company_memory)
-        .bind(channel.persist_agent_memory)
-        .bind(channel.persist_user_memory)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        insert_channel_slugs(
-            &mut tx,
-            company_id,
-            channel_id,
-            &channel.slug,
-            &channel.alias_slugs,
-        )
-        .await
-        .map_err(|error| match error {
-            AppError::BadRequest(_) => AppError::BadRequest(format!(
-                "Address '{address}' is already in use; no agent was created."
-            )),
-            other => other,
-        })?;
-        write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
-        insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
-        sqlx::query(
-            "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",
-        )
-        .bind(company_id)
-        .bind(channel_id)
-        .bind(agent_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-
-        let agent = AgentPersistence::get_by_id(self, agent_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))?;
-        let channel = load_channel(self, channel_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created channel was not found".into()))?;
-        Ok((agent, channel))
+    async fn create_owned_agent_channel_from_library(
+        &self,
+        company_id: Uuid,
+        library_agent_id: Uuid,
+        agent: AgentWrite,
+        channel: ChannelWrite,
+    ) -> AppResult<(Agent, Channel)> {
+        create_owned_agent_channel(self, company_id, agent, channel, Some(library_agent_id)).await
     }
 
     async fn update_agent_and_owned_address(
@@ -778,18 +636,141 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
     }
 }
 
-fn owned_address_error(error: sqlx::Error, address: &str) -> AppError {
-    if error
-        .as_database_error()
-        .and_then(|db| db.code())
-        .as_deref()
-        == Some("23505")
-    {
-        return AppError::BadRequest(format!(
-            "Address '{address}' is already in use; no agent was created."
-        ));
+/// Atomically provision the agent, its capabilities, its principal, and its personal channel.
+/// When the source is a library agent, its global skills are copied into the tenant first, within
+/// this same transaction, and the new agent is attached only to those tenant-owned copies.
+async fn create_owned_agent_channel(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    mut agent: AgentWrite,
+    channel: ChannelWrite,
+    library_agent_id: Option<Uuid>,
+) -> AppResult<(Agent, Channel)> {
+    let agent_id = Uuid::new_v4();
+    let channel_id = Uuid::new_v4();
+    let channel_created_by = serde_json::to_value(
+        channel
+            .created_by
+            .clone()
+            .unwrap_or_else(CreationProvenance::system),
+    )
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    let (access_mode, participants) = channel_access(channel.participant_emails.clone());
+    let mut tx = persistence.pool.begin().await.map_err(AppError::from)?;
+
+    if let Some(library_agent_id) = library_agent_id {
+        let source_exists = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM agents \
+                 WHERE id = $1 AND company_id IS NULL FOR KEY SHARE",
+        )
+        .bind(library_agent_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?
+        .is_some();
+        if !source_exists {
+            return Err(AppError::NotFound("Library agent not found.".into()));
+        }
+
+        let source_skill_ids = sqlx::query_scalar::<_, Uuid>(
+            "SELECT skill_id FROM agent_skills \
+                 WHERE agent_id = $1 ORDER BY position",
+        )
+        .bind(library_agent_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let created_by = agent
+            .created_by
+            .clone()
+            .unwrap_or_else(CreationProvenance::system);
+        let mut copied_skill_ids = Vec::with_capacity(source_skill_ids.len());
+        for source_skill_id in source_skill_ids {
+            let copied =
+                copy_library_skill_on(&mut tx, company_id, source_skill_id, &created_by).await?;
+            copied_skill_ids.push(copied.id);
+        }
+        agent.skill_ids = copied_skill_ids;
     }
-    AppError::from(error)
+
+    let company_slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
+        .bind(company_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    let address = format!("{}@{}", channel.slug, company_slug);
+    insert_agent_on(&mut tx, agent_id, Some(company_id), &agent)
+        .await
+        .map_err(|error| match error {
+            AppError::Conflict(_) => AppError::BadRequest(format!(
+                "Address '{address}' is already in use; no agent was created."
+            )),
+            other => other,
+        })?;
+
+    create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
+
+    sqlx::query(
+        r#"INSERT INTO channels (
+                    id, company_id, owner_agent_id, name, description, access_mode, enabled,
+                    add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
+                    retrieve_user_memory, persist_company_memory, persist_agent_memory,
+                    persist_user_memory)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
+    )
+    .bind(channel_id)
+    .bind(company_id)
+    .bind(agent_id)
+    .bind(&channel.name)
+    .bind(&channel.description)
+    .bind(access_mode.as_str())
+    .bind(channel.enabled)
+    .bind(channel.add_3rd_party)
+    .bind(channel_created_by)
+    .bind(channel.retrieve_company_memory)
+    .bind(channel.retrieve_agent_memory)
+    .bind(channel.retrieve_user_memory)
+    .bind(channel.persist_company_memory)
+    .bind(channel.persist_agent_memory)
+    .bind(channel.persist_user_memory)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+
+    insert_channel_slugs(
+        &mut tx,
+        company_id,
+        channel_id,
+        &channel.slug,
+        &channel.alias_slugs,
+    )
+    .await
+    .map_err(|error| match error {
+        AppError::BadRequest(_) => AppError::BadRequest(format!(
+            "Address '{address}' is already in use; no agent was created."
+        )),
+        other => other,
+    })?;
+    write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
+    insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
+    sqlx::query(
+            "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .bind(agent_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+
+    let agent = AgentPersistence::get_by_id(persistence, agent_id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Created agent was not found".into()))?;
+    let channel = load_channel(persistence, channel_id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Created channel was not found".into()))?;
+    Ok((agent, channel))
 }
 
 #[cfg(test)]

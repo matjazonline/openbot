@@ -13,7 +13,10 @@ use serde_json::{Value, json};
 
 use crate::app_error::{AppError, AppResult};
 use crate::entities::{
-    harness::AgentCapabilitySpec,
+    harness::{
+        AgentCapabilitySpec, AiAgentsAdvancedConfigV1, AiAgentsReasoningMode,
+        AiAgentsReflectionMode,
+    },
     skill::{Skill, SkillInstruction},
     tool_catalogue::{CatalogueTool, GrantFilter, ToolSource, retain_grantable},
     value_objects::ToolId,
@@ -62,20 +65,21 @@ pub struct ProviderSettings {
 
 /// Compile `spec` into runnable YAML.
 ///
-/// The order of the steps is load-bearing and is the reason this reads as a sequence rather than
-/// as a builder: the tool grant is rebuilt *after* the agent's own configuration is merged in, so
-/// a `tools:` list typed into `config_json` is filtered rather than trusted; and the `llm:`
-/// defaults are stamped *after* the grant exists, because one of them is decided by whether the
-/// grant is empty.
+/// The order is load-bearing: start from a fresh server-owned base, map only reviewed typed
+/// settings, build the effective grant from typed capability fields, then stamp credentials and
+/// model selection last. No persisted JSON is merged into the runtime document.
 pub fn compile(
     spec: &AgentCapabilitySpec,
     api_key: &str,
     native_tools: &[NativeToolDeclaration],
 ) -> AppResult<CompiledConfig> {
     let mut config = base_agent_config();
-    merge_json(&mut config, &spec.extra_config);
+    let advanced = spec.harness_config.ai_agents().ok_or_else(|| {
+        AppError::BadRequest("The stored config does not match the ai-agents harness.".into())
+    })?;
+    apply_advanced_config(&mut config, advanced);
 
-    let grant = grant_for(spec, &config, native_tools);
+    let grant = grant_for(spec, native_tools);
     if let Some(map) = config.as_object_mut() {
         // Removed rather than emitted empty when nothing survived: an agent that grants no tools
         // must compile to the document it compiled to before there was a grant list at all.
@@ -88,8 +92,7 @@ pub fn compile(
             ),
         };
     }
-    // Only overwritten when the spec has skills of its own. An agent with none is left exactly
-    // as its configuration was merged, so this phase adds no `skills:` key to any existing agent.
+    // Only emitted when the spec has skills of its own, keeping the default document minimal.
     if !spec.skills.is_empty() {
         config["skills"] = Value::Array(spec.skills.iter().map(compile_skill).collect());
     }
@@ -104,7 +107,10 @@ pub fn compile(
     );
     append_base_context_prompt(&mut config);
 
-    let provider = provider_settings(&config)?;
+    let mut provider = provider_settings(&config)?;
+    if let Some(base_url) = &spec.provider_base_url {
+        provider.base_url = Some(base_url.clone());
+    }
     let yaml = serde_yaml::to_string(&config)
         .map_err(|error| AppError::Internal(format!("Agent configuration is not YAML: {error}")))?;
 
@@ -131,13 +137,8 @@ struct ToolGrant {
 /// The union with skill tools is not optional. The runtime checks a skill's tool step against the
 /// same declared scope as a model-initiated call, so a skill naming a tool absent from `tools:`
 /// dies mid-run on "not available in the current scope" rather than at compile time.
-fn grant_for(
-    spec: &AgentCapabilitySpec,
-    merged: &Value,
-    native_tools: &[NativeToolDeclaration],
-) -> ToolGrant {
-    let mut wanted = configured_tool_ids(merged);
-    wanted.extend(spec.required_tool_ids());
+fn grant_for(spec: &AgentCapabilitySpec, native_tools: &[NativeToolDeclaration]) -> ToolGrant {
+    let wanted = spec.required_tool_ids();
 
     let GrantFilter { granted, refused } = retain_grantable(&wanted);
 
@@ -160,29 +161,6 @@ fn grant_for(
         refused,
         unavailable,
     }
-}
-
-/// The tool ids already in a merged configuration's `tools:` list.
-///
-/// `ToolEntry` upstream is untagged `Simple(String) | Structured { name, .. }`, and an MCP entry
-/// arrives in the structured form. Both are read here so that whatever an operator typed is put
-/// through the allowlist rather than silently kept or silently dropped -- we emit only the simple
-/// form, so a structured entry that survives the filter is emitted as its id alone.
-fn configured_tool_ids(config: &Value) -> Vec<ToolId> {
-    config
-        .get("tools")
-        .and_then(Value::as_array)
-        .map(|tools| {
-            tools
-                .iter()
-                .filter_map(|entry| match entry {
-                    Value::String(id) => Some(ToolId::from(id.as_str())),
-                    Value::Object(map) => map.get("name").and_then(Value::as_str).map(ToolId::from),
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// One skill, as the inline `SkillDefinition` the runtime deserializes.
@@ -243,9 +221,9 @@ fn ai_agents_observability_enabled() -> bool {
 /// The server-owned half of every agent configuration: what may be observed, what needs a human,
 /// what each tool is bounded by, and which runtime facts the prompt can read.
 ///
-/// An agent's own `config_json` is merged *over* this, so every value here is a default an
-/// operator can override -- with the deliberate exception of `tools:`, which the compiler rebuilds
-/// afterwards from the platform allowlist.
+/// Persisted configuration is never merged over this document. The compiler maps reviewed typed
+/// settings into selected fields while credentials, approval, ceilings, context, and observability
+/// remain server-owned.
 pub fn base_agent_config() -> Value {
     base_agent_config_with_observability(ai_agents_observability_enabled())
 }
@@ -341,24 +319,45 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> Value {
     })
 }
 
-/// Deep-merge `override_val` into `base`, object by object.
-///
-/// Arrays are replaced wholesale rather than concatenated. That is why the compiler rebuilds
-/// `tools:` after this runs instead of trying to reconcile two sources of grants.
-pub fn merge_json(base: &mut Value, override_val: &Value) {
-    match (base, override_val) {
-        (Value::Object(base_map), Value::Object(override_map)) => {
-            for (k, v) in override_map {
-                if let Some(base_val) = base_map.get_mut(k) {
-                    merge_json(base_val, v);
-                } else {
-                    base_map.insert(k.clone(), v.clone());
-                }
-            }
+fn apply_advanced_config(config: &mut Value, advanced: &AiAgentsAdvancedConfigV1) {
+    if let Some(reasoning) = &advanced.reasoning {
+        let mode = match reasoning.mode {
+            AiAgentsReasoningMode::None => "none",
+            AiAgentsReasoningMode::ChainOfThought => "cot",
+            AiAgentsReasoningMode::React => "react",
+            AiAgentsReasoningMode::Auto => "auto",
+        };
+        let mut value = json!({
+            "mode": mode,
+            "output": "hidden",
+            "max_iterations": reasoning.max_iterations
+        });
+        if reasoning.mode == AiAgentsReasoningMode::Auto {
+            value["judge_llm"] = json!("default");
         }
-        (base_slot, override_val) => {
-            *base_slot = override_val.clone();
+        config["reasoning"] = value;
+    }
+    if let Some(reflection) = &advanced.reflection {
+        let enabled = match reflection.enabled {
+            AiAgentsReflectionMode::Disabled => "disabled",
+            AiAgentsReflectionMode::Enabled => "enabled",
+            AiAgentsReflectionMode::Auto => "auto",
+        };
+        let mut value = json!({
+            "enabled": enabled,
+            "max_retries": reflection.max_retries
+        });
+        if reflection.enabled != AiAgentsReflectionMode::Disabled {
+            value["evaluator_llm"] = json!("default");
         }
+        config["reflection"] = value;
+    }
+    if let Some(disambiguation) = &advanced.disambiguation {
+        config["disambiguation"] = if disambiguation.enabled {
+            json!({"enabled": true, "detection": {"llm": "default"}})
+        } else {
+            json!({"enabled": false})
+        };
     }
 }
 
@@ -376,11 +375,11 @@ fn declares_tools(config: &serde_json::Map<String, Value>) -> bool {
 /// Stamp the fields the server owns, and default the two the runtime gets wrong on its own.
 ///
 /// The two fallbacks are required rather than optional, and are the agent's own name and prompt
-/// as [`ResolvedAgentParams`] resolved them. There is deliberately no last-resort literal here:
+/// as [`ResolvedAgentCapabilities`] resolved them. There is deliberately no last-resort literal here:
 /// what an unnamed agent is called and what a promptless one says are decided once, in
 /// `services::agent_runner::params`, and a second copy in this file is how the two drift.
 ///
-/// [`ResolvedAgentParams`]: crate::services::agent_runner::ResolvedAgentParams
+/// [`ResolvedAgentCapabilities`]: crate::services::agent_runner::ResolvedAgentCapabilities
 pub fn ensure_config_fields(
     config: &mut Value,
     provider: &str,

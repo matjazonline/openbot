@@ -18,17 +18,20 @@ use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::adapters::protocols::email::test_support::{RecordingTransport, recording_transport};
 use crate::adapters::protocols::email::{EmailRenderer, EmailSender};
 use crate::entities::message::MessageRole;
+use crate::entities::skill::SkillInstruction;
 use crate::entities::task::{TaskLeaseRef, TaskStatus};
 use crate::entities::transport::{DeliveryId, TransportKind};
-use crate::entities::value_objects::MessageId;
+use crate::entities::value_objects::{MessageId, ToolId};
 use crate::infra::config::ResendApiConfig;
 use crate::services::test_support::{
-    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, ScriptedLlm, scripted_agent_config, scripted_llm,
+    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, ScriptedLlm, register_scripted_agent_base_url,
+    scripted_llm,
 };
 use crate::transport::{ProviderSendOutcome, TransportSender, ports::TransportRenderers};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite};
+use crate::use_cases::skill::{SkillManagementPersistence, SkillWrite};
 use crate::use_cases::thread::test_support::{harness_registry, text_classifier};
 use crate::use_cases::user::UserPersistence;
 use chrono::Utc;
@@ -258,6 +261,17 @@ struct QueuedDelivery {
 }
 
 async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
+    fixture_with_capabilities(pool, llm_base_url, false).await
+}
+
+/// Build the ordinary round-trip fixture, optionally attaching a real stored skill and grant to
+/// its agent. Keeping this on the same fixture makes the capability test exercise precisely the
+/// dispatch path the regression tests already trust.
+async fn fixture_with_capabilities(
+    pool: sqlx::PgPool,
+    llm_base_url: &str,
+    attach_skill_and_grant: bool,
+) -> Fixture {
     let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
     let suffix = Uuid::new_v4().simple().to_string();
     let owner_email = format!("reply_owner_{suffix}@example.com");
@@ -285,7 +299,7 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
     .expect("the company is created");
 
     // The credential the runner resolves. Production reads it from here rather than from the
-    // agent, so a fixture that skipped this would fail in `resolve_agent_params` before the
+    // agent, so a fixture that skipped this would fail in `resolve_agent_capabilities` before the
     // scripted model was ever reached.
     CompanyPersistence::replace_model_connections_for_user(
         persistence.as_ref(),
@@ -304,6 +318,40 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
     .await
     .expect("the company model connection is stored");
 
+    let skill_ids = if attach_skill_and_grant {
+        let skill = SkillManagementPersistence::create_company(
+            persistence.as_ref(),
+            company.id,
+            SkillWrite {
+                slug: "invoice-math".to_string(),
+                name: "Invoice math".to_string(),
+                description: "Calculate a value needed for an invoice answer.".to_string(),
+                trigger: "The customer asks an invoice calculation question.".to_string(),
+                instructions: vec![
+                    SkillInstruction::Tool {
+                        tool: ToolId::from("calculator"),
+                        args: Some(serde_json::json!({"expression": "2 + 2"})),
+                        output_as: Some("calculation".to_string()),
+                    },
+                    SkillInstruction::Prompt {
+                        text: "Answer the customer using the calculation result.".to_string(),
+                    },
+                ],
+                created_by: Some(crate::entities::creation::CreationProvenance::system()),
+            },
+        )
+        .await
+        .expect("the stored skill is created");
+        vec![skill.id]
+    } else {
+        Vec::new()
+    };
+    let granted_tool_ids = if attach_skill_and_grant {
+        vec![ToolId::from("calculator")]
+    } else {
+        Vec::new()
+    };
+
     let agent = AgentPersistence::create(
         persistence.as_ref(),
         company.id,
@@ -314,12 +362,14 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
             provider: Some(SCRIPTED_PROVIDER.to_string()),
             model: Some(SCRIPTED_MODEL.to_string()),
             system_prompt: Some("Answer the customer briefly.".to_string()),
-            config_json: Some(scripted_agent_config(llm_base_url)),
+            skill_ids,
+            granted_tool_ids,
             ..AgentWrite::default()
         },
     )
     .await
     .expect("the agent is created");
+    register_scripted_agent_base_url(agent.id, llm_base_url);
 
     let channel = ChannelPersistence::create(
         persistence.as_ref(),
@@ -363,6 +413,7 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
             config.clone(),
         )
         .with_agent_persistence(persistence.clone())
+        .with_agent_capability_reader(persistence.clone())
         .with_harnesses(harness_registry(), text_classifier()),
     );
 
@@ -595,6 +646,63 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
             .collect::<Vec<_>>(),
         vec![MessageRole::Human, MessageRole::Agent, MessageRole::Human],
         "the reply belongs at the end of the same conversation"
+    );
+
+    CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
+        .await
+        .expect("the fixture company is removed");
+}
+
+#[tokio::test]
+async fn a_stored_skill_and_tool_grant_run_through_the_production_harness() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    const SKILL_ANSWER: &str = "The calculated invoice value is four.";
+    // The first response selects the stored skill. The runtime can make the second request only
+    // after its stored calculator step has passed the compiled grant check and executed.
+    let mut llm = scripted_llm(vec![
+        LlmTurn::text("invoice-math"),
+        LlmTurn::text(SKILL_ANSWER),
+    ])
+    .await;
+    let fx = fixture_with_capabilities(pool, &llm.base_url, true).await;
+
+    let ingest = fx
+        .threads
+        .ingest_test_email(inbound(
+            &fx,
+            CUSTOMER_FIRST_MESSAGE_ID,
+            "Invoice calculation",
+            "Please calculate the invoice value.",
+        ))
+        .await
+        .expect("the capability test mail is ingested");
+    let task_id = ingest.task_id.expect("the mail queues an agent run");
+    let outcome = fx
+        .threads
+        .execute_claimed_agent_task_and_dispatch(
+            &ingest,
+            ReplyDelivery::InAppOnly,
+            fx.claim(task_id).await,
+            ingest.correlation_id().expect("the ingest has a chain"),
+        )
+        .await
+        .expect("the stored skill runs");
+
+    let DispatchOutcome::Replied(result) = outcome else {
+        panic!("the stored skill must produce an answer, got {outcome:?}");
+    };
+    assert_eq!(result.agent_response, SKILL_ANSWER);
+    let requests = llm.observed();
+    assert_eq!(
+        requests.len(),
+        2,
+        "skill routing and the final skill prompt must both reach the model"
+    );
+    assert!(
+        requests[0].to_string().contains("invoice-math"),
+        "the router request must contain the stored skill"
     );
 
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)

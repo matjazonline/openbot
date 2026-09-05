@@ -85,6 +85,8 @@ pub struct AgentRun<'a> {
     /// Boxed: it carries every skill body, so it dominates any future or enum it lands in
     /// (`clippy::large_enum_variant`).
     pub spec: Box<AgentCapabilitySpec>,
+    /// Stable identity for structured warnings and authorization context.
+    pub agent_id: uuid::Uuid,
     /// Resolved from the company's encrypted model connection by the caller.
     ///
     /// A `&str` and deliberately not a newtype: it is the one value `sanitize_text` matches

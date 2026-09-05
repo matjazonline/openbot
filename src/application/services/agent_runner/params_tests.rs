@@ -6,11 +6,13 @@
 
 use uuid::Uuid;
 
-use super::{ResolvedAgentParams, resolve_agent_params};
+use super::{ResolvedAgentCapabilities, resolve_agent_capabilities};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::company::Company;
 use crate::entities::harness::{HarnessKind, SubAgentScope};
-use crate::entities::value_objects::{ModelName, ModelProvider};
+use crate::entities::skill::{Skill, SkillInstruction};
+use crate::entities::value_objects::{ModelName, ModelProvider, ToolId};
+use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
 
 fn company_named(name: &str) -> Company {
     Company {
@@ -28,7 +30,7 @@ fn company_named(name: &str) -> Company {
 
 #[test]
 fn an_unsupported_provider_is_refused_before_a_credential_is_touched() {
-    let error = ResolvedAgentParams::from_connection(
+    let error = ResolvedAgentCapabilities::from_connection(
         None,
         None,
         &ModelProvider::canonical(""),
@@ -41,7 +43,7 @@ fn an_unsupported_provider_is_refused_before_a_credential_is_touched() {
 
 #[test]
 fn an_agent_without_a_model_cannot_be_resolved() {
-    let error = ResolvedAgentParams::from_connection(
+    let error = ResolvedAgentCapabilities::from_connection(
         Some(&company_named("Test")),
         None,
         &ModelProvider::canonical("google"),
@@ -54,7 +56,7 @@ fn an_agent_without_a_model_cannot_be_resolved() {
 
 #[test]
 fn a_blank_credential_is_refused_rather_than_passed_on() {
-    let error = ResolvedAgentParams::from_connection(
+    let error = ResolvedAgentCapabilities::from_connection(
         Some(&company_named("Test")),
         None,
         &ModelProvider::canonical("google"),
@@ -72,7 +74,7 @@ fn a_blank_credential_is_refused_rather_than_passed_on() {
 fn a_company_without_an_agent_resolves_to_a_spec_that_grants_nothing() {
     let company = company_named("Acme Corp");
 
-    let resolved = ResolvedAgentParams::new(Some(&company), None).expect("params resolve");
+    let resolved = ResolvedAgentCapabilities::new(Some(&company), None).expect("params resolve");
 
     assert_eq!(resolved.provider(), "google");
     assert_eq!(resolved.model(), "gemini-2.5-flash");
@@ -85,20 +87,27 @@ fn a_company_without_an_agent_resolves_to_a_spec_that_grants_nothing() {
     assert!(spec.granted_tools.is_empty());
     assert!(spec.skills.is_empty());
     assert_eq!(spec.sub_agents, SubAgentScope::AllCompanySiblings);
-    assert_eq!(spec.extra_config, serde_json::json!({}));
+    assert_eq!(
+        spec.harness_config,
+        crate::entities::harness::HarnessConfig::empty(HarnessKind::AiAgents)
+    );
 }
 
-/// The agent's own name and prompt win over the company's, and its configuration is carried
-/// through untouched -- compiling it is the harness's job, not this one's.
+/// The agent's own name and prompt win over the company's, and reviewed advanced settings are
+/// decoded into the typed capability spec.
 #[test]
-fn an_agent_supplies_its_own_name_prompt_and_residual_configuration() {
+fn an_agent_supplies_its_own_name_prompt_and_reviewed_configuration() {
     let company = company_named("Acme Corp");
     let mut agent = agent_selecting(None, None);
     agent.name = "Support Agent".into();
     agent.system_prompt = Some("You are a helpful triage assistant.".into());
-    agent.config_json = Some(serde_json::json!({ "llm": { "temperature": 0.2 } }));
+    agent.config_json = Some(serde_json::json!({
+        "version": 1,
+        "reasoning": {"mode": "react", "max_iterations": 4}
+    }));
 
-    let resolved = ResolvedAgentParams::new(Some(&company), Some(&agent)).expect("params resolve");
+    let resolved =
+        ResolvedAgentCapabilities::new(Some(&company), Some(&agent)).expect("params resolve");
 
     assert_eq!(resolved.spec().name, "Support Agent");
     assert_eq!(
@@ -107,7 +116,10 @@ fn an_agent_supplies_its_own_name_prompt_and_residual_configuration() {
     );
     assert_eq!(
         resolved.config(),
-        &serde_json::json!({ "llm": { "temperature": 0.2 } })
+        serde_json::json!({
+            "version": 1,
+            "reasoning": {"mode": "react", "max_iterations": 4}
+        })
     );
 }
 
@@ -117,7 +129,8 @@ fn an_agent_with_a_blank_prompt_falls_back_to_the_default() {
     let mut agent = agent_selecting(None, None);
     agent.system_prompt = Some("   ".into());
 
-    let resolved = ResolvedAgentParams::new(Some(&company), Some(&agent)).expect("params resolve");
+    let resolved =
+        ResolvedAgentCapabilities::new(Some(&company), Some(&agent)).expect("params resolve");
 
     assert_eq!(
         resolved.spec().system_prompt,
@@ -130,7 +143,7 @@ fn every_supported_provider_resolves_and_nothing_else_does() {
     let company = company_named("Acme Corp");
 
     for provider in ["google", "openai", "anthropic", "groq"] {
-        let resolved = ResolvedAgentParams::from_connection(
+        let resolved = ResolvedAgentCapabilities::from_connection(
             Some(&company),
             None,
             &ModelProvider::canonical(provider),
@@ -141,7 +154,7 @@ fn every_supported_provider_resolves_and_nothing_else_does() {
         assert_eq!(resolved.provider(), provider);
     }
 
-    let error = ResolvedAgentParams::from_connection(
+    let error = ResolvedAgentCapabilities::from_connection(
         Some(&company),
         None,
         &ModelProvider::canonical("unsupported_provider"),
@@ -271,6 +284,9 @@ fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
         run_timeout_secs: None,
         system_prompt: Some("Answer the question.".into()),
         description: None,
+        harness_kind: HarnessKind::default(),
+        granted_tool_ids: Vec::new(),
+        native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
         config_json: None,
         memory_persistence_mode: Default::default(),
         memory_recall_mode: Default::default(),
@@ -278,6 +294,46 @@ fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
         avatar_url: None,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: chrono::Utc::now(),
+    }
+}
+
+struct StubCapabilityReader {
+    snapshot: Option<StoredAgentCapabilities>,
+    failure: Option<String>,
+}
+
+fn capabilities(agent: AgentEntity) -> StubCapabilityReader {
+    StubCapabilityReader {
+        snapshot: Some(StoredAgentCapabilities {
+            agent,
+            skills: Vec::new(),
+            sub_agent_scope: SubAgentScope::AllCompanySiblings,
+        }),
+        failure: None,
+    }
+}
+
+#[async_trait::async_trait]
+impl AgentCapabilityReader for StubCapabilityReader {
+    async fn load_for_execution(
+        &self,
+        execution_company_id: Uuid,
+        agent_id: Uuid,
+    ) -> crate::app_error::AppResult<Option<StoredAgentCapabilities>> {
+        if let Some(message) = &self.failure {
+            return Err(crate::app_error::AppError::Database(message.clone()));
+        }
+        Ok(self
+            .snapshot
+            .as_ref()
+            .filter(|snapshot| {
+                snapshot.agent.id == agent_id
+                    && snapshot
+                        .agent
+                        .company_id
+                        .is_none_or(|company_id| company_id == execution_company_id)
+            })
+            .cloned())
     }
 }
 
@@ -303,9 +359,15 @@ async fn an_agent_that_selects_nothing_inherits_the_default_connection_and_its_f
     ]);
     let company = resolving_company();
 
-    let resolved = resolve_agent_params(&persistence, &company, None)
-        .await
-        .expect("the default connection resolves");
+    let agent = agent_selecting(None, None);
+    let resolved = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(agent.clone()),
+        &company,
+        agent.id,
+    )
+    .await
+    .expect("the default connection resolves");
 
     assert_eq!(resolved.provider(), "openai");
     assert_eq!(resolved.model(), "gpt-first");
@@ -318,9 +380,15 @@ async fn a_company_with_no_default_connection_cannot_resolve_an_agent() {
     let persistence =
         StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], false)]);
 
-    let error = resolve_agent_params(&persistence, &resolving_company(), None)
-        .await
-        .expect_err("a company with no default cannot run an agent");
+    let agent = agent_selecting(None, None);
+    let error = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(agent.clone()),
+        &resolving_company(),
+        agent.id,
+    )
+    .await
+    .expect_err("a company with no default cannot run an agent");
 
     assert!(
         error
@@ -336,9 +404,14 @@ async fn an_agent_cannot_select_a_provider_its_company_has_not_enabled() {
         StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
     let agent = agent_selecting(Some("anthropic"), Some("claude-a"));
 
-    let error = resolve_agent_params(&persistence, &resolving_company(), Some(&agent))
-        .await
-        .expect_err("a provider the company never configured is not usable");
+    let error = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(agent.clone()),
+        &resolving_company(),
+        agent.id,
+    )
+    .await
+    .expect_err("a provider the company never configured is not usable");
 
     assert!(
         error
@@ -354,9 +427,14 @@ async fn an_agent_cannot_select_a_model_outside_its_providers_allow_list() {
         StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
     let agent = agent_selecting(Some("openai"), Some("gpt-unlisted"));
 
-    let error = resolve_agent_params(&persistence, &resolving_company(), Some(&agent))
-        .await
-        .expect_err("the allow-list is the whole set of models an agent may pick");
+    let error = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(agent.clone()),
+        &resolving_company(),
+        agent.id,
+    )
+    .await
+    .expect_err("the allow-list is the whole set of models an agent may pick");
 
     assert!(
         error
@@ -373,17 +451,27 @@ async fn provider_selection_folds_case_while_model_selection_does_not() {
     let company = resolving_company();
 
     let shouting = agent_selecting(Some("OpenAI"), Some("gpt-first"));
-    let resolved = resolve_agent_params(&persistence, &company, Some(&shouting))
-        .await
-        .expect("providers are matched case-insensitively");
+    let resolved = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(shouting.clone()),
+        &company,
+        shouting.id,
+    )
+    .await
+    .expect("providers are matched case-insensitively");
     assert_eq!(resolved.provider(), "openai");
 
     // Model ids are provider-assigned and case-sensitive, so this one is genuinely absent.
     let miscased = agent_selecting(Some("openai"), Some("GPT-First"));
     assert!(
-        resolve_agent_params(&persistence, &company, Some(&miscased))
-            .await
-            .is_err()
+        resolve_agent_capabilities(
+            &persistence,
+            &capabilities(miscased.clone()),
+            &company,
+            miscased.id
+        )
+        .await
+        .is_err()
     );
 }
 
@@ -394,12 +482,103 @@ async fn a_connection_without_a_stored_credential_refuses_to_build_provider_para
         ..StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)])
     };
 
-    let error = resolve_agent_params(&persistence, &resolving_company(), None)
-        .await
-        .expect_err("no credential means no provider call");
+    let agent = agent_selecting(None, None);
+    let error = resolve_agent_capabilities(
+        &persistence,
+        &capabilities(agent.clone()),
+        &resolving_company(),
+        agent.id,
+    )
+    .await
+    .expect_err("no credential means no provider call");
 
     assert!(
         error.to_string().contains("API key is missing"),
         "unexpected error: {error}"
     );
+}
+
+fn skill(slug: &str) -> Skill {
+    let now = chrono::Utc::now();
+    Skill {
+        id: Uuid::new_v4(),
+        company_id: None,
+        slug: slug.into(),
+        name: slug.to_string(),
+        description: format!("{slug} description"),
+        trigger: format!("Use {slug}"),
+        instructions: vec![SkillInstruction::Prompt {
+            text: format!("Apply {slug}"),
+        }],
+        created_by: crate::entities::creation::CreationProvenance::system(),
+        created_at: now,
+        updated_at: now,
+    }
+}
+
+#[tokio::test]
+async fn a_spec_carries_its_agents_skills_in_position_order() {
+    let persistence =
+        StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+    let company = resolving_company();
+    let mut agent = agent_selecting(None, None);
+    agent.granted_tool_ids = vec![ToolId::from("calculator")];
+    let first = skill("first");
+    let second = skill("second");
+    let reader = StubCapabilityReader {
+        snapshot: Some(StoredAgentCapabilities {
+            agent: agent.clone(),
+            skills: vec![first.clone(), second.clone()],
+            sub_agent_scope: SubAgentScope::Restricted(vec![Uuid::new_v4()]),
+        }),
+        failure: None,
+    };
+
+    let resolved = resolve_agent_capabilities(&persistence, &reader, &company, agent.id)
+        .await
+        .expect("the stored snapshot resolves");
+
+    assert_eq!(resolved.agent_id, agent.id);
+    assert_eq!(resolved.spec.skills, vec![first, second]);
+    assert_eq!(resolved.spec.granted_tools, [ToolId::from("calculator")]);
+    assert!(matches!(
+        resolved.spec.sub_agents,
+        SubAgentScope::Restricted(_)
+    ));
+}
+
+#[tokio::test]
+async fn a_scope_read_error_fails_the_run_instead_of_becoming_unrestricted() {
+    let persistence =
+        StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+    let agent = agent_selecting(None, None);
+    let reader = StubCapabilityReader {
+        snapshot: None,
+        failure: Some("scope unavailable".into()),
+    };
+
+    let error = resolve_agent_capabilities(&persistence, &reader, &resolving_company(), agent.id)
+        .await
+        .expect_err("a failed authorization read must fail execution");
+
+    assert!(matches!(error, crate::app_error::AppError::Database(_)));
+    assert!(error.to_string().contains("scope unavailable"));
+}
+
+#[tokio::test]
+async fn an_absent_capability_snapshot_fails_explicitly() {
+    let persistence =
+        StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+    let agent_id = Uuid::new_v4();
+    let reader = StubCapabilityReader {
+        snapshot: None,
+        failure: None,
+    };
+
+    let error = resolve_agent_capabilities(&persistence, &reader, &resolving_company(), agent_id)
+        .await
+        .expect_err("absence must not become an empty capability");
+
+    assert!(matches!(error, crate::app_error::AppError::NotFound(_)));
+    assert!(error.to_string().contains(&agent_id.to_string()));
 }

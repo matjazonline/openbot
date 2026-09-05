@@ -13,7 +13,7 @@ use uuid::Uuid;
 use super::*;
 use crate::entities::{
     creation::CreationProvenance,
-    harness::{HarnessKind, SubAgentScope},
+    harness::{HarnessConfig, HarnessKind, SubAgentScope},
     skill::{Skill, SkillInstruction},
     tool_catalogue::{ALLOWED_BUILTIN_TOOL_IDS, OUTREACH_TOOL_ID},
     value_objects::{ModelName, ModelProvider, SkillSlug},
@@ -60,16 +60,23 @@ const UPSTREAM_BUILTIN_TOOL_IDS: [&str; 30] = [
 ];
 
 fn spec_with(extra_config: serde_json::Value) -> AgentCapabilitySpec {
+    let harness_config = if extra_config == json!({}) {
+        HarnessConfig::empty(HarnessKind::AiAgents)
+    } else {
+        HarnessConfig::parse(HarnessKind::AiAgents, Some(&extra_config))
+            .expect("test config must use the reviewed schema")
+    };
     AgentCapabilitySpec {
         harness: HarnessKind::AiAgents,
         name: "Support".to_string(),
         system_prompt: "You are a helpful email agent.".to_string(),
         provider: ModelProvider::canonical("openai"),
         model: ModelName::canonical("gpt-4o"),
+        provider_base_url: None,
         skills: Vec::new(),
         granted_tools: Vec::new(),
         sub_agents: SubAgentScope::AllCompanySiblings,
-        extra_config,
+        harness_config,
     }
 }
 
@@ -84,6 +91,7 @@ fn skill_of(slug: &str, instructions: Vec<SkillInstruction>) -> Skill {
         instructions,
         created_by: CreationProvenance::system(),
         created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -134,20 +142,6 @@ fn command_is_dropped_from_the_grant() {
         serde_yaml::from_str(&output.yaml).expect("the compiled configuration is YAML");
 
     assert_eq!(granted_tools(&document), ["calculator"]);
-    assert_eq!(output.refused_tools, [ToolId::from("command")]);
-}
-
-/// The one that proves the grant is rebuilt *after* the agent's own configuration is merged in.
-/// A `tools:` list typed into `config_json` is input, not authority.
-#[test]
-fn command_is_dropped_even_when_it_arrives_through_extra_config() {
-    let spec = spec_with(json!({ "tools": ["command", "datetime"] }));
-
-    let output = compile(&spec, "sk-test-123", &[]).expect("the spec compiles");
-    let document: serde_yaml::Value =
-        serde_yaml::from_str(&output.yaml).expect("the compiled configuration is YAML");
-
-    assert_eq!(granted_tools(&document), ["datetime"]);
     assert_eq!(output.refused_tools, [ToolId::from("command")]);
 }
 
@@ -367,7 +361,7 @@ fn an_agent_with_no_skills_compiles_to_a_document_without_the_key() {
 /// list at all -- no empty `tools:`, and so no `tool_choice` either.
 #[test]
 fn a_grant_that_survives_nothing_leaves_no_tools_key_behind() {
-    let mut spec = spec_with(json!({ "tools": ["command"] }));
+    let mut spec = spec_with(json!({}));
     spec.granted_tools = vec![ToolId::from("file_write")];
 
     let document = compiled(&spec);
@@ -381,7 +375,7 @@ fn a_grant_that_survives_nothing_leaves_no_tools_key_behind() {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-fn the_specs_name_and_prompt_are_used_only_as_fallbacks() {
+fn the_specs_name_and_prompt_are_server_owned() {
     let plain = compiled(&spec_with(json!({})));
     assert_eq!(plain["name"].as_str(), Some("Support"));
     assert!(
@@ -390,25 +384,11 @@ fn the_specs_name_and_prompt_are_used_only_as_fallbacks() {
             .expect("a system prompt")
             .starts_with("You are a helpful email agent.")
     );
-
-    // An operator who named them in the agent's own configuration keeps them.
-    let overridden = compiled(&spec_with(
-        json!({ "name": "Custom", "system_prompt": "Custom prompt" }),
-    ));
-    assert_eq!(overridden["name"].as_str(), Some("Custom"));
-    assert!(
-        overridden["system_prompt"]
-            .as_str()
-            .expect("a system prompt")
-            .starts_with("Custom prompt")
-    );
 }
 
 #[test]
-fn the_credential_and_model_selection_are_stamped_over_whatever_was_configured() {
-    let document = compiled(&spec_with(json!({
-        "llm": { "provider": "google", "model": "gemini-2.5-flash", "api_key": "operator-key" }
-    })));
+fn the_credential_and_model_selection_are_stamped_by_the_server() {
+    let document = compiled(&spec_with(json!({})));
 
     assert_eq!(document["llm"]["provider"].as_str(), Some("openai"));
     assert_eq!(document["llm"]["model"].as_str(), Some("gpt-4o"));
@@ -606,22 +586,8 @@ fn the_base_config_declares_the_delivery_context() {
     }
 }
 
-#[test]
-fn an_agents_own_configuration_can_turn_observability_off() {
-    let mut config = base_agent_config_with_observability(true);
-    merge_json(
-        &mut config,
-        &json!({ "observability": { "enabled": false } }),
-    );
-
-    assert_eq!(config["observability"]["enabled"], false);
-    assert_eq!(config["observability"]["privacy"]["include_prompts"], false);
-}
-
-/// The base configuration compiles each native tool's policy into this runtime's dialect, while
-/// the tool itself applies the same bounds when no policy reaches it. Two statements of one rule:
-/// this is the test that keeps them equal, so an agent is bounded the same way whichever runtime
-/// -- or none -- supplied the values.
+/// The adapter's server-owned defaults match the native tools' defaults. Per-agent policy is not
+/// represented here: it remains typed and is applied directly by the host tool implementations.
 #[test]
 fn the_base_tool_policy_matches_what_the_tools_default_to_on_their_own() {
     let config = base_agent_config_with_observability(false);
@@ -652,74 +618,4 @@ fn the_base_tool_policy_matches_what_the_tools_default_to_on_their_own() {
             .as_u64(),
         Some(crate::services::agent_directory_tool::DEFAULT_DIRECTORY_MAX_RESULTS as u64)
     );
-}
-
-#[test]
-fn the_provider_settings_are_read_back_without_the_credential() {
-    let document = compiled(&spec_with(json!({
-        "llm": {
-            "temperature": 0.25,
-            "top_p": 0.8,
-            "base_url": "https://example.test",
-            "timeout_seconds": 45,
-            "reasoning": true,
-            "reasoning_budget_tokens": 1024
-        }
-    })));
-    assert_eq!(document["llm"]["api_key"].as_str(), Some("sk-test-123"));
-
-    let output = compile(
-        &spec_with(json!({
-            "llm": {
-                "temperature": 0.25,
-                "top_p": 0.8,
-                "base_url": "https://example.test",
-                "timeout_seconds": 45,
-                "reasoning": true,
-                "reasoning_budget_tokens": 1024
-            }
-        })),
-        "sk-test-123",
-        &[],
-    )
-    .expect("the spec compiles");
-
-    assert_eq!(output.provider.config.temperature, Some(0.25));
-    assert_eq!(output.provider.config.max_tokens, Some(8192));
-    assert_eq!(output.provider.config.top_p, Some(0.8));
-    assert_eq!(output.provider.config.timeout_seconds, Some(45));
-    assert_eq!(output.provider.config.reasoning, Some(true));
-    assert_eq!(output.provider.config.reasoning_budget_tokens, Some(1024));
-    assert!(!output.provider.config.extra.contains_key("api_key"));
-    assert_eq!(
-        output.provider.base_url.as_deref(),
-        Some("https://example.test")
-    );
-    assert!(output.provider.tool_choice.is_none());
-}
-
-/// The runner reads the internal-delegation policy from the agent's own configuration rather than
-/// from the compiled document, so that the application layer never has to know a runtime's config
-/// schema. It may only do that because the two answers are the same: the base value is `true` and
-/// the reader's own default is `true`, so nothing but an explicit `false` changes either.
-#[test]
-fn the_delegation_policy_reads_the_same_from_the_residual_config_and_the_compiled_one() {
-    use crate::services::harness::internal_requires_approval;
-
-    for residual in [
-        json!({}),
-        json!({ "tool_security": { "tools": { OUTREACH_TOOL_ID: { "config": { "internal_requires_approval": false } } } } }),
-        json!({ "tool_security": { "tools": { OUTREACH_TOOL_ID: { "config": { "internal_requires_approval": true } } } } }),
-        // Malformed, which fails closed on both sides.
-        json!({ "tool_security": { "tools": { OUTREACH_TOOL_ID: { "config": { "internal_requires_approval": "yes" } } } } }),
-    ] {
-        let mut merged = base_agent_config();
-        merge_json(&mut merged, &residual);
-
-        assert_eq!(
-            internal_requires_approval(&residual),
-            internal_requires_approval(&merged),
-            "the two readings disagree for {residual}"
-        );
-    }
 }

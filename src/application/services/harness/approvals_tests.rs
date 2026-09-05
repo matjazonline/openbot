@@ -23,6 +23,7 @@ fn policy(
         channel_persistence: Arc::new(ChannelDirectoryStub::new(channels)),
         company_id,
         source_channel_id: Uuid::new_v4(),
+        sub_agent_scope: crate::entities::harness::SubAgentScope::AllCompanySiblings,
         requires_approval,
     }
 }
@@ -50,6 +51,27 @@ async fn an_all_internal_call_skips_the_human_when_policy_allows() {
 
     assert!(
         policy
+            .approves_without_human(&outreach(&args))
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn an_excluded_internal_target_is_not_classified_as_allowed_delegation() {
+    let company_id = Uuid::new_v4();
+    let target = agent_channel(company_id, "billing");
+    let policy = InternalDelegationPolicy {
+        channel_persistence: Arc::new(ChannelDirectoryStub::new(vec![target])),
+        company_id,
+        source_channel_id: Uuid::new_v4(),
+        sub_agent_scope: crate::entities::harness::SubAgentScope::Restricted(vec![Uuid::new_v4()]),
+        requires_approval: false,
+    };
+    let args = outreach_args(&["billing"], &[]);
+
+    assert!(
+        !policy
             .approves_without_human(&outreach(&args))
             .await
             .unwrap()
@@ -121,6 +143,7 @@ async fn a_directory_failure_propagates_instead_of_becoming_a_human_request() {
         ),
         company_id,
         source_channel_id: Uuid::new_v4(),
+        sub_agent_scope: crate::entities::harness::SubAgentScope::AllCompanySiblings,
         requires_approval: false,
     };
     let args = outreach_args(&["billing"], &[]);
@@ -201,22 +224,6 @@ async fn only_the_outreach_tool_can_be_exempted() {
             .await
             .unwrap()
     );
-}
-
-#[test]
-fn the_approval_flag_fails_closed_unless_explicitly_false() {
-    let explicit = json!({
-        "tool_security": { "tools": { OUTREACH_TOOL_ID: {
-            "config": { "internal_requires_approval": false } } } }
-    });
-    assert!(!internal_requires_approval(&explicit));
-
-    assert!(internal_requires_approval(&json!({})));
-    let wrong_type = json!({
-        "tool_security": { "tools": { OUTREACH_TOOL_ID: {
-            "config": { "internal_requires_approval": "false" } } } }
-    });
-    assert!(internal_requires_approval(&wrong_type));
 }
 
 /// The step key is what a restarted process uses to recognise a decision it did not ask for, so

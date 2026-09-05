@@ -7,13 +7,19 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::{Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MIN_AGENT_RUN_TIMEOUT_SECS},
+        agent::{
+            Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS,
+            MAX_EFFECTIVE_AGENT_TOOLS, MAX_GRANTED_TOOLS, MIN_AGENT_RUN_TIMEOUT_SECS,
+        },
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyChannelDefaults},
         creation::CreationProvenance,
+        harness::{HarnessConfig, HarnessKind, NativeToolPolicy},
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
+        skill::Skill,
+        tool_catalogue::{CREATE_AGENT_CHANNEL_TOOL_ID, CatalogueTool},
         user::Viewer,
-        value_objects::{AvatarUrl, ModelName, ModelProvider},
+        value_objects::{AvatarUrl, ModelName, ModelProvider, ToolId},
     },
     services::harness::{ClassificationRequest, TextClassifier},
     use_cases::{
@@ -43,7 +49,12 @@ pub struct AgentWrite {
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
+    pub harness_kind: HarnessKind,
+    pub granted_tool_ids: Vec<ToolId>,
+    pub native_tool_policy: NativeToolPolicy,
     pub config_json: Option<serde_json::Value>,
+    pub skill_ids: Vec<Uuid>,
+    pub sub_agent_ids: Vec<Uuid>,
     pub memory_enabled: bool,
     pub memory_persistence_mode: MemoryPersistenceMode,
     pub memory_recall_mode: MemoryRecallMode,
@@ -62,7 +73,12 @@ impl Default for AgentWrite {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
+            harness_kind: HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: NativeToolPolicy::default(),
             config_json: None,
+            skill_ids: Vec::new(),
+            sub_agent_ids: Vec::new(),
             memory_enabled: false,
             memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: MemoryRecallMode::Fast,
@@ -114,48 +130,78 @@ impl AgentWrite {
                 "Memory result limit must be between 1 and 20.".into(),
             ));
         }
-        validate_agent_config(self.config_json.as_ref())?;
+        self.native_tool_policy
+            .validate()
+            .map_err(AppError::BadRequest)?;
+        let harness_config = HarnessConfig::parse(self.harness_kind, self.config_json.as_ref())
+            .map_err(AppError::BadRequest)?;
+        let canonical = harness_config.to_json().map_err(AppError::BadRequest)?;
+        self.config_json = (canonical != serde_json::json!({"version": 1})).then_some(canonical);
+
+        deduplicate(&mut self.granted_tool_ids);
+        if self.granted_tool_ids.len() > MAX_GRANTED_TOOLS {
+            return Err(AppError::BadRequest(format!(
+                "An agent may be granted at most {MAX_GRANTED_TOOLS} tools."
+            )));
+        }
+        for id in &self.granted_tool_ids {
+            if CatalogueTool::get(id).is_none() {
+                return Err(AppError::BadRequest(format!(
+                    "Tool '{id}' is not available for agents."
+                )));
+            }
+        }
+        deduplicate(&mut self.skill_ids);
+        if self.skill_ids.len() > MAX_AGENT_SKILLS {
+            return Err(AppError::BadRequest(format!(
+                "An agent may carry at most {MAX_AGENT_SKILLS} skills."
+            )));
+        }
+        deduplicate(&mut self.sub_agent_ids);
+        if self.sub_agent_ids.len() > MAX_AGENT_SUB_AGENTS {
+            return Err(AppError::BadRequest(format!(
+                "An agent may name at most {MAX_AGENT_SUB_AGENTS} sub-agents."
+            )));
+        }
 
         Ok(())
     }
 }
 
-fn validate_agent_config(config: Option<&serde_json::Value>) -> AppResult<()> {
-    let Some(config) = config else { return Ok(()) };
-    let object = config
-        .as_object()
-        .ok_or_else(|| AppError::BadRequest("Agent config must be a JSON object.".into()))?;
-    for reserved in ["name", "system_prompt"] {
-        if object.contains_key(reserved) {
-            return Err(AppError::BadRequest(format!(
-                "Agent config path '{reserved}' is reserved; use the typed agent field instead."
-            )));
+fn deduplicate<T: PartialEq>(values: &mut Vec<T>) {
+    let mut index = 0;
+    while index < values.len() {
+        if values[..index].contains(&values[index]) {
+            values.remove(index);
+        } else {
+            index += 1;
         }
     }
-    if let Some(llm) = object.get("llm").and_then(serde_json::Value::as_object) {
-        for reserved in ["provider", "model", "api_key"] {
-            if llm.contains_key(reserved) {
-                return Err(AppError::BadRequest(format!(
-                    "Agent config path 'llm.{reserved}' is reserved; use the typed agent or company field instead."
-                )));
-            }
+}
+
+pub(crate) fn validate_effective_capabilities(
+    write: &AgentWrite,
+    skills: &[Skill],
+) -> AppResult<()> {
+    let mut effective = write.granted_tool_ids.clone();
+    for id in skills.iter().flat_map(Skill::referenced_tool_ids) {
+        if !effective.contains(&id) {
+            effective.push(id);
         }
     }
-    fn contains_secret_key(value: &serde_json::Value) -> bool {
-        match value {
-            serde_json::Value::Object(map) => map.iter().any(|(key, value)| {
-                matches!(
-                    key.to_ascii_lowercase().as_str(),
-                    "api_key" | "apikey" | "api-key"
-                ) || contains_secret_key(value)
-            }),
-            serde_json::Value::Array(values) => values.iter().any(contains_secret_key),
-            _ => false,
-        }
+    if effective.len() > MAX_EFFECTIVE_AGENT_TOOLS {
+        return Err(AppError::BadRequest(format!(
+            "The selected grants and skills require {} tools; an agent may use at most {MAX_EFFECTIVE_AGENT_TOOLS}.",
+            effective.len()
+        )));
     }
-    if contains_secret_key(config) {
+    if !write.sub_agent_ids.is_empty()
+        && effective
+            .iter()
+            .any(|id| id.as_str() == CREATE_AGENT_CHANNEL_TOOL_ID)
+    {
         return Err(AppError::BadRequest(
-            "Agent config must not contain API keys or other model credentials.".into(),
+            "A restricted sub-agent list cannot be combined with the create-agent tool.".into(),
         ));
     }
     Ok(())
@@ -165,11 +211,7 @@ fn validate_agent_config(config: Option<&serde_json::Value>) -> AppResult<()> {
 pub trait AgentPersistence: Send + Sync {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
-    async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
-        Err(AppError::Internal(
-            "Agent library persistence is unavailable.".into(),
-        ))
-    }
+    async fn create_library(&self, write: AgentWrite) -> AppResult<Agent>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
 
@@ -181,9 +223,7 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
-    async fn list_library(&self) -> AppResult<Vec<Agent>> {
-        Ok(Vec::new())
-    }
+    async fn list_library(&self) -> AppResult<Vec<Agent>>;
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
@@ -195,6 +235,14 @@ pub trait OwnedAgentChannelPersistence: Send + Sync {
     async fn create_owned_agent_channel(
         &self,
         company_id: Uuid,
+        agent: AgentWrite,
+        channel: ChannelWrite,
+    ) -> AppResult<(Agent, Channel)>;
+
+    async fn create_owned_agent_channel_from_library(
+        &self,
+        company_id: Uuid,
+        library_agent_id: Uuid,
         agent: AgentWrite,
         channel: ChannelWrite,
     ) -> AppResult<(Agent, Channel)>;
@@ -322,7 +370,12 @@ fn library_agent_write(definition: &Agent) -> AgentWrite {
         run_timeout_secs: definition.run_timeout_secs,
         system_prompt: definition.system_prompt.clone(),
         description: definition.description.clone(),
+        harness_kind: definition.harness_kind,
+        granted_tool_ids: definition.granted_tool_ids.clone(),
+        native_tool_policy: definition.native_tool_policy.clone(),
         config_json: definition.config_json.clone(),
+        skill_ids: Vec::new(),
+        sub_agent_ids: Vec::new(),
         memory_enabled: definition.memory_enabled,
         memory_persistence_mode: definition.memory_persistence_mode,
         memory_recall_mode: definition.memory_recall_mode,
@@ -584,7 +637,8 @@ impl AgentUseCases {
         company_id: Uuid,
         library_agent_id: Uuid,
     ) -> AppResult<ProvisionedAgent> {
-        self.verify_company_manager(user_id, company_id).await?;
+        let company =
+            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         let definition = self
             .get_library_agent(library_agent_id)
             .await?
@@ -612,12 +666,30 @@ impl AgentUseCases {
             });
         }
 
-        let mut provisioned = self
-            .create_addressable_agent(user_id, company_id, write)
+        write.created_by = Some(CreationProvenance::user(user_id));
+        write.normalize()?;
+        self.validate_model_selection(company_id, &write).await?;
+        let mut decision =
+            personal_channel_write(&write, &company.channel_defaults, self.spam_scanning);
+        decision.channel.created_by = Some(CreationProvenance::user(user_id));
+        decision
+            .channel
+            .normalize_with(crate::use_cases::channel::ActiveAgent::SuppliedByCaller)?;
+        let (agent, channel) = self
+            .owned_persistence
+            .create_owned_agent_channel_from_library(
+                company_id,
+                library_agent_id,
+                write,
+                decision.channel,
+            )
             .await?;
-        warnings.append(&mut provisioned.warnings);
-        provisioned.warnings = warnings;
-        Ok(provisioned)
+        warnings.append(&mut decision.warnings);
+        Ok(ProvisionedAgent {
+            agent,
+            channel,
+            warnings,
+        })
     }
 
     #[instrument(skip(self))]
@@ -772,7 +844,9 @@ impl AgentUseCases {
             agent_id, company_id, write.name, write.slug
         );
 
-        self.agent_persistence.update(agent_id, write).await
+        self.owned_persistence
+            .update_agent_and_owned_address(agent_id, write)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -1062,6 +1136,9 @@ mod tests {
             run_timeout_secs: Some(45),
             system_prompt: None,
             description: None,
+            harness_kind: HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
@@ -1074,7 +1151,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_config_accepts_supplementary_settings_and_rejects_typed_or_secret_paths() {
+    fn agent_config_accepts_only_reviewed_settings_and_rejects_authority_paths() {
         for config in [
             json!({"name": "forged"}),
             json!({"system_prompt": "forged"}),
@@ -1096,8 +1173,10 @@ mod tests {
             name: "Configured".into(),
             slug: "configured".into(),
             config_json: Some(json!({
-                "llm": {"temperature": 0.2, "max_tokens": 512},
-                "tools": {"web": {"enabled": true}}
+                "version": 1,
+                "reasoning": {"mode": "react", "max_iterations": 4},
+                "reflection": {"enabled": "auto", "max_retries": 2},
+                "disambiguation": {"enabled": true}
             })),
             ..AgentWrite::default()
         };
@@ -1242,6 +1321,9 @@ mod tests {
                 run_timeout_secs: write.run_timeout_secs,
                 system_prompt: write.system_prompt,
                 description: write.description,
+                harness_kind: write.harness_kind,
+                granted_tool_ids: write.granted_tool_ids,
+                native_tool_policy: write.native_tool_policy,
                 config_json: write.config_json,
                 memory_enabled: write.memory_enabled,
                 avatar_url: write.avatar_url,
@@ -1249,6 +1331,21 @@ mod tests {
                 created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());
+            Ok(agent)
+        }
+
+        async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
+            let mut agent = self.create(Uuid::nil(), write).await?;
+            agent.company_id = None;
+            if let Some(stored) = self
+                .agents
+                .lock()
+                .unwrap()
+                .iter_mut()
+                .find(|stored| stored.id == agent.id)
+            {
+                stored.company_id = None;
+            }
             Ok(agent)
         }
 
@@ -1283,6 +1380,17 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|a| a.company_id == Some(company_id))
+                .cloned()
+                .collect())
+        }
+
+        async fn list_library(&self) -> AppResult<Vec<Agent>> {
+            Ok(self
+                .agents
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|agent| agent.company_id.is_none())
                 .cloned()
                 .collect())
         }
@@ -1355,6 +1463,17 @@ mod tests {
                 created_at: Utc::now(),
             };
             Ok((agent, channel))
+        }
+
+        async fn create_owned_agent_channel_from_library(
+            &self,
+            company_id: Uuid,
+            _library_agent_id: Uuid,
+            agent: AgentWrite,
+            channel: ChannelWrite,
+        ) -> AppResult<(Agent, Channel)> {
+            self.create_owned_agent_channel(company_id, agent, channel)
+                .await
         }
 
         async fn update_agent_and_owned_address(
@@ -1635,7 +1754,10 @@ mod tests {
         assert!(invalid_res.is_err());
 
         // 1. Owner creates agent with config_json
-        let config = json!({ "temperature": 0.7 });
+        let config = json!({
+            "version": 1,
+            "reasoning": {"mode": "auto", "max_iterations": 5}
+        });
 
         let agent = use_cases
             .create_agent(
@@ -1684,7 +1806,10 @@ mod tests {
         assert_eq!(list.len(), 1);
 
         // 4. Update agent
-        let updated_config = json!({ "temperature": 0.2 });
+        let updated_config = json!({
+            "version": 1,
+            "reflection": {"enabled": "enabled", "max_retries": 1}
+        });
         let invalid_model = use_cases
             .update_agent(
                 owner_id,
@@ -1951,6 +2076,9 @@ mod tests {
             run_timeout_secs: Some(90),
             system_prompt: Some("Answer briefly.".into()),
             description: Some("Sorts support mail".into()),
+            harness_kind: HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: NativeToolPolicy::default(),
             config_json: None,
             memory_enabled: true,
             memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,

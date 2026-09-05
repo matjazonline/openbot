@@ -25,6 +25,7 @@ pub const MAX_SKILL_DESCRIPTION_CHARS: usize = 500;
 pub const MAX_SKILL_NAME_CHARS: usize = 120;
 /// A template variable name, not free text -- the bound is generous for one identifier.
 pub const MAX_SKILL_OUTPUT_AS_CHARS: usize = 64;
+pub const MAX_SKILL_INSTRUCTIONS_JSON_BYTES: usize = 524_288;
 
 /// One skill as it is stored and edited.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,6 +43,7 @@ pub struct Skill {
     pub instructions: Vec<SkillInstruction>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// One step of a skill.
@@ -257,6 +259,7 @@ mod tests {
             instructions,
             created_by: CreationProvenance::system(),
             created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 

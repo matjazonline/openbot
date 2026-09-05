@@ -34,7 +34,7 @@ use crate::{
     },
     services::{
         agent_channel_tool::AgentChannelToolContext,
-        agent_runner::{AgentRunner, ResolvedAgentParams, resolve_agent_params},
+        agent_runner::{AgentRunner, ResolvedAgentCapabilities, resolve_agent_capabilities},
         harness::AgentExecutionDisposition,
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outreach_tool::OutreachToolContext,
@@ -218,7 +218,7 @@ struct AgentRun<'a> {
     /// The first agent error from any matched channel. Its presence means the whole logical task
     /// failed: no reply is committed for any channel, and the worker retries the task.
     failure: Option<AppError>,
-    primary_params: Option<ResolvedAgentParams>,
+    primary_params: Option<ResolvedAgentCapabilities>,
     primary_agent: Option<Agent>,
 }
 
@@ -425,13 +425,22 @@ impl ThreadUseCases {
             .list_agent_history(payload.thread_id)
             .await?;
 
-        let params = Box::pin(resolve_agent_params(
+        let capability_reader = self.agent_capability_reader.as_ref().ok_or_else(|| {
+            AppError::Internal("Agent capability persistence is unavailable.".into())
+        })?;
+        let params = Box::pin(resolve_agent_capabilities(
             self.company_persistence.as_ref(),
+            capability_reader.as_ref(),
             &company,
-            Some(&agent),
+            agent.id,
         ))
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to resolve agent parameters: {e}")))?;
+        .map_err(|error| {
+            // Capability resolution is execution-time configuration. Preserve the established
+            // retry classification so repairing a credential or agent configuration can make an
+            // already-queued run succeed.
+            AppError::Internal(format!("Failed to resolve agent capabilities: {error}"))
+        })?;
 
         let mut prompt = payload.prompt.clone();
         if let Some(memory) = self.memory.as_ref()
@@ -812,6 +821,9 @@ impl ThreadUseCases {
             primary_params: None,
             primary_agent: None,
         };
+        let capability_reader = self.agent_capability_reader.as_ref().ok_or_else(|| {
+            AppError::Internal("Agent capability persistence is unavailable.".into())
+        })?;
         let mut agent_cache: HashMap<Uuid, Option<Agent>> = HashMap::new();
 
         for (index, channel_match) in matches.iter().enumerate() {
@@ -819,16 +831,18 @@ impl ThreadUseCases {
                 .thread_persistence
                 .list_agent_history(channel_match.thread.id)
                 .await?;
-            let agent = Some(
-                self.first_agent_for(channel_match, &mut agent_cache)
-                    .await?,
-            );
+            let loaded_agent = self
+                .first_agent_for(channel_match, &mut agent_cache)
+                .await?;
+            let agent_id = loaded_agent.id;
+            let agent = Some(loaded_agent);
             // Box the credential-resolution seam so this already-deep dispatch future does not
             // absorb another provider-facing async frame.
-            let params = Box::pin(resolve_agent_params(
+            let params = Box::pin(resolve_agent_capabilities(
                 self.company_persistence.as_ref(),
+                capability_reader.as_ref(),
                 &channel_match.company,
-                agent.as_ref(),
+                agent_id,
             ))
             .await;
             if index == 0 {
@@ -881,9 +895,9 @@ impl ThreadUseCases {
                 }
             }
 
-            let result = match &params {
+            let result = match params {
                 Ok(params) => {
-                    let mut runner = AgentRunner::new(&agent_prompt, params)
+                    let mut runner = AgentRunner::new(&agent_prompt, &params)
                         .subject(Some(envelope.content.subject()))
                         .history(&history)
                         .approval_use_cases(self.approval_use_cases.clone())
@@ -905,7 +919,7 @@ impl ThreadUseCases {
                         .ids(
                             Some(channel_match.company.id),
                             Some(channel_match.channel.id),
-                            agent.as_ref().map(|a| a.id),
+                            Some(params.agent_id),
                         )
                         // After `ids`, which is where the hook context reads them from.
                         .trace(run_correlation_id, ingest.task_id);
@@ -923,6 +937,7 @@ impl ThreadUseCases {
                                 task_id,
                                 lease.worker_id,
                                 run_correlation_id,
+                                params.spec().sub_agents.clone(),
                             ),
                         );
                         // The address book only makes sense alongside the tool that uses it.
@@ -971,7 +986,9 @@ impl ThreadUseCases {
                         ))),
                     }
                 }
-                Err(err) => Err(AppError::Internal(err.to_string())),
+                Err(error) => Err(AppError::Internal(format!(
+                    "Failed to resolve agent capabilities: {error}"
+                ))),
             };
 
             match result {
@@ -1137,6 +1154,7 @@ impl ThreadUseCases {
         task_id: Uuid,
         worker_id: Uuid,
         correlation_id: CorrelationId,
+        sub_agent_scope: crate::entities::harness::SubAgentScope,
     ) -> OutreachToolContext {
         OutreachToolContext {
             task_id,
@@ -1144,6 +1162,7 @@ impl ThreadUseCases {
             worker_id,
             company_id: channel_match.company.id,
             channel_id: channel_match.channel.id,
+            sub_agent_scope,
             thread_id: channel_match.thread.id,
             channel_name: channel_match.channel.name.clone(),
             channel_slug: channel_match.reply_slug(),
@@ -1561,18 +1580,18 @@ impl ThreadUseCases {
 }
 
 fn build_execution_parameters(
-    params: Option<&ResolvedAgentParams>,
+    params: Option<&ResolvedAgentCapabilities>,
     agent: Option<&Agent>,
     prompt: &str,
 ) -> serde_json::Value {
     match params {
         Some(params) => {
-            let mut config = params.config().clone();
+            let mut config = params.config();
             scrub_json_secrets(Some(&mut config));
             serde_json::json!({
                 "provider": params.provider(),
                 "model": params.model(),
-                "agent_id": agent.map(|a| a.id),
+                "agent_id": Some(params.agent_id),
                 "agent_name": agent.map(|a| a.name.as_str()),
                 "prompt": prompt,
                 "config": config,
@@ -1824,6 +1843,9 @@ mod agent_reply_tests {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
+            harness_kind: crate::entities::harness::HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             memory_persistence_mode: Default::default(),

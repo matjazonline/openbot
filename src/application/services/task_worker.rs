@@ -1261,6 +1261,7 @@ mod tests {
         use_cases::{
             agent::{AgentPersistence, AgentWrite},
             company::{CompanyPersistence, CompanyWrite},
+            skill::{AgentCapabilityReader, StoredAgentCapabilities},
             thread::ThreadPersistence,
         },
     };
@@ -1272,6 +1273,9 @@ mod tests {
     #[async_trait]
     impl AgentPersistence for MockAgentPersistence {
         async fn create(&self, _company_id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
+            unimplemented!()
+        }
+        async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
             unimplemented!()
         }
         async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
@@ -1287,11 +1291,34 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Agent>> {
             unimplemented!()
         }
+        async fn list_library(&self) -> AppResult<Vec<Agent>> {
+            unimplemented!()
+        }
         async fn update(&self, _id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
+        }
+    }
+
+    #[async_trait]
+    impl AgentCapabilityReader for MockAgentPersistence {
+        async fn load_for_execution(
+            &self,
+            execution_company_id: Uuid,
+            agent_id: Uuid,
+        ) -> AppResult<Option<StoredAgentCapabilities>> {
+            Ok((self.agent.id == agent_id
+                && self
+                    .agent
+                    .company_id
+                    .is_none_or(|company_id| company_id == execution_company_id))
+            .then(|| StoredAgentCapabilities {
+                agent: self.agent.clone(),
+                skills: Vec::new(),
+                sub_agent_scope: crate::entities::harness::SubAgentScope::AllCompanySiblings,
+            }))
         }
     }
 
@@ -1307,6 +1334,9 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("Help with the request.".into()),
             description: None,
+            harness_kind: crate::entities::harness::HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             memory_persistence_mode: Default::default(),
@@ -2294,6 +2324,9 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agent: active_agent(company_id, agent_id),
+        });
         let thread_use_cases = Arc::new(
             ThreadUseCases::for_test(
                 thread_persistence.clone(),
@@ -2303,9 +2336,8 @@ mod tests {
                 task_persistence.clone(),
                 config.clone(),
             )
-            .with_agent_persistence(Arc::new(MockAgentPersistence {
-                agent: active_agent(company_id, agent_id),
-            })),
+            .with_agent_persistence(agent_persistence.clone())
+            .with_agent_capability_reader(agent_persistence),
         );
 
         let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases, config);
@@ -2464,6 +2496,9 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agent: active_agent(company_id, agent_id),
+        });
         let thread_use_cases = Arc::new(
             ThreadUseCases::for_test(
                 thread_persistence.clone(),
@@ -2475,9 +2510,8 @@ mod tests {
                 task_persistence.clone(),
                 config.clone(),
             )
-            .with_agent_persistence(Arc::new(MockAgentPersistence {
-                agent: active_agent(company_id, agent_id),
-            })),
+            .with_agent_persistence(agent_persistence.clone())
+            .with_agent_capability_reader(agent_persistence),
         );
 
         let worker = Arc::new(TaskWorker::new(
@@ -2649,6 +2683,9 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agent: active_agent(company_id, agent_id),
+        });
         let thread_use_cases = Arc::new(
             ThreadUseCases::for_test(
                 thread_persistence.clone(),
@@ -2660,9 +2697,8 @@ mod tests {
                 task_persistence.clone(),
                 config.clone(),
             )
-            .with_agent_persistence(Arc::new(MockAgentPersistence {
-                agent: active_agent(company_id, agent_id),
-            })),
+            .with_agent_persistence(agent_persistence.clone())
+            .with_agent_capability_reader(agent_persistence),
         );
 
         let worker = Arc::new(TaskWorker::new(
@@ -2751,7 +2787,8 @@ mod tests {
     #[tokio::test]
     async fn a_successful_scheduled_run_records_execution_parameters_and_result() {
         use crate::services::test_support::{
-            LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, scripted_agent_config, scripted_llm,
+            LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url,
+            scripted_llm,
         };
         let _llm = scripted_llm(vec![LlmTurn::text("Audit complete: all good.")]).await;
 
@@ -2864,8 +2901,10 @@ mod tests {
         });
 
         let mut agent = active_agent(company_id, agent_id);
-        agent.config_json = Some(scripted_agent_config(&_llm.base_url));
+        register_scripted_agent_base_url(agent.id, &_llm.base_url);
+        agent.config_json = None;
 
+        let agent_persistence = Arc::new(MockAgentPersistence { agent });
         let thread_use_cases = Arc::new(
             ThreadUseCases::for_test(
                 thread_persistence.clone(),
@@ -2877,7 +2916,8 @@ mod tests {
                 task_persistence.clone(),
                 config.clone(),
             )
-            .with_agent_persistence(Arc::new(MockAgentPersistence { agent })),
+            .with_agent_persistence(agent_persistence.clone())
+            .with_agent_capability_reader(agent_persistence),
         );
 
         let worker = Arc::new(TaskWorker::new(

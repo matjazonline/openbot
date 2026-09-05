@@ -28,6 +28,7 @@ use crate::{
         delivery::DeliveryReader,
         memory::MemoryUseCases,
         schedule::ScheduleUseCases,
+        skill::SkillUseCases,
         thread::ThreadUseCases,
         user::UserUseCases,
     },
@@ -49,6 +50,7 @@ pub struct AppState {
     pub channel_use_cases: Arc<ChannelUseCases>,
     pub schedule_use_cases: Arc<ScheduleUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
+    pub skill_use_cases: Arc<SkillUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub memory_use_cases: Arc<MemoryUseCases>,
@@ -152,6 +154,12 @@ impl FromRef<AppState> for Arc<ScheduleUseCases> {
 impl FromRef<AppState> for Arc<AgentUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.agent_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<SkillUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.skill_use_cases.clone()
     }
 }
 

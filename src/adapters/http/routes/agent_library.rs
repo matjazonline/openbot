@@ -116,6 +116,7 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         memory_max_results: payload.memory_max_results,
         avatar_url,
         created_by: None,
+        ..AgentWrite::default()
     })
 }
 

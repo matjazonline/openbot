@@ -776,6 +776,7 @@ async fn update_agent(
                     .unwrap_or_else(crate::entities::memory::default_memory_max_results),
                 avatar_url,
                 created_by: None,
+                ..AgentWrite::default()
             },
         )
         .await;
@@ -1252,6 +1253,7 @@ impl SubmittedAgent {
                 .unwrap_or_else(crate::entities::memory::default_memory_max_results),
             avatar_url: self.avatar_url.clone()?,
             created_by: None,
+            ..AgentWrite::default()
         })
     }
 

@@ -78,14 +78,14 @@ impl AgentHarness for AiAgentsHarness {
         for id in &compiled.refused_tools {
             warn!(
                 tool_id = %id,
-                agent = %run.spec.name,
+                agent_id = %run.agent_id,
                 "tool grant is not in the platform allowlist and was dropped"
             );
         }
         for id in &compiled.unavailable_tools {
             warn!(
                 tool_id = %id,
-                agent = %run.spec.name,
+                agent_id = %run.agent_id,
                 "tool grant has no context to run in on this task and was dropped"
             );
         }

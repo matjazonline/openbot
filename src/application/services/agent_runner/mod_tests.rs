@@ -16,9 +16,10 @@ use crate::adapters::harness::ai_agents::{AiAgentsHarness, AiAgentsTextClassifie
 use crate::entities::{agent::Agent as AgentEntity, harness::HarnessKind};
 use crate::services::harness::HarnessRegistry;
 use crate::services::test_support::{
-    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, StubHarness, scripted_agent_config, scripted_llm,
+    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, StubHarness, register_scripted_agent_base_url,
+    scripted_llm,
 };
-use params::ResolvedAgentParams;
+use params::ResolvedAgentCapabilities;
 
 fn company() -> Company {
     Company {
@@ -34,9 +35,9 @@ fn company() -> Company {
     }
 }
 
-/// A fixture agent whose configuration points the real runtime at `config_json`.
-fn agent_with(config_json: serde_json::Value) -> AgentEntity {
-    AgentEntity {
+/// A fixture agent whose trusted connection endpoint points at the scripted provider.
+fn agent_with(base_url: &str) -> AgentEntity {
+    let agent = AgentEntity {
         memory_enabled: false,
         id: Uuid::new_v4(),
         company_id: None,
@@ -47,14 +48,19 @@ fn agent_with(config_json: serde_json::Value) -> AgentEntity {
         run_timeout_secs: None,
         system_prompt: Some("Answer briefly.".into()),
         description: None,
-        config_json: Some(config_json),
+        harness_kind: HarnessKind::default(),
+        granted_tool_ids: Vec::new(),
+        native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
+        config_json: None,
         memory_persistence_mode: Default::default(),
         memory_recall_mode: Default::default(),
         memory_max_results: crate::entities::memory::default_memory_max_results(),
         avatar_url: None,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: chrono::Utc::now(),
-    }
+    };
+    register_scripted_agent_base_url(agent.id, base_url);
+    agent
 }
 
 fn registry_of(harness: Arc<dyn AgentHarness>) -> Arc<HarnessRegistry> {
@@ -75,7 +81,7 @@ fn classifier() -> Arc<dyn TextClassifier> {
 #[tokio::test]
 async fn a_run_with_no_configured_harness_fails_instead_of_choosing_one() {
     let company = company();
-    let params = ResolvedAgentParams::new(Some(&company), None).expect("params resolve");
+    let params = ResolvedAgentCapabilities::new(Some(&company), None).expect("params resolve");
 
     let error = AgentRunner::new("Hello world", &params)
         .execute()
@@ -89,12 +95,28 @@ async fn a_run_with_no_configured_harness_fails_instead_of_choosing_one() {
     assert!(matches!(error, AppError::BadRequest(_)));
 }
 
+#[tokio::test]
+async fn an_agent_with_no_registered_harness_fails_the_run() {
+    let company = company();
+    let params = ResolvedAgentCapabilities::new(Some(&company), None).expect("params resolve");
+    let registry = Arc::new(HarnessRegistry::new());
+
+    let error = AgentRunner::new("Hello world", &params)
+        .harnesses(registry.clone(), classifier())
+        .execute()
+        .await
+        .expect_err("an empty registry cannot execute the requested kind");
+
+    assert!(error.to_string().contains(HarnessKind::AiAgents.as_str()));
+    assert!(registry.registered().is_empty());
+}
+
 /// A run that reached a harness and failed there is recorded and reported -- with the company's
 /// credential removed from the message on the way out.
 #[tokio::test]
 async fn a_failed_run_is_reported_without_the_credential_that_caused_it() {
     let company = company();
-    let params = ResolvedAgentParams::new(Some(&company), None).expect("params resolve");
+    let params = ResolvedAgentCapabilities::new(Some(&company), None).expect("params resolve");
     let harness = StubHarness::new(HarnessKind::AiAgents)
         .failing("provider rejected key company-api-key with 401");
 
@@ -115,7 +137,7 @@ async fn a_failed_run_is_reported_without_the_credential_that_caused_it() {
 #[test]
 fn a_run_with_no_tool_context_offers_the_harness_no_native_tools() {
     let company = company();
-    let params = ResolvedAgentParams::new(Some(&company), None).expect("params resolve");
+    let params = ResolvedAgentCapabilities::new(Some(&company), None).expect("params resolve");
     let runner = AgentRunner::new("Hello world", &params);
 
     assert!(runner.tool_host().is_none());
@@ -127,8 +149,8 @@ fn a_run_with_no_tool_context_offers_the_harness_no_native_tools() {
 async fn agent_execution_sends_resolved_current_date_to_llm() -> anyhow::Result<()> {
     let mut llm = scripted_llm(vec![LlmTurn::text("Today is noted.")]).await;
     let company = company();
-    let agent = agent_with(scripted_agent_config(&llm.base_url));
-    let params = ResolvedAgentParams::new(Some(&company), Some(&agent))?;
+    let agent = agent_with(&llm.base_url);
+    let params = ResolvedAgentCapabilities::new(Some(&company), Some(&agent))?;
 
     let output = AgentRunner::new("What date is it today?", &params)
         .harnesses(registry_of(Arc::new(AiAgentsHarness::new())), classifier())

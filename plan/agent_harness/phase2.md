@@ -50,7 +50,7 @@ No default bodies. `src/application/AGENTS.md` is explicit that a silently-succe
 a broken protocol passes its tests, and this trait's single method *is* the correctness operation.
 Note the contrast with `AgentPersistence` (`use_cases/agent.rs:168`), whose
 `create_library`/`list_library` defaults return `Err`/`Ok(vec![])` — that is the anti-pattern, and
-phase 4 does not copy it for `SkillPersistence`.
+phase 4 does not copy it for `SkillManagementPersistence` or `AgentCapabilityReader`.
 
 `AgentExecutionOutput`, `AgentExecutionDisposition` and `TokenUsage` already exist
 (`agent_runner.rs:63`, `:72`, `entities/task.rs`) and are already harness-neutral. Move

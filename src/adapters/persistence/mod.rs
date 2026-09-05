@@ -21,6 +21,7 @@ pub mod memory;
 pub mod participant;
 pub mod runtime_metrics;
 pub mod schedule;
+pub mod skill;
 pub mod task;
 #[cfg(test)]
 pub mod test_support;

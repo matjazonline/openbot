@@ -597,6 +597,7 @@ pub enum InternalTargetRejection {
     SelfCall,
     Disabled,
     NoAgent,
+    OutsideSubAgentScope,
 }
 
 impl InternalTargetRejection {
@@ -606,6 +607,7 @@ impl InternalTargetRejection {
             Self::SelfCall => "A channel cannot call itself",
             Self::Disabled => "Target channel is disabled",
             Self::NoAgent => "Target channel has no configured agent",
+            Self::OutsideSubAgentScope => "Target channel is outside this agent's sub-agent scope",
         }
     }
 }
@@ -627,6 +629,7 @@ pub fn check_internal_target(
     target: &Channel,
     caller_company_id: Uuid,
     caller_channel_id: Uuid,
+    sub_agent_scope: &crate::entities::harness::SubAgentScope,
 ) -> Result<(), InternalTargetRejection> {
     if target.company_id != caller_company_id {
         return Err(InternalTargetRejection::CrossCompany);
@@ -637,8 +640,18 @@ pub fn check_internal_target(
     if !target.enabled {
         return Err(InternalTargetRejection::Disabled);
     }
-    if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+    let Some(first_agent_id) = target
+        .agent_ids
+        .as_ref()
+        .and_then(|agent_ids| agent_ids.first())
+        .copied()
+    else {
         return Err(InternalTargetRejection::NoAgent);
+    };
+    // Authorization follows dispatch ordering: position zero is the responder that will run. An
+    // allowed later agent cannot lend its authority to an excluded first responder.
+    if !sub_agent_scope.allows(first_agent_id) {
+        return Err(InternalTargetRejection::OutsideSubAgentScope);
     }
     Ok(())
 }
@@ -662,6 +675,7 @@ pub async fn resolve_internal_target(
     selector: &ChannelSelector,
     caller_company_id: Uuid,
     caller_channel_id: Uuid,
+    sub_agent_scope: &crate::entities::harness::SubAgentScope,
     channel_persistence: &dyn ChannelPersistence,
 ) -> AppResult<InternalTargetOutcome> {
     let channel = match selector {
@@ -682,7 +696,12 @@ pub async fn resolve_internal_target(
         )));
     };
 
-    match check_internal_target(&channel, caller_company_id, caller_channel_id) {
+    match check_internal_target(
+        &channel,
+        caller_company_id,
+        caller_channel_id,
+        sub_agent_scope,
+    ) {
         Ok(()) => Ok(InternalTargetOutcome::Callable(Box::new(channel))),
         Err(rejection) => Ok(InternalTargetOutcome::Rejected(format!(
             "{rejection}: {selector}"

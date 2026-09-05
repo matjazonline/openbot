@@ -26,67 +26,24 @@ Independently of any agent's configuration, only the tools in `src/domain/entiti
 
 The list has no environment override and no per-company escape. A grant naming anything else is dropped when the configuration is compiled, whichever route it arrived by, and logged with the agent it belonged to. Revisit it when — and only when — a sandboxed harness exists to run those tools in.
 
-## Agent YAML
+## Agent grants and advanced configuration
 
-Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its configuration. Registration alone does not expose a tool to the model: the effective tool set is built from the top-level `tools:` list, so `hitl` or `tool_security` entries for a tool that is not in that list are inert.
+Custom tools are registered by the Rust server, but registration alone does not expose them to a model. An agent stores an explicit, typed `granted_tool_ids` list. Its effective grant is the deduplicated union of that list and the tools required by its selected skills, intersected with the platform catalogue and the native tools available to that particular run.
 
-```yaml
-name: VendorResearchAgent
-system_prompt: |
-  You coordinate requests for information from external contacts.
-  When no suitable specialist exists, use create_agent_channel to create one.
-  Use list_company_agents to discover callable specialists.
-  Use outreach_and_await_quorum when the task requires replies from third parties.
-  Use one recipient and a 100 percent threshold for single-party delegation.
-  After the outreach resumes, synthesize the received replies for the original requester.
+The stored `config_json` document is not runtime YAML and cannot grant tools. It is a versioned, fail-closed advanced-settings object. Version 1 accepts only bounded reasoning, reflection, and disambiguation settings. Unknown fields are rejected with their JSON path.
 
-llm:
-  provider: openai
-  model: gpt-5.4-mini
-
-tools:
-  - name: create_agent_channel
-  - name: list_company_agents
-  - name: outreach_and_await_quorum
-
-hitl:
-  default_timeout_seconds: 86400
-  on_timeout: reject
-  tools:
-    create_agent_channel:
-      require_approval: true
-      approval_context:
-        - name
-        - slug
-        - description
-    outreach_and_await_quorum:
-      require_approval: true
-      approval_context:
-        - target_emails
-        - completion_threshold_percent
-        - timeout_hours
-        - subject
-
-tool_security:
-  tools:
-    create_agent_channel:
-      timeout_ms: 10000
-      max_output_chars: 2000
-    list_company_agents:
-      timeout_ms: 5000
-      max_output_chars: 4000
-      config:
-        max_results: 50
-    outreach_and_await_quorum:
-      timeout_ms: 10000
-      max_output_chars: 4000
-      config:
-        max_targets: 50
-        max_timeout_hours: 720
-        allowed_target_scope: external_only
+```json
+{
+  "version": 1,
+  "reasoning": { "mode": "react", "max_iterations": 5 },
+  "reflection": { "enabled": "auto", "max_retries": 2 },
+  "disambiguation": { "enabled": true }
+}
 ```
 
-The server supplies the shown HITL and security settings as defaults. Channel and agent configuration is merged over those defaults, and the `tools:` list is then rebuilt from the allowlist above — so what an agent typed is an input to the grant, not the grant itself. Keep approval enabled unless the channel is explicitly trusted to send external mail autonomously.
+Tool policy is stored separately in the typed `native_tool_policy` field. It can bound outreach targets and timeouts, select the outreach target scope, and bound directory results. Approval requirements, execution timeouts, output ceilings, credentials, model selection, trusted runtime context, storage, and observability remain server-owned.
+
+The server rejects upstream feature-grant paths including `tools`, `skills`, `spawner`, `persona`, `hitl`, `tool_security`, `context`, `observability`, `storage`, `runtime`, `process`, `states`, `llms`, `tool_aliases`, and provider-owned `llm` configuration. In particular, upstream spawner management/orchestration tools and persona evolution cannot become indirect grants.
 
 Do not add task, company, channel, thread, or worker identifiers to the YAML or tool arguments. The server injects those values from the trusted task execution context.
 
@@ -254,7 +211,7 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 ## Configuration Notes
 
 - The creation tool ID must be exactly `create_agent_channel` everywhere.
-- `create_agent_channel` requires approval by default. Channel or agent configuration may explicitly override that policy through the normal merged HITL configuration.
+- `create_agent_channel` requires approval; agent configuration cannot weaken the server-owned HITL policy.
 - The tool is registered only when the run has a durable task and resolved parent agent; its company and provenance never come from model input.
 - Creating a child does not call it automatically. Use the returned address with `outreach_and_await_quorum`.
 - Dynamically created channels are immediately eligible for `list_company_agents` and internal outreach because they are enabled and have an assigned agent.

@@ -27,7 +27,7 @@ pub mod ports;
 pub mod redaction;
 pub mod registry;
 
-pub use approvals::{AgentApprovalHandler, InternalDelegationPolicy, internal_requires_approval};
+pub use approvals::{AgentApprovalHandler, InternalDelegationPolicy};
 pub use classifier::{ClassificationRequest, TextClassifier};
 pub use ports::{
     AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun, ApprovalAsk,

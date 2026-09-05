@@ -9,5 +9,6 @@ pub mod integration;
 pub mod memory;
 pub mod participant;
 pub mod schedule;
+pub mod skill;
 pub mod thread;
 pub mod user;

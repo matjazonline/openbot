@@ -4,6 +4,7 @@ use crate::{
         channel::Channel,
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
+        harness::{OutreachTargetScope, OutreachToolPolicy, SubAgentScope},
         message::CanonicalMessageId,
         message::{MessageDirection, MessageParticipantKind, MessageRole},
         transport::{ChannelSelector, ExternalDestination, TransportKind},
@@ -45,6 +46,8 @@ pub struct OutreachToolContext {
     pub worker_id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
+    /// Immutable callable-sibling scope captured with the running agent's capability snapshot.
+    pub sub_agent_scope: SubAgentScope,
     pub channel_name: String,
     pub channel_slug: ChannelSlug,
     pub company_slug: CompanySlug,
@@ -105,7 +108,7 @@ pub struct OutreachAndAwaitQuorumTool {
     /// their deliveries all land in one transaction.
     deliveries: DeliveryComposer,
     context: OutreachToolContext,
-    policy_config: Option<Value>,
+    policy: OutreachToolPolicy,
 }
 
 impl OutreachAndAwaitQuorumTool {
@@ -120,12 +123,12 @@ impl OutreachAndAwaitQuorumTool {
             channel_persistence,
             deliveries,
             context,
-            policy_config: None,
+            policy: OutreachToolPolicy::default(),
         }
     }
 
-    pub fn with_policy_config(mut self, config: Value) -> Self {
-        self.policy_config = Some(config);
+    pub fn with_policy(mut self, policy: OutreachToolPolicy) -> Self {
+        self.policy = policy;
         self
     }
 }
@@ -163,13 +166,7 @@ impl OutreachAndAwaitQuorumTool {
             Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
         };
 
-        let effective_config = self
-            .policy_config
-            .as_ref()
-            .filter(|c| !c.is_null() && c.as_object().is_some_and(|m| !m.is_empty()))
-            .unwrap_or(&Value::Null);
-
-        let limits = OutreachLimits::from_config(effective_config);
+        let limits = OutreachLimits::from_policy(&self.policy);
         let email_renderer = match self.deliveries.renderer(TransportKind::Email) {
             Ok(renderer) => renderer,
             Err(error) => return ToolInvocation::failure(error.to_string()),
@@ -177,11 +174,8 @@ impl OutreachAndAwaitQuorumTool {
         let resolved = match resolve_targets(
             &input,
             TargetPolicy {
-                max_targets: config_usize(effective_config, "max_targets", DEFAULT_MAX_TARGETS),
-                scope: match configured_target_scope(effective_config) {
-                    Ok(scope) => scope,
-                    Err(error) => return ToolInvocation::failure(error),
-                },
+                max_targets: usize::from(self.policy.max_targets),
+                scope: self.policy.allowed_target_scope.into(),
             },
             &self.context,
             self.channel_persistence.as_ref(),
@@ -283,14 +277,10 @@ pub const DEFAULT_TIMEOUT_HOURS: u32 = 96;
 pub const MAX_TIMEOUT_HOURS: u32 = 720;
 
 impl OutreachLimits {
-    fn from_config(config: &Value) -> Self {
+    fn from_policy(policy: &OutreachToolPolicy) -> Self {
         Self {
-            default_timeout_hours: config_u32(
-                config,
-                "default_timeout_hours",
-                DEFAULT_TIMEOUT_HOURS,
-            ),
-            max_timeout_hours: config_u32(config, "max_timeout_hours", MAX_TIMEOUT_HOURS),
+            default_timeout_hours: u32::from(policy.default_timeout_hours),
+            max_timeout_hours: u32::from(policy.max_timeout_hours),
         }
     }
 }
@@ -486,6 +476,16 @@ enum AllowedTargetScope {
     Any,
 }
 
+impl From<OutreachTargetScope> for AllowedTargetScope {
+    fn from(scope: OutreachTargetScope) -> Self {
+        match scope {
+            OutreachTargetScope::ExternalOnly => Self::ExternalOnly,
+            OutreachTargetScope::SameCompanyChannels => Self::SameCompanyChannels,
+            OutreachTargetScope::Any => Self::Any,
+        }
+    }
+}
+
 /// The two bounds a request is checked against before anything is resolved.
 ///
 /// Named because both come from tool policy rather than from the model, and because a count and
@@ -547,26 +547,6 @@ impl NormalizedOutreachTarget {
     }
 }
 
-fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String> {
-    let scope_val = config
-        .get("allowed_target_scope")
-        .or_else(|| {
-            config
-                .get("config")
-                .and_then(|c| c.get("allowed_target_scope"))
-        })
-        .and_then(Value::as_str)
-        .unwrap_or(DEFAULT_ALLOWED_TARGET_SCOPE);
-    match scope_val {
-        "external_only" => Ok(AllowedTargetScope::ExternalOnly),
-        "same_company_channels" => Ok(AllowedTargetScope::SameCompanyChannels),
-        "any" => Ok(AllowedTargetScope::Any),
-        value => Err(format!(
-            "Unsupported allowed_target_scope '{value}'; expected external_only, same_company_channels, or any"
-        )),
-    }
-}
-
 /// Turn what the model asked for into destinations this tool policy permits.
 ///
 /// Every allowlist decision here is taken against something the *server* resolved -- a channel row
@@ -620,10 +600,15 @@ async fn resolve_channel_target(
         ));
     }
     let selector = ChannelSelector::parse(value).map_err(|error| error.to_string())?;
-    let outcome =
-        resolve_internal_target(&selector, context.company_id, context.channel_id, channels)
-            .await
-            .map_err(|error| format!("Failed to resolve platform channel {selector}: {error}"))?;
+    let outcome = resolve_internal_target(
+        &selector,
+        context.company_id,
+        context.channel_id,
+        &context.sub_agent_scope,
+        channels,
+    )
+    .await
+    .map_err(|error| format!("Failed to resolve platform channel {selector}: {error}"))?;
     match outcome {
         InternalTargetOutcome::Callable(channel) => Ok(NormalizedOutreachTarget {
             destination: OutreachDestination::Channel {
@@ -675,24 +660,6 @@ fn push_unique(targets: &mut Vec<NormalizedOutreachTarget>, target: NormalizedOu
     if !targets.iter().any(|seen| seen.key() == target.key()) {
         targets.push(target);
     }
-}
-
-fn config_usize(config: &Value, key: &str, default: usize) -> usize {
-    config
-        .get(key)
-        .or_else(|| config.get("config").and_then(|c| c.get(key)))
-        .and_then(Value::as_u64)
-        .and_then(|value| usize::try_from(value).ok())
-        .unwrap_or(default)
-}
-
-fn config_u32(config: &Value, key: &str, default: u32) -> u32 {
-    config
-        .get(key)
-        .or_else(|| config.get("config").and_then(|c| c.get(key)))
-        .and_then(Value::as_u64)
-        .and_then(|value| u32::try_from(value).ok())
-        .unwrap_or(default)
 }
 
 #[cfg(test)]
@@ -779,12 +746,32 @@ mod tests {
         input: &OutreachInput,
         scope: AllowedTargetScope,
     ) -> Result<Vec<NormalizedOutreachTarget>, String> {
+        resolve_in_sub_agent_scope(
+            company_id,
+            source_channel_id,
+            channel,
+            input,
+            scope,
+            SubAgentScope::AllCompanySiblings,
+        )
+        .await
+    }
+
+    async fn resolve_in_sub_agent_scope(
+        company_id: Uuid,
+        source_channel_id: Uuid,
+        channel: Option<Channel>,
+        input: &OutreachInput,
+        scope: AllowedTargetScope,
+        sub_agent_scope: SubAgentScope,
+    ) -> Result<Vec<NormalizedOutreachTarget>, String> {
         let context = OutreachToolContext {
             task_id: Uuid::new_v4(),
             correlation_id: CorrelationId::new(),
             worker_id: Uuid::new_v4(),
             company_id,
             channel_id: source_channel_id,
+            sub_agent_scope,
             thread_id: Uuid::new_v4(),
             channel_name: "Source".into(),
             channel_slug: "source".into(),
@@ -808,6 +795,121 @@ mod tests {
             &EmailRenderer::new(&context.app_domain_name),
         )
         .await
+    }
+
+    #[tokio::test]
+    async fn a_restricted_agent_cannot_outreach_to_an_excluded_sibling_by_selector() {
+        let company_id = Uuid::new_v4();
+        let target = channel(Uuid::new_v4(), company_id, "support");
+
+        let error = resolve_in_sub_agent_scope(
+            company_id,
+            Uuid::new_v4(),
+            Some(target),
+            &request(&["support"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
+            SubAgentScope::Restricted(vec![Uuid::new_v4()]),
+        )
+        .await
+        .expect_err("a remembered or guessed selector must still be refused");
+
+        assert!(
+            error.contains("outside this agent's sub-agent scope"),
+            "{error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_channel_is_authorized_against_the_first_agent_that_dispatch_will_run() {
+        let company_id = Uuid::new_v4();
+        let allowed = Uuid::new_v4();
+        let mut target = channel(Uuid::new_v4(), company_id, "support");
+        target.agent_ids = Some(vec![allowed, Uuid::new_v4()]);
+
+        let resolved = resolve_in_sub_agent_scope(
+            company_id,
+            Uuid::new_v4(),
+            Some(target),
+            &request(&["support"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
+            SubAgentScope::Restricted(vec![allowed]),
+        )
+        .await
+        .expect("the allowed first responder authorizes the channel");
+
+        assert_eq!(resolved.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn an_allowed_later_agent_does_not_authorize_an_excluded_first_responder() {
+        let company_id = Uuid::new_v4();
+        let allowed_later = Uuid::new_v4();
+        let mut target = channel(Uuid::new_v4(), company_id, "support");
+        target.agent_ids = Some(vec![Uuid::new_v4(), allowed_later]);
+
+        let error = resolve_in_sub_agent_scope(
+            company_id,
+            Uuid::new_v4(),
+            Some(target),
+            &request(&["support"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
+            SubAgentScope::Restricted(vec![allowed_later]),
+        )
+        .await
+        .expect_err("a later agent never answers dispatch");
+
+        assert!(
+            error.contains("outside this agent's sub-agent scope"),
+            "{error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_restricted_agent_cannot_reach_a_direct_global_library_responder() {
+        let company_id = Uuid::new_v4();
+        let global_agent_id = Uuid::new_v4();
+        let mut target = channel(Uuid::new_v4(), company_id, "library");
+        target.agent_ids = Some(vec![global_agent_id]);
+
+        let error = resolve_in_sub_agent_scope(
+            company_id,
+            Uuid::new_v4(),
+            Some(target),
+            &request(&["library"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
+            SubAgentScope::Restricted(vec![Uuid::new_v4()]),
+        )
+        .await
+        .expect_err("a global id cannot appear in a company-owned allowlist");
+
+        assert!(
+            error.contains("outside this agent's sub-agent scope"),
+            "{error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_newly_created_agent_never_extends_a_restricted_scope_implicitly() {
+        let company_id = Uuid::new_v4();
+        let persisted_allowed = Uuid::new_v4();
+        let mut new_channel = channel(Uuid::new_v4(), company_id, "new-child");
+        new_channel.agent_ids = Some(vec![Uuid::new_v4()]);
+
+        let error = resolve_in_sub_agent_scope(
+            company_id,
+            Uuid::new_v4(),
+            Some(new_channel),
+            &request(&["new-child"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
+            SubAgentScope::Restricted(vec![persisted_allowed]),
+        )
+        .await
+        .expect_err("creating a row cannot mutate an immutable execution snapshot");
+
+        assert!(
+            error.contains("outside this agent's sub-agent scope"),
+            "{error}"
+        );
     }
 
     fn request(channels: &[&str], emails: &[&str]) -> OutreachInput {

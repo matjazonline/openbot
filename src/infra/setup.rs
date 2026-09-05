@@ -43,6 +43,7 @@ use crate::{
         company_resend_api::CompanyResendApiUseCases,
         memory::MemoryUseCases,
         schedule::ScheduleUseCases,
+        skill::SkillUseCases,
         thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
         user::{EmailConfirmation, UserUseCases},
     },
@@ -182,6 +183,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         },
     )
     .with_prompt_classifier(text_classifier.clone());
+    let skill_use_cases = Arc::new(SkillUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+    ));
 
     // Renderers first, then the use cases that freeze parts with them, then the senders -- one of
     // which needs those use cases as its internal relay. Building the pair in that order is what
@@ -222,6 +227,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         )
         .with_agent_run_timeout(agent_run_timeout)
         .with_agent_persistence(postgres_arc.clone())
+        .with_agent_capability_reader(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
@@ -297,6 +303,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         channel_use_cases,
         schedule_use_cases,
         agent_use_cases: Arc::new(agent_use_cases),
+        skill_use_cases,
         thread_use_cases,
         approval_use_cases,
         memory_use_cases,

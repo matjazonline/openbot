@@ -12,7 +12,8 @@ mod params;
 mod prompt;
 
 pub use params::{
-    DEFAULT_AGENT_NAME, DEFAULT_SYSTEM_PROMPT, ResolvedAgentParams, resolve_agent_params,
+    DEFAULT_AGENT_NAME, DEFAULT_SYSTEM_PROMPT, ResolvedAgentCapabilities,
+    resolve_agent_capabilities,
 };
 
 use std::sync::Arc;
@@ -27,7 +28,6 @@ use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::entities::task::TokenUsage;
-use crate::entities::tool_catalogue::{AGENT_DIRECTORY_TOOL_ID, OUTREACH_TOOL_ID};
 use crate::infra::config::AppConfig;
 use crate::services::agent_channel_tool::{
     AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
@@ -37,7 +37,7 @@ use crate::services::agent_trace_hooks::{AgentTraceContext, AgentTraceHooks};
 use crate::services::harness::{
     AgentApprovalHandler, AgentExecutionOutput, AgentHarness, AgentRun, HarnessApprovals,
     HarnessRegistry, HarnessToolHost, HarnessTrace, InternalDelegationPolicy, TextClassifier,
-    internal_requires_approval, sanitize_text,
+    sanitize_text,
 };
 use crate::services::llm_guardrail::GuardrailCheck;
 use crate::services::native_tools::NativeToolHost;
@@ -58,7 +58,7 @@ pub struct AgentRunner<'a> {
     /// Subject of the message `prompt` came from, if it has one.
     subject: Option<&'a str>,
     history: &'a [AgentHistoryMessage],
-    params: &'a ResolvedAgentParams,
+    params: &'a ResolvedAgentCapabilities,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalSubject>,
     monitoring: Option<Arc<dyn MonitoringService>>,
@@ -90,7 +90,7 @@ pub struct AgentRunner<'a> {
 }
 
 impl<'a> AgentRunner<'a> {
-    pub fn new(prompt: &'a str, params: &'a ResolvedAgentParams) -> Self {
+    pub fn new(prompt: &'a str, params: &'a ResolvedAgentCapabilities) -> Self {
         Self {
             prompt,
             subject: None,
@@ -140,7 +140,7 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub fn params(mut self, params: &'a ResolvedAgentParams) -> Self {
+    pub fn params(mut self, params: &'a ResolvedAgentCapabilities) -> Self {
         self.params = params;
         self
     }
@@ -302,6 +302,7 @@ impl<'a> AgentRunner<'a> {
 
         let run = AgentRun {
             spec: Box::new(self.params.spec().clone()),
+            agent_id: self.params.agent_id,
             api_key: key,
             full_prompt: &full_prompt,
             history_message_count,
@@ -371,7 +372,9 @@ impl<'a> AgentRunner<'a> {
                 channel_persistence: channels.clone(),
                 company_id: context.company_id,
                 source_channel_id: context.channel_id,
-                requires_approval: internal_requires_approval(self.params.config()),
+                sub_agent_scope: self.params.spec().sub_agents.clone(),
+                // Approval authority is server-owned; persisted agent policy cannot weaken it.
+                requires_approval: true,
             });
         Some(Arc::new(AgentApprovalHandler {
             approval_use_cases: use_cases,
@@ -412,23 +415,23 @@ impl<'a> AgentRunner<'a> {
                     AgentDirectoryContext {
                         company_id: context.company_id,
                         source_channel_id: context.channel_id,
+                        sub_agent_scope: self.params.spec().sub_agents.clone(),
                     },
                 );
-                if let Some(policy) = self.tool_policy(AGENT_DIRECTORY_TOOL_ID) {
-                    directory = directory.with_policy_config(policy);
-                }
+                directory =
+                    directory.with_policy(self.params.native_tool_policy().directory.clone());
                 host = host.with_directory(directory);
             }
 
+            let mut context = context;
+            context.sub_agent_scope = self.params.spec().sub_agents.clone();
             let mut outreach = OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,
                 deliveries,
                 context,
             );
-            if let Some(policy) = self.tool_policy(OUTREACH_TOOL_ID) {
-                outreach = outreach.with_policy_config(policy);
-            }
+            outreach = outreach.with_policy(self.params.native_tool_policy().outreach.clone());
             host = host.with_outreach(outreach);
         }
 
@@ -437,23 +440,6 @@ impl<'a> AgentRunner<'a> {
         }
 
         (!host.is_empty()).then(|| Arc::new(host) as Arc<dyn HarnessToolHost>)
-    }
-
-    /// One tool's slice of the agent's own tool policy.
-    ///
-    /// Read from the agent's configuration rather than from a compiled harness config on purpose:
-    /// every key this can carry has a platform default the tool applies for itself, and those
-    /// defaults are the same values a harness would compile in. Reading the agent's overrides
-    /// alone therefore gives the identical answer, and does it without the application layer
-    /// having to know a runtime's config schema. Phase 4 replaces this with typed policy.
-    fn tool_policy(&self, tool_id: &str) -> Option<serde_json::Value> {
-        self.params
-            .config()
-            .get("tool_security")?
-            .get("tools")?
-            .get(tool_id)?
-            .get("config")
-            .cloned()
     }
 
     /// One hook object sees every tool the run reaches for, including the runtime's built-ins and

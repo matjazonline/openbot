@@ -187,8 +187,9 @@ impl Skill {
     /// Tool ids this skill's steps invoke, deduplicated and in first-use order.
     ///
     /// The compiler unions these into the agent's `tools:` grant. Without that, the runtime denies
-    /// the step — `declared_tool_ids` is built only from `tools:`, and a skill step is checked
-    /// against it exactly like a model-initiated call.
+    /// an ordinary catalogue step: skill calls are checked against the same effective scope as
+    /// model-initiated calls. Other upstream feature grants exist, but phase 4 rejects those
+    /// configuration paths rather than treating them as skill capability sources.
     pub fn referenced_tool_ids(&self) -> Vec<ToolId>;
 }
 ```

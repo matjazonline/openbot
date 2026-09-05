@@ -547,6 +547,21 @@ mod tests {
             ))
         }
 
+        async fn create_owned_agent_channel_from_library(
+            &self,
+            _company_id: Uuid,
+            _library_agent_id: Uuid,
+            _agent: crate::use_cases::agent::AgentWrite,
+            _channel: crate::use_cases::channel::ChannelWrite,
+        ) -> AppResult<(
+            crate::entities::agent::Agent,
+            crate::entities::channel::Channel,
+        )> {
+            Err(crate::app_error::AppError::Internal(
+                "unused owned-agent persistence".into(),
+            ))
+        }
+
         async fn update_agent_and_owned_address(
             &self,
             _agent_id: Uuid,
@@ -567,6 +582,12 @@ mod tests {
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
+        async fn create_library(
+            &self,
+            _write: AgentWrite,
+        ) -> AppResult<crate::entities::agent::Agent> {
+            unimplemented!()
+        }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::agent::Agent>> {
             unimplemented!()
         }
@@ -581,6 +602,9 @@ mod tests {
             &self,
             _company_id: Uuid,
         ) -> AppResult<Vec<crate::entities::agent::Agent>> {
+            Ok(vec![])
+        }
+        async fn list_library(&self) -> AppResult<Vec<crate::entities::agent::Agent>> {
             Ok(vec![])
         }
         async fn update(
@@ -1351,6 +1375,13 @@ mod tests {
                 Arc::new(MockAgentPersistence),
                 Arc::new(UnusedOwnedAgentPersistence),
                 crate::use_cases::agent::SpamScanning::Available,
+            )),
+            skill_use_cases: Arc::new(crate::use_cases::skill::SkillUseCases::new(
+                Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+                    sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                        .expect("valid lazy pool url"),
+                )),
+                company_persistence.clone(),
             )),
             thread_use_cases,
             approval_use_cases,

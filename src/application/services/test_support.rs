@@ -7,9 +7,9 @@
 //! swapping the harness out swaps out the compiler, the tool grant, the skill steps and the
 //! runtime, which is most of what these tests exist to check.
 //!
-//! What the real harness offers instead is an HTTP seam: an agent's `config_json` carries
-//! `llm.base_url`, the compiler leaves it alone, and the adapter hands it to
-//! `ai_agents::UnifiedLLMProvider`. Pointing that at a localhost listener means the real runner,
+//! What the real harness offers instead is an HTTP seam: this test module registers a trusted
+//! provider endpoint for a fixture agent id, and connection resolution carries it separately from
+//! agent configuration. Pointing that at a localhost listener means the real runner,
 //! the real prompt assembly, the real `UntrustedFence`, the real compiled configuration and the
 //! real tool registry all run -- only the model is scripted.
 //!
@@ -24,6 +24,11 @@
 //! registered tool runs to tens of kilobytes and arrives across several segments, so a single read
 //! truncates the body and the test sees a parse error instead of a request. This one frames the
 //! request properly -- headers, then `Content-Length` bytes -- and bounds what it will accept.
+
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 
 use chrono::Utc;
 use serde_json::{Value, json};
@@ -45,6 +50,26 @@ use crate::entities::{
 use crate::services::harness::{
     AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun,
 };
+
+static SCRIPTED_AGENT_BASE_URLS: OnceLock<Mutex<HashMap<Uuid, String>>> = OnceLock::new();
+
+/// Register the trusted provider endpoint for one fixture agent.
+pub fn register_scripted_agent_base_url(agent_id: Uuid, base_url: &str) {
+    SCRIPTED_AGENT_BASE_URLS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .expect("scripted endpoint registry lock")
+        .insert(agent_id, base_url.to_string());
+}
+
+pub(crate) fn scripted_agent_base_url(agent_id: Uuid) -> Option<String> {
+    SCRIPTED_AGENT_BASE_URLS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .expect("scripted endpoint registry lock")
+        .get(&agent_id)
+        .cloned()
+}
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 
 /// The largest request body the double will read before giving up.
@@ -249,68 +274,6 @@ fn http_response(body: &str) -> String {
     )
 }
 
-/// The same, for an agent that is expected to delegate to a sibling channel.
-///
-/// Three things stand between a model and an actual hop, and all three default closed:
-///
-/// * the tool has to be *granted*. The compiled base configuration carries policy for
-///   `outreach_and_await_quorum` but grants nothing, and `declared_tool_ids` in the `ai-agents`
-///   builder comes from the compiled `tools:` list -- so an agent without a grant is offered no
-///   tools at all. `docs/inter_channel_agent_communication.md` is where the grant is documented.
-/// * a `tool_choice` has to reach the provider, or it sends neither native tool definitions nor
-///   the prompt-protocol instructions and the grant above reaches the model as nothing at all.
-///   the compiler defaults one for any configuration that grants tools, so this fixture sets no
-///   `tool_choice` of its own -- and would stop delegating if that default regressed.
-/// * `allowed_target_scope` defaults to `external_only` and `internal_requires_approval` to
-///   `true`, so a sibling channel is refused outright and a permitted one still waits for a human.
-///
-/// The policy lives under `tool_security.tools.<id>.config`, which is where `AgentRunner` reads it
-/// from the agent's own configuration before handing it to the tool. Repeating it under the
-/// `tools:` entry does nothing, and neither does relying on the runtime to carry it:
-/// `ToolSecurityConfig::enabled` defaults to false, so the `ai-agents` security engine hands every
-/// tool a null `custom_config` and never carries these values itself.
-///
-/// This is the delegating configuration `docs/inter_channel_agent_communication.md` documents.
-pub fn delegating_agent_config(base_url: &str) -> Value {
-    let mut config = scripted_agent_config(base_url);
-    let outreach_tool_config = json!({
-        "allowed_target_scope": "same_company_channels",
-        "max_targets": 1,
-        // The documented pairing: mail to strangers still waits for a human, a hop to
-        // a colleague does not.
-        "internal_requires_approval": false,
-    });
-    config["tools"] = json!([
-        { "name": crate::services::agent_directory_tool::AGENT_DIRECTORY_TOOL_ID },
-        { "name": crate::services::outreach_tool::OUTREACH_TOOL_ID },
-    ]);
-    config["tool_security"] = json!({
-        "tools": {
-            crate::services::outreach_tool::OUTREACH_TOOL_ID: {
-                "config": outreach_tool_config,
-            }
-        }
-    });
-    config
-}
-
-/// The `config_json` for a fixture agent pointed at a scripted model.
-///
-/// Only `llm.base_url` matters; provider, model and key are still resolved from the company's
-/// model connection the way production does, so the fixture has to create one that agrees with
-/// [`SCRIPTED_PROVIDER`] and [`SCRIPTED_MODEL`].
-pub fn scripted_agent_config(base_url: &str) -> Value {
-    json!({
-        "llm": {
-            "provider": SCRIPTED_PROVIDER,
-            "model": SCRIPTED_MODEL,
-            "base_url": base_url,
-            "temperature": 0.0,
-            "max_tokens": 1024,
-        }
-    })
-}
-
 // -------------------------------------------------------------------------------------------
 // Shared doubles
 // -------------------------------------------------------------------------------------------
@@ -414,8 +377,8 @@ pub fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
 /// An [`AgentHarness`] that answers without running anything.
 ///
 /// For the tests that need a harness to *exist* -- registry wiring, dispatch resolution -- rather
-/// than one that thinks. Tests that need a real run point [`scripted_agent_config`] at
-/// [`ScriptedLlm`] and drive the actual harness.
+/// than one that thinks. Tests that need a real run register a trusted fixture endpoint with
+/// [`register_scripted_agent_base_url`] and drive the actual harness.
 pub struct StubHarness {
     kind: HarnessKind,
     reply: String,

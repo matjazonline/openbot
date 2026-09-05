@@ -379,6 +379,7 @@ pub struct ThreadUseCases {
     /// wire it would answer every customer in the thread and mail nobody.
     deliveries: DeliveryComposer,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    agent_capability_reader: Option<Arc<dyn crate::use_cases::skill::AgentCapabilityReader>>,
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
@@ -430,6 +431,7 @@ impl ThreadUseCases {
             binding_persistence: ingest.bindings,
             deliveries,
             agent_persistence: None,
+            agent_capability_reader: None,
             agent_channel_provisioning: None,
             approval_use_cases: None,
             monitoring: None,
@@ -464,6 +466,14 @@ impl ThreadUseCases {
 
     pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
         self.agent_persistence = Some(agent_persistence);
+        self
+    }
+
+    pub fn with_agent_capability_reader(
+        mut self,
+        reader: Arc<dyn crate::use_cases::skill::AgentCapabilityReader>,
+    ) -> Self {
+        self.agent_capability_reader = Some(reader);
         self
     }
 

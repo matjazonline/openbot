@@ -10,7 +10,7 @@ use serde_json::json;
 
 use super::*;
 use crate::entities::{
-    harness::{AgentCapabilitySpec, SubAgentScope},
+    harness::{AgentCapabilitySpec, HarnessConfig, SubAgentScope},
     transport::RecipientRole,
     value_objects::{ModelName, ModelProvider},
 };
@@ -22,16 +22,18 @@ fn spec() -> AgentCapabilitySpec {
         system_prompt: "You are a legal assistant.".to_string(),
         provider: ModelProvider::canonical("openai"),
         model: ModelName::canonical("gpt-4o"),
+        provider_base_url: None,
         skills: Vec::new(),
         granted_tools: Vec::new(),
         sub_agents: SubAgentScope::AllCompanySiblings,
-        extra_config: json!({}),
+        harness_config: HarnessConfig::empty(HarnessKind::AiAgents),
     }
 }
 
 fn run_of(spec: AgentCapabilitySpec, prompt: &str) -> AgentRun<'_> {
     AgentRun {
         spec: Box::new(spec),
+        agent_id: uuid::Uuid::new_v4(),
         api_key: "test-key",
         full_prompt: prompt,
         history_message_count: 0,

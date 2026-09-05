@@ -1,5 +1,10 @@
 use crate::{
-    entities::{channel::Channel, transport::ChannelSelector, value_objects::ToolId},
+    entities::{
+        channel::Channel,
+        harness::{DirectoryToolPolicy, SubAgentScope},
+        transport::ChannelSelector,
+        value_objects::ToolId,
+    },
     services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     use_cases::{
         agent::AgentPersistence, channel::ChannelPersistence, channel::check_internal_target,
@@ -24,6 +29,7 @@ pub use crate::entities::tool_catalogue::AGENT_DIRECTORY_TOOL_ID;
 pub struct AgentDirectoryContext {
     pub company_id: Uuid,
     pub source_channel_id: Uuid,
+    pub sub_agent_scope: SubAgentScope,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -77,7 +83,7 @@ pub struct ListCompanyAgentsTool {
     ///
     /// Supplied by the caller rather than read from the running harness, so the bound applies the
     /// same way whichever runtime is invoking the tool.
-    policy_config: Option<Value>,
+    policy: DirectoryToolPolicy,
 }
 
 impl ListCompanyAgentsTool {
@@ -92,12 +98,12 @@ impl ListCompanyAgentsTool {
             agent_persistence,
             binding_persistence,
             context,
-            policy_config: None,
+            policy: DirectoryToolPolicy::default(),
         }
     }
 
-    pub fn with_policy_config(mut self, config: Value) -> Self {
-        self.policy_config = Some(config);
+    pub fn with_policy(mut self, policy: DirectoryToolPolicy) -> Self {
+        self.policy = policy;
         self
     }
 
@@ -194,13 +200,7 @@ impl ListCompanyAgentsTool {
 
     /// The callable siblings of this run's channel.
     pub async fn call(&self, _args: Value) -> ToolInvocation {
-        let policy = self.policy_config.clone().unwrap_or(Value::Null);
-        let max_results = policy
-            .get("max_results")
-            .or_else(|| policy.get("config").and_then(|c| c.get("max_results")))
-            .and_then(Value::as_u64)
-            .and_then(|value| usize::try_from(value).ok())
-            .unwrap_or(DEFAULT_DIRECTORY_MAX_RESULTS);
+        let max_results = usize::from(self.policy.max_results);
 
         let channels = match self
             .channel_persistence
@@ -222,6 +222,7 @@ impl ListCompanyAgentsTool {
                 &channel,
                 self.context.company_id,
                 self.context.source_channel_id,
+                &self.context.sub_agent_scope,
             )
             .is_err()
             {
@@ -320,6 +321,12 @@ mod tests {
         ) -> AppResult<Agent> {
             unreachable!("the directory only reads")
         }
+        async fn create_library(
+            &self,
+            _write: crate::use_cases::agent::AgentWrite,
+        ) -> AppResult<Agent> {
+            unreachable!("the directory only reads")
+        }
         async fn get_by_company_slug_and_agent_slug(
             &self,
             _company_slug: &str,
@@ -329,6 +336,9 @@ mod tests {
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Agent>> {
             Ok(self.agent.clone().into_iter().collect())
+        }
+        async fn list_library(&self) -> AppResult<Vec<Agent>> {
+            Ok(Vec::new())
         }
         async fn update(
             &self,
@@ -442,6 +452,19 @@ mod tests {
     }
 
     async fn listing(directory: Directory, source_channel_id: Uuid) -> Json {
+        listing_in_scope(
+            directory,
+            source_channel_id,
+            SubAgentScope::AllCompanySiblings,
+        )
+        .await
+    }
+
+    async fn listing_in_scope(
+        directory: Directory,
+        source_channel_id: Uuid,
+        sub_agent_scope: SubAgentScope,
+    ) -> Json {
         let company_id = directory.channels[0].company_id;
         let directory = Arc::new(directory);
         let tool = ListCompanyAgentsTool::new(
@@ -451,11 +474,35 @@ mod tests {
             AgentDirectoryContext {
                 company_id,
                 source_channel_id,
+                sub_agent_scope,
             },
         );
         let result = tool.call(Json::Null).await;
         assert!(result.success, "{:?}", result.output);
         result.output
+    }
+
+    #[tokio::test]
+    async fn a_restricted_agent_sees_only_its_allowlisted_siblings_in_the_directory() {
+        let company_id = Uuid::new_v4();
+        let source = channel(company_id, "source");
+        let allowed = channel(company_id, "allowed");
+        let excluded = channel(company_id, "excluded");
+        let allowed_agent_id = allowed.agent_ids.as_ref().unwrap()[0];
+
+        let output = listing_in_scope(
+            Directory {
+                channels: vec![source.clone(), excluded, allowed],
+                agent: None,
+                bindings: Vec::new(),
+            },
+            source.id,
+            SubAgentScope::Restricted(vec![allowed_agent_id]),
+        )
+        .await;
+
+        assert_eq!(output["count"], 1);
+        assert_eq!(output["agents"][0]["channel"], "allowed");
     }
 
     /// The listing is what an agent delegates from, so it names each channel by its selector and

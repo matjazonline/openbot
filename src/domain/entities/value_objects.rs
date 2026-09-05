@@ -392,7 +392,7 @@ string_newtype!(SkillSlug);
 
 impl SkillSlug {
     /// The longest slug the column stores.
-    pub const MAX_CHARS: usize = 64;
+    pub const MAX_CHARS: usize = 120;
 
     /// Lowercase letters, digits and single-position hyphens, neither leading nor trailing.
     ///

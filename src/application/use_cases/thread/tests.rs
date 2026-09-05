@@ -20,6 +20,7 @@ use crate::use_cases::company::CompanyWrite;
 use crate::use_cases::participant::test_support::{
     InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
 };
+use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
 use crate::use_cases::thread::test_support::InMemoryThreads;
 use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
 use chrono::Utc;
@@ -350,6 +351,10 @@ impl AgentPersistence for MockAgentPersistence {
         unimplemented!()
     }
 
+    async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
+        unimplemented!()
+    }
+
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         Ok(self.agents.iter().find(|agent| agent.id == id).cloned())
     }
@@ -366,12 +371,41 @@ impl AgentPersistence for MockAgentPersistence {
         unimplemented!()
     }
 
+    async fn list_library(&self) -> AppResult<Vec<Agent>> {
+        unimplemented!()
+    }
+
     async fn update(&self, _id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
         unimplemented!()
     }
 
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
         unimplemented!()
+    }
+}
+
+#[async_trait]
+impl AgentCapabilityReader for MockAgentPersistence {
+    async fn load_for_execution(
+        &self,
+        execution_company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Option<StoredAgentCapabilities>> {
+        Ok(self
+            .agents
+            .iter()
+            .find(|agent| {
+                agent.id == agent_id
+                    && agent
+                        .company_id
+                        .is_none_or(|company_id| company_id == execution_company_id)
+            })
+            .cloned()
+            .map(|agent| StoredAgentCapabilities {
+                agent,
+                skills: Vec::new(),
+                sub_agent_scope: crate::entities::harness::SubAgentScope::AllCompanySiblings,
+            }))
     }
 }
 
@@ -3808,29 +3842,33 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
         agent_ids: Some(vec![agent_id]),
         ..TestChannel::default()
     });
-    let thread_use_cases =
-        thread_use_cases.with_agent_persistence(Arc::new(MockAgentPersistence {
-            agents: vec![Agent {
-                memory_enabled: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
-                id: agent_id,
-                company_id: None,
-                name: "Triage Bot".to_string(),
-                slug: "triage-bot".to_string(),
-                provider: None,
-                model: None,
-                run_timeout_secs: None,
-                system_prompt: None,
-                description: None,
-                config_json: None,
-                avatar_url: None,
-                created_by: crate::entities::creation::CreationProvenance::system(),
-                created_at: Utc::now(),
-            }],
-        }));
+    let agent_persistence = Arc::new(MockAgentPersistence {
+        agents: vec![Agent {
+            memory_enabled: false,
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            id: agent_id,
+            company_id: None,
+            name: "Triage Bot".to_string(),
+            slug: "triage-bot".to_string(),
+            provider: None,
+            model: None,
+            run_timeout_secs: None,
+            system_prompt: None,
+            description: None,
+            harness_kind: crate::entities::harness::HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
+            config_json: None,
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }],
+    });
+    let thread_use_cases = thread_use_cases
+        .with_agent_persistence(agent_persistence.clone())
+        .with_agent_capability_reader(agent_persistence);
 
     let result = thread_use_cases
         .ingest_test_email(cc_message(
@@ -4293,6 +4331,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
         })
         .collect();
 
+    let agent_persistence = Arc::new(MockAgentPersistence { agents });
     ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
@@ -4303,7 +4342,8 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
         Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     )
-    .with_agent_persistence(Arc::new(MockAgentPersistence { agents }))
+    .with_agent_persistence(agent_persistence.clone())
+    .with_agent_capability_reader(agent_persistence)
 }
 
 fn misspelled_message_from(sender: &str) -> RawInboundPayload {
@@ -4523,6 +4563,9 @@ async fn a_channel_without_its_own_description_borrows_its_agent_s() {
             run_timeout_secs: None,
             system_prompt: None,
             description: Some("Answers supplier capacity and delivery-date questions.".to_string()),
+            harness_kind: crate::entities::harness::HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),

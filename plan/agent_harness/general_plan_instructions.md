@@ -42,11 +42,11 @@ agent settings page (`pages/agent_settings.rs`, inside the collapsed "Custom mod
 to pick from, no validation, and no way to express a grant a *different* harness could honour.
 
 **Nothing constrains which built-in tools an agent gets.** `auto_configure_features()` registers all
-30 `ai-agents` built-ins into the tool registry. Only the `tools:` list decides what is granted — and
-that list is whatever someone typed into the textarea. `command`, `file_write`, `file_edit`,
-`patch`, `delete_path`, `move_path` and `copy_path` execute **in this process, on this host**. There
-is no sandbox. A grant of `command` is remote code execution reachable by prompt injection through
-inbound mail.
+30 `ai-agents` built-ins into the tool registry. The ordinary grant is whatever someone typed into
+the textarea's `tools:` list, and spawner/persona feature fields can add still more grants.
+`command`, `file_write`, `file_edit`, `patch`, `delete_path`, `move_path` and `copy_path` execute **in
+this process, on this host**. There is no sandbox. A grant of `command` is remote code execution
+reachable by prompt injection through inbound mail.
 
 The outcome, in the shape of vercel.com/eve: an agent is configured by *selecting* from libraries —
 skills, tools, and (already) channels and sibling agents — and a harness-neutral spec describes that
@@ -137,8 +137,9 @@ web_search  command    text       template   math       http
 `auto_configure_features()` (`crates/ai-agents-runtime/src/builder.rs:407`) registers **all of them**
 into the registry whenever `self.tools.is_none()`.
 
-**The `tools:` list is the only grant, and it is enforced on every call.** `declared_tool_ids` is
-built solely from `spec.tools` plus explicit spawner/persona feature grants
+**The ordinary `tools:` list is enforced on every call, but it is not the only way the pinned
+runtime grants a tool.** `declared_tool_ids` is built from `spec.tools` plus explicit
+spawner/persona feature grants
 (`crates/ai-agents-runtime/src/builder.rs:1190`), and `execute_tool_record_inner`
 (`crates/ai-agents-runtime/src/runtime.rs:4784`) denies any invocation whose canonical id is not in
 the current scope:
@@ -152,21 +153,40 @@ if !initial_scope_snapshot.tool_ids.iter().any(|id| id == &canonical_id) {
 ```
 
 This runs for model-initiated calls **and** for skill tool-steps, which reach it through
-`impl ToolInvoker for RuntimeAgent` (`runtime.rs:12542`). Two consequences the phases depend on:
+`impl ToolInvoker for RuntimeAgent` (`runtime.rs:12542`). Three consequences the phases depend on:
 
-- Filtering the compiled `tools:` list is a **complete** enforcement point. Nothing else can reach an
-  ungranted tool, so the allowlist needs no second checkpoint inside the tools themselves.
+- Filtering the compiled top-level `tools:` list is necessary but **not a complete enforcement
+  point**. `spawner.management_tools`, `spawner.orchestration_tools`, and
+  `persona.evolution.allow_llm_evolve` add grants after that list is built. Residual config must not
+  be able to enable any of them. Keep a regression test against the built runtime's effective tool
+  ids, not only the compiled YAML.
 - A skill's tool steps **must** be unioned into the agent's `tools:` grant, or the skill dies
   mid-run with a denied step. Phase 3 does that union; phase 1 supplies
   `Skill::referenced_tool_ids()`.
+- A future upstream field that can register or grant tools is denied by default until it has a typed
+  platform capability and an explicit safety review. A denylist of today's dangerous keys is not a
+  durable security boundary.
 
 **`AgentSpec`** — `crates/ai-agents-runtime/src/spec/mod.rs:46` — the full surface `config_json` can
 reach: `name, version, description, system_prompt, llm, llms, skills, memory, storage, tools,
 max_iterations, max_context_tokens, error_recovery, tool_security, process, context, states,
 parallel_tools, streaming, hitl, reasoning, reflection, disambiguation, observability, runtime,
-tool_aliases, metadata, spawner, persona`. The server already owns and overwrites `name`,
-`system_prompt`, `llm.{provider,model,api_key,max_tokens,tool_choice}`, `observability`, `hitl`,
-`tool_security` and `context`. After phase 4 it also owns `tools` and `skills`.
+tool_aliases, metadata, spawner, persona`. Today `config_json` is deep-merged *over* the base
+configuration, so most of those fields are operator-overridable defaults; only a small subset is
+stamped afterwards. Phase 4 must correct that description and the implementation together:
+
+- security-owned fields (`tools`, `skills`, `spawner`, `hitl`, `tool_security`, `context`,
+  `observability`, runtime feature grants, and provider credentials) are never accepted from
+  residual config;
+- the adapter maps the typed advanced DTO onto a fresh server base and stamps server-owned values
+  last; and
+- residual config is a harness-specific, fail-closed allowlist. A new upstream `AgentSpec` field is
+  rejected until it is reviewed, bounded and deliberately added.
+
+Do not call the remaining JSON harness-neutral or pass an arbitrary `Value` across the application
+boundary. Deserialize it into a versioned, `deny_unknown_fields` ai-agents advanced-config DTO,
+then carry that as `HarnessConfig::AiAgents(AiAgentsAdvancedConfigV1)`. A second harness must get its
+own variant and cannot reinterpret the first runtime's document.
 
 ---
 
@@ -260,16 +280,14 @@ async boundary.
 
 ## Migration style
 
-**Reset and edit in place.** New tables and columns go into
-`migrations/20260817000000_init_schema.sql` itself; both databases are recreated because the file's
-checksum changes. `company_resend_integrations` set this precedent on the current branch, against
-`src/adapters/persistence/AGENTS.md` §1's additive-migration rule — the reset workflow is the one in
-force.
+**Add a new timestamped migration.** `migrations/20260817000000_init_schema.sql` is an applied,
+squashed baseline and is immutable under `src/adapters/persistence/AGENTS.md`. New columns need a
+default or an explicit backfill before `SET NOT NULL`, because persistent environments already have
+agent rows. Never repair a checksum by recreating the development databases.
 
 ```sh
-dropdb --if-exists mail_agents      && createdb mail_agents
-dropdb --if-exists mail_agents_test && createdb mail_agents_test
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" sqlx migrate run
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo sqlx migrate run
+psql "postgres://$(whoami)@localhost:5432/mail_agents" -X -c '\d agents'
 ```
 
 Schema conventions, all uniform across the ~45 existing tables: app-side `UUID PRIMARY KEY` (never
@@ -298,7 +316,7 @@ Full rules in `AGENTS.md`, `src/AGENTS.md`, `src/application/AGENTS.md`,
   silently-successful default is how a broken protocol passes its tests. `AgentHarness`,
   `HarnessApprovals` and `HarnessToolHost` get no default bodies. Contrast `AgentPersistence`
   (`use_cases/agent.rs:168`), whose `create_library`/`list_library` defaults are the anti-pattern —
-  do not copy them for `SkillPersistence`.
+  do not copy them for `SkillManagementPersistence` or `AgentCapabilityReader`.
 - **Newtypes over bare `String`.** `ToolId` and `SkillSlug` travel beside each other and beside
   `ChannelSlug`/`CompanySlug`; a tool id is also a map key. Extend `value_objects.rs` via
   `string_newtype!` rather than hand-rolling.
@@ -306,19 +324,23 @@ Full rules in `AGENTS.md`, `src/AGENTS.md`, `src/application/AGENTS.md`,
   `agent_runner.rs` is 2,933 lines against a ~1,000-line threshold and its test module is well past
   ~500 — phase 3 splits it into a directory module with sibling test files.
 - **Name your tuples; no flag parameters.** `AgentRun<'_>` is a struct, not a nine-argument call.
-  `AgentWrite` (`use_cases/agent.rs:37`) is the model for the write DTO gaining four new fields.
+  `AgentWrite` (`use_cases/agent.rs:37`) is the model for the write DTO gaining five new fields.
 - **Don't collapse errors into defaults on authorization paths.** The sub-agent scope in phase 5 is
   an authorization decision; `.ok().flatten()` and `.unwrap_or(false)` are banned on it.
-- **Bound work at every external boundary.** `MAX_SKILL_INSTRUCTIONS`, `MAX_AGENT_SKILLS`,
-  `MAX_GRANTED_TOOLS`, and the existing `MIN/MAX_AGENT_RUN_TIMEOUT_SECS`. Advertising a limit
-  without rejecting input that exceeds it is not enforcement — each gets a SQL `CHECK` *and* a
-  `normalize()` rejection.
+- **Bound work at every external boundary.** `MAX_SKILL_INSTRUCTIONS`, serialized instruction
+  bytes, skill field/slug lengths, `MAX_AGENT_SKILLS`, `MAX_AGENT_SUB_AGENTS`,
+  `MAX_GRANTED_TOOLS`, list page sizes, and the existing `MIN/MAX_AGENT_RUN_TIMEOUT_SECS`.
+  Advertising a limit without rejecting input that exceeds it is not enforcement. Use a SQL
+  constraint where the schema can express the invariant (for example an upper position bound) and
+  reject it at the application boundary too.
 - **Scope the object being used, not a sibling.** Every caller-supplied `skill_id` and `agent_id`
   loads through an ownership predicate in the same statement. `src/adapters/http/AGENTS.md`
   requires a test that attempts another tenant's id for every new route.
 - **Make operations traceable without leaking data.** A tool grant dropped by the allowlist is
   `warn!(tool_id = %id, agent_id = %agent_id, "…")` — structured fields, never an interpolated
-  sentence, and never the compiled YAML (it carries the API key until `sanitize_text` has run).
+  sentence or a user-authored agent name, and never the compiled YAML (it carries the API key until
+  `sanitize_text` has run). Phase 4/5 must carry the stable agent id to the harness run so the
+  phase-3 warning can follow this rule.
 - **Escape for the output context** — `escape_html_text` for text nodes, an attribute encoder for
   attributes and `hx-confirm`. Phase 6 renders user-authored skill instructions, so this is not
   theoretical.
@@ -335,7 +357,7 @@ From `src/adapters/persistence/AGENTS.md`, and each has cost real debugging time
   pre-existing.
 
 ```sh
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test --lib   # lands on _test
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo test --lib   # lands on _test
 ```
 
 ---
@@ -343,24 +365,26 @@ DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test --lib   # 
 ## Verification, once every phase has landed
 
 ```sh
-cargo fmt --check
-cargo clippy --all-targets
+npm ci
+npm run check:css
+cargo fmt --all -- --check
+SQLX_OFFLINE=true cargo check --locked --all-targets
+cargo clippy --locked --all-targets -- -D warnings
 
-dropdb --if-exists mail_agents      && createdb mail_agents
-dropdb --if-exists mail_agents_test && createdb mail_agents_test
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" sqlx migrate run
-psql "postgres://mac03@localhost:5432/mail_agents" -c '\d skills' -c '\d agent_skills' -c '\d agents'
-
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo sqlx prepare -- --all-targets
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test
-SQLX_OFFLINE=true cargo build          # the offline path CI and Fly.io use
-./scripts/stack-budget.sh              # the chain gained a dyn dispatch level
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo sqlx migrate run
+psql "postgres://$(whoami)@localhost:5432/mail_agents" -X \
+  -c '\d skills' -c '\d agent_skills' -c '\d agent_sub_agents' -c '\d agents'
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
+  cargo sqlx prepare --check -- --all-targets
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo test --locked --all-targets
+./scripts/stack-budget.sh
 ./scripts/transport-boundary-check.sh
 ```
 
 End to end, server on `:3001`:
 
-1. Reset both databases as above.
+1. Apply the additive migration to development and test databases; do not rewrite or reset the
+   applied baseline.
 2. Company settings → **Skills** → create a skill with two instructions: a `Tool` step on `datetime`,
    then a `Prompt` step. Confirm saving one that *ends* on the tool step is refused with a worded
    message, not a 500.
@@ -370,7 +394,7 @@ End to end, server on `:3001`:
 5. **Prove the allowlist.** Put `{"tools": ["command"]}` in the agent's raw config textarea — expect
    a `BadRequest` naming `tools` as reserved. Then insert the grant directly, bypassing the use case:
    ```sh
-   psql "postgres://mac03@localhost:5432/mail_agents" \
+   psql "postgres://$(whoami)@localhost:5432/mail_agents" \
      -c "UPDATE agents SET granted_tool_ids = ARRAY['command','calculator'] WHERE slug = '…';"
    ```
    Re-run: the run must succeed, log `warn!` that the grant was dropped, and the compiled YAML must
@@ -380,6 +404,6 @@ End to end, server on `:3001`:
 7. Attempt `/ui/skill-library` as a non-operator — expect `NotFound`, not `403`.
 8. Attempt another company's `skill_id` on every new route — expect `NotFound`.
 9. Set a sub-agent allowlist on an agent; confirm `list_company_agents` returns only those siblings
-   **and** that outreach to an excluded sibling's address is refused. Clear the allowlist; confirm
+   **and** that outreach to an excluded sibling's selector is refused. Clear the allowlist; confirm
    behaviour returns to today's.
 10. Delete a skill that an agent uses; confirm the agent still runs, with the skill gone.

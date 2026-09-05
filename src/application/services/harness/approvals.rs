@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::app_error::AppResult;
 use crate::entities::{
     approval::{ApprovalAction, ApprovalStatus, ApprovalSubject},
+    harness::SubAgentScope,
     tool_catalogue::OUTREACH_TOOL_ID,
     transport::ChannelSelector,
 };
@@ -41,24 +42,10 @@ pub struct InternalDelegationPolicy {
     pub channel_persistence: Arc<dyn ChannelPersistence>,
     pub company_id: Uuid,
     pub source_channel_id: Uuid,
+    pub sub_agent_scope: SubAgentScope,
     /// When false, a call whose recipients are *all* same-company agent channels skips the human.
     /// Defaults to true, so behaviour is unchanged until an operator opts in.
     pub requires_approval: bool,
-}
-
-/// Read `tool_security.tools.outreach_and_await_quorum.config.internal_requires_approval`.
-///
-/// Absent, malformed, or non-boolean all mean `true`: this gates outbound mail, so anything other
-/// than an explicit `false` fails closed.
-pub fn internal_requires_approval(config: &serde_json::Value) -> bool {
-    config
-        .get("tool_security")
-        .and_then(|v| v.get("tools"))
-        .and_then(|v| v.get(OUTREACH_TOOL_ID))
-        .and_then(|v| v.get("config"))
-        .and_then(|v| v.get("internal_requires_approval"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(true)
 }
 
 impl InternalDelegationPolicy {
@@ -104,6 +91,7 @@ impl InternalDelegationPolicy {
                 &selector,
                 self.company_id,
                 self.source_channel_id,
+                &self.sub_agent_scope,
                 self.channel_persistence.as_ref(),
             )
             .await?;
