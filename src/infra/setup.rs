@@ -1,5 +1,6 @@
 use crate::{
     adapters::{
+        harness::ai_agents::{AiAgentsHarness, AiAgentsTextClassifier},
         http::{app_state::AppState, session::SessionAuthority},
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
@@ -11,7 +12,9 @@ use crate::{
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
-    entities::{memory::MemoryProviderKind, runtime_metrics::MachineIdentity},
+    entities::{
+        harness::HarnessKind, memory::MemoryProviderKind, runtime_metrics::MachineIdentity,
+    },
     infra::{
         argon2_password_hasher,
         config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
@@ -20,6 +23,7 @@ use crate::{
     },
     services::{
         database_query_health::DatabaseQueryHealthService,
+        harness::{HarnessRegistry, TextClassifier},
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
@@ -155,6 +159,18 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         )
         .with_memory_persistence(postgres_arc.clone()),
     );
+    // The runtimes an agent may be executed on. One today; the registry is what a second one
+    // attaches to, and what makes an agent asking for a harness this deployment does not carry
+    // fail loudly instead of silently running somewhere else.
+    let harnesses = Arc::new(
+        HarnessRegistry::new()
+            .register(HarnessKind::AiAgents, Arc::new(AiAgentsHarness::new()))
+            .map_err(|error| {
+                anyhow::anyhow!("Could not register the ai-agents harness: {error}")
+            })?,
+    );
+    let text_classifier: Arc<dyn TextClassifier> = Arc::new(AiAgentsTextClassifier::new());
+
     let agent_use_cases = AgentUseCases::new(
         postgres_arc.clone(),
         postgres_arc.clone(),
@@ -164,7 +180,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         } else {
             crate::use_cases::agent::SpamScanning::Unavailable
         },
-    );
+    )
+    .with_prompt_classifier(text_classifier.clone());
 
     // Renderers first, then the use cases that freeze parts with them, then the senders -- one of
     // which needs those use cases as its internal relay. Building the pair in that order is what
@@ -208,7 +225,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
-        .with_memory(memory_coordinator),
+        .with_memory(memory_coordinator)
+        .with_harnesses(harnesses, text_classifier),
     );
 
     // Registered unconditionally now that Resend is configured per company: any tenant may connect

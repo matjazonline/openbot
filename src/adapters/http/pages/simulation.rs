@@ -895,7 +895,7 @@ pub(crate) fn resolved_agent_config(
     _company: Option<&Company>,
     _channel: Option<&Channel>,
 ) -> serde_json::Value {
-    crate::services::agent_runner::base_agent_config()
+    crate::adapters::harness::ai_agents::base_agent_config()
 }
 
 /// Wrap a simulated thread view in its own live connection.

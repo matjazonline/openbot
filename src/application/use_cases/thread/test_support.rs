@@ -98,7 +98,29 @@ impl ThreadUseCases {
             renderers,
             config,
         )
+        .with_harnesses(harness_registry(), text_classifier())
     }
+}
+
+/// The real harness, not a stub.
+///
+/// These tests drive the whole chain down to a scripted model over a socket, and swapping the
+/// runtime out here would stop them proving that what the compiler produced is a configuration
+/// `AgentBuilder::from_yaml` accepts. [`crate::services::test_support::StubHarness`] is the right
+/// double for a test about dispatch; this is the one for a test about what an agent does.
+pub fn harness_registry() -> Arc<crate::services::harness::HarnessRegistry> {
+    Arc::new(
+        crate::services::harness::HarnessRegistry::new()
+            .register(
+                crate::entities::harness::HarnessKind::AiAgents,
+                Arc::new(crate::adapters::harness::ai_agents::AiAgentsHarness::new()),
+            )
+            .expect("one harness registers"),
+    )
+}
+
+pub fn text_classifier() -> Arc<dyn crate::services::harness::TextClassifier> {
+    Arc::new(crate::adapters::harness::ai_agents::AiAgentsTextClassifier::new())
 }
 
 /// One stored canonical payload.

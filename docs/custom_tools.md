@@ -14,9 +14,21 @@ list_company_agents
 
 `list_company_agents` is the read-only address book that makes delegation usable: it returns the sibling agent channels this agent may call, with each one's description. Without it, callable addresses have to be hardcoded into a system prompt and go stale silently when a channel is renamed or disabled.
 
+## How a tool reaches a model
+
+Each of the three lives in `src/application/services/*_tool.rs` and describes itself with a `declaration()` — its id, the copy the model reads, the JSON Schema of its arguments, and what it is safe to do with it. None of them names an agent runtime. `NativeToolHost` (`src/application/services/native_tools.rs`) assembles the ones a given run can actually serve, and the harness adapter turns each declaration into whatever its runtime declares tools with.
+
+Which of the three a run can serve is decided by the contexts it was given: outreach needs a durable task, the directory needs agent and binding persistence, and channel creation needs a provisioning port. Adding a fourth tool means writing a `declaration()` and a `call()` beside its logic and adding an arm to the host — not touching the adapter.
+
+## The platform allowlist
+
+Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Twelve of the runtime's thirty built-ins are on that list, plus the three above. The eighteen absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep` and `ask_user` — execute in this process, on this host, with no sandbox, and inbound mail is an untrusted prompt source.
+
+The list has no environment override and no per-company escape. A grant naming anything else is dropped when the configuration is compiled, whichever route it arrived by, and logged with the agent it belonged to. Revisit it when — and only when — a sandboxed harness exists to run those tools in.
+
 ## Agent YAML
 
-Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its YAML configuration. Registration alone does not expose a tool to the model: the runtime's effective tool set is built from the top-level `tools:` list, so `hitl` or `tool_security` entries for a tool that is not in that list are inert.
+Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its configuration. Registration alone does not expose a tool to the model: the effective tool set is built from the top-level `tools:` list, so `hitl` or `tool_security` entries for a tool that is not in that list are inert.
 
 ```yaml
 name: VendorResearchAgent
@@ -74,7 +86,7 @@ tool_security:
         allowed_target_scope: external_only
 ```
 
-The server supplies the shown HITL and security settings as defaults. Channel and agent configuration is merged over those defaults. Keep approval enabled unless the channel is explicitly trusted to send external mail autonomously.
+The server supplies the shown HITL and security settings as defaults. Channel and agent configuration is merged over those defaults, and the `tools:` list is then rebuilt from the allowlist above — so what an agent typed is an input to the grant, not the grant itself. Keep approval enabled unless the channel is explicitly trusted to send external mail autonomously.
 
 Do not add task, company, channel, thread, or worker identifiers to the YAML or tool arguments. The server injects those values from the trusted task execution context.
 
@@ -247,10 +259,10 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 - Creating a child does not call it automatically. Use the returned address with `outreach_and_await_quorum`.
 - Dynamically created channels are immediately eligible for `list_company_agents` and internal outreach because they are enabled and have an assigned agent.
 - The canonical tool ID must be exactly `outreach_and_await_quorum` everywhere.
-- A YAML `tools:` grant without the Rust implementation causes agent build validation to fail.
+- A `tools:` grant for a native tool this run cannot serve — outreach on a run with no durable task, say — is dropped when the configuration is compiled and logged, rather than offered to the model and then denied on use.
 - Omitting the tool from `tools:` means the model has no access to it.
-- Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` reach the Rust tool because `AgentRunner` reads that path off the merged agent config and hands it to the tool directly. They do *not* arrive through `ToolExecutionContext.custom_config`: the `ai-agents` tool-security engine is disabled unless `tool_security.enabled` is set, and a disabled engine hands every tool an empty custom config.
-- Granting a tool in `tools:` is enough to make the model aware of it. A grant is only advertised when the provider has a tool choice, so `ensure_config_fields` sets `llm.tool_choice: auto` for any config that grants at least one tool; without that a config listing `tools:` would run with no tools and no error. Name a choice explicitly only to override it — `required` to force a call, `none` to keep the grant but disable it.
+- Tool-specific values under `tool_security.tools.<id>.config` reach the Rust tool because the runner reads that path off the agent's own configuration and hands it to the tool directly. They do *not* arrive through `ToolExecutionContext.custom_config`: the `ai-agents` tool-security engine is disabled unless `tool_security.enabled` is set, and a disabled engine hands every tool an empty custom config. Every key there has the same default in the tool itself, so a value omitted from configuration and a value the harness compiled agree by construction.
+- Granting a tool in `tools:` is enough to make the model aware of it. A grant is only advertised when the provider has a tool choice, so the compiler sets `llm.tool_choice: auto` for any configuration that grants at least one tool; without that a configuration listing `tools:` would run with no tools and no error. Name a choice explicitly only to override it — `required` to force a call, `none` to keep the grant but disable it.
 - `allowed_target_scope` accepts `external_only` (default), `same_company_channels`, or `any`.
 - `default_timeout_hours` (default 96) fills in an omitted `timeout_hours`. A default above `max_timeout_hours` is rejected, not clamped.
 - `internal_requires_approval` (default `true`) governs whether a call whose recipients are *all* same-company agent channels may skip human approval. Anything other than an explicit `false` — absent, malformed, or the wrong type — means `true`.

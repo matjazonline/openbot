@@ -1,18 +1,11 @@
 use crate::{
-    entities::{channel::Channel, transport::ChannelSelector},
+    entities::{channel::Channel, transport::ChannelSelector, value_objects::ToolId},
+    services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     use_cases::{
         agent::AgentPersistence, channel::ChannelPersistence, channel::check_internal_target,
         integration::ChannelBindingPersistence,
     },
 };
-use ai_agents::{
-    Tool, ToolResult,
-    tools::{
-        ToolExecutionContext, ToolOperationKind, ToolSafetyMetadata, ToolSideEffectLevel,
-        generate_schema,
-    },
-};
-use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -80,6 +73,11 @@ pub struct ListCompanyAgentsTool {
     agent_persistence: Arc<dyn AgentPersistence>,
     binding_persistence: Arc<dyn ChannelBindingPersistence>,
     context: AgentDirectoryContext,
+    /// This tool's slice of the agent's tool policy, when the agent configured one.
+    ///
+    /// Supplied by the caller rather than read from the running harness, so the bound applies the
+    /// same way whichever runtime is invoking the tool.
+    policy_config: Option<Value>,
 }
 
 impl ListCompanyAgentsTool {
@@ -94,7 +92,13 @@ impl ListCompanyAgentsTool {
             agent_persistence,
             binding_persistence,
             context,
+            policy_config: None,
         }
+    }
+
+    pub fn with_policy_config(mut self, config: Value) -> Self {
+        self.policy_config = Some(config);
+        self
     }
 
     /// The channel's responding agent — the same one dispatch picks, so the description shown
@@ -156,58 +160,47 @@ impl ListCompanyAgentsTool {
     }
 }
 
-#[async_trait]
-impl Tool for ListCompanyAgentsTool {
-    fn id(&self) -> &str {
-        AGENT_DIRECTORY_TOOL_ID
-    }
+/// The most entries one listing returns when policy names no other bound.
+///
+/// `src/AGENTS.md` -- bound work at every external boundary. A company with a thousand channels
+/// must not put a thousand of them in a prompt.
+pub const DEFAULT_DIRECTORY_MAX_RESULTS: usize = 50;
 
-    fn name(&self) -> &str {
-        "List Company Agents"
-    }
-
-    fn description(&self) -> &str {
-        "List the other agents in this company that you can contact, with what each one does and \
-         which interfaces it is reachable on. Pass a `channel` value from this list to the \
-         outreach tool's target_channels to delegate work to that agent. Your own channel is \
-         never listed."
-    }
-
-    fn input_schema(&self) -> Value {
-        generate_schema::<DirectoryInput>()
-    }
-
-    fn safety_metadata(&self) -> ToolSafetyMetadata {
-        ToolSafetyMetadata {
-            read_only: true,
-            concurrency_safe: true,
-            operation: ToolOperationKind::Read,
-            side_effect_level: ToolSideEffectLevel::None,
-            requires_network: false,
-            destructive: false,
-            open_world: false,
-            host_dependent: true,
-            requires_user_interaction: false,
-            supports_cancellation: false,
-            default_requires_approval: false,
-            should_defer_schema: false,
-            max_output_chars: Some(4_000),
-            max_result_size_chars: Some(8_000),
+impl ListCompanyAgentsTool {
+    /// How this tool is offered to whichever harness is running.
+    pub fn declaration() -> NativeToolDeclaration {
+        NativeToolDeclaration {
+            id: ToolId::from(AGENT_DIRECTORY_TOOL_ID),
+            name: "List Company Agents",
+            description: "List the other agents in this company that you can contact, with what \
+                          each one does and which interfaces it is reachable on. Pass a `channel` \
+                          value from this list to the outreach tool's target_channels to delegate \
+                          work to that agent. Your own channel is never listed.",
+            input_schema: serde_json::to_value(schemars::schema_for!(DirectoryInput))
+                .unwrap_or_else(|_| serde_json::json!({})),
+            safety: NativeToolSafety {
+                read_only: true,
+                concurrency_safe: true,
+                has_external_effect: false,
+                requires_network: false,
+                destructive: false,
+                open_world: false,
+                requires_approval_by_default: false,
+                max_output_chars: 4_000,
+                max_result_chars: 8_000,
+            },
         }
     }
 
-    async fn execute(&self, _args: Value, ctx: ToolExecutionContext) -> ToolResult {
-        let max_results = ctx
-            .custom_config
+    /// The callable siblings of this run's channel.
+    pub async fn call(&self, _args: Value) -> ToolInvocation {
+        let policy = self.policy_config.clone().unwrap_or(Value::Null);
+        let max_results = policy
             .get("max_results")
-            .or_else(|| {
-                ctx.custom_config
-                    .get("config")
-                    .and_then(|c| c.get("max_results"))
-            })
+            .or_else(|| policy.get("config").and_then(|c| c.get("max_results")))
             .and_then(Value::as_u64)
             .and_then(|value| usize::try_from(value).ok())
-            .unwrap_or(50);
+            .unwrap_or(DEFAULT_DIRECTORY_MAX_RESULTS);
 
         let channels = match self
             .channel_persistence
@@ -216,7 +209,9 @@ impl Tool for ListCompanyAgentsTool {
         {
             Ok(channels) => channels,
             Err(error) => {
-                return ToolResult::error(format!("Failed to list company channels: {error}"));
+                return ToolInvocation::failure(format!(
+                    "Failed to list company channels: {error}"
+                ));
             }
         };
 
@@ -251,9 +246,11 @@ impl Tool for ListCompanyAgentsTool {
             count: agents.len(),
             agents,
         };
-        match serde_json::to_string(&output) {
-            Ok(json) => ToolResult::ok(json),
-            Err(error) => ToolResult::error(format!("Failed to serialize tool output: {error}")),
+        match serde_json::to_value(&output) {
+            Ok(json) => ToolInvocation::success(json),
+            Err(error) => {
+                ToolInvocation::failure(format!("Failed to serialize tool output: {error}"))
+            }
         }
     }
 }
@@ -276,6 +273,7 @@ mod tests {
         },
         use_cases::{channel::ChannelWrite, integration::BindingWrite},
     };
+    use async_trait::async_trait;
     use serde_json::Value as Json;
 
     struct Directory {
@@ -455,14 +453,9 @@ mod tests {
                 source_channel_id,
             },
         );
-        let result = tool
-            .execute(
-                Json::Null,
-                ToolExecutionContext::test(AGENT_DIRECTORY_TOOL_ID),
-            )
-            .await;
+        let result = tool.call(Json::Null).await;
         assert!(result.success, "{:?}", result.output);
-        serde_json::from_str(&result.output).expect("the tool returns JSON")
+        result.output
     }
 
     /// The listing is what an agent delegates from, so it names each channel by its selector and

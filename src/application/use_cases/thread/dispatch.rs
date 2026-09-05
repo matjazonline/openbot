@@ -472,6 +472,10 @@ impl ThreadUseCases {
             .ids(Some(company.id), Some(channel.id), Some(agent.id))
             .trace(task.correlation_id, Some(task.id));
 
+        if let Some((harnesses, classifier)) = self.agent_harnesses() {
+            runner = runner.harnesses(harnesses, classifier);
+        }
+
         if let Some(agent_persistence) = self.agent_persistence() {
             runner =
                 runner.agent_directory(agent_persistence.clone(), self.binding_persistence.clone());
@@ -905,6 +909,9 @@ impl ThreadUseCases {
                         )
                         // After `ids`, which is where the hook context reads them from.
                         .trace(run_correlation_id, ingest.task_id);
+                    if let Some((harnesses, classifier)) = self.agent_harnesses() {
+                        runner = runner.harnesses(harnesses, classifier);
+                    }
                     if let Some(task_id) = ingest.task_id {
                         runner = runner.outreach_tool(
                             self.task_persistence.clone(),

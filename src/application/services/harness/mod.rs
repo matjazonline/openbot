@@ -8,6 +8,11 @@
 //! Adding a second harness means implementing [`AgentHarness`] under `src/adapters/harness/` and
 //! registering it. It does not mean editing the runner, the capability spec, or this module.
 //!
+//! [`TextClassifier`] sits beside it and deliberately does not extend it: the spam guardrail and
+//! the system-prompt generator want one classified answer against a company credential, not an
+//! agent, and `src/application/AGENTS.md` says to split a broad trait rather than add optional
+//! methods to one.
+//!
 //! # Why the ports live here
 //!
 //! `src/application/AGENTS.md`: ports are defined where they are consumed. Dispatch is what asks
@@ -17,15 +22,20 @@
 //! [`AgentCapabilitySpec`]: crate::entities::harness::AgentCapabilitySpec
 
 pub mod approvals;
+pub mod classifier;
 pub mod ports;
+pub mod redaction;
 pub mod registry;
 
 pub use approvals::{AgentApprovalHandler, InternalDelegationPolicy, internal_requires_approval};
+pub use classifier::{ClassificationRequest, TextClassifier};
 pub use ports::{
     AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun, ApprovalAsk,
-    ApprovalTrigger, ApprovalVerdict, HarnessApprovals, HarnessToolHost, HarnessTrace,
-    ToolInvocation, ToolTraceOutcome, ToolTraceRecord, ToolTraceSource,
+    ApprovalTrigger, ApprovalVerdict, EXECUTION_DIAGNOSTICS_KEY, HarnessApprovals, HarnessToolHost,
+    HarnessTrace, NativeToolDeclaration, NativeToolSafety, ToolInvocation, ToolTraceOutcome,
+    ToolTraceRecord, ToolTraceSource,
 };
+pub use redaction::sanitize_text;
 pub use registry::{HarnessRegistrationError, HarnessRegistry, UnsupportedHarness};
 
 /// Harness vocabulary that is domain-level, re-exported so this module reads as one place.

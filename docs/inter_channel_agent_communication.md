@@ -66,10 +66,16 @@ The top-level `tools:` list is the grant itself, and it is the only thing that g
 builds its effective tool set from that list, so an agent that omits it is offered no tools at all
 no matter what `hitl` or `tool_security` say about them. Policy without a grant is inert.
 
+What an agent asks for is an *input* to that list rather than the list itself. Before a run, the
+harness rebuilds `tools:` from the platform allowlist in `src/domain/entities/tool_catalogue.rs`,
+unions in every tool the agent's skills invoke, and drops anything the allowlist refuses or this
+particular run cannot serve — each drop logged with the agent it belonged to. See
+[Custom Agent Tools](custom_tools.md).
+
 A grant also has to reach the model. The runtime asks the provider for a tool choice and, given
 none, sends neither native tool definitions nor the prompt-protocol instructions -- a config that
 lists `tools:` and says nothing about `tool_choice` therefore runs with no tools, silently and
-without an error. `ensure_config_fields` closes that gap: any config that grants at least one tool
+without an error. The harness closes that gap when it compiles the configuration: any that grants at least one tool
 is given `llm.tool_choice: auto` unless it names a choice of its own, so the YAML below needs no
 `tool_choice` line. Set one explicitly only to depart from the default -- `required` to force a
 call, `none` to keep a grant on the books while turning it off.
@@ -97,10 +103,12 @@ tool_security:
         internal_requires_approval: false
 ```
 
-Per-tool `config` blocks are read by `AgentRunner` straight off the merged agent config, at
-`tool_security.tools.<id>.config` -- the path shown above. They are deliberately not read through
-the `ai-agents` tool-security engine, which is disabled by default and would hand every tool an
-empty config; repeating the same values anywhere else has no effect.
+Per-tool `config` blocks are read by `AgentRunner` straight off the agent's own configuration, at
+`tool_security.tools.<id>.config` -- the path shown above -- and handed to the tool. They are
+deliberately not read through the `ai-agents` tool-security engine, which is disabled by default
+and would hand every tool an empty config; repeating the same values anywhere else has no effect.
+Every key there has the same default inside the tool itself as the harness compiles into its own
+dialect, so an omitted value and a compiled one agree by construction.
 
 `require_approval: true` with `internal_requires_approval: false` is the combination that lets one agent mail strangers under approval while delegating to colleagues freely. Approval is keyed by tool ID, so the tool alone cannot tell the two apart; the server resolves every recipient against the channel directory before the approval gate and lets the call through only when all of them are callable same-company channels. A single external or unresolvable recipient pulls the whole call back under approval, and a persistence failure does the same.
 

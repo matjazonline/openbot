@@ -94,7 +94,7 @@ For enums crossing an async phase boundary, box every payload large enough to do
 boxing only the currently largest variant can merely make the next variant oversized. Keep
 `clippy::large_enum_variant` enabled as the early failure signal.
 
-The chain above is now 347 KiB. `scripts/stack-frames.sh` prints what each frame costs: measure
+The chain above is now 336 KiB. `scripts/stack-frames.sh` prints what each frame costs: measure
 before and after rather than reasoning about it.
 
 # One decision, one place

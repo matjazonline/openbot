@@ -1,4 +1,5 @@
 pub mod crypto;
+pub mod harness;
 pub mod http;
 pub mod memory;
 pub mod monitoring;

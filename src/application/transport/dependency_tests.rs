@@ -5,6 +5,10 @@
 //! compiler -- everything is one crate -- so it is asserted here instead, over the source itself.
 //!
 //! Step 11 closed the temporary exception list. Every upward production import now fails.
+//!
+//! The agent runtime joined the list when the harness adapter landed. It is checked separately
+//! from [`FORBIDDEN`] because prose may name it -- saying which types a module exists to keep out
+//! is the documentation -- so only code counts.
 
 use std::{fs, path::Path};
 
@@ -105,6 +109,38 @@ fn the_application_layer_imports_no_adapter_framework_or_provider_type() {
         "the application layer must not depend on adapters, SQLx, Axum, Lettre or a provider \
          client. Move the port into `src/application` and let the adapter implement it:\n  {}",
         unexpected.join("\n  ")
+    );
+}
+
+/// The agent runtime belongs behind [`AgentHarness`], and nothing above the adapter may name it.
+///
+/// This is the boundary the harness phases exist to create: a single `use ai_agents::...` in the
+/// application layer would make a port an alias for one runtime's types and nothing would fail.
+/// `src/application/services/harness/tests.rs` asserts the same thing one module in; this is the
+/// whole layer.
+///
+/// [`AgentHarness`]: crate::services::harness::AgentHarness
+#[test]
+fn the_application_layer_names_no_agent_runtime() {
+    let sources = application_sources();
+    let mut offenders = Vec::new();
+
+    for (file, source) in &sources {
+        for (number, line) in source.lines().enumerate() {
+            let code = line.trim();
+            // Prose may name the runtime; a comment compiles to nothing.
+            if code.starts_with("//") || !code.contains("ai_agents") {
+                continue;
+            }
+            offenders.push(format!("{file}:{}: {code}", number + 1));
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "the application layer must not name the agent runtime. Translate in \
+         `src/adapters/harness/ai_agents/` instead:\n  {}",
+        offenders.join("\n  ")
     );
 }
 

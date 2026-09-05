@@ -49,11 +49,37 @@ pub enum AgentExecutionDisposition {
     Suspended,
 }
 
+impl AgentExecutionOutput {
+    /// Record how long the run took.
+    ///
+    /// The harness cannot know: it is handed a composed prompt and returns a response, while the
+    /// clock belongs to the caller that also owns the timeout and the lease. It is stamped into
+    /// the diagnostics the harness already wrote rather than added beside them, so a reader has
+    /// one place to look.
+    pub fn stamp_duration(&mut self, duration_ms: u64) {
+        let Some(diagnostics) = self
+            .metadata
+            .as_mut()
+            .and_then(|metadata| metadata.get_mut(EXECUTION_DIAGNOSTICS_KEY))
+            .and_then(serde_json::Value::as_object_mut)
+        else {
+            return;
+        };
+        diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
+    }
+}
+
+/// The metadata key a harness records its own per-run diagnostics under.
+///
+/// Shared because both sides write to it: the harness fills it in, and the caller stamps the one
+/// field it alone can measure. It is also already in stored task rows, so it is fixed.
+pub const EXECUTION_DIAGNOSTICS_KEY: &str = "execution_diagnostics";
+
 /// Everything one harness run needs, and nothing more.
 ///
 /// A struct rather than a nine-argument call: `src/AGENTS.md` -- any tuple with three-plus
 /// elements, or two same-typed elements, becomes a struct with named fields. Two `&str` prompt
-/// fields and three `Option<&dyn ...>` ports sit here side by side, and positional arguments
+/// fields and three `Option<Arc<dyn ...>>` ports sit here side by side, and positional arguments
 /// would let any two of them swap silently.
 pub struct AgentRun<'a> {
     /// Boxed: it carries every skill body, so it dominates any future or enum it lands in
@@ -71,10 +97,15 @@ pub struct AgentRun<'a> {
     /// Whether the agent was addressed directly or copied, for the runtime context block.
     pub recipient_role: Option<RecipientRole>,
     /// `None` when nothing about this run can be approved, which is also when nothing may be.
-    pub approvals: Option<&'a dyn HarnessApprovals>,
+    ///
+    /// `Arc` rather than `&'a dyn`: a harness hands these to its own runtime, which owns them for
+    /// as long as the run lasts and requires `'static`. A borrow would push every implementation
+    /// into cloning the port into an `Arc` itself, which is the same allocation with the sharing
+    /// left to chance.
+    pub approvals: Option<Arc<dyn HarnessApprovals>>,
     /// `None` when this run has no native tools to offer -- see [`HarnessToolHost::available`].
-    pub tool_host: Option<&'a dyn HarnessToolHost>,
-    pub trace: Option<&'a dyn HarnessTrace>,
+    pub tool_host: Option<Arc<dyn HarnessToolHost>>,
+    pub trace: Option<Arc<dyn HarnessTrace>>,
     /// Set by the approval handler or the outreach tool when the run parks awaiting a human or
     /// another agent. The caller reads it to decide `Completed` vs `Suspended`.
     pub suspended: Arc<AtomicBool>,
@@ -211,14 +242,64 @@ impl ApprovalVerdict {
 /// keeps it that way -- see `docs/custom_tools.md`.
 #[async_trait]
 pub trait HarnessToolHost: Send + Sync {
-    /// The native tools this run may use, in a stable order.
-    fn available(&self) -> &[ToolId];
+    /// The native tools this run may use, in a stable order, each with everything a harness needs
+    /// to declare it to its own runtime.
+    ///
+    /// Returning the declarations rather than bare ids is what keeps each tool's name, copy and
+    /// argument schema next to the tool that answers to them. The harness adds whatever its own
+    /// registry needs on top; it does not get to invent what our tool accepts.
+    fn available(&self) -> &[NativeToolDeclaration];
 
     /// Run one native tool.
     ///
-    /// A dispatcher, not a schema registry: each tool's JSON schema stays with the tool, and the
-    /// adapter reads it from there when it declares the tool to its runtime.
+    /// A dispatcher, not a schema registry: `id` is one of the ids [`Self::available`] reported,
+    /// and anything else is a harness that declared a tool this host never offered.
     async fn invoke(&self, id: &ToolId, args: serde_json::Value) -> AppResult<ToolInvocation>;
+}
+
+/// Everything a harness must know to offer one of our tools to a model.
+///
+/// The schema is a JSON Schema object, produced from the tool's own input type, so the argument
+/// shape a model is told about and the shape [`HarnessToolHost::invoke`] deserializes cannot
+/// drift apart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeToolDeclaration {
+    pub id: ToolId,
+    /// The human-facing name a transcript shows.
+    pub name: &'static str,
+    /// What the model is told the tool does. Written for a model, not for an operator.
+    pub description: &'static str,
+    pub input_schema: serde_json::Value,
+    pub safety: NativeToolSafety,
+}
+
+/// What one native tool does, in terms a harness can turn into its own policy vocabulary.
+///
+/// Restated here rather than borrowed from a runtime for the reason [`ToolTraceSource`] is: these
+/// are facts about *our* tool -- whether it writes, whether it leaves the building, whether a
+/// human should see the call first -- and they stay true whichever runtime is asking. What a
+/// given harness *does* with them is its own business, and lives in its adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeToolSafety {
+    /// It does not change local or external state.
+    pub read_only: bool,
+    /// Two calls may run at once without observable races.
+    pub concurrency_safe: bool,
+    /// It affects something outside this process -- mail leaves, a row is written another system
+    /// can see. `false` means the effect, if any, stays here.
+    pub has_external_effect: bool,
+    pub requires_network: bool,
+    /// It can destroy or remove state. None of our tools does; the field is here so the day one
+    /// does, saying so is a field to set rather than a policy to remember.
+    pub destructive: bool,
+    /// Its targets are open-ended rather than drawn from a list this platform controls.
+    pub open_world: bool,
+    /// A human should see the call before it happens unless policy explicitly allows it.
+    pub requires_approval_by_default: bool,
+    /// Bounds, as `src/AGENTS.md` requires at every boundary: how much of the result the model is
+    /// shown, and how much of it is kept.
+    pub max_output_chars: usize,
+    pub max_result_chars: usize,
 }
 
 /// What one native tool call returned.
@@ -229,6 +310,37 @@ pub trait HarnessToolHost: Send + Sync {
 pub struct ToolInvocation {
     pub success: bool,
     pub output: serde_json::Value,
+}
+
+impl ToolInvocation {
+    /// A tool that did what it was asked. `output` is the structured answer the model reads.
+    pub fn success(output: serde_json::Value) -> Self {
+        Self {
+            success: true,
+            output,
+        }
+    }
+
+    /// A tool that ran and reported a problem the model should see and can act on -- a slug
+    /// already taken, a recipient outside policy. Not a transport fault: those are `Err`.
+    pub fn failure(reason: impl Into<String>) -> Self {
+        Self {
+            success: false,
+            output: serde_json::Value::String(reason.into()),
+        }
+    }
+
+    /// The output as a model-facing string.
+    ///
+    /// A plain string is rendered as itself rather than as a quoted JSON scalar, so a failure
+    /// reason reads as the sentence it is -- which is what [`Self::failure`]'s callers wrote and
+    /// what the runtime showed before this was a port.
+    pub fn render(&self) -> String {
+        match &self.output {
+            serde_json::Value::String(text) => text.clone(),
+            other => other.to_string(),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

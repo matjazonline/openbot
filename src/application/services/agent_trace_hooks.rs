@@ -2,13 +2,13 @@
 //!
 //! The task span says a run happened; this says what the run *did*. Every tool the agent reaches
 //! for -- ours, the runtime's built-ins, and anything reached over MCP -- passes through
-//! [`ai_agents::AgentHooks`], so one implementation covers them all without each tool having to
-//! remember to log itself.
+//! [`HarnessTrace`], so one implementation covers them all without each tool having to remember
+//! to log itself.
 //!
-//! [`AgentHooks::on_tool_execution_record`] is the authoritative callback: it fires once per
-//! logical executor request, with retries folded in, and `executed` is the only trustworthy
-//! statement that the tool implementation actually ran. `on_tool_start` may be skipped entirely,
-//! so nothing here depends on having seen it.
+//! [`HarnessTrace::tool_finished`] is the authoritative callback: it fires once per logical
+//! executor request, with retries folded in, and `executed` is the only trustworthy statement
+//! that the tool implementation actually ran. [`HarnessTrace::tool_started`] may be skipped
+//! entirely, so nothing here depends on having seen it.
 //!
 //! # What is deliberately not logged
 //!
@@ -22,17 +22,14 @@
 
 use std::sync::Arc;
 
-use ai_agents::{
-    AgentHooks,
-    tools::{ToolCallSource, ToolExecutionRecord, ToolResult},
-};
 use async_trait::async_trait;
 use serde_json::Value;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::domain::monitoring::MonitoringService;
-use crate::entities::correlation::CorrelationId;
+use crate::entities::{correlation::CorrelationId, value_objects::ToolId};
+use crate::services::harness::{HarnessTrace, ToolTraceRecord};
 
 /// Which run an action belongs to. Every field is an identifier or a count, so the whole struct is
 /// safe to attach to a log line.
@@ -68,35 +65,6 @@ impl AgentTraceHooks {
     }
 }
 
-/// The runtime path that asked for a call, as a bounded label.
-fn source_label(source: &ToolCallSource) -> &'static str {
-    match source {
-        ToolCallSource::Model => "model",
-        ToolCallSource::Skill { .. } => "skill",
-        ToolCallSource::StateAction { .. } => "state_action",
-        ToolCallSource::Plan { .. } => "plan",
-        ToolCallSource::Orchestration => "orchestration",
-        ToolCallSource::Spawner => "spawner",
-        _ => "other",
-    }
-}
-
-/// How a finished call ended, in one word, for metric labels and for reading a log at a glance.
-fn outcome_label(record: &ToolExecutionRecord) -> &'static str {
-    if record.cancelled {
-        "cancelled"
-    } else if record.timed_out {
-        "timed_out"
-    } else if !record.executed {
-        // Blocked before the implementation ran: policy refused it, or approval did.
-        "not_executed"
-    } else if record.success {
-        "success"
-    } else {
-        "failed"
-    }
-}
-
 /// The argument *names* an object-shaped call carries. Names come from the tool's own JSON schema,
 /// not from the sender, so they say which variant of a call this was without quoting anybody.
 fn argument_keys(args: &Value) -> Vec<&str> {
@@ -106,8 +74,8 @@ fn argument_keys(args: &Value) -> Vec<&str> {
 }
 
 #[async_trait]
-impl AgentHooks for AgentTraceHooks {
-    async fn on_tool_start(&self, tool: &str, args: &Value) {
+impl HarnessTrace for AgentTraceHooks {
+    async fn tool_started(&self, tool: &ToolId, args: &Value) {
         info!(
             target: "trace::tool",
             correlation_id = %self.context.correlation_id,
@@ -119,18 +87,13 @@ impl AgentHooks for AgentTraceHooks {
         );
     }
 
-    async fn on_tool_complete(&self, _tool: &str, _result: &ToolResult, _duration_ms: u64) {
-        // Intentionally empty: `on_tool_execution_record` describes the same logical request with
-        // strictly more evidence, and firing both would double every tool line in the log.
-    }
-
-    async fn on_tool_execution_record(&self, record: &ToolExecutionRecord) {
-        let outcome = outcome_label(record);
-        let source = source_label(&record.source);
+    async fn tool_finished(&self, record: ToolTraceRecord<'_>) {
+        let outcome = record.outcome.label();
+        let source = record.source.label();
         self.count(
             "agent_tool_calls_total",
             &[
-                ("tool", record.canonical_id.as_str()),
+                ("tool", record.tool.as_str()),
                 ("outcome", outcome),
                 ("source", source),
             ],
@@ -138,7 +101,7 @@ impl AgentHooks for AgentTraceHooks {
 
         // A call that never reached the tool is an operational event, not routine chatter: it
         // means policy or an approval stopped the agent doing what it decided to do.
-        if record.executed && record.success {
+        if record.executed && record.outcome.is_success() {
             info!(
                 target: "trace::tool",
                 correlation_id = %self.context.correlation_id,
@@ -146,12 +109,12 @@ impl AgentHooks for AgentTraceHooks {
                 company_id = ?self.context.company_id,
                 channel_id = ?self.context.channel_id,
                 agent_id = ?self.context.agent_id,
-                tool = %record.canonical_id,
+                tool = %record.tool,
                 call_id = %record.call_id,
                 source = %source,
                 outcome = %outcome,
                 duration_ms = record.duration_ms,
-                output_bytes = record.output.len(),
+                output_bytes = record.output_bytes,
                 output_truncated = record.output_truncated,
                 "Tool call finished"
             );
@@ -163,31 +126,33 @@ impl AgentHooks for AgentTraceHooks {
                 company_id = ?self.context.company_id,
                 channel_id = ?self.context.channel_id,
                 agent_id = ?self.context.agent_id,
-                tool = %record.canonical_id,
+                tool = %record.tool,
                 call_id = %record.call_id,
                 source = %source,
                 outcome = %outcome,
                 executed = record.executed,
                 duration_ms = record.duration_ms,
-                policy = ?record.policy.outcome,
-                approval = ?record.approval.as_ref().map(|approval| &approval.status),
-                cancellation_reason = ?record.cancellation_reason,
+                // Flattened rather than `?`-formatted: these are closed-set labels, and
+                // `Some("Denied")` in a log line is a Rust rendering, not a fact about the call.
+                policy = record.policy.unwrap_or("unreported"),
+                approval = record.approval.unwrap_or("not_checked"),
+                cancellation_reason = record.cancellation_reason.unwrap_or("none"),
                 "Tool call did not succeed"
             );
         }
     }
 
-    async fn on_approval_requested(&self, request: &ai_agents::hitl::ApprovalRequest) {
+    async fn approval_requested(&self, request_id: &str) {
         info!(
             target: "trace::approval",
             correlation_id = %self.context.correlation_id,
             task_id = ?self.context.task_id,
-            request_id = %request.id,
+            request_id = %request_id,
             "Agent run parked awaiting human approval"
         );
     }
 
-    async fn on_error(&self, error: &ai_agents::AgentError) {
+    async fn run_failed(&self, error: &str) {
         warn!(
             target: "trace::agent",
             correlation_id = %self.context.correlation_id,
@@ -198,7 +163,7 @@ impl AgentHooks for AgentTraceHooks {
         );
     }
 
-    async fn on_handoff(&self, from: &str, to: &str, reason: &str) {
+    async fn handoff(&self, from: &str, to: &str, reason: &str) {
         info!(
             target: "trace::agent",
             correlation_id = %self.context.correlation_id,
@@ -210,12 +175,12 @@ impl AgentHooks for AgentTraceHooks {
         );
     }
 
-    async fn on_delegate_complete(&self, agent_id: &str, state: &str, duration_ms: u64) {
+    async fn delegate_finished(&self, agent: &str, state: &str, duration_ms: u64) {
         info!(
             target: "trace::agent",
             correlation_id = %self.context.correlation_id,
             task_id = ?self.context.task_id,
-            delegate_agent = %agent_id,
+            delegate_agent = %agent,
             state = %state,
             duration_ms = duration_ms,
             "Delegated step finished"

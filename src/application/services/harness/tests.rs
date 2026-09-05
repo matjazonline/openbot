@@ -204,8 +204,8 @@ fn every_trace_label_is_distinct_and_bounded() {
 ///
 /// This module exists to keep the agent runtime out of everything above it; a single `use
 /// ai_agents::...` here would make the port an alias for one runtime's types and nothing would
-/// fail. `src/application/transport/dependency_tests.rs` does the same job one layer out, and
-/// widens to the whole application layer once phase 3 lands.
+/// fail. `src/application/transport/dependency_tests.rs` now does the same job over the whole
+/// application layer; this stays because this module is the one that must never regress first.
 #[test]
 fn the_harness_ports_name_no_agent_runtime() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/application/services/harness");

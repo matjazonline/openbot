@@ -7,8 +7,9 @@ use crate::{
         message::CanonicalMessageId,
         message::{MessageDirection, MessageParticipantKind, MessageRole},
         transport::{ChannelSelector, ExternalDestination, TransportKind},
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ToolId},
     },
+    services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     task_queue::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence},
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
@@ -23,14 +24,6 @@ use crate::{
         },
     },
 };
-use ai_agents::{
-    Tool, ToolResult,
-    tools::{
-        ToolExecutionContext, ToolOperationKind, ToolSafetyMetadata, ToolSideEffectLevel,
-        generate_schema,
-    },
-};
-use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -143,70 +136,57 @@ impl OutreachAndAwaitQuorumTool {
     }
 }
 
-#[async_trait]
-impl Tool for OutreachAndAwaitQuorumTool {
-    fn id(&self) -> &str {
-        OUTREACH_TOOL_ID
-    }
-
-    fn name(&self) -> &str {
-        "Outreach and Await Quorum"
-    }
-
-    fn description(&self) -> &str {
-        "Contact one or more recipients and pause this task until enough of them reply, or until the timeout requires a human decision. \
-         Recipients may be third parties, or — when tool policy permits — other agents in this company, addressed by their channel address. \
-         To delegate one request to one agent or person, pass a single address and omit completion_threshold_percent and timeout_hours. \
-         Use list_company_agents to discover which agents in this company you can address."
-    }
-
-    fn input_schema(&self) -> Value {
-        generate_schema::<OutreachInput>()
-    }
-
-    fn safety_metadata(&self) -> ToolSafetyMetadata {
-        ToolSafetyMetadata {
-            read_only: false,
-            concurrency_safe: false,
-            operation: ToolOperationKind::Write,
-            side_effect_level: ToolSideEffectLevel::ExternalWrite,
-            requires_network: true,
-            destructive: false,
-            open_world: true,
-            host_dependent: true,
-            requires_user_interaction: false,
-            supports_cancellation: false,
-            default_requires_approval: true,
-            should_defer_schema: false,
-            max_output_chars: Some(4_000),
-            max_result_size_chars: Some(8_000),
+impl OutreachAndAwaitQuorumTool {
+    /// How this tool is offered to whichever harness is running.
+    pub fn declaration() -> NativeToolDeclaration {
+        NativeToolDeclaration {
+            id: ToolId::from(OUTREACH_TOOL_ID),
+            name: "Outreach and Await Quorum",
+            description: "Contact one or more recipients and pause this task until enough of them reply, or until the timeout requires a human decision. \
+                          Recipients may be third parties, or — when tool policy permits — other agents in this company, addressed by their channel address. \
+                          To delegate one request to one agent or person, pass a single address and omit completion_threshold_percent and timeout_hours. \
+                          Use list_company_agents to discover which agents in this company you can address.",
+            input_schema: serde_json::to_value(schemars::schema_for!(OutreachInput))
+                .unwrap_or_else(|_| serde_json::json!({})),
+            safety: NativeToolSafety {
+                read_only: false,
+                concurrency_safe: false,
+                has_external_effect: true,
+                requires_network: true,
+                destructive: false,
+                open_world: true,
+                requires_approval_by_default: true,
+                max_output_chars: 4_000,
+                max_result_chars: 8_000,
+            },
         }
     }
 
-    async fn execute(&self, args: Value, ctx: ToolExecutionContext) -> ToolResult {
+    /// Queue the mail and park the task, or say why the request was refused.
+    pub async fn call(&self, args: Value) -> ToolInvocation {
         let input: OutreachInput = match serde_json::from_value(args) {
             Ok(input) => input,
-            Err(error) => return ToolResult::error(format!("Invalid input: {error}")),
+            Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
         };
 
         let effective_config = self
             .policy_config
             .as_ref()
             .filter(|c| !c.is_null() && c.as_object().is_some_and(|m| !m.is_empty()))
-            .unwrap_or(&ctx.custom_config);
+            .unwrap_or(&Value::Null);
 
         let limits = OutreachLimits::from_config(effective_config);
         let email_renderer = match self.deliveries.renderer(TransportKind::Email) {
             Ok(renderer) => renderer,
-            Err(error) => return ToolResult::error(error.to_string()),
+            Err(error) => return ToolInvocation::failure(error.to_string()),
         };
         let resolved = match resolve_targets(
             &input,
             TargetPolicy {
-                max_targets: config_usize(effective_config, "max_targets", 50),
+                max_targets: config_usize(effective_config, "max_targets", DEFAULT_MAX_TARGETS),
                 scope: match configured_target_scope(effective_config) {
                     Ok(scope) => scope,
-                    Err(error) => return ToolResult::error(error),
+                    Err(error) => return ToolInvocation::failure(error),
                 },
             },
             &self.context,
@@ -216,19 +196,19 @@ impl Tool for OutreachAndAwaitQuorumTool {
         .await
         {
             Ok(targets) => targets,
-            Err(error) => return ToolResult::error(error),
+            Err(error) => return ToolInvocation::failure(error),
         };
         // The idempotency key is hashed over the *resolved* destinations, so the short and long
         // forms of one request re-attach instead of mailing everybody twice.
         let canonical_targets: Vec<String> = resolved.iter().map(|target| target.key()).collect();
         let request = match ValidatedOutreach::from_input(&input, limits) {
             Ok(request) => request,
-            Err(error) => return ToolResult::error(error),
+            Err(error) => return ToolInvocation::failure(error),
         };
 
         let targets = match self.build_target_requests(&resolved, &request).await {
             Ok(targets) => targets,
-            Err(error) => return ToolResult::error(error),
+            Err(error) => return ToolInvocation::failure(error),
         };
 
         let progress = match self
@@ -250,7 +230,9 @@ impl Tool for OutreachAndAwaitQuorumTool {
             .await
         {
             Ok(progress) => progress,
-            Err(error) => return ToolResult::error(format!("Failed to create outreach: {error}")),
+            Err(error) => {
+                return ToolInvocation::failure(format!("Failed to create outreach: {error}"));
+            }
         };
 
         // Suspending parks the whole agent run until the replies arrive or the outreach times out.
@@ -273,9 +255,11 @@ impl Tool for OutreachAndAwaitQuorumTool {
             },
             expires_at: progress.expires_at.to_rfc3339(),
         };
-        match serde_json::to_string(&output) {
-            Ok(output) => ToolResult::ok(output),
-            Err(error) => ToolResult::error(format!("Failed to serialize tool output: {error}")),
+        match serde_json::to_value(&output) {
+            Ok(output) => ToolInvocation::success(output),
+            Err(error) => {
+                ToolInvocation::failure(format!("Failed to serialize tool output: {error}"))
+            }
         }
     }
 }
@@ -296,11 +280,27 @@ struct OutreachLimits {
     max_timeout_hours: u32,
 }
 
+/// The bounds this tool applies when the agent's tool policy names none.
+///
+/// Public and named because they are the *platform* defaults, not the fallbacks of one config
+/// reader: a harness compiling a policy block for its runtime must be able to assert it agrees
+/// with them, or the same agent would be bounded differently depending on which runtime ran it.
+pub const DEFAULT_MAX_TARGETS: usize = 50;
+/// Mailing a stranger is the capability that needs saying out loud; delegating to a colleague is
+/// opened by policy, not assumed.
+pub const DEFAULT_ALLOWED_TARGET_SCOPE: &str = "external_only";
+pub const DEFAULT_TIMEOUT_HOURS: u32 = 96;
+pub const MAX_TIMEOUT_HOURS: u32 = 720;
+
 impl OutreachLimits {
     fn from_config(config: &Value) -> Self {
         Self {
-            default_timeout_hours: config_u32(config, "default_timeout_hours", 96),
-            max_timeout_hours: config_u32(config, "max_timeout_hours", 720),
+            default_timeout_hours: config_u32(
+                config,
+                "default_timeout_hours",
+                DEFAULT_TIMEOUT_HOURS,
+            ),
+            max_timeout_hours: config_u32(config, "max_timeout_hours", MAX_TIMEOUT_HOURS),
         }
     }
 }
@@ -566,7 +566,7 @@ fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String>
                 .and_then(|c| c.get("allowed_target_scope"))
         })
         .and_then(Value::as_str)
-        .unwrap_or("external_only");
+        .unwrap_or(DEFAULT_ALLOWED_TARGET_SCOPE);
     match scope_val {
         "external_only" => Ok(AllowedTargetScope::ExternalOnly),
         "same_company_channels" => Ok(AllowedTargetScope::SameCompanyChannels),
@@ -714,6 +714,7 @@ mod tests {
         entities::channel::{Channel, ChannelAccessMode},
         use_cases::channel::{ChannelPersistence, ChannelWrite},
     };
+    use async_trait::async_trait;
 
     struct MockChannelPersistence {
         channel: Option<Channel>,

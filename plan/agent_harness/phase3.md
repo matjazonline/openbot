@@ -30,12 +30,79 @@ not on this path.
 
 | Frame | Before | After |
 |---|---|---|
-| `AgentRunner::execute` | 25 KiB | |
-| `AgentTask::run` → `AgentHarness::run` | 22 KiB | |
-| `build_agent` | 174 KiB | |
-| `build_with_tools` | 72 KiB | |
-| `builder_with_provider` | 48 KiB | |
-| whole task chain | 351 KiB — `run_task` 16 + `run_agents` 42 + `execute` 25 + `run` 22 + `build_agent` 174 + `build_with_tools` 72 (the 347 KiB in `src/AGENTS.md` is the same path, measured before this branch) | |
+| `AgentRunner::execute` | 25 KiB | **6 KiB** |
+| `AgentTask::run` → `AgentHarness::run` | 22 KiB | **28 KiB** |
+| `build_agent` | 174 KiB | **191 KiB** |
+| `build_with_tools` | 72 KiB | **50 KiB** |
+| `builder_with_provider` | 48 KiB | **53 KiB** |
+| whole task chain | 351 KiB — `run_task` 16 + `run_agents` 42 + `execute` 25 + `run` 22 + `build_agent` 174 + `build_with_tools` 72 (the 347 KiB in `src/AGENTS.md` is the same path, measured before this branch) | **336 KiB** — `run_task` 16 + `run_agents` 42 + `execute` 6 + `run` 28 + `build_agent` 191 + `builder_with_provider` 53 |
+
+Both sides count the deeper of `builder_with_provider` and `build_with_tools`, which are siblings
+inside `build_agent` rather than nested: 72 before, 53 now.
+
+The chain lost 15 KiB across a change that added a `dyn` dispatch level, which is the number this
+phase was watching. Where it went: `execute` shed 19 KiB by no longer constructing an eighteen-field
+`AgentTask` in its own frame, and `build_with_tools` shed 22 KiB by registering one shim type in a
+loop instead of three distinct tool types inline. What it gained: `AgentHarness::run` costs 6 KiB
+more than `AgentTask::run` did, because it now holds the compiled configuration and the two refusal
+lists; and `build_agent` gained 17 KiB of `AppResult` conversion at each fallible step, where the
+old code propagated `anyhow` with a bare `?`. Neither is worth chasing while the total is down.
+
+`./scripts/stack-budget.sh` passes at the stock 2 MiB.
+
+### What landed differently from this file, and why
+
+Written down here rather than left for a reader to reconstruct from the diff.
+
+1. **`AgentRun`'s three ports are `Arc<dyn ...>`, not `&'a dyn ...`.** The runtime takes ownership
+   of an approval handler, a tool and a hook object for the length of a run and requires
+   `'static`. A borrow would have forced every implementation to clone into an `Arc` itself.
+2. **`HarnessToolHost::available()` returns `NativeToolDeclaration`s rather than bare `ToolId`s.**
+   The adapter has to declare each native tool to its runtime — name, model-facing copy, argument
+   schema, safety — and all four are facts about *our* tool. Keeping them beside the tool is what
+   stops the schema a model is shown drifting from the shape `invoke` deserializes. The schema is
+   built with `schemars::schema_for!`, which is exactly what `ai_agents::tools::generate_schema`
+   does, so the emitted document is unchanged.
+3. **`tool_host.available()` bounds the native grant; it does not create one.** This file's step 3
+   sketched `wanted.extend(tool_host_available)`, which would auto-grant our three tools to every
+   agent — today they are granted only by being named in `config_json`, so that would have changed
+   every existing agent. What is implemented instead: a native grant this run cannot serve is
+   dropped and reported as `unavailable_tools`, separately from `refused_tools`, because "this
+   platform will never allow it" and "this run cannot do it" are different problems.
+4. **`merge_json` moved into the adapter, not `params.rs`.** `ResolvedAgentParams` no longer merges
+   anything: it carries the agent's residual `config_json` as `spec.extra_config` and the compiler
+   is the only caller. Leaving it in the application layer would have left dead code there.
+5. **Diagnostics and `estimate_tokens` live in the adapter.** Only the metadata *key* is shared, as
+   `ports::EXECUTION_DIAGNOSTICS_KEY`, with `AgentExecutionOutput::stamp_duration` for the one
+   field the caller can measure and the harness cannot.
+6. **`skills:` is written only when the spec has skills.** Overwriting unconditionally would have
+   deleted a hand-authored `skills:` block from `config_json`. Phase 4 closes that escape hatch
+   deliberately; phase 3 must not.
+7. **The runner reads tool policy from `spec.extra_config`, not from a compiled document.** Every
+   key under `tool_security.tools.<id>.config` has the same default in the tool itself as the base
+   configuration compiles, so the two readings are equal by construction —
+   `the_base_tool_policy_matches_what_the_tools_default_to_on_their_own` and
+   `the_delegation_policy_reads_the_same_from_the_residual_config_and_the_compiled_one` are what
+   keep them equal. Without this the application layer would have had to know a runtime's config
+   schema to decide an authorization question.
+8. **The harness and classifier are wired at boot in this phase.** `HarnessRegistry` and
+   `TextClassifier` reach `ThreadUseCases` and `AgentUseCases` from `infra/setup.rs`, because
+   otherwise nothing runs. Phase 5 still owns choosing a harness *per agent* from a stored
+   `harness_kind`; today every spec asks for `HarnessKind::default()`.
+9. **One visible behaviour change, in a debug payload.** `execution_parameters.config` on the
+   durable task row now records the agent's own configuration rather than the server defaults
+   merged with it. The agent's reply is unaffected.
+10. **The LLM spam guardrail was broken and is now fixed.** Moving it behind `TextClassifier`
+    meant writing the round-trip test the old one lacked — the old test asserted only that the
+    classifier config was *valid YAML*, never that `AgentBuilder` accepted it. It did not:
+    `AgentSpec` requires `name`, which the config omitted, and the credential was at the top level
+    where the spec ignores it, so `build()` also refused with "At least one LLM provider is
+    required". Every company with `enable_llm_spam_guardrail` enabled therefore failed every agent
+    run at the guardrail. `adapters/harness/ai_agents/classifier.rs` now emits a real `AgentSpec`
+    and registers the provider explicitly, and
+    `a_classifier_is_wired_from_a_companys_own_credential` asserts the whole wiring rather than the
+    document. This is a behaviour change for those companies — from every run failing, to the
+    guardrail actually classifying.
 
 ## Module layout
 

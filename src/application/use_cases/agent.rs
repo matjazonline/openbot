@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ai_agents::Agent as _;
 use async_trait::async_trait;
 use tracing::{info, instrument};
 use uuid::Uuid;
@@ -16,6 +15,7 @@ use crate::{
         user::Viewer,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
+    services::harness::{ClassificationRequest, TextClassifier},
     use_cases::{
         channel::{ChannelWrite, SlugKind, check_spam_interlock, validate_slug},
         company::{CompanyPersistence, managed_company},
@@ -344,6 +344,12 @@ pub struct AgentUseCases {
     agent_persistence: Arc<dyn AgentPersistence>,
     owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
     spam_scanning: SpamScanning,
+    /// What writes a system prompt when an operator asks for one to be generated.
+    ///
+    /// Optional because every other use case here works without a model, and wired separately for
+    /// the same reason `with_memory_persistence` is: a deployment that has not configured one
+    /// still manages agents. The one path that needs it refuses rather than degrading.
+    prompt_classifier: Option<Arc<dyn TextClassifier>>,
 }
 
 impl AgentUseCases {
@@ -358,7 +364,22 @@ impl AgentUseCases {
             agent_persistence,
             owned_persistence,
             spam_scanning,
+            prompt_classifier: None,
         }
+    }
+
+    pub fn with_prompt_classifier(mut self, classifier: Arc<dyn TextClassifier>) -> Self {
+        self.prompt_classifier = Some(classifier);
+        self
+    }
+
+    /// The model that writes system prompts, or the reason there is none.
+    fn prompt_classifier(&self) -> AppResult<&Arc<dyn TextClassifier>> {
+        self.prompt_classifier.as_ref().ok_or_else(|| {
+            AppError::Internal(
+                "No agent harness is configured to generate a system prompt.".to_string(),
+            )
+        })
     }
 
     async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
@@ -829,7 +850,7 @@ impl AgentUseCases {
             .await?;
         let llm = PromptGeneratorLlm::resolve_explicit(&provider, &model, api_key.as_deref())?;
 
-        generate_prompt_with(llm, instructions).await
+        generate_prompt_with(self.prompt_classifier()?.as_ref(), llm, instructions).await
     }
 
     /// Generate a library prompt from explicit operator settings (falling back to environment
@@ -842,24 +863,33 @@ impl AgentUseCases {
         api_key: Option<&str>,
     ) -> AppResult<String> {
         let llm = PromptGeneratorLlm::resolve_global(provider, model, api_key)?;
-        generate_prompt_with(llm, instructions).await
+        generate_prompt_with(self.prompt_classifier()?.as_ref(), llm, instructions).await
     }
 }
 
-async fn generate_prompt_with(llm: PromptGeneratorLlm, instructions: &str) -> AppResult<String> {
-    let agent = llm.build_agent()?;
+async fn generate_prompt_with(
+    classifier: &dyn TextClassifier,
+    llm: PromptGeneratorLlm,
+    instructions: &str,
+) -> AppResult<String> {
     info!(
         "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
         llm.provider, llm.model
     );
-    let response = agent
-        .chat(instructions)
+    let response = classifier
+        .complete(ClassificationRequest {
+            purpose: "prompt_generator",
+            system_prompt: PROMPT_GENERATOR_SYSTEM_PROMPT,
+            user_prompt: instructions,
+            provider: &llm.provider,
+            model: &llm.model,
+            api_key: &llm.api_key,
+        })
         .await
         .map_err(|e| AppError::Internal(format!("AI generation call failed: {e}")))?;
 
     // Models like to wrap the prompt in a code fence despite being told not to.
     Ok(response
-        .content
         .trim()
         .trim_start_matches("```")
         .trim_end_matches("```")
@@ -880,8 +910,8 @@ Guidelines:
 /// The model that writes system prompts, resolved from explicit operator input or company-owned
 /// settings. Deployment credentials are never shared with a company.
 struct PromptGeneratorLlm {
-    provider: String,
-    model: String,
+    provider: ModelProvider,
+    model: ModelName,
     api_key: String,
 }
 
@@ -898,9 +928,9 @@ impl PromptGeneratorLlm {
                     "A provider is required to generate a global library prompt.".into(),
                 )
             })?;
-        let model = non_empty(model_override)
-            .unwrap_or_else(|| default_model_for(&provider))
-            .to_string();
+        let model = ModelName::canonical(
+            non_empty(model_override).unwrap_or_else(|| default_model_for(&provider)),
+        );
         let api_key = non_empty(api_key_override)
             .ok_or_else(|| {
                 AppError::BadRequest(format!(
@@ -909,7 +939,7 @@ impl PromptGeneratorLlm {
             })?
             .to_string();
         Ok(Self {
-            provider,
+            provider: ModelProvider::canonical(&provider),
             model,
             api_key,
         })
@@ -920,9 +950,6 @@ impl PromptGeneratorLlm {
         model: &ModelName,
         api_key: Option<&str>,
     ) -> AppResult<Self> {
-        let provider = provider.as_str().to_string();
-        let model = model.as_str().to_string();
-
         // A company that has not finished configuring its provider is a caller problem, not a
         // server fault -- every sibling check in `generate_system_prompt` says so with a 400.
         let api_key = non_empty(api_key)
@@ -932,49 +959,10 @@ impl PromptGeneratorLlm {
             .to_string();
 
         Ok(Self {
-            provider,
-            model,
+            provider: provider.clone(),
+            model: model.clone(),
             api_key,
         })
-    }
-
-    fn build_agent(&self) -> AppResult<ai_agents::RuntimeAgent> {
-        // The system prompt goes in as a YAML block scalar, so every line needs indenting.
-        let indented_system_prompt = PROMPT_GENERATOR_SYSTEM_PROMPT
-            .lines()
-            .map(|line| {
-                if line.is_empty() {
-                    String::new()
-                } else {
-                    format!("  {}", line)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let config_yaml = format!(
-            "name: prompt_generator\nsystem_prompt: |\n{}\nllm:\n  provider: {}\n  model: {}\n  api_key: {}",
-            indented_system_prompt, self.provider, self.model, self.api_key
-        );
-
-        let builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
-            AppError::Internal(format!("Failed to parse agent builder config: {e}"))
-        })?;
-
-        let provider_type = std::str::FromStr::from_str(&self.provider).map_err(|_| {
-            AppError::BadRequest(format!("Unsupported LLM provider '{}'.", self.provider))
-        })?;
-        let provider = ai_agents::UnifiedLLMProvider::new(
-            provider_type,
-            self.model.clone(),
-            Some(self.api_key.clone()),
-            None,
-        )
-        .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {e}")))?;
-        let builder = builder.llm(Arc::new(provider));
-
-        builder
-            .build()
-            .map_err(|e| AppError::Internal(format!("Failed to build AI agent: {e}")))
     }
 }
 
@@ -1747,36 +1735,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(list_after.len(), 0);
-    }
-
-    #[test]
-    fn test_generate_system_prompt_yaml_serialization_validity() {
-        let prepared_system_prompt = "\
-You are an expert AI prompt engineer specializing in crafting system prompts for autonomous AI agents.
-Your task is to generate a comprehensive, clear, structured, and production-ready system prompt based on the user's instructions.
-
-Guidelines:
-- Define a clear role and primary objective for the agent.
-- Output ONLY the system prompt text itself.";
-
-        let indented_system_prompt = prepared_system_prompt
-            .lines()
-            .map(|line| {
-                if line.is_empty() {
-                    String::new()
-                } else {
-                    format!("  {}", line)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let config_yaml = format!(
-            "name: prompt_generator\nsystem_prompt: |\n{}\nllm:\n  provider: {}\n  model: {}\n  api_key: {}",
-            indented_system_prompt, "google", "gemini-2.5-flash", "test_key"
-        );
-
-        assert!(ai_agents::AgentBuilder::from_yaml(&config_yaml).is_ok());
     }
 
     #[test]

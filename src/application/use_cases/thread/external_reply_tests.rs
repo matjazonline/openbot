@@ -29,6 +29,7 @@ use crate::transport::{ProviderSendOutcome, TransportSender, ports::TransportRen
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite};
+use crate::use_cases::thread::test_support::{harness_registry, text_classifier};
 use crate::use_cases::user::UserPersistence;
 use chrono::Utc;
 
@@ -361,7 +362,8 @@ async fn fixture(pool: sqlx::PgPool, llm_base_url: &str) -> Fixture {
             renderers.clone(),
             config.clone(),
         )
-        .with_agent_persistence(persistence.clone()),
+        .with_agent_persistence(persistence.clone())
+        .with_harnesses(harness_registry(), text_classifier()),
     );
 
     let transport = recording_transport();

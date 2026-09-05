@@ -32,6 +32,7 @@ use crate::transport::EmailThreading;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
+use crate::use_cases::thread::test_support::{harness_registry, text_classifier};
 use crate::use_cases::user::UserPersistence;
 use chrono::Utc;
 
@@ -263,7 +264,8 @@ async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
             config,
         )
         .with_agent_persistence(persistence.clone())
-        .with_approval_use_cases(approvals),
+        .with_approval_use_cases(approvals)
+        .with_harnesses(harness_registry(), text_classifier()),
     );
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.

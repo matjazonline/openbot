@@ -1,13 +1,17 @@
 //! A scripted model over a real socket, for the tests that need an agent to actually answer.
 //!
-//! # Why a socket rather than a fake `AgentRunner`
+//! # Why a socket rather than a stub harness
 //!
-//! [`crate::services::agent_runner::AgentRunner`] is a concrete struct, built inline by
-//! `thread::dispatch` and `task_worker`, so there is no trait to swap. What there *is* is an HTTP
-//! seam: an agent's `config_json` carries `llm.base_url`, `ensure_config_fields` leaves it alone,
-//! and `builder_with_provider` hands it to `ai_agents::UnifiedLLMProvider`. Pointing that at a
-//! localhost listener means the real runner, the real prompt assembly, the real `UntrustedFence`
-//! and the real tool registry all run -- only the model is scripted.
+//! There is a trait to swap now -- [`StubHarness`] below is it -- and for a test about *dispatch*
+//! that is the right double. It is the wrong one for a test about what the agent actually does:
+//! swapping the harness out swaps out the compiler, the tool grant, the skill steps and the
+//! runtime, which is most of what these tests exist to check.
+//!
+//! What the real harness offers instead is an HTTP seam: an agent's `config_json` carries
+//! `llm.base_url`, the compiler leaves it alone, and the adapter hands it to
+//! `ai_agents::UnifiedLLMProvider`. Pointing that at a localhost listener means the real runner,
+//! the real prompt assembly, the real `UntrustedFence`, the real compiled configuration and the
+//! real tool registry all run -- only the model is scripted.
 //!
 //! The wire shape is OpenAI's `POST {base_url}/chat/completions`, because the `llm` crate's OpenAI
 //! backend is what `ai-agents` reaches for and `mail_agents` permits only
@@ -250,19 +254,20 @@ fn http_response(body: &str) -> String {
 ///
 /// Three things stand between a model and an actual hop, and all three default closed:
 ///
-/// * the tool has to be *granted*. `base_agent_config()` carries policy for
-///   `outreach_and_await_quorum` but no top-level `tools:` list, and `declared_tool_ids` in the
-///   `ai-agents` builder comes from that list -- so an agent without one is offered no tools at
-///   all. `docs/inter_channel_agent_communication.md` is where the grant is documented.
+/// * the tool has to be *granted*. The compiled base configuration carries policy for
+///   `outreach_and_await_quorum` but grants nothing, and `declared_tool_ids` in the `ai-agents`
+///   builder comes from the compiled `tools:` list -- so an agent without a grant is offered no
+///   tools at all. `docs/inter_channel_agent_communication.md` is where the grant is documented.
 /// * a `tool_choice` has to reach the provider, or it sends neither native tool definitions nor
 ///   the prompt-protocol instructions and the grant above reaches the model as nothing at all.
-///   `ensure_config_fields` now defaults one for any config that grants tools, so this fixture
-///   sets no `tool_choice` of its own -- and would stop delegating if that default regressed.
+///   the compiler defaults one for any configuration that grants tools, so this fixture sets no
+///   `tool_choice` of its own -- and would stop delegating if that default regressed.
 /// * `allowed_target_scope` defaults to `external_only` and `internal_requires_approval` to
 ///   `true`, so a sibling channel is refused outright and a permitted one still waits for a human.
 ///
 /// The policy lives under `tool_security.tools.<id>.config`, which is where `AgentRunner` reads it
-/// from the merged agent config. Repeating it under the `tools:` entry does nothing --
+/// from the agent's own configuration before handing it to the tool. Repeating it under the
+/// `tools:` entry does nothing, and neither does relying on the runtime to carry it:
 /// `ToolSecurityConfig::enabled` defaults to false, so the `ai-agents` security engine hands every
 /// tool a null `custom_config` and never carries these values itself.
 ///
@@ -401,6 +406,8 @@ pub struct StubHarness {
     kind: HarnessKind,
     reply: String,
     disposition: AgentExecutionDisposition,
+    /// When set, the run fails with this message instead of answering.
+    failure: Option<String>,
 }
 
 impl StubHarness {
@@ -410,7 +417,15 @@ impl StubHarness {
             kind,
             reply: "stub reply".to_string(),
             disposition: AgentExecutionDisposition::Completed,
+            failure: None,
         }
+    }
+
+    /// A harness whose run fails, for the caller-side error paths -- recording the failure,
+    /// redacting it, and refusing to commit a reply.
+    pub fn failing(mut self, message: impl Into<String>) -> Self {
+        self.failure = Some(message.into());
+        self
     }
 
     pub fn replying(mut self, reply: impl Into<String>) -> Self {
@@ -432,6 +447,9 @@ impl AgentHarness for StubHarness {
     }
 
     async fn run(&self, run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
+        if let Some(failure) = self.failure.as_ref() {
+            return Err(crate::app_error::AppError::Internal(failure.clone()));
+        }
         if self.disposition == AgentExecutionDisposition::Suspended {
             run.suspended.store(true, Ordering::SeqCst);
         }

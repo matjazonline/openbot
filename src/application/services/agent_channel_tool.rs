@@ -1,12 +1,5 @@
 use std::sync::Arc;
 
-use ai_agents::{
-    Tool, ToolResult,
-    tools::{
-        ToolExecutionContext, ToolOperationKind, ToolSafetyMetadata, ToolSideEffectLevel,
-        generate_schema,
-    },
-};
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,8 +13,9 @@ use crate::{
         company::CompanyChannelDefaults,
         creation::CreationProvenance,
         transport::{ChannelSelector, TransportKind},
-        value_objects::{ChannelSlug, CompanySlug},
+        value_objects::{ChannelSlug, CompanySlug, ToolId},
     },
+    services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     use_cases::{
         agent::{AgentWrite, ProvisioningWarning, SpamScanning, personal_channel_write},
         channel::ChannelWrite,
@@ -147,46 +141,47 @@ impl CreateAgentChannelTool {
     }
 }
 
-#[async_trait]
-impl Tool for CreateAgentChannelTool {
-    fn id(&self) -> &str {
-        CREATE_AGENT_CHANNEL_TOOL_ID
-    }
-    fn name(&self) -> &str {
-        "Create Agent Channel"
-    }
-    fn description(&self) -> &str {
-        "Permanently create a specialist agent and a callable channel for it in this company. The new agent inherits company model settings. After creation, delegate to the returned `channel` selector with outreach_and_await_quorum."
-    }
-    fn input_schema(&self) -> Value {
-        generate_schema::<CreateAgentChannelInput>()
-    }
-    fn safety_metadata(&self) -> ToolSafetyMetadata {
-        ToolSafetyMetadata {
-            read_only: false,
-            concurrency_safe: false,
-            operation: ToolOperationKind::Write,
-            side_effect_level: ToolSideEffectLevel::ExternalWrite,
-            requires_network: false,
-            destructive: false,
-            open_world: false,
-            host_dependent: true,
-            requires_user_interaction: false,
-            supports_cancellation: false,
-            default_requires_approval: true,
-            should_defer_schema: false,
-            max_output_chars: Some(2_000),
-            max_result_size_chars: Some(4_000),
+impl CreateAgentChannelTool {
+    /// How this tool is offered to whichever harness is running.
+    ///
+    /// An associated function rather than a method: a picker and a boot-time check want to know
+    /// what the tool accepts without a company, a task or a persistence handle to construct one
+    /// with.
+    pub fn declaration() -> NativeToolDeclaration {
+        NativeToolDeclaration {
+            id: ToolId::from(CREATE_AGENT_CHANNEL_TOOL_ID),
+            name: "Create Agent Channel",
+            description: "Permanently create a specialist agent and a callable channel for it in this company. The new agent inherits company model settings. After creation, delegate to the returned `channel` selector with outreach_and_await_quorum.",
+            input_schema: serde_json::to_value(schemars::schema_for!(CreateAgentChannelInput))
+                .unwrap_or_else(|_| serde_json::json!({})),
+            safety: NativeToolSafety {
+                read_only: false,
+                concurrency_safe: false,
+                has_external_effect: true,
+                requires_network: false,
+                destructive: false,
+                open_world: false,
+                requires_approval_by_default: true,
+                max_output_chars: 2_000,
+                max_result_chars: 4_000,
+            },
         }
     }
-    async fn execute(&self, args: Value, _ctx: ToolExecutionContext) -> ToolResult {
+
+    /// Create the agent and its channel, or say why not.
+    ///
+    /// Returns `ToolInvocation` rather than `AppResult` because most of what can go wrong here is
+    /// something the *model* should read and retry differently -- a slug that is taken, a blank
+    /// description. Those are `success: false` with the reason, exactly as they were when this was
+    /// an `ai_agents::Tool`, and not errors that end the run.
+    pub async fn call(&self, args: Value) -> ToolInvocation {
         let input = match serde_json::from_value(args) {
             Ok(input) => input,
-            Err(error) => return ToolResult::error(format!("Invalid input: {error}")),
+            Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
         };
         let request = match self.request(input) {
             Ok(request) => request,
-            Err(error) => return ToolResult::error(error),
+            Err(error) => return ToolInvocation::failure(error),
         };
         let name = request.agent.name.clone();
         let slug = ChannelSlug::from(request.channel.slug.clone());
@@ -200,22 +195,21 @@ impl Tool for CreateAgentChannelTool {
                     &self.context.company_slug,
                     &self.context.app_domain_name,
                 );
-                ToolResult::ok(
-                    serde_json::json!({
-                        "created": result.created,
-                        "agent_id": result.agent_id,
-                        "channel_id": result.channel_id,
-                        "channel": ChannelSelector::CurrentCompany(slug.clone()).to_string(),
-                        "name": name,
-                        "slug": slug.as_str(),
-                        "interfaces": [{ "transport": TransportKind::Email.as_str(),
-                                         "display_address": address.as_str() }],
-                        "warnings": result.warnings,
-                    })
-                    .to_string(),
-                )
+                ToolInvocation::success(serde_json::json!({
+                    "created": result.created,
+                    "agent_id": result.agent_id,
+                    "channel_id": result.channel_id,
+                    "channel": ChannelSelector::CurrentCompany(slug.clone()).to_string(),
+                    "name": name,
+                    "slug": slug.as_str(),
+                    "interfaces": [{ "transport": TransportKind::Email.as_str(),
+                                     "display_address": address.as_str() }],
+                    "warnings": result.warnings,
+                }))
             }
-            Err(error) => ToolResult::error(format!("Failed to create agent channel: {error}")),
+            Err(error) => {
+                ToolInvocation::failure(format!("Failed to create agent channel: {error}"))
+            }
         }
     }
 }
