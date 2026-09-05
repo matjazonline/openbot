@@ -186,6 +186,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let skill_use_cases = Arc::new(SkillUseCases::new(
         postgres_arc.clone(),
         postgres_arc.clone(),
+        postgres_arc.clone(),
     ));
 
     // Renderers first, then the use cases that freeze parts with them, then the senders -- one of

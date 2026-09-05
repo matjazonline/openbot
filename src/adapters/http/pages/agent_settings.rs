@@ -6,7 +6,14 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::schedule::{ChannelSchedule, ScheduleRunAsChoices};
+use crate::entities::{
+    agent::MAX_GRANTED_TOOLS,
+    harness::{HarnessKind, NativeToolPolicy, OutreachTargetScope},
+    schedule::{ChannelSchedule, ScheduleRunAsChoices},
+    skill::Skill,
+    tool_catalogue::{CREATE_AGENT_CHANNEL_TOOL_ID, CatalogueTool, ToolSource},
+    value_objects::ToolId,
+};
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
@@ -66,7 +73,7 @@ pub struct AgentSettingsPage<'a> {
 ///
 /// The Advanced create form and the edit form take exactly these fields, which is why they share
 /// one renderer; only the URL they submit to differs.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AgentDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
@@ -82,6 +89,11 @@ pub struct AgentDraft<'a> {
     pub memory_recall_mode: &'a str,
     pub memory_max_results: u8,
     pub config_json: &'a str,
+    pub harness_kind: HarnessKind,
+    pub granted_tool_ids: Vec<ToolId>,
+    pub skill_ids: Vec<Uuid>,
+    pub sub_agent_ids: Vec<Uuid>,
+    pub native_tool_policy: NativeToolPolicy,
     pub avatar_url: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
@@ -106,6 +118,11 @@ impl Default for AgentDraft<'_> {
             memory_recall_mode: MemoryRecallMode::default().as_str(),
             memory_max_results: default_memory_max_results(),
             config_json: "",
+            harness_kind: HarnessKind::default(),
+            granted_tool_ids: Vec::new(),
+            skill_ids: Vec::new(),
+            sub_agent_ids: Vec::new(),
+            native_tool_policy: NativeToolPolicy::default(),
             avatar_url: "",
             advanced: false,
         }
@@ -124,8 +141,15 @@ pub struct AgentEditPane<'a> {
     /// What the user last typed, when a save was rejected; `None` shows the stored agent.
     pub draft: Option<&'a AgentDraft<'a>>,
     pub error: Option<&'a str>,
+    pub capability_options: AgentCapabilityOptions<'a>,
     /// Which half of the agent the pane is showing.
     pub body: AgentPaneBody<'a>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AgentCapabilityOptions<'a> {
+    pub skills: &'a [Skill],
+    pub sub_agents: &'a [Agent],
 }
 
 /// Which half of an agent's settings a request asked for.
@@ -215,6 +239,7 @@ pub struct AgentCreatePane<'a> {
     pub tab: AgentCreateTab,
     pub draft: &'a AgentDraft<'a>,
     pub error: Option<&'a str>,
+    pub capability_options: AgentCapabilityOptions<'a>,
 }
 
 pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
@@ -477,6 +502,7 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
             agent_id: Some(agent_id),
             draft,
             model_connections: pane.model_connections,
+            capability_options: pane.capability_options,
         }),
     )
 }
@@ -712,6 +738,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
             agent_id: None,
             draft: pane.draft,
             model_connections: pane.model_connections,
+            capability_options: pane.capability_options,
         }),
     )
 }
@@ -860,6 +887,45 @@ fn carried_agent_fields(draft: &AgentDraft<'_>) -> String {
             &draft.memory_max_results.to_string(),
         ),
         hidden("agent_config_json", draft.config_json),
+        hidden("agent_harness_kind", draft.harness_kind.as_str()),
+        hidden(
+            "agent_granted_tool_ids",
+            &csv_tools(&draft.granted_tool_ids),
+        ),
+        hidden("agent_skill_ids", &csv_uuids(&draft.skill_ids)),
+        hidden("agent_sub_agent_ids", &csv_uuids(&draft.sub_agent_ids)),
+        hidden(
+            "agent_outreach_target_scope",
+            draft
+                .native_tool_policy
+                .outreach
+                .allowed_target_scope
+                .as_str(),
+        ),
+        hidden(
+            "agent_outreach_max_targets",
+            &draft.native_tool_policy.outreach.max_targets.to_string(),
+        ),
+        hidden(
+            "agent_outreach_default_timeout_hours",
+            &draft
+                .native_tool_policy
+                .outreach
+                .default_timeout_hours
+                .to_string(),
+        ),
+        hidden(
+            "agent_outreach_max_timeout_hours",
+            &draft
+                .native_tool_policy
+                .outreach
+                .max_timeout_hours
+                .to_string(),
+        ),
+        hidden(
+            "agent_directory_max_results",
+            &draft.native_tool_policy.directory.max_results.to_string(),
+        ),
         hidden("agent_avatar_url", draft.avatar_url),
     ]
     .concat()
@@ -920,6 +986,7 @@ struct AgentFields<'a> {
     agent_id: Option<Uuid>,
     draft: &'a AgentDraft<'a>,
     model_connections: &'a [CompanyModelConnection],
+    capability_options: AgentCapabilityOptions<'a>,
 }
 
 #[derive(Clone, Copy)]
@@ -929,11 +996,20 @@ enum AgentFormScope {
 }
 
 pub fn library_agent_fields(draft: &AgentDraft<'_>, agent_id: Option<Uuid>) -> String {
+    library_agent_fields_with_capabilities(draft, agent_id, AgentCapabilityOptions::default())
+}
+
+pub fn library_agent_fields_with_capabilities(
+    draft: &AgentDraft<'_>,
+    agent_id: Option<Uuid>,
+    capability_options: AgentCapabilityOptions<'_>,
+) -> String {
     agent_fields(&AgentFields {
         scope: AgentFormScope::Library,
         agent_id,
         draft,
         model_connections: &[],
+        capability_options,
     })
 }
 
@@ -947,12 +1023,17 @@ fn id_prefix(agent_id: Option<Uuid>) -> String {
 fn agent_fields(fields: &AgentFields<'_>) -> String {
     let draft = fields.draft;
     let id_prefix = id_prefix(fields.agent_id);
-    let overrides_open =
-        if draft.provider.is_empty() && draft.model.is_empty() && draft.config_json.is_empty() {
-            ""
-        } else {
-            " open"
-        };
+    let overrides_open = if draft.provider.is_empty()
+        && draft.model.is_empty()
+        && draft.config_json.is_empty()
+        && draft.granted_tool_ids.is_empty()
+        && draft.skill_ids.is_empty()
+        && draft.sub_agent_ids.is_empty()
+    {
+        ""
+    } else {
+        " open"
+    };
     let description_help = match fields.scope {
         AgentFormScope::Company(_) => "Shown to other agents in this company",
         AgentFormScope::Library => "Shown to agents in companies that select it",
@@ -1004,8 +1085,9 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         {prompt_textarea}
                     </div>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
-                        <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
+                        <summary class="collapse-title text-sm font-medium">Capabilities &amp; advanced options</summary>
                         <div class="collapse-content space-y-4">
+                            {capabilities}
                             {model_connection_fields}
                             <label class="form-control w-full">
                                 <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
@@ -1049,15 +1131,18 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                     class="input w-full text-sm">
                             </label>
                             <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Agent Config (JSON)</span></div>
-                                <textarea name="config_json" rows="4" placeholder='{{ "temperature": 0.2 }}'
+                                <div class="label"><span class="text-xs opacity-70">ai-agents advanced options</span></div>
+                                <textarea name="config_json" rows="4" placeholder='{{"version":1,"reasoning":{{"mode":"react","max_iterations":8}}}}'
                                     class="textarea w-full font-mono text-xs">{config_json}</textarea>
+                                <div class="label"><span class="text-[11px] opacity-60"><a class="link" href="#agent-advanced-shape-{id_prefix}">Accepted shape</a>: version 1 with bounded reasoning, reflection, and disambiguation options. Capabilities, models, prompts, planning, approvals, tool security, context, runtime/spawner/persona, storage, and provider settings are managed elsewhere and rejected here.</span></div>
+                                <code id="agent-advanced-shape-{id_prefix}" class="block overflow-x-auto text-[11px] opacity-60">{{"version":1,"reasoning":{{"mode":"react","max_iterations":8}},"reflection":{{"enabled":"auto","max_retries":2}},"disambiguation":{{"enabled":true}}}}</code>
                             </label>
                         </div>
                     </details>
         "##,
         sparkle = icon(Icon::Sparkle, BUTTON_ICON),
         generator = prompt_generator(fields.scope, fields.agent_id, &id_prefix),
+        capabilities = capability_picker(fields),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
         name = escape_html_text(draft.name),
@@ -1089,6 +1174,274 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         memory_max_results = draft.memory_max_results,
         memory_enabled_checked = if draft.memory_enabled { " checked" } else { "" },
     )
+}
+
+fn csv_uuids(ids: &[Uuid]) -> String {
+    ids.iter()
+        .map(Uuid::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn csv_tools(ids: &[ToolId]) -> String {
+    ids.iter().map(ToolId::as_str).collect::<Vec<_>>().join(",")
+}
+
+fn capability_picker(fields: &AgentFields<'_>) -> String {
+    let draft = fields.draft;
+    let harness_options = HarnessKind::ALL
+        .into_iter()
+        .map(|kind| {
+            format!(
+                r#"<option value="{}"{}>{}</option>"#,
+                kind.as_str(),
+                if kind == draft.harness_kind {
+                    " selected"
+                } else {
+                    ""
+                },
+                escape_html_text(kind.label()),
+            )
+        })
+        .collect::<String>();
+    let single_harness = HarnessKind::ALL.len() == 1;
+    let harness = format!(
+        r##"<label class="form-control"><span class="label text-xs opacity-70">Harness</span>
+            <select class="select w-full"{name}{disabled}>{harness_options}</select>
+            {hidden}<span class="label text-[11px] opacity-60">Other runtimes are not yet available.</span></label>"##,
+        name = if single_harness {
+            ""
+        } else {
+            " name=\"harness_kind\""
+        },
+        disabled = if single_harness { " disabled" } else { "" },
+        hidden = if single_harness {
+            format!(
+                r#"<input type="hidden" name="harness_kind" value="{}">"#,
+                draft.harness_kind.as_str()
+            )
+        } else {
+            String::new()
+        },
+    );
+
+    let mut implied = Vec::<ToolId>::new();
+    for skill in fields
+        .capability_options
+        .skills
+        .iter()
+        .filter(|skill| draft.skill_ids.contains(&skill.id))
+    {
+        for tool in skill.referenced_tool_ids() {
+            if !implied.contains(&tool) {
+                implied.push(tool);
+            }
+        }
+    }
+    let mut effective = draft.granted_tool_ids.clone();
+    for tool in &implied {
+        if !effective.contains(tool) {
+            effective.push(tool.clone());
+        }
+    }
+    let tools = [ToolSource::Builtin, ToolSource::Native]
+        .into_iter()
+        .map(|source| tool_group(source, draft, &implied))
+        .collect::<String>();
+    let tool_picker = format!(
+        r##"<section class="space-y-2" data-capability-multi-select>
+            <input type="hidden" name="granted_tool_ids" value="{selected}">
+            <div class="flex items-center justify-between"><h4 class="text-sm font-semibold">Tools</h4>
+                <span class="badge badge-ghost" data-effective-grant-count data-effective-grant-max="{max_count}">{count} / {max_count} effective grants</span></div>
+            <p class="text-xs opacity-60">Approval requirements and runtime ceilings are managed by the platform. Skill-required tools count here even when not selected directly.</p>
+            {tools}{policies}
+        </section>"##,
+        selected = escape_html_attr(&csv_tools(&draft.granted_tool_ids)),
+        count = effective.len(),
+        max_count = MAX_GRANTED_TOOLS,
+        policies = native_policy_fields(draft),
+    );
+
+    let skills = skill_picker(fields.capability_options.skills, draft, fields.scope);
+    let sub_agents = match fields.scope {
+        AgentFormScope::Library => String::new(),
+        AgentFormScope::Company(_) => sub_agent_picker(
+            fields.capability_options.sub_agents,
+            fields.agent_id,
+            draft,
+            effective
+                .iter()
+                .any(|tool| tool.as_str() == CREATE_AGENT_CHANNEL_TOOL_ID),
+        ),
+    };
+
+    format!(
+        r##"<section class="space-y-5 rounded-box border border-base-300 bg-base-100 p-4" data-agent-capability-picker>
+            <div><h3 class="font-semibold">Agent capabilities</h3><p class="text-xs opacity-60">Explicitly choose what this agent may use.</p></div>
+            {harness}{tool_picker}{skills}{sub_agents}
+        </section>"##
+    )
+}
+
+fn tool_group(source: ToolSource, draft: &AgentDraft<'_>, implied: &[ToolId]) -> String {
+    let cards = CatalogueTool::grantable()
+        .filter(|tool| tool.source == source)
+        .map(|tool| {
+            let selected = draft
+                .granted_tool_ids
+                .iter()
+                .any(|id| id.as_str() == tool.id);
+            let implied_by_skill = implied.iter().any(|id| id.as_str() == tool.id);
+            format!(
+                r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
+                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}"
+                        data-action="capability-multi-select" data-direct-tool-grant{checked}>
+                    <span><span class="font-medium">{label}</span>{implied}<span class="block text-xs opacity-60">{description}</span></span>
+                </label>"##,
+                id = escape_html_attr(tool.id),
+                checked = if selected { " checked" } else { "" },
+                label = escape_html_text(tool.label),
+                implied = if implied_by_skill {
+                    r#" <span class="badge badge-info badge-xs">required by skill</span>"#
+                } else {
+                    ""
+                },
+                description = escape_html_text(tool.description),
+            )
+        })
+        .collect::<String>();
+    let heading = match source {
+        ToolSource::Builtin => "Built-in",
+        ToolSource::Native => "This platform",
+    };
+    format!(
+        r#"<div><h5 class="mb-2 text-xs font-semibold uppercase tracking-wide opacity-60">{heading}</h5><div class="grid grid-cols-1 gap-2 md:grid-cols-2">{cards}</div></div>"#
+    )
+}
+
+fn native_policy_fields(draft: &AgentDraft<'_>) -> String {
+    let policy = &draft.native_tool_policy;
+    format!(
+        r##"<details class="rounded-box border border-base-300 p-3"><summary class="cursor-pointer text-sm font-medium">Native tool policy</summary>
+            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label class="form-control"><span class="label text-xs opacity-70">Outreach target scope</span>
+                    <select class="select w-full" name="outreach_target_scope">
+                        <option value="external_only"{external}>External recipients only</option>
+                        <option value="same_company_channels"{company}>Same-company channels only</option>
+                        <option value="any"{any}>External and same-company</option></select></label>
+                <label class="form-control"><span class="label text-xs opacity-70">Maximum outreach targets</span>
+                    <input class="input w-full" type="number" min="1" max="100" name="outreach_max_targets" value="{max_targets}"></label>
+                <label class="form-control"><span class="label text-xs opacity-70">Default outreach timeout (hours)</span>
+                    <input class="input w-full" type="number" min="1" max="720" name="outreach_default_timeout_hours" value="{default_timeout}"></label>
+                <label class="form-control"><span class="label text-xs opacity-70">Maximum outreach timeout (hours)</span>
+                    <input class="input w-full" type="number" min="1" max="720" name="outreach_max_timeout_hours" value="{max_timeout}"></label>
+                <label class="form-control"><span class="label text-xs opacity-70">Maximum directory results</span>
+                    <input class="input w-full" type="number" min="1" max="100" name="directory_max_results" value="{directory_results}"></label>
+            </div></details>"##,
+        external =
+            selected(policy.outreach.allowed_target_scope == OutreachTargetScope::ExternalOnly),
+        company = selected(
+            policy.outreach.allowed_target_scope == OutreachTargetScope::SameCompanyChannels
+        ),
+        any = selected(policy.outreach.allowed_target_scope == OutreachTargetScope::Any),
+        max_targets = policy.outreach.max_targets,
+        default_timeout = policy.outreach.default_timeout_hours,
+        max_timeout = policy.outreach.max_timeout_hours,
+        directory_results = policy.directory.max_results,
+    )
+}
+
+fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
+    let cards = skills
+        .iter()
+        .filter(|skill| match scope {
+            AgentFormScope::Company(company_id) => skill.company_id == Some(company_id),
+            AgentFormScope::Library => skill.company_id.is_none(),
+        })
+        .map(|skill| {
+            let required_tool_ids = skill.referenced_tool_ids();
+            let tools = required_tool_ids
+                .iter()
+                .filter_map(CatalogueTool::get)
+                .map(|tool| tool.label)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
+                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}"
+                        data-action="capability-multi-select" data-required-tools="{required_tools}"{checked}>
+                    <span><span class="font-medium">{name}</span><span class="block text-xs opacity-60">{description}</span>{tools}</span>
+                </label>"##,
+                id = skill.id,
+                checked = if draft.skill_ids.contains(&skill.id) { " checked" } else { "" },
+                name = escape_html_text(&skill.name),
+                description = escape_html_text(&skill.description),
+                required_tools = escape_html_attr(&csv_tools(&required_tool_ids)),
+                tools = if tools.is_empty() { String::new() } else { format!(r#"<span class="block text-[11px] text-info">Also grants: {}</span>"#, escape_html_text(&tools)) },
+            )
+        })
+        .collect::<String>();
+    let empty = if cards.is_empty() {
+        r#"<p class="text-xs opacity-60">No skills are available yet.</p>"#
+    } else {
+        ""
+    };
+    format!(
+        r##"<section class="space-y-2" data-capability-multi-select>
+            <input type="hidden" name="skill_ids" value="{value}">
+            <div class="flex items-center justify-between"><h4 class="text-sm font-semibold">Skills</h4>{browse}</div>
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">{cards}</div>{empty}</section>"##,
+        value = escape_html_attr(&csv_uuids(&draft.skill_ids)),
+        browse = match scope {
+            AgentFormScope::Company(company_id) => format!(
+                r#"<a class="btn btn-ghost btn-xs" href="/ui/companies?company_id={company_id}&amp;tab=skills">Browse library</a>"#
+            ),
+            AgentFormScope::Library => String::new(),
+        },
+    )
+}
+
+fn sub_agent_picker(
+    agents: &[Agent],
+    current_agent_id: Option<Uuid>,
+    draft: &AgentDraft<'_>,
+    creates_agents: bool,
+) -> String {
+    let cards = agents
+        .iter()
+        .filter(|agent| Some(agent.id) != current_agent_id && !agent.is_library())
+        .map(|agent| {
+            format!(
+                r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
+                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}"
+                        data-action="capability-multi-select"{checked}>
+                    <span><span class="font-medium">{name}</span><span class="block font-mono text-xs opacity-60">{slug}</span></span>
+                </label>"##,
+                id = agent.id,
+                checked = if draft.sub_agent_ids.contains(&agent.id) { " checked" } else { "" },
+                name = escape_html_text(&agent.name),
+                slug = escape_html_text(&agent.slug),
+            )
+        })
+        .collect::<String>();
+    let incompatible = !draft.sub_agent_ids.is_empty() && creates_agents;
+    format!(
+        r##"<section class="space-y-2" data-capability-multi-select>
+            <input type="hidden" name="sub_agent_ids" value="{value}">
+            <h4 class="text-sm font-semibold">Sub-agents</h4>
+            <p class="text-xs opacity-60">Leave empty to let this agent reach every agent in the company.</p>
+            {error}<div class="grid grid-cols-1 gap-2 md:grid-cols-2">{cards}</div></section>"##,
+        value = escape_html_attr(&csv_uuids(&draft.sub_agent_ids)),
+        error = if incompatible {
+            r#"<p class="text-xs text-error">A restricted sub-agent list cannot be combined with the create-agent tool, including when a selected skill grants it.</p>"#
+        } else {
+            ""
+        },
+    )
+}
+
+fn selected(value: bool) -> &'static str {
+    if value { " selected" } else { "" }
 }
 
 fn company_model_selection(
@@ -1343,6 +1696,11 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         memory_recall_mode: agent.memory_recall_mode.as_str(),
         memory_max_results: agent.memory_max_results,
         config_json,
+        harness_kind: agent.harness_kind,
+        granted_tool_ids: agent.granted_tool_ids.clone(),
+        skill_ids: Vec::new(),
+        sub_agent_ids: Vec::new(),
+        native_tool_policy: agent.native_tool_policy.clone(),
         avatar_url: agent
             .avatar_url
             .as_ref()
@@ -1357,5 +1715,109 @@ pub fn stored_agent_config(agent: &Agent) -> String {
     match &agent.config_json {
         Some(config) => serde_json::to_string_pretty(config).unwrap_or_else(|_| config.to_string()),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod capability_tests {
+    use chrono::Utc;
+
+    use super::*;
+    use crate::entities::{
+        creation::CreationProvenance, skill::SkillInstruction, value_objects::SkillSlug,
+    };
+
+    fn skill(company_id: Option<Uuid>, name: &str, tool: &str) -> Skill {
+        Skill {
+            id: Uuid::new_v4(),
+            company_id,
+            slug: SkillSlug::parse(&name.to_ascii_lowercase()).unwrap(),
+            name: name.into(),
+            description: format!("{name} description"),
+            trigger: "When needed".into(),
+            instructions: vec![
+                SkillInstruction::Tool {
+                    tool: ToolId::from(tool),
+                    args: None,
+                    output_as: None,
+                },
+                SkillInstruction::Prompt {
+                    text: "Reply".into(),
+                },
+            ],
+            created_by: CreationProvenance::system(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn the_tool_grid_offers_only_grantable_tools() {
+        let html = library_agent_fields(&AgentDraft::default(), None);
+        assert!(html.contains("value=\"calculator\""));
+        assert!(!html.contains("value=\"command\""));
+    }
+
+    #[test]
+    fn the_harness_select_lists_every_kind_and_submits_a_disabled_value() {
+        let html = library_agent_fields(&AgentDraft::default(), None);
+        for kind in HarnessKind::ALL {
+            assert!(html.contains(&format!("value=\"{}\"", kind.as_str())));
+        }
+        assert!(html.contains("<select class=\"select w-full\" disabled>"));
+        assert!(html.contains("type=\"hidden\" name=\"harness_kind\" value=\"ai_agents\""));
+    }
+
+    #[test]
+    fn an_empty_sub_agent_allowlist_renders_the_unrestricted_note() {
+        let company_id = Uuid::new_v4();
+        let html = agent_fields(&AgentFields {
+            scope: AgentFormScope::Company(company_id),
+            agent_id: None,
+            draft: &AgentDraft::default(),
+            model_connections: &[],
+            capability_options: AgentCapabilityOptions::default(),
+        });
+        assert!(html.contains("Leave empty to let this agent reach every agent in the company."));
+    }
+
+    #[test]
+    fn selected_skills_show_the_tools_they_grant_implicitly() {
+        let company_id = Uuid::new_v4();
+        let selected = skill(Some(company_id), "Clock", "datetime");
+        let draft = AgentDraft {
+            skill_ids: vec![selected.id],
+            ..AgentDraft::default()
+        };
+        let html = agent_fields(&AgentFields {
+            scope: AgentFormScope::Company(company_id),
+            agent_id: None,
+            draft: &draft,
+            model_connections: &[],
+            capability_options: AgentCapabilityOptions {
+                skills: std::slice::from_ref(&selected),
+                sub_agents: &[],
+            },
+        });
+        assert!(html.contains("Also grants: Date and time"));
+        assert!(html.contains("1 / 32 effective grants"));
+    }
+
+    #[test]
+    fn a_library_agent_picker_offers_only_global_skills_and_no_sub_agents() {
+        let global = skill(None, "Global", "datetime");
+        let company = skill(Some(Uuid::new_v4()), "Company", "json");
+        let options = [global, company];
+        let html = library_agent_fields_with_capabilities(
+            &AgentDraft::default(),
+            None,
+            AgentCapabilityOptions {
+                skills: &options,
+                sub_agents: &[],
+            },
+        );
+        assert!(html.contains("Global description"));
+        assert!(!html.contains("Company description"));
+        assert!(!html.contains("name=\"sub_agent_ids\""));
     }
 }

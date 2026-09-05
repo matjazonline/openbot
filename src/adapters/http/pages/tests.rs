@@ -1113,6 +1113,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1126,7 +1127,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     assert!(html.contains("name=\"run_timeout_secs\" min=\"1\" max=\"3600\""));
     assert!(html.contains("value=\"45\""));
     assert!(html.contains("Answer &lt;billing&gt; questions.</textarea>"));
-    assert!(html.contains("\"temperature\": 0.2"));
+    assert!(html.contains("&quot;temperature&quot;: 0.2"));
     // Overrides are set, so the collapsed section starts open.
     assert!(html.contains("bg-base-200\" open"));
     // The name is escaped everywhere it appears, including inside the confirm prompt.
@@ -1148,6 +1149,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("bg-base-200\" open"));
@@ -1171,6 +1173,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(html.contains(r#"src="https://example.com/triage.png""#));
@@ -1187,6 +1190,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("<img"));
@@ -1221,6 +1225,7 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
         used_by: &[&channel],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1251,6 +1256,7 @@ fn run_by_names_the_shared_channels_and_leaves_the_personal_one_to_its_tab() {
         used_by: &[&personal, &shared],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1270,6 +1276,7 @@ fn run_by_names_the_shared_channels_and_leaves_the_personal_one_to_its_tab() {
         used_by: &[&personal],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(!alone.contains("Run by"));
@@ -1293,6 +1300,7 @@ fn the_channel_tab_appears_only_for_an_agent_that_owns_a_channel() {
         used_by: &[&personal],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1314,6 +1322,7 @@ fn the_channel_tab_appears_only_for_an_agent_that_owns_a_channel() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(!alone.contains("role=\"tablist\""));
@@ -1346,6 +1355,7 @@ fn the_channel_tab_renders_the_owned_channel_and_cannot_delete_it() {
         used_by: &[&personal],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Channel(&tab),
     });
 
@@ -1398,6 +1408,7 @@ fn the_channel_tab_keeps_a_rejected_save_in_the_form() {
         used_by: &[&personal],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Channel(&tab),
     });
 
@@ -1444,6 +1455,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
         used_by: &[],
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1469,6 +1481,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
 
@@ -1497,6 +1510,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
         tab: AgentCreateTab::Simple,
         draft: &AgentDraft::default(),
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
     });
     assert!(create.contains("id=\"agent-generator-new\""));
     assert!(create.contains("id=\"agent-prompt-new\""));
@@ -1547,6 +1561,7 @@ fn the_easy_tab_creates_the_picked_library_agents() {
         tab: AgentCreateTab::Easy,
         draft: &AgentDraft::default(),
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
     });
 
     // The tab opens on the picker, and the other two forms stay behind their tabs.
@@ -1590,6 +1605,7 @@ fn an_empty_library_leaves_no_easy_tab_to_open() {
         tab: AgentCreateTab::Simple,
         draft: &AgentDraft::default(),
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
     });
 
     assert!(!pane.contains("agent-tab-easy"));
@@ -1614,6 +1630,7 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
                 ..AgentDraft::default()
             },
             error: None,
+            capability_options: AgentCapabilityOptions::default(),
         })
     };
 
@@ -1656,6 +1673,7 @@ fn a_blank_agent_form_stays_inside_the_bounds_its_own_fields_declare() {
         tab: AgentCreateTab::Advanced,
         draft: &AgentDraft::default(),
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
     });
 
     assert!(pane.contains(
@@ -4131,6 +4149,7 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         counts: CompanyCounts {
             channels: 3,
             agents: 2,
+            skills: 0,
         },
         draft: None,
         error: None,
@@ -4225,6 +4244,7 @@ fn company_member_can_open_company_without_edit_controls_or_api_key() {
         counts: CompanyCounts {
             channels: 3,
             agents: 2,
+            skills: 0,
         },
         draft: None,
         error: None,
@@ -4683,6 +4703,7 @@ fn each_agent_form_owns_its_own_picker() {
         tab: AgentCreateTab::Simple,
         draft: &AgentDraft::default(),
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
     });
     assert!(create.contains(r#"id="agent-avatar-simple""#));
     assert!(create.contains(r#"id="agent-avatar-new""#));
@@ -4701,6 +4722,7 @@ fn each_agent_form_owns_its_own_picker() {
         used_by: &[],
         draft: None,
         error: None,
+        capability_options: AgentCapabilityOptions::default(),
         body: AgentPaneBody::Settings,
     });
     assert!(edit.contains(&format!(r#"id="agent-avatar-{}""#, agent.id)));

@@ -19,6 +19,7 @@ use crate::{
     infra::config::AppConfig,
     use_cases::{
         agent::{AgentUseCases, AgentWrite},
+        skill::{MAX_SKILL_PAGE_SIZE, SkillPageRequest, SkillUseCases},
         user::UserUseCases,
     },
 };
@@ -48,19 +49,26 @@ struct LibraryAgentResponse {
     slug: String,
     provider: Option<String>,
     model: Option<String>,
+    run_timeout_secs: Option<u32>,
     system_prompt: Option<String>,
     description: Option<String>,
     config_json: Option<serde_json::Value>,
+    memory_enabled: bool,
     memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode,
     memory_recall_mode: crate::entities::memory::MemoryRecallMode,
     memory_max_results: u8,
     avatar_url: Option<AvatarUrl>,
     created_by: crate::entities::creation::CreationProvenance,
     created_at: chrono::DateTime<chrono::Utc>,
+    harness_kind: crate::entities::harness::HarnessKind,
+    granted_tool_ids: Vec<crate::entities::value_objects::ToolId>,
+    native_tool_policy: crate::entities::harness::NativeToolPolicy,
+    skill_ids: Vec<Uuid>,
+    sub_agent_ids: Vec<Uuid>,
 }
 
-impl From<Agent> for LibraryAgentResponse {
-    fn from(agent: Agent) -> Self {
+impl LibraryAgentResponse {
+    fn new(agent: Agent, skill_ids: Vec<Uuid>, sub_agent_ids: Vec<Uuid>) -> Self {
         Self {
             id: agent.id,
             scope: "library",
@@ -68,20 +76,27 @@ impl From<Agent> for LibraryAgentResponse {
             slug: agent.slug,
             provider: agent.provider,
             model: agent.model,
+            run_timeout_secs: agent.run_timeout_secs,
             system_prompt: agent.system_prompt,
             description: agent.description,
             config_json: agent.config_json,
+            memory_enabled: agent.memory_enabled,
             memory_persistence_mode: agent.memory_persistence_mode,
             memory_recall_mode: agent.memory_recall_mode,
             memory_max_results: agent.memory_max_results,
             avatar_url: agent.avatar_url,
             created_by: agent.created_by,
             created_at: agent.created_at,
+            harness_kind: agent.harness_kind,
+            granted_tool_ids: agent.granted_tool_ids,
+            native_tool_policy: agent.native_tool_policy,
+            skill_ids,
+            sub_agent_ids,
         }
     }
 }
 
-async fn require_operator(
+pub(super) async fn require_operator(
     user: &AuthenticatedUser,
     users: &UserUseCases,
     config: &AppConfig,
@@ -93,9 +108,7 @@ async fn require_operator(
     if config.is_operator(&account.email.as_str().into()) {
         Ok(())
     } else {
-        Err(AppError::NotFound(
-            "Agent library workspace not found.".into(),
-        ))
+        Err(AppError::NotFound("Library workspace not found.".into()))
     }
 }
 
@@ -109,6 +122,11 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         run_timeout_secs: payload.run_timeout_secs,
         system_prompt: payload.system_prompt,
         description: payload.description,
+        harness_kind: payload.harness_kind,
+        granted_tool_ids: payload.granted_tool_ids,
+        native_tool_policy: payload.native_tool_policy,
+        skill_ids: payload.skill_ids,
+        sub_agent_ids: payload.sub_agent_ids,
         config_json: payload.config_json,
         memory_enabled: payload.memory_enabled,
         memory_persistence_mode: payload.memory_persistence_mode,
@@ -116,63 +134,100 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         memory_max_results: payload.memory_max_results,
         avatar_url,
         created_by: None,
-        ..AgentWrite::default()
     })
 }
 
 async fn list_json(
     State(agents): State<Arc<AgentUseCases>>,
-    _user: AuthenticatedUser,
+    State(skills): State<Arc<SkillUseCases>>,
+    State(users): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    user: AuthenticatedUser,
 ) -> AppResult<Json<Vec<LibraryAgentResponse>>> {
-    Ok(Json(
-        agents
-            .list_library_agents()
+    require_operator(&user, &users, &config).await?;
+    let mut response = Vec::new();
+    for agent in agents.list_library_agents().await? {
+        let capabilities = skills
+            .library_agent_capabilities(agent.id)
             .await?
-            .into_iter()
-            .map(Into::into)
-            .collect(),
-    ))
+            .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+        response.push(LibraryAgentResponse::new(
+            agent,
+            capabilities.skills.iter().map(|skill| skill.id).collect(),
+            capabilities.sub_agent_scope.allowed_ids().to_vec(),
+        ));
+    }
+    Ok(Json(response))
 }
 
 async fn get_json(
     State(agents): State<Arc<AgentUseCases>>,
-    _user: AuthenticatedUser,
+    State(skills): State<Arc<SkillUseCases>>,
+    State(users): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<LibraryAgentResponse>> {
-    agents
+    require_operator(&user, &users, &config).await?;
+    let agent = agents
         .get_library_agent(id)
         .await?
-        .map(|agent| Json(agent.into()))
-        .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))
+        .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+    let capabilities = skills
+        .library_agent_capabilities(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+    Ok(Json(LibraryAgentResponse::new(
+        agent,
+        capabilities.skills.iter().map(|skill| skill.id).collect(),
+        capabilities.sub_agent_scope.allowed_ids().to_vec(),
+    )))
 }
 
 async fn create_json(
     State(agents): State<Arc<AgentUseCases>>,
     State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
+    State(skills): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Json(payload): Json<AgentJsonPayload>,
 ) -> AppResult<(StatusCode, Json<LibraryAgentResponse>)> {
     require_operator(&user, &users, &config).await?;
     let agent = agents.create_library_agent(write(payload)?).await?;
-    Ok((StatusCode::CREATED, Json(agent.into())))
+    let capabilities = skills
+        .library_agent_capabilities(agent.id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(LibraryAgentResponse::new(
+            agent,
+            capabilities.skills.iter().map(|skill| skill.id).collect(),
+            capabilities.sub_agent_scope.allowed_ids().to_vec(),
+        )),
+    ))
 }
 
 async fn update_json(
     State(agents): State<Arc<AgentUseCases>>,
     State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
+    State(skills): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(payload): Json<AgentJsonPayload>,
 ) -> AppResult<Json<LibraryAgentResponse>> {
     require_operator(&user, &users, &config).await?;
-    Ok(Json(
-        agents
-            .update_library_agent(id, write(payload)?)
-            .await?
-            .into(),
-    ))
+    let agent = agents.update_library_agent(id, write(payload)?).await?;
+    let capabilities = skills
+        .library_agent_capabilities(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+    Ok(Json(LibraryAgentResponse::new(
+        agent,
+        capabilities.skills.iter().map(|skill| skill.id).collect(),
+        capabilities.sub_agent_scope.allowed_ids().to_vec(),
+    )))
 }
 
 async fn delete_json(
@@ -250,6 +305,7 @@ async fn generate_prompt(
 
 async fn workspace(
     State(agents): State<Arc<AgentUseCases>>,
+    State(skills): State<Arc<SkillUseCases>>,
     State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -261,48 +317,68 @@ async fn workspace(
         .ok_or(AppError::InvalidCredentials)?;
     let account_email = account.email.as_str().into();
     let workspace_user = workspace_user(&account, &account_email, &config);
-    let rows = agents
-        .list_library_agents()
-        .await?
-        .into_iter()
-        .map(|agent| {
-            let config_json = pages::stored_agent_config(&agent);
-            let draft = pages::AgentDraft {
-                name: &agent.name,
-                slug: &agent.slug,
-                system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
-                description: agent.description.as_deref().unwrap_or(""),
-                provider: agent.provider.as_deref().unwrap_or(""),
-                model: agent.model.as_deref().unwrap_or(""),
-                run_timeout_secs: agent.run_timeout_secs,
-                memory_enabled: agent.memory_enabled,
-                memory_persistence_mode: agent.memory_persistence_mode.as_str(),
-                memory_recall_mode: agent.memory_recall_mode.as_str(),
-                memory_max_results: agent.memory_max_results,
-                config_json: &config_json,
-                avatar_url: agent
-                    .avatar_url
-                    .as_ref()
-                    .map(AvatarUrl::as_str)
-                    .unwrap_or(""),
-                advanced: true,
-            };
-            format!(
+    let skill_page = skills
+        .list_library_page(SkillPageRequest {
+            before: None,
+            limit: MAX_SKILL_PAGE_SIZE,
+        })
+        .await?;
+    let mut rows = String::new();
+    for agent in agents.list_library_agents().await? {
+        let capabilities = skills
+            .library_agent_capabilities(agent.id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
+        let config_json = pages::stored_agent_config(&agent);
+        let draft = pages::AgentDraft {
+            name: &agent.name,
+            slug: &agent.slug,
+            system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+            description: agent.description.as_deref().unwrap_or(""),
+            provider: agent.provider.as_deref().unwrap_or(""),
+            model: agent.model.as_deref().unwrap_or(""),
+            run_timeout_secs: agent.run_timeout_secs,
+            memory_enabled: agent.memory_enabled,
+            memory_persistence_mode: agent.memory_persistence_mode.as_str(),
+            memory_recall_mode: agent.memory_recall_mode.as_str(),
+            memory_max_results: agent.memory_max_results,
+            config_json: &config_json,
+            harness_kind: agent.harness_kind,
+            granted_tool_ids: agent.granted_tool_ids.clone(),
+            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            sub_agent_ids: Vec::new(),
+            native_tool_policy: agent.native_tool_policy.clone(),
+            avatar_url: agent
+                .avatar_url
+                .as_ref()
+                .map(AvatarUrl::as_str)
+                .unwrap_or(""),
+            advanced: true,
+        };
+        rows.push_str(&format!(
                 r#"<form class="card bg-base-200 p-4 space-y-4" data-submit="save-library-agent" data-agent-id="{id}">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" data-action="delete-library-agent" data-agent-id="{id}">Delete</button></div></form>"#,
                 id = agent.id,
-                fields = pages::library_agent_fields(&draft, Some(agent.id)),
-            )
-        })
-        .collect::<String>();
-    let create_fields = pages::library_agent_fields(
+                fields = pages::library_agent_fields_with_capabilities(
+                    &draft,
+                    Some(agent.id),
+                    pages::AgentCapabilityOptions { skills: &skill_page.items, sub_agents: &[] },
+                ),
+            ));
+    }
+    let create_fields = pages::library_agent_fields_with_capabilities(
         &pages::AgentDraft {
             advanced: true,
             ..pages::AgentDraft::default()
         },
         None,
+        pages::AgentCapabilityOptions {
+            skills: &skill_page.items,
+            sub_agents: &[],
+        },
     );
     let content = format!(
         r#"<main class="flex-1 overflow-auto p-8"><div class="mx-auto max-w-4xl"><h1 class="text-2xl font-bold">Agent library</h1><p class="mb-6 opacity-70">Live global definitions available to every company.</p>
+    <div class="alert alert-warning mb-6 text-sm">A library agent assigned directly to a company channel can reach every sibling in that company. Prefer copy-on-pick when a restricted scope is needed.</div>
     <form class="card mb-6 bg-base-200 p-4 space-y-2" data-submit="create-library-agent">
       <h2 class="font-bold">New library agent</h2>
       {create_fields}

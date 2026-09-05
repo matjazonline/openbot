@@ -16,18 +16,23 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent,
+        agent::{Agent, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS, MAX_GRANTED_TOOLS},
         channel::Channel,
+        harness::{
+            DirectoryToolPolicy, HarnessConfig, HarnessKind, NativeToolPolicy, OutreachTargetScope,
+            OutreachToolPolicy,
+        },
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
-        value_objects::AvatarUrl,
+        value_objects::{AvatarUrl, ToolId},
     },
     use_cases::{
         agent::{AgentUseCases, ProvisioningWarning},
         company::CompanyUseCases,
+        skill::SkillUseCases,
     },
 };
 
-use super::channel::{parse_config_form, slugify};
+use super::channel::slugify;
 use super::task::deserialize_empty_string_as_none;
 
 pub fn router() -> Router<AppState> {
@@ -84,6 +89,23 @@ pub struct AgentForm {
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     pub config_json: Option<String>,
+    #[serde(default)]
+    pub harness_kind: Option<String>,
+    #[serde(default)]
+    pub granted_tool_ids: Option<String>,
+    #[serde(default)]
+    pub skill_ids: Option<String>,
+    #[serde(default)]
+    pub sub_agent_ids: Option<String>,
+    pub outreach_target_scope: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub outreach_max_targets: Option<u16>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub outreach_default_timeout_hours: Option<u16>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub outreach_max_timeout_hours: Option<u16>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub directory_max_results: Option<u16>,
     pub avatar_url: Option<String>,
     #[serde(default)]
     pub memory_enabled: bool,
@@ -113,9 +135,129 @@ impl AgentForm {
             .map(String::from)
             .unwrap_or_else(|| slugify(&self.name))
     }
+
+    pub(super) fn capabilities(&self) -> Result<SubmittedCapabilities, String> {
+        let harness_kind = match self.harness_kind.as_deref().map(str::trim) {
+            None | Some("") => HarnessKind::default(),
+            Some(value) => HarnessKind::parse(value)
+                .ok_or_else(|| format!("Unknown agent harness '{value}'."))?,
+        };
+        let granted_tool_ids = parse_csv(
+            self.granted_tool_ids.as_deref(),
+            MAX_GRANTED_TOOLS,
+            "tool grants",
+        )?
+        .into_iter()
+        .map(ToolId::from)
+        .collect();
+        let skill_ids = parse_uuid_csv(self.skill_ids.as_deref(), MAX_AGENT_SKILLS, "skills")?;
+        let sub_agent_ids = parse_uuid_csv(
+            self.sub_agent_ids.as_deref(),
+            MAX_AGENT_SUB_AGENTS,
+            "sub-agents",
+        )?;
+        let defaults = NativeToolPolicy::default();
+        let target_scope = match self.outreach_target_scope.as_deref().map(str::trim) {
+            None | Some("") | Some("external_only") => OutreachTargetScope::ExternalOnly,
+            Some("same_company_channels") => OutreachTargetScope::SameCompanyChannels,
+            Some("any") => OutreachTargetScope::Any,
+            Some(value) => return Err(format!("Unknown outreach target scope '{value}'.")),
+        };
+        let native_tool_policy = NativeToolPolicy {
+            version: 1,
+            outreach: OutreachToolPolicy {
+                max_targets: self
+                    .outreach_max_targets
+                    .unwrap_or(defaults.outreach.max_targets),
+                default_timeout_hours: self
+                    .outreach_default_timeout_hours
+                    .unwrap_or(defaults.outreach.default_timeout_hours),
+                max_timeout_hours: self
+                    .outreach_max_timeout_hours
+                    .unwrap_or(defaults.outreach.max_timeout_hours),
+                allowed_target_scope: target_scope,
+            },
+            directory: DirectoryToolPolicy {
+                max_results: self
+                    .directory_max_results
+                    .unwrap_or(defaults.directory.max_results),
+            },
+        };
+        native_tool_policy.validate()?;
+        Ok(SubmittedCapabilities {
+            harness_kind,
+            granted_tool_ids,
+            skill_ids,
+            sub_agent_ids,
+            native_tool_policy,
+        })
+    }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
+pub(super) struct SubmittedCapabilities {
+    pub harness_kind: HarnessKind,
+    pub granted_tool_ids: Vec<ToolId>,
+    pub skill_ids: Vec<Uuid>,
+    pub sub_agent_ids: Vec<Uuid>,
+    pub native_tool_policy: NativeToolPolicy,
+}
+
+const MAX_CAPABILITY_CSV_BYTES: usize = 8 * 1024;
+
+fn parse_csv(value: Option<&str>, max: usize, label: &str) -> Result<Vec<String>, String> {
+    let value = value.unwrap_or_default();
+    if value.len() > MAX_CAPABILITY_CSV_BYTES {
+        return Err(format!("The {label} selection is too large."));
+    }
+    let mut parsed = Vec::new();
+    for item in value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+    {
+        if !parsed.iter().any(|stored| stored == item) {
+            parsed.push(item.to_string());
+        }
+        if parsed.len() > max {
+            return Err(format!(
+                "Too many {label} were selected; the limit is {max}."
+            ));
+        }
+    }
+    Ok(parsed)
+}
+
+pub(super) fn parse_uuid_csv(
+    value: Option<&str>,
+    max: usize,
+    label: &str,
+) -> Result<Vec<Uuid>, String> {
+    parse_csv(value, max, label)?
+        .into_iter()
+        .map(|value| {
+            Uuid::parse_str(&value).map_err(|_| format!("A selected {label} id is invalid."))
+        })
+        .collect()
+}
+
+pub(super) fn parse_config_form(
+    input: Option<String>,
+    harness_kind: HarnessKind,
+) -> Result<Option<serde_json::Value>, String> {
+    let value = match input {
+        Some(value) if !value.trim().is_empty() => Some(
+            serde_json::from_str(value.trim())
+                .map_err(|error| format!("Invalid JSON config: {error}"))?,
+        ),
+        _ => None,
+    };
+    let config = HarnessConfig::parse(harness_kind, value.as_ref())?;
+    let canonical = config.to_json()?;
+    Ok((canonical != serde_json::json!({"version": 1})).then_some(canonical))
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentJsonPayload {
     pub name: String,
     pub slug: String,
@@ -126,6 +268,16 @@ pub struct AgentJsonPayload {
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    #[serde(default)]
+    pub harness_kind: HarnessKind,
+    #[serde(default)]
+    pub granted_tool_ids: Vec<ToolId>,
+    #[serde(default)]
+    pub skill_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub sub_agent_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub native_tool_policy: NativeToolPolicy,
     pub avatar_url: Option<String>,
     #[serde(default)]
     pub memory_enabled: bool,
@@ -152,6 +304,8 @@ pub struct AgentResponse {
     pub channel: Option<Channel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<ProvisioningWarning>,
+    pub skill_ids: Vec<Uuid>,
+    pub sub_agent_ids: Vec<Uuid>,
 }
 
 /// What an agent answers with when it should not take the company's LLM settings.
@@ -254,10 +408,12 @@ async fn create_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let submitted = parse_config_form(form.config_json.clone())
-        .and_then(|config_json| Ok((config_json, form.avatar_url()?)));
+    let submitted = form.capabilities().and_then(|capabilities| {
+        parse_config_form(form.config_json.clone(), capabilities.harness_kind)
+            .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
+    });
 
-    let (config_json, avatar_url) = match submitted {
+    let (capabilities, config_json, avatar_url) = match submitted {
         Ok(fields) => fields,
         Err(err) => {
             let error_html = pages::error_alert(&err);
@@ -285,6 +441,11 @@ async fn create_agent_handler(
                 run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
+                harness_kind: capabilities.harness_kind,
+                granted_tool_ids: capabilities.granted_tool_ids,
+                skill_ids: capabilities.skill_ids,
+                sub_agent_ids: capabilities.sub_agent_ids,
+                native_tool_policy: capabilities.native_tool_policy,
                 config_json,
                 memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
@@ -294,7 +455,6 @@ async fn create_agent_handler(
                     .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
-                ..AgentWrite::default()
             },
         )
         .await
@@ -389,10 +549,12 @@ async fn update_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let submitted = parse_config_form(form.config_json.clone())
-        .and_then(|config_json| Ok((config_json, form.avatar_url()?)));
+    let submitted = form.capabilities().and_then(|capabilities| {
+        parse_config_form(form.config_json.clone(), capabilities.harness_kind)
+            .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
+    });
 
-    let (config_json, avatar_url) = match submitted {
+    let (capabilities, config_json, avatar_url) = match submitted {
         Ok(fields) => fields,
         Err(err) => return Html(pages::error_alert(&err)),
     };
@@ -410,6 +572,11 @@ async fn update_agent_handler(
                 run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
+                harness_kind: capabilities.harness_kind,
+                granted_tool_ids: capabilities.granted_tool_ids,
+                skill_ids: capabilities.skill_ids,
+                sub_agent_ids: capabilities.sub_agent_ids,
+                native_tool_policy: capabilities.native_tool_policy,
                 config_json,
                 memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
@@ -419,7 +586,6 @@ async fn update_agent_handler(
                     .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
-                ..AgentWrite::default()
             },
         )
         .await
@@ -445,13 +611,29 @@ async fn delete_agent_handler(
 /// JSON API: List company agents (Protected).
 async fn list_agents_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(skill_use_cases): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
         .await?;
-    Ok((StatusCode::OK, Json(agents)))
+    let mut response = Vec::with_capacity(agents.len());
+    for agent in agents {
+        let capabilities = skill_use_cases
+            .company_agent_capabilities(user.id, company_id, agent.id)
+            .await?
+            .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        response.push(AgentResponse {
+            success: true,
+            agent,
+            channel: None,
+            warnings: Vec::new(),
+            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
+        });
+    }
+    Ok((StatusCode::OK, Json(response)))
 }
 
 /// JSON API: Create company agent (Protected).
@@ -475,6 +657,11 @@ async fn create_agent_json(
                 run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
+                harness_kind: payload.harness_kind,
+                granted_tool_ids: payload.granted_tool_ids.clone(),
+                skill_ids: payload.skill_ids.clone(),
+                sub_agent_ids: payload.sub_agent_ids.clone(),
+                native_tool_policy: payload.native_tool_policy.clone(),
                 config_json: payload.config_json.clone(),
                 memory_enabled: payload.memory_enabled,
                 memory_persistence_mode: payload.memory_persistence_mode,
@@ -482,7 +669,6 @@ async fn create_agent_json(
                 memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
-                ..AgentWrite::default()
             },
         )
         .await?;
@@ -494,6 +680,8 @@ async fn create_agent_json(
             agent: provisioned.agent,
             channel: Some(provisioned.channel),
             warnings: provisioned.warnings,
+            skill_ids: payload.skill_ids,
+            sub_agent_ids: payload.sub_agent_ids,
         }),
     ))
 }
@@ -501,6 +689,7 @@ async fn create_agent_json(
 /// JSON API: Get company agent details (Protected).
 async fn get_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(skill_use_cases): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<impl IntoResponse> {
@@ -509,7 +698,21 @@ async fn get_agent_json(
         .await?
         .ok_or_else(crate::use_cases::agent::agent_not_found)?;
 
-    Ok((StatusCode::OK, Json(agent)))
+    let capabilities = skill_use_cases
+        .company_agent_capabilities(user.id, company_id, agent_id)
+        .await?
+        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+    Ok((
+        StatusCode::OK,
+        Json(AgentResponse {
+            success: true,
+            agent,
+            channel: None,
+            warnings: Vec::new(),
+            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
+        }),
+    ))
 }
 
 /// JSON API: Update company agent (Protected).
@@ -534,6 +737,11 @@ async fn update_agent_json(
                 run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
+                harness_kind: payload.harness_kind,
+                granted_tool_ids: payload.granted_tool_ids.clone(),
+                skill_ids: payload.skill_ids.clone(),
+                sub_agent_ids: payload.sub_agent_ids.clone(),
+                native_tool_policy: payload.native_tool_policy.clone(),
                 config_json: payload.config_json.clone(),
                 memory_enabled: payload.memory_enabled,
                 memory_persistence_mode: payload.memory_persistence_mode,
@@ -541,7 +749,6 @@ async fn update_agent_json(
                 memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
-                ..AgentWrite::default()
             },
         )
         .await?;
@@ -553,6 +760,8 @@ async fn update_agent_json(
             agent,
             channel: None,
             warnings: Vec::new(),
+            skill_ids: payload.skill_ids,
+            sub_agent_ids: payload.sub_agent_ids,
         }),
     ))
 }
@@ -730,6 +939,76 @@ mod tests {
             Some(StatusCode::UNPROCESSABLE_ENTITY),
             "a non-numeric timeout is still a bad form, not a silent None"
         );
+    }
+
+    #[tokio::test]
+    async fn clearing_every_capability_checkbox_submits_empty_lists() {
+        use axum::extract::{FromRequest, Request};
+
+        let request = Request::post("/ui/agents")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(axum::body::Body::from(
+                "name=Support&harness_kind=ai_agents&granted_tool_ids=&skill_ids=&sub_agent_ids=",
+            ))
+            .unwrap();
+        let Form(form) = Form::<AgentForm>::from_request(request, &())
+            .await
+            .expect("an empty selection parses");
+        let parsed = form.capabilities().expect("empty selections are valid");
+        assert!(parsed.granted_tool_ids.is_empty());
+        assert!(parsed.skill_ids.is_empty());
+        assert!(parsed.sub_agent_ids.is_empty());
+    }
+
+    #[test]
+    fn json_payload_round_trips_every_capability_field() {
+        let skill_id = Uuid::new_v4();
+        let sub_agent_id = Uuid::new_v4();
+        let payload: AgentJsonPayload = serde_json::from_value(serde_json::json!({
+            "name": "Support",
+            "slug": "support",
+            "provider": null,
+            "model": null,
+            "run_timeout_secs": 90,
+            "system_prompt": "Help",
+            "description": "Answers support mail",
+            "config_json": {"version": 1, "disambiguation": {"enabled": true}},
+            "avatar_url": null,
+            "harness_kind": "ai_agents",
+            "granted_tool_ids": ["calculator"],
+            "skill_ids": [skill_id],
+            "sub_agent_ids": [sub_agent_id],
+            "native_tool_policy": {"version": 1},
+            "memory_enabled": false
+        }))
+        .unwrap();
+        let encoded = serde_json::to_value(&payload).unwrap();
+        assert_eq!(encoded["harness_kind"], "ai_agents");
+        assert_eq!(encoded["granted_tool_ids"][0], "calculator");
+        assert_eq!(encoded["skill_ids"][0], skill_id.to_string());
+        assert_eq!(encoded["sub_agent_ids"][0], sub_agent_id.to_string());
+        assert_eq!(encoded["native_tool_policy"]["version"], 1);
+    }
+
+    #[test]
+    fn unknown_or_security_owned_advanced_config_paths_are_rejected_with_the_path_named() {
+        let unknown = parse_config_form(
+            Some(
+                r#"{"version":1,"reasoning":{"mode":"react","max_iterations":4,"surprise":true}}"#
+                    .into(),
+            ),
+            HarnessKind::AiAgents,
+        )
+        .expect_err("an unknown nested field must fail closed");
+        assert!(unknown.contains("reasoning"), "{unknown}");
+        assert!(unknown.contains("surprise"), "{unknown}");
+
+        let security_owned = parse_config_form(
+            Some(r#"{"version":1,"tool_security":{"allow":["command"]}}"#.into()),
+            HarnessKind::AiAgents,
+        )
+        .expect_err("security-owned settings cannot enter harness config");
+        assert!(security_owned.contains("tool_security"), "{security_owned}");
     }
 
     #[test]

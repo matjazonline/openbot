@@ -273,6 +273,17 @@ impl SkillManagementPersistence for PostgresPersistence {
         Ok(SkillPage::from_probe(skills, page.limit))
     }
 
+    async fn count_company(&self, company_id: Uuid) -> AppResult<u64> {
+        let count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM skills WHERE company_id = $1")
+                .bind(company_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(AppError::from)?;
+        u64::try_from(count)
+            .map_err(|_| AppError::Internal("A company skill count was negative.".into()))
+    }
+
     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage> {
         let before_at = page.before.map(|cursor| cursor.updated_at);
         let before_id = page.before.map(|cursor| cursor.id);

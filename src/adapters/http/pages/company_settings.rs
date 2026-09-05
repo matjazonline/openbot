@@ -60,6 +60,7 @@ pub enum CompanyTab {
     #[default]
     Settings,
     Team,
+    Skills,
 }
 
 impl CompanyTab {
@@ -67,6 +68,7 @@ impl CompanyTab {
     pub fn from_query(value: Option<&str>) -> Self {
         match value.map(str::trim) {
             Some("team") => CompanyTab::Team,
+            Some("skills") => CompanyTab::Skills,
             _ => CompanyTab::Settings,
         }
     }
@@ -81,6 +83,7 @@ impl CompanyTab {
 pub enum CompanyPaneBody<'a> {
     Settings,
     Team(&'a str),
+    Skills(&'a str),
 }
 
 impl CompanyPaneBody<'_> {
@@ -88,6 +91,7 @@ impl CompanyPaneBody<'_> {
         match self {
             CompanyPaneBody::Settings => CompanyTab::Settings,
             CompanyPaneBody::Team(_) => CompanyTab::Team,
+            CompanyPaneBody::Skills(_) => CompanyTab::Skills,
         }
     }
 }
@@ -202,6 +206,7 @@ pub struct CompanyCreatePane<'a> {
 pub struct CompanyCounts {
     pub channels: usize,
     pub agents: usize,
+    pub skills: usize,
 }
 
 pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
@@ -327,11 +332,12 @@ pub fn company_edit_pane_with_memory(
         body = match pane.body {
             CompanyPaneBody::Settings => company_settings_body(pane, memory, configured),
             CompanyPaneBody::Team(html) => html.to_string(),
+            CompanyPaneBody::Skills(html) => html.to_string(),
         },
     )
 }
 
-/// The pane's two halves, as ordinary links rather than htmx swaps.
+/// The pane's tabs, as ordinary links rather than htmx swaps.
 ///
 /// A tab is a whole pane, and a plain URL is what makes one shareable and what the back button
 /// already understands — the same reason the sidebar's own entries are links.
@@ -341,6 +347,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
                 <div role="tablist" class="tabs tabs-border -mb-px mt-3">
                     <a role="tab" class="tab {settings_active}" href="/ui/companies?company_id={company_id}">Settings</a>
                     <a role="tab" class="tab {team_active}" href="{team_url}">Team</a>
+                    <a role="tab" class="tab {skills_active}" href="/ui/companies?company_id={company_id}&amp;tab=skills">Skills</a>
                 </div>
         "##,
         settings_active = if tab == CompanyTab::Settings {
@@ -349,6 +356,11 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
             ""
         },
         team_active = if tab == CompanyTab::Team {
+            "tab-active"
+        } else {
+            ""
+        },
+        skills_active = if tab == CompanyTab::Skills {
             "tab-active"
         } else {
             ""
@@ -470,7 +482,7 @@ pub fn company_create_pane_with_memory(
 fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
     format!(
         r##"
-                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <a href="/ui/channels?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{channels}</span>
                         <span class="text-[11px] font-normal opacity-60">Channels</span>
@@ -478,6 +490,10 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                     <a href="/ui/agents?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{agents}</span>
                         <span class="text-[11px] font-normal opacity-60">Agents</span>
+                    </a>
+                    <a href="/ui/companies?company_id={company_id}&amp;tab=skills" class="btn btn-ghost h-auto flex-col gap-0 py-2">
+                        <span class="text-lg font-bold">{skills}</span>
+                        <span class="text-[11px] font-normal opacity-60">Skills</span>
                     </a>
                     <a href="/ui/tasks?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{tasks_glyph}</span>
@@ -491,6 +507,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
         "##,
         channels = counts.channels,
         agents = counts.agents,
+        skills = counts.skills,
         tasks_glyph = icon(Icon::Gear, "h-5 w-5"),
         mailbox_glyph = icon(Icon::Mail, "h-5 w-5"),
     )

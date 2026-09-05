@@ -38,14 +38,21 @@ use crate::{
     },
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
-        schedule::ScheduleUseCases, user::UserUseCases,
+        agent::AgentUseCases,
+        channel::ChannelUseCases,
+        company::CompanyUseCases,
+        schedule::ScheduleUseCases,
+        skill::{MAX_SKILL_PAGE_SIZE, SkillPageRequest, SkillUseCases},
+        user::UserUseCases,
     },
 };
 
 use super::{
-    agent::{AgentForm, AgentInstructionRequest, ModelOverrides, create_agent_from_instructions},
-    channel::{ChannelForm, checkbox_ticked, parse_agent_ids_form, parse_config_form},
+    agent::{
+        AgentForm, AgentInstructionRequest, ModelOverrides, create_agent_from_instructions,
+        parse_config_form,
+    },
+    channel::{ChannelForm, checkbox_ticked, parse_agent_ids_form},
     task::deserialize_empty_string_as_none,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
     ui_channels::SubmittedChannel,
@@ -152,6 +159,40 @@ pub struct CarriedAgent {
     pub description: Option<String>,
     #[serde(rename = "agent_config_json")]
     pub config_json: Option<String>,
+    #[serde(rename = "agent_harness_kind")]
+    pub harness_kind: Option<String>,
+    #[serde(rename = "agent_granted_tool_ids")]
+    pub granted_tool_ids: Option<String>,
+    #[serde(rename = "agent_skill_ids")]
+    pub skill_ids: Option<String>,
+    #[serde(rename = "agent_sub_agent_ids")]
+    pub sub_agent_ids: Option<String>,
+    #[serde(rename = "agent_outreach_target_scope")]
+    pub outreach_target_scope: Option<String>,
+    #[serde(
+        rename = "agent_outreach_max_targets",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub outreach_max_targets: Option<u16>,
+    #[serde(
+        rename = "agent_outreach_default_timeout_hours",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub outreach_default_timeout_hours: Option<u16>,
+    #[serde(
+        rename = "agent_outreach_max_timeout_hours",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub outreach_max_timeout_hours: Option<u16>,
+    #[serde(
+        rename = "agent_directory_max_results",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub directory_max_results: Option<u16>,
     #[serde(rename = "agent_avatar_url")]
     pub avatar_url: Option<String>,
     /// A ticked box as its raw value: a flattened field is handed to its type as the string the
@@ -182,6 +223,15 @@ impl From<CarriedAgent> for AgentForm {
             system_prompt: carried.system_prompt,
             description: carried.description,
             config_json: carried.config_json,
+            harness_kind: carried.harness_kind,
+            granted_tool_ids: carried.granted_tool_ids,
+            skill_ids: carried.skill_ids,
+            sub_agent_ids: carried.sub_agent_ids,
+            outreach_target_scope: carried.outreach_target_scope,
+            outreach_max_targets: carried.outreach_max_targets,
+            outreach_default_timeout_hours: carried.outreach_default_timeout_hours,
+            outreach_max_timeout_hours: carried.outreach_max_timeout_hours,
+            directory_max_results: carried.directory_max_results,
             avatar_url: carried.avatar_url,
             memory_enabled: checkbox_ticked(carried.memory_enabled.as_deref()),
             memory_persistence_mode: carried.memory_persistence_mode,
@@ -231,6 +281,7 @@ struct Workspace {
     agent_use_cases: Arc<AgentUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     schedule_use_cases: Arc<ScheduleUseCases>,
+    skill_use_cases: Arc<SkillUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -250,6 +301,7 @@ impl FromRequestParts<AppState> for Workspace {
             agent_use_cases: state.agent_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
             schedule_use_cases: state.schedule_use_cases.clone(),
+            skill_use_cases: state.skill_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -271,6 +323,7 @@ impl Workspace {
             agent_use_cases: &self.agent_use_cases,
             channel_use_cases: &self.channel_use_cases,
             schedule_use_cases: &self.schedule_use_cases,
+            skill_use_cases: &self.skill_use_cases,
             config: &self.config,
             user_id: self.user_id,
             company,
@@ -738,11 +791,8 @@ async fn update_agent(
     let channels = view.channels().await?;
     let submitted = SubmittedAgent::new(form);
 
-    let fields = parse_config_form(submitted.form.config_json.clone())
-        .and_then(|config_json| Ok((config_json, submitted.avatar_url.clone()?)));
-
-    let (config_json, avatar_url) = match fields {
-        Ok(fields) => fields,
+    let write = match submitted.agent_write() {
+        Ok(write) => write,
         Err(message) => {
             return Ok(Html(
                 view.edit_pane(&stored, &channels, Some(&submitted.draft()), Some(&message))
@@ -754,31 +804,7 @@ async fn update_agent(
 
     let saved = workspace
         .agent_use_cases
-        .update_agent(
-            workspace.user_id,
-            company.id,
-            agent_id,
-            AgentWrite {
-                name: submitted.form.name.clone(),
-                slug: submitted.slug.clone(),
-                provider: submitted.form.provider.clone(),
-                model: submitted.form.model.clone(),
-                run_timeout_secs: submitted.form.run_timeout_secs,
-                system_prompt: submitted.form.system_prompt.clone(),
-                description: submitted.form.description.clone(),
-                config_json,
-                memory_enabled: submitted.form.memory_enabled,
-                memory_persistence_mode: submitted.form.memory_persistence_mode.unwrap_or_default(),
-                memory_recall_mode: submitted.form.memory_recall_mode.unwrap_or_default(),
-                memory_max_results: submitted
-                    .form
-                    .memory_max_results
-                    .unwrap_or_else(crate::entities::memory::default_memory_max_results),
-                avatar_url,
-                created_by: None,
-                ..AgentWrite::default()
-            },
-        )
+        .update_agent(workspace.user_id, company.id, agent_id, write)
         .await;
 
     match saved {
@@ -897,6 +923,7 @@ struct AgentSettingsView<'a> {
     agent_use_cases: &'a AgentUseCases,
     channel_use_cases: &'a ChannelUseCases,
     schedule_use_cases: &'a ScheduleUseCases,
+    skill_use_cases: &'a SkillUseCases,
     config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
@@ -916,6 +943,21 @@ impl AgentSettingsView<'_> {
         self.agent_use_cases
             .list_company_agents(self.user_id, self.company.id)
             .await
+    }
+
+    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::Skill>> {
+        Ok(self
+            .skill_use_cases
+            .list_company_page(
+                self.user_id,
+                self.company.id,
+                SkillPageRequest {
+                    before: None,
+                    limit: MAX_SKILL_PAGE_SIZE,
+                },
+            )
+            .await?
+            .items)
     }
 
     async fn agent(&self, agent_id: Uuid) -> AppResult<Agent> {
@@ -986,6 +1028,18 @@ impl AgentSettingsView<'_> {
     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
         let model_connections = self.model_connections().await?;
         let library_agents = self.agent_use_cases.list_library_agents().await?;
+        let mut skills = self.skills().await?;
+        for skill_id in &form.draft.skill_ids {
+            if !skills.iter().any(|skill| skill.id == *skill_id)
+                && let Some(skill) = self
+                    .skill_use_cases
+                    .get_company(self.user_id, self.company.id, *skill_id)
+                    .await?
+            {
+                skills.push(skill);
+            }
+        }
+        let sub_agents = self.agents().await?;
         // Nothing to start from means no Easy tab, so a request that asked for it lands on Simple.
         let tab = match form.tab {
             Some(pages::AgentCreateTab::Easy) | None if library_agents.is_empty() => {
@@ -1004,6 +1058,10 @@ impl AgentSettingsView<'_> {
             tab,
             draft: form.draft,
             error: form.error,
+            capability_options: pages::AgentCapabilityOptions {
+                skills: &skills,
+                sub_agents: &sub_agents,
+            },
         }))
     }
 
@@ -1094,6 +1152,45 @@ impl AgentSettingsView<'_> {
     ) -> AppResult<String> {
         let used_by = self.used_by(agent.id, channels);
         let model_connections = self.model_connections().await?;
+        let capabilities = self
+            .skill_use_cases
+            .company_agent_capabilities(self.user_id, self.company.id, agent.id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+        let mut skills = self.skills().await?;
+        for selected in &capabilities.skills {
+            if !skills.iter().any(|skill| skill.id == selected.id) {
+                skills.push(selected.clone());
+            }
+        }
+        let sub_agents = self.agents().await?;
+        let config_json = pages::stored_agent_config(agent);
+        let stored = pages::AgentDraft {
+            name: &agent.name,
+            slug: &agent.slug,
+            system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+            description: agent.description.as_deref().unwrap_or(""),
+            provider: agent.provider.as_deref().unwrap_or(""),
+            model: agent.model.as_deref().unwrap_or(""),
+            run_timeout_secs: agent.run_timeout_secs,
+            memory_enabled: agent.memory_enabled,
+            memory_persistence_mode: agent.memory_persistence_mode.as_str(),
+            memory_recall_mode: agent.memory_recall_mode.as_str(),
+            memory_max_results: agent.memory_max_results,
+            config_json: &config_json,
+            harness_kind: agent.harness_kind,
+            granted_tool_ids: agent.granted_tool_ids.clone(),
+            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
+            native_tool_policy: agent.native_tool_policy.clone(),
+            avatar_url: agent
+                .avatar_url
+                .as_ref()
+                .map(AvatarUrl::as_str)
+                .unwrap_or(""),
+            advanced: true,
+        };
+        let shown = draft.cloned().unwrap_or(stored);
 
         Ok(pages::agent_edit_pane(&pages::AgentEditPane {
             company: self.company,
@@ -1101,8 +1198,12 @@ impl AgentSettingsView<'_> {
             model_connections: &model_connections,
             agent,
             used_by: &used_by,
-            draft,
+            draft: Some(&shown),
             error,
+            capability_options: pages::AgentCapabilityOptions {
+                skills: &skills,
+                sub_agents: &sub_agents,
+            },
             body: pages::AgentPaneBody::Settings,
         }))
     }
@@ -1142,6 +1243,7 @@ impl AgentSettingsView<'_> {
             used_by: &used_by,
             draft: None,
             error: None,
+            capability_options: pages::AgentCapabilityOptions::default(),
             body: pages::AgentPaneBody::Channel(&tab),
         }))
     }
@@ -1235,6 +1337,7 @@ impl SubmittedAgent {
     /// the channel step's check, and the create that ends it — so none of them can drift on what
     /// the form means.
     fn agent_write(&self) -> Result<AgentWrite, String> {
+        let capabilities = self.form.capabilities()?;
         Ok(AgentWrite {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
@@ -1243,7 +1346,15 @@ impl SubmittedAgent {
             run_timeout_secs: self.form.run_timeout_secs,
             system_prompt: self.form.system_prompt.clone(),
             description: self.form.description.clone(),
-            config_json: parse_config_form(self.form.config_json.clone())?,
+            harness_kind: capabilities.harness_kind,
+            granted_tool_ids: capabilities.granted_tool_ids,
+            skill_ids: capabilities.skill_ids,
+            sub_agent_ids: capabilities.sub_agent_ids,
+            native_tool_policy: capabilities.native_tool_policy,
+            config_json: parse_config_form(
+                self.form.config_json.clone(),
+                capabilities.harness_kind,
+            )?,
             memory_enabled: self.form.memory_enabled,
             memory_persistence_mode: self.form.memory_persistence_mode.unwrap_or_default(),
             memory_recall_mode: self.form.memory_recall_mode.unwrap_or_default(),
@@ -1253,7 +1364,6 @@ impl SubmittedAgent {
                 .unwrap_or_else(crate::entities::memory::default_memory_max_results),
             avatar_url: self.avatar_url.clone()?,
             created_by: None,
-            ..AgentWrite::default()
         })
     }
 
@@ -1265,6 +1375,16 @@ impl SubmittedAgent {
     }
 
     fn draft(&self) -> pages::AgentDraft<'_> {
+        let capabilities =
+            self.form
+                .capabilities()
+                .unwrap_or_else(|_| super::agent::SubmittedCapabilities {
+                    harness_kind: crate::entities::harness::HarnessKind::default(),
+                    granted_tool_ids: Vec::new(),
+                    skill_ids: Vec::new(),
+                    sub_agent_ids: Vec::new(),
+                    native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
+                });
         pages::AgentDraft {
             name: &self.form.name,
             slug: &self.slug,
@@ -1291,6 +1411,11 @@ impl SubmittedAgent {
                 .memory_max_results
                 .unwrap_or_else(crate::entities::memory::default_memory_max_results),
             config_json: self.form.config_json.as_deref().unwrap_or(""),
+            harness_kind: capabilities.harness_kind,
+            granted_tool_ids: capabilities.granted_tool_ids,
+            skill_ids: capabilities.skill_ids,
+            sub_agent_ids: capabilities.sub_agent_ids,
+            native_tool_policy: capabilities.native_tool_policy,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),
         }

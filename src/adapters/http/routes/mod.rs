@@ -11,6 +11,7 @@ mod live_updates;
 pub mod monitoring;
 pub mod onboarding;
 pub mod schedule;
+pub mod skill_library;
 pub mod task;
 pub mod ui;
 pub mod ui_agents;
@@ -70,6 +71,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(task::router())
         .merge(channel::router())
         .merge(schedule::router())
+        .merge(skill_library::router())
         .merge(agent::router())
         .merge(agent_library::router())
         .merge(approval::router())

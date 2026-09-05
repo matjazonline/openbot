@@ -315,17 +315,6 @@ pub(super) fn parse_list_form(input: Option<String>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-pub(super) fn parse_config_form(
-    input: Option<String>,
-) -> Result<Option<serde_json::Value>, String> {
-    match input {
-        Some(ref s) if !s.trim().is_empty() => serde_json::from_str(s.trim())
-            .map(Some)
-            .map_err(|e| format!("Invalid JSON config: {e}")),
-        _ => Ok(None),
-    }
-}
-
 /// Which form the page should arrive with open — set by the mailbox's channel buttons.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ChannelsPageQuery {

@@ -16,7 +16,7 @@ use crate::{
         skill::{MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction},
         value_objects::SkillSlug,
     },
-    use_cases::company::{CompanyPersistence, managed_company},
+    use_cases::company::{CompanyPersistence, managed_company, owned_company},
 };
 
 pub const MAX_SKILL_PAGE_SIZE: u16 = 100;
@@ -137,6 +137,7 @@ pub trait SkillManagementPersistence: Send + Sync {
         company_id: Uuid,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage>;
+    async fn count_company(&self, company_id: Uuid) -> AppResult<u64>;
     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage>;
     async fn update_company(
         &self,
@@ -168,22 +169,65 @@ pub trait AgentCapabilityReader: Send + Sync {
 pub struct SkillUseCases {
     persistence: Arc<dyn SkillManagementPersistence>,
     companies: Arc<dyn CompanyPersistence>,
+    capabilities: Arc<dyn AgentCapabilityReader>,
 }
 
 impl SkillUseCases {
     pub fn new(
         persistence: Arc<dyn SkillManagementPersistence>,
         companies: Arc<dyn CompanyPersistence>,
+        capabilities: Arc<dyn AgentCapabilityReader>,
     ) -> Self {
         Self {
             persistence,
             companies,
+            capabilities,
         }
     }
 
-    async fn authorize(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+    async fn authorize_read(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
         managed_company(self.companies.as_ref(), user_id, company_id).await?;
         Ok(())
+    }
+
+    async fn authorize_write(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        owned_company(self.companies.as_ref(), user_id, company_id).await?;
+        Ok(())
+    }
+
+    pub async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        self.authorize_write(user_id, company_id).await
+    }
+
+    /// The ordered capability relationships stored for one company agent, for an owner-facing
+    /// editor. The capability reader scopes the agent in the same query; the second check keeps a
+    /// global library agent from being mistaken for a company-owned one.
+    pub async fn company_agent_capabilities(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Option<StoredAgentCapabilities>> {
+        self.authorize_read(user_id, company_id).await?;
+        Ok(self
+            .capabilities
+            .load_for_execution(company_id, agent_id)
+            .await?
+            .filter(|stored| stored.agent.company_id == Some(company_id)))
+    }
+
+    /// The ordered skills attached to an operator-managed library agent. Passing a nil execution
+    /// company is deliberate: global agents are selectable for every company and the persistence
+    /// predicate admits only the global row when no company has that id.
+    pub async fn library_agent_capabilities(
+        &self,
+        agent_id: Uuid,
+    ) -> AppResult<Option<StoredAgentCapabilities>> {
+        Ok(self
+            .capabilities
+            .load_for_execution(Uuid::nil(), agent_id)
+            .await?
+            .filter(|stored| stored.agent.is_library()))
     }
 
     #[instrument(skip(self, write), fields(%user_id, %company_id))]
@@ -193,7 +237,7 @@ impl SkillUseCases {
         company_id: Uuid,
         mut write: SkillWrite,
     ) -> AppResult<Skill> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_write(user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
         self.persistence.create_company(company_id, write).await
@@ -206,7 +250,7 @@ impl SkillUseCases {
         company_id: Uuid,
         skill_id: Uuid,
     ) -> AppResult<Option<Skill>> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_read(user_id, company_id).await?;
         self.persistence.get_company(company_id, skill_id).await
     }
 
@@ -217,10 +261,15 @@ impl SkillUseCases {
         company_id: Uuid,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_read(user_id, company_id).await?;
         self.persistence
             .list_company_page(company_id, page.validate()?)
             .await
+    }
+
+    pub async fn count_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<u64> {
+        self.authorize_read(user_id, company_id).await?;
+        self.persistence.count_company(company_id).await
     }
 
     #[instrument(skip(self, write), fields(%user_id, %company_id, %skill_id))]
@@ -231,7 +280,7 @@ impl SkillUseCases {
         skill_id: Uuid,
         mut write: SkillWrite,
     ) -> AppResult<Skill> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_write(user_id, company_id).await?;
         write.created_by = None;
         write.normalize()?;
         self.persistence
@@ -246,7 +295,7 @@ impl SkillUseCases {
         company_id: Uuid,
         skill_id: Uuid,
     ) -> AppResult<()> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_write(user_id, company_id).await?;
         self.persistence.delete_company(company_id, skill_id).await
     }
 
@@ -258,7 +307,7 @@ impl SkillUseCases {
         company_id: Uuid,
         skill_id: Uuid,
     ) -> AppResult<Skill> {
-        self.authorize(user_id, company_id).await?;
+        self.authorize_write(user_id, company_id).await?;
         self.persistence
             .copy_library_to_company(company_id, skill_id, CreationProvenance::user(user_id))
             .await

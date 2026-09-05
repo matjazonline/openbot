@@ -45,6 +45,7 @@ use crate::{
         company_invite::CompanyInviteUseCases,
         company_resend_api::{CompanyResendApiUseCases, SubmittedResendApiIntegration},
         memory::MemoryUseCases,
+        skill::{MAX_SKILL_PAGE_SIZE, SkillPage, SkillPageRequest, SkillUseCases},
         user::UserUseCases,
     },
 };
@@ -148,6 +149,7 @@ struct Workspace {
     resend_api_use_cases: Arc<CompanyResendApiUseCases>,
     user_use_cases: Arc<UserUseCases>,
     memory_use_cases: Arc<MemoryUseCases>,
+    skill_use_cases: Arc<SkillUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -169,6 +171,7 @@ impl FromRequestParts<AppState> for Workspace {
             resend_api_use_cases: state.company_resend_api_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             memory_use_cases: state.memory_use_cases.clone(),
+            skill_use_cases: state.skill_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -209,10 +212,15 @@ impl Workspace {
             .agent_use_cases
             .list_company_agents(self.user_id, company_id)
             .await?;
+        let skills = self
+            .skill_use_cases
+            .count_company(self.user_id, company_id)
+            .await?;
 
         Ok(CompanyCounts {
             channels: channels.len(),
             agents: agents.len(),
+            skills: usize::try_from(skills).unwrap_or(usize::MAX),
         })
     }
 
@@ -308,6 +316,46 @@ impl Workspace {
             // The Team tab renders no settings at all, and the Resend panel is settings.
             resend_api_section: "",
             body: pages::CompanyPaneBody::Team(&team),
+        }))
+    }
+
+    async fn skills_pane(&self, company: &Company, editable: bool) -> AppResult<String> {
+        let counts = self.counts(company.id, editable).await?;
+        let empty = SkillPage::default();
+        let page = if editable {
+            self.skill_use_cases
+                .list_company_page(
+                    self.user_id,
+                    company.id,
+                    SkillPageRequest {
+                        before: None,
+                        limit: MAX_SKILL_PAGE_SIZE,
+                    },
+                )
+                .await?
+        } else {
+            empty
+        };
+        let skills = pages::company_skills_section(&pages::SkillSection {
+            company_id: Some(company.id),
+            skills: &page.items,
+            next_url: None,
+            previous_url: None,
+            draft: None,
+            error: None,
+            notice: None,
+            editable,
+        });
+        Ok(pages::company_edit_pane(&pages::CompanyEditPane {
+            company,
+            model_connections: &[],
+            app_domain_name: &self.config.app_domain_name,
+            counts,
+            draft: None,
+            error: None,
+            editable,
+            resend_api_section: "",
+            body: pages::CompanyPaneBody::Skills(&skills),
         }))
     }
 
@@ -419,6 +467,12 @@ async fn companies_page(
                     },
                 )
                 .await?
+        }
+        Some(company) if tab == CompanyTab::Skills => {
+            let editable = access
+                .as_ref()
+                .is_some_and(|access| access.membership.is_owner());
+            workspace.skills_pane(company, editable).await?
         }
         Some(company) => {
             let editable = access
