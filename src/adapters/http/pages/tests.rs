@@ -2431,6 +2431,8 @@ fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
         attachments: Vec::new(),
         direction: MessageDirection::Inbound,
         role: MessageRole::Human,
+        audience: crate::entities::message::MessageAudience::ExternalConversation,
+        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         created_at: Utc::now(),
     }
 }
@@ -3301,6 +3303,8 @@ fn the_diagnostic_pane_qualifies_every_provider_key_by_its_interface() {
         },
         direction: MessageDirection::Outbound,
         role: MessageRole::Agent,
+        audience: crate::entities::message::MessageAudience::ExternalConversation,
+        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         correlation_id: CorrelationId::new(),
         external_keys: vec![ExternalMessageRef {
             binding_id: ChannelBindingId::random(),
@@ -3334,6 +3338,8 @@ fn the_diagnostic_pane_says_when_no_transport_carried_a_message() {
         },
         direction: MessageDirection::Inbound,
         role: MessageRole::System,
+        audience: crate::entities::message::MessageAudience::InternalOnly,
+        entry_kind: crate::entities::message::ThreadEntryKind::SystemEvent,
         correlation_id: CorrelationId::new(),
         external_keys: Vec::new(),
         created_at: Utc::now(),
@@ -3357,6 +3363,7 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
             storage_key: Some(crate::entities::value_objects::ObjectKey::new(
                 "attachments/abc123.pdf",
             )),
+            source: None,
         },
         // Mail that arrived before there was anywhere to keep it.
         AttachmentMetadata {
@@ -3365,6 +3372,7 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
             sha256_hash: "def456".to_string(),
             size_bytes: 10,
             storage_key: None,
+            source: None,
         },
     ];
 

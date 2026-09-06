@@ -22,7 +22,7 @@ use crate::{
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
         email_message::EmailMessageMetadata,
-        message::{CanonicalMessageId, Message, MessageRole},
+        message::{CanonicalMessageId, Message, MessageRole, ThreadEntryKind},
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
         },
@@ -315,6 +315,7 @@ pub trait ThreadPersistence: Send + Sync {
         &self,
         thread_id: Uuid,
         message: CanonicalMessageId,
+        entry_kind: ThreadEntryKind,
     ) -> AppResult<Message>;
 
     /// The newest turns of a thread, oldest first, as a page renders them.
@@ -1196,9 +1197,10 @@ impl ThreadUseCases {
         &self,
         thread_id: Uuid,
         message: CanonicalMessageId,
+        entry_kind: ThreadEntryKind,
     ) -> AppResult<Message> {
         self.thread_persistence
-            .associate_message(thread_id, message)
+            .associate_message(thread_id, message, entry_kind)
             .await
     }
 

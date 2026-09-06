@@ -21,7 +21,7 @@ use crate::{
     app_error::AppResult,
     entities::{
         correlation::CorrelationId,
-        message::CanonicalMessageId,
+        message::{CanonicalMessageId, MessageAudience},
         transport::{
             ChannelBindingId, DeliveryId, DeliveryPartId, DeliveryPartStatus, DeliveryPurpose,
             DeliveryStatus, ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
@@ -111,6 +111,9 @@ pub struct NewDelivery {
     /// is written as a system-authored message in the thread it concerns, so the queue holds
     /// identifiers rather than the only copy of what was sent.
     pub message_id: CanonicalMessageId,
+    /// Carried into the composite message foreign key. Canonical deliveries are external by
+    /// construction; private and unclassified messages cannot satisfy the database relationship.
+    pub message_audience: MessageAudience,
     pub source_binding_id: ChannelBindingId,
     pub destination_binding_id: ChannelBindingId,
     /// The recipient named within the destination interface's namespace, or `None` when the

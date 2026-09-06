@@ -255,6 +255,7 @@ impl EmailParser {
                 sha256_hash: hash_hex.clone(),
                 size_bytes: size,
                 storage_key: att.stored_key.clone(),
+                source: None,
             };
 
             attachments.push(meta.clone());

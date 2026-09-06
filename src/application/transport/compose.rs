@@ -17,7 +17,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         correlation::CorrelationId,
-        message::CanonicalMessageId,
+        message::{CanonicalMessageId, MessageAudience},
         transport::{
             ChannelBinding, DeliveryId, DeliveryPurpose, ExternalDestination, ExternalMessageKey,
             TransportKind,
@@ -168,6 +168,7 @@ impl DeliveryComposer {
                 company_id: request.company_id,
                 channel_id: request.channel_id,
                 message_id: request.message_id,
+                message_audience: MessageAudience::ExternalConversation,
                 source_binding_id: binding.id,
                 destination_binding_id: binding.id,
                 external_destination: match &destination {

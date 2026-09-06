@@ -133,6 +133,7 @@ struct Canonical {
     attachments: Option<Vec<AttachmentMetadata>>,
     direction: MessageDirection,
     role: MessageRole,
+    audience: crate::entities::message::MessageAudience,
     correlation_id: CorrelationId,
     participants: Vec<MessageParticipant>,
     email: Option<EmailMessageMetadata>,
@@ -161,6 +162,7 @@ struct Association {
     id: Uuid,
     thread_id: Uuid,
     message_id: CanonicalMessageId,
+    entry_kind: crate::entities::message::ThreadEntryKind,
     created_at: DateTime<Utc>,
 }
 
@@ -271,6 +273,8 @@ impl InMemoryThreads {
             attachments: canonical.attachments.clone(),
             direction: canonical.direction,
             role: canonical.role,
+            audience: canonical.audience,
+            entry_kind: association.entry_kind,
             correlation_id: canonical.correlation_id,
             participants: canonical.participants.clone(),
             created_at: association.created_at,
@@ -600,6 +604,7 @@ impl ThreadPersistence for InMemoryThreads {
             attachments: (!write.attachments.is_empty()).then(|| write.attachments.clone()),
             direction: write.direction,
             role: write.role,
+            audience: write.audience,
             correlation_id: write.correlation_id,
             participants,
             email: write.email_metadata().cloned(),
@@ -651,7 +656,13 @@ impl ThreadPersistence for InMemoryThreads {
             }
         };
 
-        let association = associate(&mut store, write.thread_id, canonical_id, write.created_at);
+        let association = associate(
+            &mut store,
+            write.thread_id,
+            canonical_id,
+            write.entry_kind,
+            write.created_at,
+        );
         let message = self
             .read(&store, &association)
             .expect("the association was just written");
@@ -703,6 +714,7 @@ impl ThreadPersistence for InMemoryThreads {
         &self,
         thread_id: Uuid,
         message: CanonicalMessageId,
+        entry_kind: crate::entities::message::ThreadEntryKind,
     ) -> AppResult<Message> {
         let mut store = self.store.lock().unwrap();
         Self::thread_channel(&store, thread_id)?;
@@ -715,7 +727,7 @@ impl ThreadPersistence for InMemoryThreads {
                 "Message {message} was not found"
             )));
         }
-        let association = associate(&mut store, thread_id, message, Utc::now());
+        let association = associate(&mut store, thread_id, message, entry_kind, Utc::now());
         let read = self
             .read(&store, &association)
             .expect("the association was just written");
@@ -799,6 +811,8 @@ impl ThreadPersistence for InMemoryThreads {
             .iter()
             .map(|message| AgentHistoryMessage {
                 role: message.role,
+                audience: message.audience,
+                entry_kind: message.entry_kind,
                 author_display: message.author.display().to_string(),
                 subject: message.subject.clone(),
                 body: message.clean_text_body.clone(),
@@ -894,6 +908,8 @@ fn thread_message_view(message: &Message) -> ThreadMessageView {
         attachments: message.attachments.clone().unwrap_or_default(),
         direction: message.direction,
         role: message.role,
+        audience: message.audience,
+        entry_kind: message.entry_kind,
         created_at: message.created_at,
     }
 }
@@ -903,6 +919,7 @@ fn associate(
     store: &mut Store,
     thread_id: Uuid,
     message_id: CanonicalMessageId,
+    entry_kind: crate::entities::message::ThreadEntryKind,
     created_at: DateTime<Utc>,
 ) -> Association {
     if let Some(existing) = store.associations.iter().find(|association| {
@@ -914,6 +931,7 @@ fn associate(
         id: Uuid::new_v4(),
         thread_id,
         message_id,
+        entry_kind,
         created_at,
     };
     store.associations.push(association);
@@ -1019,6 +1037,8 @@ pub fn stored_email(draft: EmailMessageDraft) -> Message {
         attachments: draft.attachments,
         direction: draft.direction,
         role: draft.role,
+        audience: crate::entities::message::MessageAudience::ExternalConversation,
+        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         correlation_id: CorrelationId::new(),
         participants: InMemoryThreads::resolve_participants(&participants),
         created_at: draft.created_at,
@@ -1066,6 +1086,8 @@ pub fn stored_email_history(draft: EmailMessageDraft) -> AgentHistoryMessage {
     let message = stored_email(draft);
     AgentHistoryMessage {
         role: message.role,
+        audience: message.audience,
+        entry_kind: message.entry_kind,
         author_display: message.author.display().to_string(),
         subject: message.subject.clone(),
         body: message.clean_text_body,
@@ -1107,6 +1129,8 @@ pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
         attachments: draft.attachments.unwrap_or_default(),
         direction: draft.direction,
         role: draft.role,
+        audience: crate::entities::message::MessageAudience::ExternalConversation,
+        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         correlation_id: CorrelationId::new(),
         participants,
         correlation: MessageCorrelation::Email(
@@ -1431,7 +1455,7 @@ impl InboundMessageCommitter for InMemoryIngress {
         for (association, thread_id) in request.associations.iter().zip(&thread_ids).skip(1) {
             let message = self
                 .threads
-                .associate_message(*thread_id, stored.canonical_id)
+                .associate_message(*thread_id, stored.canonical_id, write.entry_kind)
                 .await?;
             association_by_channel.insert(association.channel_id, message.id);
         }
@@ -1547,6 +1571,16 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
             MessageRole::Agent
         } else {
             MessageRole::Human
+        },
+        audience: if envelope.directives.source_channel_id.is_some() {
+            crate::entities::message::MessageAudience::InternalOnly
+        } else {
+            crate::entities::message::MessageAudience::ExternalConversation
+        },
+        entry_kind: if envelope.directives.source_channel_id.is_some() {
+            crate::entities::message::ThreadEntryKind::Delegation
+        } else {
+            crate::entities::message::ThreadEntryKind::Conversation
         },
         correlation_id: envelope.correlation_id,
         participants,

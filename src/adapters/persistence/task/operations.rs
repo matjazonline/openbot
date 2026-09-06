@@ -46,6 +46,19 @@ use crate::{
     transport::{DeliveryCreation, NewDelivery},
 };
 
+#[derive(sqlx::FromRow)]
+struct ResponseDraftDb {
+    version: i32,
+    status: String,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    task_id: Option<Uuid>,
+    author_principal_id: Uuid,
+    subject: String,
+    body: String,
+    recipient_snapshot: serde_json::Value,
+}
+
 /// Retire the questions an outreach has not sent yet.
 ///
 /// Reached when the outreach stops waiting -- quorum met, or the run that owns it completed. The
@@ -1228,6 +1241,7 @@ impl TaskPersistence for PostgresPersistence {
                 &mut tx,
                 thread_id,
                 stored.canonical_id,
+                commit.reply.message.entry_kind,
             )
             .await?;
         }
@@ -1262,6 +1276,28 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<HumanTaskCompletionResult> {
         let expected_version = i64::try_from(completion.expected_ownership_version)
             .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?;
+        let draft_version = i32::try_from(completion.draft_version)
+            .map_err(|_| AppError::BadRequest("Draft version is out of range.".into()))?;
+        let Some(publish_delivery) = completion.deliveries.first() else {
+            return Err(AppError::BadRequest(
+                "A published draft requires exactly one delivery.".into(),
+            ));
+        };
+        if completion.deliveries.len() != 1
+            || !completion.message.audience.is_externally_deliverable()
+            || completion
+                .deliveries
+                .iter()
+                .any(|delivery| !delivery.message_audience.is_externally_deliverable())
+        {
+            return Err(AppError::BadRequest(
+                "Only an external-conversation message can be published.".into(),
+            ));
+        }
+        let recipient_snapshot =
+            serde_json::to_value(&completion.recipient_snapshot).map_err(|error| {
+                AppError::Internal(format!("Failed to serialize draft recipients: {error}"))
+            })?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let task: Option<(String, Option<Uuid>, Option<String>, i64, Option<Uuid>)> =
             sqlx::query_as(
@@ -1328,11 +1364,105 @@ impl TaskPersistence for PostgresPersistence {
             ));
         }
 
+        let latest = sqlx::query_as::<_, ResponseDraftDb>(
+            r#"SELECT version, status, channel_id, thread_id, task_id, author_principal_id,
+                      subject, body, recipient_snapshot
+                 FROM response_drafts
+                WHERE company_id = $1 AND id = $2
+                ORDER BY version DESC
+                LIMIT 1
+                FOR UPDATE"#,
+        )
+        .bind(completion.company_id)
+        .bind(completion.draft_id.as_uuid())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        match latest {
+            Some(draft)
+                if draft.version == draft_version
+                    && draft.status == "active"
+                    && draft.channel_id == publish_delivery.channel_id
+                    && draft.thread_id == completion.message.thread_id
+                    && draft.task_id == Some(completion.task_id)
+                    && draft.author_principal_id == completion.owner_principal_id.as_uuid()
+                    && draft.subject == completion.message.subject
+                    && draft.body == completion.message.clean_text_body
+                    && draft.recipient_snapshot == recipient_snapshot => {}
+            Some(_) => {
+                return Err(AppError::Conflict(
+                    "This draft version is stale, superseded, changed, or already published."
+                        .into(),
+                ));
+            }
+            None if draft_version == 1 => {
+                sqlx::query(
+                    r#"INSERT INTO response_drafts (
+                           id, version, company_id, channel_id, thread_id, task_id,
+                           author_principal_id, subject, body, recipient_snapshot, status
+                       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')"#,
+                )
+                .bind(completion.draft_id.as_uuid())
+                .bind(draft_version)
+                .bind(completion.company_id)
+                .bind(publish_delivery.channel_id)
+                .bind(completion.message.thread_id)
+                .bind(completion.task_id)
+                .bind(completion.owner_principal_id.as_uuid())
+                .bind(&completion.message.subject)
+                .bind(&completion.message.clean_text_body)
+                .bind(&recipient_snapshot)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+            }
+            None => {
+                return Err(AppError::Conflict(
+                    "A draft cannot start at a version other than one.".into(),
+                ));
+            }
+        }
+
         let stored = insert_message_on(&mut tx, completion.message).await?;
         let mut deliveries = Vec::with_capacity(completion.deliveries.len());
         for delivery in &completion.deliveries {
             deliveries.push(insert_delivery_on(&mut tx, delivery).await?);
         }
+        let published_delivery_id = deliveries
+            .first()
+            .map(|creation| creation.delivery_id())
+            .ok_or_else(|| AppError::BadRequest("A published draft requires a delivery.".into()))?;
+        let advanced = sqlx::query(
+            r#"UPDATE response_drafts
+                  SET status = 'published', updated_at = CURRENT_TIMESTAMP
+                WHERE company_id = $1 AND id = $2 AND version = $3 AND status = 'active'"#,
+        )
+        .bind(completion.company_id)
+        .bind(completion.draft_id.as_uuid())
+        .bind(draft_version)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if advanced.rows_affected() != 1 {
+            return Err(AppError::Conflict(
+                "This draft version is stale, superseded, or already published.".into(),
+            ));
+        }
+        sqlx::query(
+            r#"INSERT INTO response_draft_publications (
+                   company_id, draft_id, draft_version, message_id, delivery_id,
+                   published_by_principal_id
+               ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(completion.company_id)
+        .bind(completion.draft_id.as_uuid())
+        .bind(draft_version)
+        .bind(stored.canonical_id.as_uuid())
+        .bind(published_delivery_id.as_uuid())
+        .bind(completion.owner_principal_id.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
         sqlx::query(
             r#"UPDATE background_tasks
                SET status = 'completed', transition_reason = 'completed',

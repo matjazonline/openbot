@@ -4,7 +4,7 @@
 //! that has already been composed, fenced and guardrailed. Moving it behind the port would mean
 //! every new harness re-deciding what an untrusted block looks like.
 
-use crate::entities::message::MessageRole;
+use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::services::prompt_fence::{UntrustedFence, UntrustedKind};
 use crate::use_cases::thread::RecipientRole;
@@ -97,6 +97,17 @@ impl PromptParts<'_> {
                 MessageRole::Agent => "Agent",
                 MessageRole::System => "System",
             };
+            let boundary_label = match msg.audience {
+                MessageAudience::ExternalConversation => "External conversation",
+                MessageAudience::InternalOnly => "Internal-only",
+                MessageAudience::LegacyUnclassified => "Legacy unclassified; do not disclose",
+            };
+            let entry_label = match msg.entry_kind {
+                ThreadEntryKind::Conversation => "Conversation",
+                ThreadEntryKind::Note => "Note",
+                ThreadEntryKind::Delegation => "Delegation",
+                ThreadEntryKind::SystemEvent => "System event",
+            };
             let stem = subject_stem(&msg.subject);
             let changed = shown_stem.is_none_or(|shown| !shown.eq_ignore_ascii_case(stem));
             let subject_label = match prompt_subject(&msg.subject).filter(|_| changed) {
@@ -107,7 +118,7 @@ impl PromptParts<'_> {
                 None => String::new(),
             };
             rendered.push_str(&format!(
-                "[{} ({}){}]: {}\n",
+                "[{boundary_label} | {entry_label} | {} ({}){}]: {}\n",
                 role_label, msg.author_display, subject_label, msg.body
             ));
         }

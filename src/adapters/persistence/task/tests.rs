@@ -386,7 +386,8 @@ async fn human_completion_commits_one_reply_delivery_and_terminal_transition() {
         MessageDirection::Outbound,
         MessageRole::Human,
         owned.correlation_id,
-    );
+    )
+    .external_conversation();
     let mut delivery = delivery_fixture(
         &persistence,
         DeliveryFixtureRequest {
@@ -400,21 +401,48 @@ async fn human_completion_commits_one_reply_delivery_and_terminal_transition() {
     delivery.correlation_id = owned.correlation_id;
 
     let command_id = Uuid::new_v4();
-    let complete = || HumanTaskCompletion {
+    let complete = |draft_version| HumanTaskCompletion {
         task_id: task.id,
         company_id: company.id,
         owner_principal_id: owner,
         expected_ownership_version: transferred.to_version,
         command_id,
         command_fingerprint: "same-completion".into(),
+        draft_id: crate::entities::response_draft::ResponseDraftId::new(command_id),
+        draft_version,
+        recipient_snapshot: crate::entities::response_draft::DraftRecipientSnapshot::email(
+            crate::entities::value_objects::EmailAddress::from("customer@example.com"),
+            Vec::new(),
+        ),
         message: &message,
         deliveries: vec![delivery.clone()],
     };
-    let first = persistence.complete_human_task(complete()).await.unwrap();
-    let replay = persistence.complete_human_task(complete()).await.unwrap();
+    assert!(matches!(
+        persistence.complete_human_task(complete(2)).await,
+        Err(AppError::Conflict(_))
+    ));
+    let first = persistence.complete_human_task(complete(1)).await.unwrap();
+    let replay = persistence.complete_human_task(complete(1)).await.unwrap();
     assert_eq!(first.message_id, replay.message_id);
     assert_eq!(first.deliveries.len(), 1);
     assert!(replay.deliveries.is_empty());
+    let draft: (String, i32, serde_json::Value) = sqlx::query_as(
+        "SELECT status, version, recipient_snapshot FROM response_drafts WHERE id = $1",
+    )
+    .bind(command_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(draft.0, "published");
+    assert_eq!(draft.1, 1);
+    assert_eq!(draft.2["version"], "1");
+    let publication_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM response_draft_publications WHERE draft_id = $1")
+            .bind(command_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(publication_count, 1, "a retry reuses one publication");
     assert_eq!(
         persistence
             .get_task_by_id(task.id)
@@ -2070,7 +2098,8 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
             MessageDirection::Outbound,
             MessageRole::Agent,
             CorrelationId::new(),
-        ),
+        )
+        .external_conversation(),
         also_in_threads: Vec::new(),
     };
     // One delivery per logical send. Two distinct keys, and then the *same* key twice, which is
@@ -3166,7 +3195,9 @@ async fn park_for_approval(
         MessageDirection::Outbound,
         MessageRole::System,
         subject.correlation_id,
-    );
+    )
+    .external_conversation()
+    .with_entry_kind(crate::entities::message::ThreadEntryKind::SystemEvent);
     let delivery = NewDelivery {
         message_id: notice.id,
         ..queued.delivery

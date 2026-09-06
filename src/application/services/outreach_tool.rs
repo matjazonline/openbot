@@ -421,6 +421,8 @@ impl OutreachAndAwaitQuorumTool {
                 self.context.correlation_id,
             )
         }
+        .external_conversation()
+        .with_entry_kind(crate::entities::message::ThreadEntryKind::Delegation)
         .with_participants(vec![
             MessageParticipantWrite::new(
                 MessageParticipantKind::Sender,

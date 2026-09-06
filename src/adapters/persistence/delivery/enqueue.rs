@@ -27,12 +27,17 @@ pub async fn insert_delivery_on(
     tx: &mut Transaction<'_, Postgres>,
     delivery: &NewDelivery,
 ) -> AppResult<DeliveryCreation> {
+    if !delivery.message_audience.is_externally_deliverable() {
+        return Err(AppError::BadRequest(
+            "Internal-only and unclassified messages cannot be delivered externally.".into(),
+        ));
+    }
     let inserted: Option<(Uuid,)> = sqlx::query_as(
         r#"INSERT INTO message_deliveries (
                 id, company_id, channel_id, message_id, source_binding_id,
                 destination_binding_id, external_destination, task_id, depends_on_delivery_id,
-                correlation_id, transport, purpose, idempotency_key, max_attempts
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                correlation_id, transport, purpose, idempotency_key, max_attempts, message_audience
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            ON CONFLICT ON CONSTRAINT message_deliveries_destination_key_key DO NOTHING
            RETURNING id"#,
     )
@@ -55,6 +60,7 @@ pub async fn insert_delivery_on(
     .bind(delivery.purpose.as_str())
     .bind(delivery.idempotency_key.as_str())
     .bind(delivery.max_attempts)
+    .bind(delivery.message_audience.as_str())
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;

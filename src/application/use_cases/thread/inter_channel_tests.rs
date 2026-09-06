@@ -357,6 +357,8 @@ impl Fixture {
                 CorrelationId::new(),
             )
         }
+        .external_conversation()
+        .with_entry_kind(crate::entities::message::ThreadEntryKind::Delegation)
         .with_correlation(crate::use_cases::thread::MessageCorrelation::Email(
             crate::entities::email_message::EmailMessageMetadata::new(MessageId::from(
                 composed

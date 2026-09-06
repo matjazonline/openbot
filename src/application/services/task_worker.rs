@@ -1001,7 +1001,11 @@ impl TaskWorker {
             // association, not a second copy of the body.
             for thread_id in missing_threads {
                 self.thread_use_cases
-                    .associate_message(thread_id, outbound.canonical_id)
+                    .associate_message(
+                        thread_id,
+                        outbound.canonical_id,
+                        crate::entities::message::ThreadEntryKind::Delegation,
+                    )
                     .await
                     .map_err(|error| error.to_string())?;
             }
@@ -1191,7 +1195,9 @@ impl TaskWorker {
             MessageDirection::Outbound,
             MessageRole::System,
             task.correlation_id,
-        );
+        )
+        .external_conversation()
+        .with_entry_kind(crate::entities::message::ThreadEntryKind::SystemEvent);
 
         let context = EmailDeliveryContext {
             from: Channel::address_for(&channel.slug, &company.slug, &self.config.app_domain_name),

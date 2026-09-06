@@ -14,8 +14,8 @@ use crate::{
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
         message::{
-            AttachmentMetadata, CanonicalMessageId, MessageDirection, MessageParticipantKind,
-            MessageRole,
+            AttachmentMetadata, CanonicalMessageId, MessageAudience, MessageDirection,
+            MessageParticipantKind, MessageRole, ThreadEntryKind,
         },
         participant::{IdentityClaimMetadata, IdentityProvenance},
         transport::{PrincipalId, QualifiedIdentity},
@@ -101,6 +101,8 @@ pub struct MessageWrite {
     pub attachments: Vec<AttachmentMetadata>,
     pub direction: MessageDirection,
     pub role: MessageRole,
+    pub audience: MessageAudience,
+    pub entry_kind: ThreadEntryKind,
     /// The chain this message belongs to. Inherited from whatever caused it.
     pub correlation_id: CorrelationId,
     pub participants: Vec<MessageParticipantWrite>,
@@ -129,6 +131,11 @@ impl MessageWrite {
             attachments: Vec::new(),
             direction,
             role,
+            audience: MessageAudience::InternalOnly,
+            entry_kind: match role {
+                MessageRole::System => ThreadEntryKind::SystemEvent,
+                MessageRole::Human | MessageRole::Agent => ThreadEntryKind::Note,
+            },
             correlation_id,
             participants: Vec::new(),
             correlation: MessageCorrelation::Internal,
@@ -148,6 +155,21 @@ impl MessageWrite {
 
     pub fn with_correlation(mut self, correlation: MessageCorrelation) -> Self {
         self.correlation = correlation;
+        self
+    }
+
+    /// Mark a newly-authored message as part of the external conversation.
+    ///
+    /// This is intentionally a builder on an unpersisted write. Persisted messages have no
+    /// audience update operation, so the same transition cannot widen stored private content.
+    pub fn external_conversation(mut self) -> Self {
+        self.audience = MessageAudience::ExternalConversation;
+        self.entry_kind = ThreadEntryKind::Conversation;
+        self
+    }
+
+    pub fn with_entry_kind(mut self, entry_kind: ThreadEntryKind) -> Self {
+        self.entry_kind = entry_kind;
         self
     }
 

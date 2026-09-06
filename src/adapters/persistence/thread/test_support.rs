@@ -276,6 +276,8 @@ pub(super) fn inbound_email(
         attachments: Vec::new(),
         direction: MessageDirection::Inbound,
         role: MessageRole::Human,
+        audience: crate::entities::message::MessageAudience::ExternalConversation,
+        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         correlation_id: CorrelationId::new(),
         participants: vec![
             participant(MessageParticipantKind::Sender, "sender@partner.test"),

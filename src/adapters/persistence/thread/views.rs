@@ -22,7 +22,9 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         cursor::MessageCursor,
-        message::{CanonicalMessageId, MessageDirection, MessageRole},
+        message::{
+            CanonicalMessageId, MessageAudience, MessageDirection, MessageRole, ThreadEntryKind,
+        },
         message_view::{
             AgentHistoryMessage, AuthorView, EmailReplyContext, ExternalMessageRef,
             MessageAuditView, THREAD_HISTORY_LIMIT, ThreadMessageView,
@@ -97,6 +99,8 @@ struct ThreadMessageDb {
     attachments: Option<Value>,
     direction: String,
     role: String,
+    audience: String,
+    entry_kind: String,
     created_at: DateTime<Utc>,
     correlation_id: Uuid,
 }
@@ -115,6 +119,10 @@ impl ThreadMessageDb {
             direction: MessageDirection::from_str(&self.direction)
                 .map_err(|error| AppError::Internal(error.to_string()))?,
             role: MessageRole::from_str(&self.role)
+                .map_err(|error| AppError::Internal(error.to_string()))?,
+            audience: MessageAudience::from_str(&self.audience)
+                .map_err(|error| AppError::Internal(error.to_string()))?,
+            entry_kind: ThreadEntryKind::from_str(&self.entry_kind)
                 .map_err(|error| AppError::Internal(error.to_string()))?,
             created_at: self.created_at,
         })
@@ -184,6 +192,8 @@ fn thread_message_select() -> String {
            message.attachments,
            message.direction,
            message.role,
+           message.audience,
+           association.entry_kind,
            association.created_at,
            message.correlation_id
     FROM thread_messages AS association
@@ -304,6 +314,8 @@ pub(super) async fn get_thread_message(
 #[derive(sqlx::FromRow, Debug)]
 struct AgentHistoryDb {
     role: String,
+    audience: String,
+    entry_kind: String,
     author_label: String,
     author_subject: Option<String>,
     subject: String,
@@ -321,6 +333,8 @@ pub(super) async fn list_agent_history(
     let rows = sqlx::query_as::<_, AgentHistoryDb>(
         r#"SELECT * FROM (
                SELECT message.role,
+                      message.audience,
+                      association.entry_kind,
                       author.display_label AS author_label,
                       author_identity.subject AS author_subject,
                       message.subject,
@@ -353,6 +367,10 @@ pub(super) async fn list_agent_history(
         .map(|row| {
             Ok(AgentHistoryMessage {
                 role: MessageRole::from_str(&row.role)
+                    .map_err(|error| AppError::Internal(error.to_string()))?,
+                audience: MessageAudience::from_str(&row.audience)
+                    .map_err(|error| AppError::Internal(error.to_string()))?,
+                entry_kind: ThreadEntryKind::from_str(&row.entry_kind)
                     .map_err(|error| AppError::Internal(error.to_string()))?,
                 author_display: display_name(row.author_label, row.author_subject),
                 subject: row.subject,
@@ -413,8 +431,8 @@ pub(super) async fn latest_email_reply_context(
              LEFT JOIN participant_identities AS author_identity
                ON (author_identity.company_id, author_identity.id) =
                   (message.company_id, message.authored_identity_id)
-             LEFT JOIN email_message_metadata AS email
-               ON (email.company_id, email.message_id) = (message.company_id, message.id)
+            LEFT JOIN email_message_metadata AS email
+              ON (email.company_id, email.message_id) = (message.company_id, message.id)
             WHERE association.thread_id = $1
             ORDER BY association.created_at DESC, association.id DESC
             LIMIT 1"#,
@@ -463,6 +481,8 @@ pub(super) async fn latest_replyable_email_context(
                ON (email.company_id, email.message_id) = (message.company_id, message.id)
             WHERE association.thread_id = $1
               AND message.direction = 'inbound'
+              AND message.audience = 'external_conversation'
+              AND association.entry_kind = 'conversation'
             ORDER BY association.created_at DESC, association.id DESC
             LIMIT 1"#,
     )
@@ -529,6 +549,8 @@ struct MessageAuditDb {
     author: AuthorDb,
     direction: String,
     role: String,
+    audience: String,
+    entry_kind: String,
     correlation_id: Uuid,
     external_keys: Value,
     created_at: DateTime<Utc>,
@@ -561,6 +583,8 @@ pub(super) async fn get_message_audit(
 {AUTHOR_COLUMNS},
            message.direction,
            message.role,
+           message.audience,
+           association.entry_kind,
            message.correlation_id,
            association.created_at,
            COALESCE((
@@ -615,6 +639,10 @@ pub(super) async fn get_message_audit(
         direction: MessageDirection::from_str(&db.direction)
             .map_err(|error| AppError::Internal(error.to_string()))?,
         role: MessageRole::from_str(&db.role)
+            .map_err(|error| AppError::Internal(error.to_string()))?,
+        audience: MessageAudience::from_str(&db.audience)
+            .map_err(|error| AppError::Internal(error.to_string()))?,
+        entry_kind: ThreadEntryKind::from_str(&db.entry_kind)
             .map_err(|error| AppError::Internal(error.to_string()))?,
         correlation_id: CorrelationId::from(db.correlation_id),
         external_keys,

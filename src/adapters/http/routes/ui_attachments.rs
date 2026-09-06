@@ -217,6 +217,7 @@ mod tests {
             sha256_hash: sha.to_string(),
             size_bytes: 12,
             storage_key: key.map(ObjectKey::new),
+            source: None,
         }
     }
 

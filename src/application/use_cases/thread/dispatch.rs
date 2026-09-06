@@ -557,8 +557,9 @@ impl ThreadUseCases {
             MessageDirection::Outbound,
             MessageRole::Agent,
             task.correlation_id,
-        );
-        let reply = AgentReply {
+        )
+        .with_entry_kind(crate::entities::message::ThreadEntryKind::Conversation);
+        let mut reply = AgentReply {
             message: reply_message,
             also_in_threads: Vec::new(),
         };
@@ -576,6 +577,9 @@ impl ThreadUseCases {
             .into_iter()
             .collect::<Vec<_>>();
         let email_sent = !deliveries.is_empty();
+        if email_sent {
+            reply.message = reply.message.external_conversation();
+        }
 
         let execution_parameters =
             build_execution_parameters(Some(&params), Some(&agent), &payload.prompt);
@@ -784,6 +788,9 @@ impl ThreadUseCases {
             deliveries,
             correlation,
         } = planned;
+        if !deliveries.is_empty() {
+            reply.message = reply.message.external_conversation();
+        }
         // Recorded on the message the commit writes, so the answer is findable under the id it is
         // sent with. Without this a reply that names only this answer has no ancestor to resolve
         // against.
@@ -1482,6 +1489,8 @@ impl ThreadUseCases {
             attachments: Vec::new(),
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
+            audience: crate::entities::message::MessageAudience::InternalOnly,
+            entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
             correlation_id,
             // No sender/to/cc rows: who this went out to is a fact of the delivery, and the
             // delivery holds it. A reply fanned out to two transports has two recipient lists and
@@ -1531,7 +1540,7 @@ impl ThreadUseCases {
                 .await?;
             for thread_id in &reply.also_in_threads {
                 self.thread_persistence
-                    .associate_message(*thread_id, stored.canonical_id)
+                    .associate_message(*thread_id, stored.canonical_id, reply.message.entry_kind)
                     .await?;
             }
             return Ok(());

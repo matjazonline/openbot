@@ -307,7 +307,8 @@ pub async fn delivery_fixture(
         MessageDirection::Outbound,
         MessageRole::Agent,
         CorrelationId::new(),
-    );
+    )
+    .external_conversation();
     let message_id = write.id;
     ThreadPersistence::create_message(persistence, &write)
         .await
@@ -328,6 +329,7 @@ pub async fn delivery_fixture(
             company_id: request.company_id,
             channel_id: request.channel_id,
             message_id,
+            message_audience: crate::entities::message::MessageAudience::ExternalConversation,
             source_binding_id: binding.id,
             destination_binding_id: binding.id,
             external_destination: Some(destination),

@@ -164,7 +164,9 @@ impl ApprovalUseCases {
             MessageDirection::Outbound,
             MessageRole::System,
             subject.correlation_id,
-        );
+        )
+        .external_conversation()
+        .with_entry_kind(crate::entities::message::ThreadEntryKind::SystemEvent);
         let delivery = self
             .approval_delivery(subject, message.id, &subject_line, &body_text)
             .await?;

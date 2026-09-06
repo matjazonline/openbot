@@ -639,6 +639,7 @@ impl ScheduleUseCases {
                     role,
                     correlation_id,
                 )
+                .with_entry_kind(crate::entities::message::ThreadEntryKind::Conversation)
                 .created_at(now),
             )
             .await?;

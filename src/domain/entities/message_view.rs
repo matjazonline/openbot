@@ -20,7 +20,10 @@ use uuid::Uuid;
 use crate::entities::{
     correlation::CorrelationId,
     cursor::MessageCursor,
-    message::{AttachmentMetadata, CanonicalMessageId, MessageDirection, MessageRole},
+    message::{
+        AttachmentMetadata, CanonicalMessageId, MessageAudience, MessageDirection, MessageRole,
+        ThreadEntryKind,
+    },
     transport::{ChannelBindingId, ExternalMessageKey, PrincipalId, TransportKind},
     value_objects::{EmailAddress, MessageId},
 };
@@ -89,6 +92,8 @@ pub struct ThreadMessageView {
     pub attachments: Vec<AttachmentMetadata>,
     pub direction: MessageDirection,
     pub role: MessageRole,
+    pub audience: MessageAudience,
+    pub entry_kind: ThreadEntryKind,
     pub created_at: DateTime<Utc>,
 }
 
@@ -115,6 +120,8 @@ impl ThreadMessageView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentHistoryMessage {
     pub role: MessageRole,
+    pub audience: MessageAudience,
+    pub entry_kind: ThreadEntryKind,
     /// The author's display name, rendered as data inside the untrusted fence -- never as a key.
     pub author_display: String,
     pub subject: String,
@@ -154,6 +161,8 @@ pub struct MessageAuditView {
     pub author: AuthorView,
     pub direction: MessageDirection,
     pub role: MessageRole,
+    pub audience: MessageAudience,
+    pub entry_kind: ThreadEntryKind,
     pub correlation_id: CorrelationId,
     /// The provider keys this message is reachable by, one per interface that carried it.
     pub external_keys: Vec<ExternalMessageRef>,

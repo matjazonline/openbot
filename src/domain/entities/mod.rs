@@ -19,6 +19,7 @@ pub mod message_view;
 pub mod outreach;
 pub mod participant;
 pub mod quoted_text;
+pub mod response_draft;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod skill;

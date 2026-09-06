@@ -200,6 +200,9 @@ pub struct HumanTaskCompletion<'a> {
     pub expected_ownership_version: u64,
     pub command_id: Uuid,
     pub command_fingerprint: String,
+    pub draft_id: crate::entities::response_draft::ResponseDraftId,
+    pub draft_version: u32,
+    pub recipient_snapshot: crate::entities::response_draft::DraftRecipientSnapshot,
     pub message: &'a MessageWrite,
     pub deliveries: Vec<NewDelivery>,
 }

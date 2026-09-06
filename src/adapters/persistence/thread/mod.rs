@@ -634,6 +634,7 @@ impl ThreadPersistence for PostgresPersistence {
             r#"{MESSAGE_SELECT}
                WHERE association.thread_id = $1
                  AND message.direction = 'outbound'
+                 AND association.entry_kind = 'conversation'
                  AND (association.created_at, association.id) >
                      (SELECT answered.created_at, answered.id
                         FROM thread_messages AS answered
@@ -661,9 +662,10 @@ impl ThreadPersistence for PostgresPersistence {
         &self,
         thread_id: Uuid,
         message: CanonicalMessageId,
+        entry_kind: crate::entities::message::ThreadEntryKind,
     ) -> AppResult<Message> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let association_id = associate_message_on(&mut tx, thread_id, message).await?;
+        let association_id = associate_message_on(&mut tx, thread_id, message, entry_kind).await?;
         tx.commit().await.map_err(AppError::from)?;
         load_message(&self.pool, association_id).await
     }

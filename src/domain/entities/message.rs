@@ -46,6 +46,84 @@ pub enum MessageRole {
     System,
 }
 
+/// The widest boundary at which a canonical message's content may appear.
+///
+/// This belongs to the payload rather than to a delivery or a thread: associating the same
+/// message with another thread must never make private content public. `LegacyUnclassified` is a
+/// fail-closed migration state and is deliberately not externally deliverable.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageAudience {
+    ExternalConversation,
+    InternalOnly,
+    LegacyUnclassified,
+}
+
+impl MessageAudience {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ExternalConversation => "external_conversation",
+            Self::InternalOnly => "internal_only",
+            Self::LegacyUnclassified => "legacy_unclassified",
+        }
+    }
+
+    pub const fn is_externally_deliverable(self) -> bool {
+        matches!(self, Self::ExternalConversation)
+    }
+}
+
+impl FromStr for MessageAudience {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "external_conversation" => Ok(Self::ExternalConversation),
+            "internal_only" => Ok(Self::InternalOnly),
+            "legacy_unclassified" => Ok(Self::LegacyUnclassified),
+            _ => Err(format!("Unknown message audience: {value}")),
+        }
+    }
+}
+
+/// How one canonical message participates in one thread.
+///
+/// Unlike [`MessageAudience`], this is association-level: the same payload may be supporting
+/// evidence in one thread and a delegation in another without changing who may receive it.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadEntryKind {
+    Conversation,
+    Note,
+    Delegation,
+    SystemEvent,
+}
+
+impl ThreadEntryKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Conversation => "conversation",
+            Self::Note => "note",
+            Self::Delegation => "delegation",
+            Self::SystemEvent => "system_event",
+        }
+    }
+}
+
+impl FromStr for ThreadEntryKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "conversation" => Ok(Self::Conversation),
+            "note" => Ok(Self::Note),
+            "delegation" => Ok(Self::Delegation),
+            "system_event" => Ok(Self::SystemEvent),
+            _ => Err(format!("Unknown thread entry kind: {value}")),
+        }
+    }
+}
+
 impl MessageRole {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -158,6 +236,17 @@ pub struct AttachmentMetadata {
     /// `None` is mail that arrived before there was anywhere to put it, or whose upload failed.
     #[serde(default, alias = "storage_url")]
     pub storage_key: Option<ObjectKey>,
+    /// The canonical attachment this artifact was derived from, when it is not original input.
+    /// Keeping the source id and digest together makes a copied object auditable without relying
+    /// on a mutable filename.
+    #[serde(default)]
+    pub source: Option<AttachmentSource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AttachmentSource {
+    pub message_id: CanonicalMessageId,
+    pub sha256_hash: String,
 }
 
 /// The stored form of a message's attachments.
@@ -228,6 +317,10 @@ pub struct Message {
     pub attachments: Option<Vec<AttachmentMetadata>>,
     pub direction: MessageDirection,
     pub role: MessageRole,
+    /// The payload's maximum audience. This cannot be widened by another thread association.
+    pub audience: MessageAudience,
+    /// What this association contributes to this particular thread.
+    pub entry_kind: ThreadEntryKind,
     /// The chain this message belongs to. Inherited from the event that caused it, never minted
     /// here -- see [`CorrelationId`].
     pub correlation_id: CorrelationId,
@@ -259,6 +352,7 @@ mod tests {
             sha256_hash: "abc".into(),
             size_bytes: 12,
             storage_key: None,
+            source: None,
         }]);
         let encoded = serde_json::to_value(&stored).unwrap();
         assert_eq!(encoded["version"], "1");

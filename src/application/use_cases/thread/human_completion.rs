@@ -11,6 +11,7 @@ use crate::{
         company::Company,
         email_message::EmailMessageMetadata,
         message::{CanonicalMessageId, MessageDirection, MessageRole},
+        response_draft::{DraftRecipientSnapshot, ResponseDraftId},
         task::BackgroundTask,
         thread::Thread,
         transport::{DeliveryPurpose, PrincipalId, TransportKind},
@@ -67,11 +68,13 @@ impl ThreadUseCases {
             &draft.company.slug,
             &self.config.app_domain_name,
         );
-        let recipients_cc = context
+        let recipients_cc: Vec<crate::entities::value_objects::EmailAddress> = context
             .cc
             .into_iter()
             .filter(|address| address != &recipient && address != &from)
             .collect();
+        let recipient_snapshot =
+            DraftRecipientSnapshot::email(recipient.clone(), recipients_cc.clone());
         let threading = EmailThreading::received(context.rfc_message_id, context.references);
         let subject = draft.thread.reply_subject();
         let content = CanonicalContent::parse(subject.clone(), body.to_string())?;
@@ -111,6 +114,8 @@ impl ThreadUseCases {
             participants: Vec::new(),
             correlation,
             created_at: chrono::Utc::now(),
+            audience: crate::entities::message::MessageAudience::ExternalConversation,
+            entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
         };
 
         let fingerprint = completion_fingerprint(
@@ -127,6 +132,9 @@ impl ThreadUseCases {
                 expected_ownership_version: draft.expected_ownership_version,
                 command_id: draft.command_id,
                 command_fingerprint: fingerprint,
+                draft_id: ResponseDraftId::new(draft.command_id),
+                draft_version: 1,
+                recipient_snapshot,
                 message: &message,
                 deliveries: vec![composed.delivery],
             })

@@ -511,6 +511,11 @@ async fn associate_threads(
             message::AssociationWrite {
                 thread_id: thread.thread_id,
                 created_at: Utc::now(),
+                entry_kind: if request.envelope.directives.source_channel_id.is_some() {
+                    crate::entities::message::ThreadEntryKind::Delegation
+                } else {
+                    crate::entities::message::ThreadEntryKind::Conversation
+                },
             },
             message_id,
         )
@@ -750,6 +755,16 @@ fn message_write(
             MessageRole::Agent
         } else {
             MessageRole::Human
+        },
+        audience: if envelope.directives.source_channel_id.is_some() {
+            crate::entities::message::MessageAudience::InternalOnly
+        } else {
+            crate::entities::message::MessageAudience::ExternalConversation
+        },
+        entry_kind: if envelope.directives.source_channel_id.is_some() {
+            crate::entities::message::ThreadEntryKind::Delegation
+        } else {
+            crate::entities::message::ThreadEntryKind::Conversation
         },
         correlation_id: envelope.correlation_id,
         participants,

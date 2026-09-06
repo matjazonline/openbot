@@ -5,7 +5,7 @@
 //! would pass for a prompt whose frame the body had forged.
 
 use super::{MAX_PROMPT_SUBJECT_CHARS, PromptParts, prompt_subject, subject_stem};
-use crate::entities::message::MessageRole;
+use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::services::prompt_fence::UntrustedFence;
 
@@ -17,6 +17,8 @@ fn history_message(
 ) -> AgentHistoryMessage {
     AgentHistoryMessage {
         role,
+        audience: MessageAudience::ExternalConversation,
+        entry_kind: ThreadEntryKind::Conversation,
         author_display: sender.to_string(),
         subject: subject.to_string(),
         body: body.to_string(),
@@ -75,9 +77,15 @@ fn a_subject_is_shown_once_per_topic_across_the_history() {
     }
     .compose(&UntrustedFence::fixed("FENCE"));
 
-    assert!(prompt.contains("[User (alice@x.com) | Subject: Invoice question]: hi\n"));
-    assert!(prompt.contains("[Agent (bot@acme.test)]: hello\n"));
-    assert!(prompt.contains("[User (alice@x.com) | Subject: Contract terms]: new topic\n"));
+    assert!(prompt.contains(
+        "[External conversation | Conversation | User (alice@x.com) | Subject: Invoice question]: hi\n"
+    ));
+    assert!(
+        prompt.contains("[External conversation | Conversation | Agent (bot@acme.test)]: hello\n")
+    );
+    assert!(prompt.contains(
+        "[External conversation | Conversation | User (alice@x.com) | Subject: Contract terms]: new topic\n"
+    ));
     assert!(prompt.ends_with(
         "Latest Inbound Message:\n\
          <untrusted-message-FENCE>\n\
@@ -124,7 +132,7 @@ fn a_message_without_a_subject_composes_exactly_as_before() {
         prompt,
         "Conversation History:\n\
          <untrusted-history-FENCE>\n\
-         [User (alice@x.com)]: hi\n\
+         [External conversation | Conversation | User (alice@x.com)]: hi\n\
          </untrusted-history-FENCE>\n\n\
          Latest Inbound Message:\n\
          <untrusted-message-FENCE>\n\

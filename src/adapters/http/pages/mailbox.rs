@@ -2534,20 +2534,27 @@ pub fn message_bubble_chat(
 
     format!(
         r##"
-                <div class="chat {side}" data-role="{role}">
+                <div class="chat {side}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
                     <div class="chat-image">{avatar}</div>
                     <div class="chat-header gap-1 opacity-70">
                         {channel_glyph}{writer}{transport_badge}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
-                    <div class="chat-footer font-mono text-[11px] opacity-40">{subject}{diagnostics}{tasks}</div>
+                    <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}{tasks}</div>
                 </div>
         "##,
         side = if is_viewer { "chat-end" } else { "chat-start" },
         // Read by the column when a bubble streams in: only the agent's own reply answers the
         // question its row's activity mark was asking.
         role = if is_agent { "agent" } else { "human" },
+        audience = message.audience.as_str(),
+        entry_kind = message.entry_kind.as_str(),
+        boundary = format_args!(
+            "{} / {}",
+            message.audience.as_str(),
+            message.entry_kind.as_str()
+        ),
         bubble_class = if is_viewer { "chat-bubble-primary" } else { "" },
         channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
         transport_badge =
@@ -2890,6 +2897,8 @@ pub fn message_diagnostics_pane(audit: &MessageAuditView) -> String {
                 <dd>{author}<span class="opacity-60 font-mono"> · {principal_id}</span></dd>
                 <dt class="opacity-60">Direction / role</dt>
                 <dd class="font-mono">{direction} · {role}</dd>
+                <dt class="opacity-60">Audience / entry</dt>
+                <dd class="font-mono">{audience} · {entry_kind}</dd>
                 <dt class="opacity-60">Correlation</dt>
                 <dd class="font-mono break-all">{correlation_id}</dd>
                 <dt class="opacity-60">Recorded</dt>
@@ -2909,6 +2918,8 @@ pub fn message_diagnostics_pane(audit: &MessageAuditView) -> String {
         principal_id = escape_html_text(&audit.author.principal_id.to_string()),
         direction = escape_html_text(audit.direction.as_str()),
         role = escape_html_text(audit.role.as_str()),
+        audience = escape_html_text(audit.audience.as_str()),
+        entry_kind = escape_html_text(audit.entry_kind.as_str()),
         correlation_id = escape_html_text(&audit.correlation_id.to_string()),
         created_at = super::format_date_time(audit.created_at),
         keys = keys,

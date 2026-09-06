@@ -24,8 +24,9 @@ use crate::{
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
         message::{
-            AttachmentMetadata, CanonicalMessageId, Message, MessageAttachments, MessageAuthor,
-            MessageDirection, MessageParticipant, MessageParticipantKind, MessageRole,
+            AttachmentMetadata, CanonicalMessageId, Message, MessageAttachments, MessageAudience,
+            MessageAuthor, MessageDirection, MessageParticipant, MessageParticipantKind,
+            MessageRole, ThreadEntryKind,
         },
         transport::{
             ExternalMessageKey, ExternalThreadKey, IdentityNamespace, IdentitySubject,
@@ -56,6 +57,8 @@ pub(super) struct MessageDb {
     pub attachments: Option<Value>,
     pub direction: String,
     pub role: String,
+    pub audience: String,
+    pub entry_kind: String,
     pub correlation_id: Uuid,
     pub participants: Value,
     pub created_at: DateTime<Utc>,
@@ -91,6 +94,8 @@ pub(super) const MESSAGE_SELECT: &str = r#"
            message.attachments,
            message.direction,
            message.role,
+           message.audience,
+           association.entry_kind,
            message.correlation_id,
            COALESCE((
                SELECT jsonb_agg(jsonb_build_object(
@@ -127,6 +132,10 @@ impl TryFrom<MessageDb> for Message {
             .map_err(|error| AppError::Internal(error.to_string()))?;
         let role = MessageRole::from_str(&db.role)
             .map_err(|error| AppError::Internal(error.to_string()))?;
+        let audience = MessageAudience::from_str(&db.audience)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        let entry_kind = ThreadEntryKind::from_str(&db.entry_kind)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
 
         Ok(Message {
             id: db.id,
@@ -148,6 +157,8 @@ impl TryFrom<MessageDb> for Message {
             attachments: decode_attachments(db.attachments)?,
             direction,
             role,
+            audience,
+            entry_kind,
             correlation_id: CorrelationId::from(db.correlation_id),
             participants: decode_participants(db.participants)?,
             created_at: db.created_at,
@@ -388,6 +399,7 @@ pub(super) fn canonical_message_hash(
         "canonical_body": email.is_none().then_some(write.clean_text_body.as_str()),
         "direction": write.direction.as_str(),
         "role": write.role.as_str(),
+        "audience": write.audience.as_str(),
         "attachments": attachments,
         "rfc_message_id": email.map(|email| email.rfc_message_id.as_str()),
         "in_reply_to": email.and_then(|email| email.in_reply_to.as_deref()),
@@ -420,6 +432,7 @@ pub(crate) async fn insert_message_on(
     write: &MessageWrite,
 ) -> AppResult<InsertedMessage> {
     let scope = thread_scope(connection, write.thread_id).await?;
+    validate_attachment_sources(connection, scope.company_id, write).await?;
     let author = resolve_author(connection, scope.company_id, &write.author).await?;
     let participants = resolve_participants(connection, scope.company_id, write).await?;
     let attachments = encode_attachments(&write.attachments)?;
@@ -462,6 +475,7 @@ pub(crate) async fn insert_message_on(
         AssociationWrite {
             thread_id: write.thread_id,
             created_at: write.created_at,
+            entry_kind: write.entry_kind,
         },
         canonical_id,
     )
@@ -476,6 +490,41 @@ pub(crate) async fn insert_message_on(
         canonical_id,
         association_id,
     })
+}
+
+/// A derived attachment cannot carry source material across a wider boundary than its source.
+/// The source is looked up tenant-scoped and errors propagate: a missing row or database outage
+/// is not permission to publish the bytes.
+async fn validate_attachment_sources(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    write: &MessageWrite,
+) -> AppResult<()> {
+    for attachment in &write.attachments {
+        let Some(source) = attachment.source.as_ref() else {
+            continue;
+        };
+        let source_audience: Option<String> =
+            sqlx::query_scalar("SELECT audience FROM messages WHERE company_id = $1 AND id = $2")
+                .bind(company_id)
+                .bind(source.message_id.as_uuid())
+                .fetch_optional(&mut *connection)
+                .await
+                .map_err(AppError::from)?;
+        let source_audience = source_audience
+            .ok_or_else(|| AppError::BadRequest("Attachment source message was not found.".into()))?
+            .parse::<MessageAudience>()
+            .map_err(AppError::Internal)?;
+        if write.audience == MessageAudience::ExternalConversation
+            && source_audience != MessageAudience::ExternalConversation
+        {
+            return Err(AppError::BadRequest(
+                "Private or unclassified attachment material cannot be published externally."
+                    .into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// What one message write produced.
@@ -495,11 +544,13 @@ pub(crate) async fn associate_message_on(
     connection: &mut sqlx::PgConnection,
     thread_id: Uuid,
     message_id: CanonicalMessageId,
+    entry_kind: ThreadEntryKind,
 ) -> AppResult<Uuid> {
     let scope = thread_scope(connection, thread_id).await?;
     let write = AssociationWrite {
         thread_id,
         created_at: Utc::now(),
+        entry_kind,
     };
     let association_id = insert_thread_association(connection, scope, write, message_id).await?;
     sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
@@ -614,8 +665,8 @@ pub(super) async fn insert_canonical_message(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
                 clean_text_body, attachments, direction, role, correlation_id, content_hash,
-                created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+                created_at, audience
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"#,
     )
     .bind(id.as_uuid())
     .bind(company_id)
@@ -629,6 +680,7 @@ pub(super) async fn insert_canonical_message(
     .bind(write.correlation_id.as_uuid())
     .bind(content_hash)
     .bind(write.created_at)
+    .bind(write.audience.as_str())
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;
@@ -667,6 +719,7 @@ pub(super) async fn insert_participants(
 pub(super) struct AssociationWrite {
     pub thread_id: Uuid,
     pub created_at: DateTime<Utc>,
+    pub entry_kind: ThreadEntryKind,
 }
 
 pub(super) async fn insert_thread_association(
@@ -677,8 +730,8 @@ pub(super) async fn insert_thread_association(
 ) -> AppResult<Uuid> {
     let association_id: Option<Uuid> = sqlx::query_scalar(
         r#"INSERT INTO thread_messages (
-                id, company_id, channel_id, thread_id, message_id, created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6)
+                id, company_id, channel_id, thread_id, message_id, created_at, entry_kind
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (channel_id, message_id) DO NOTHING
            RETURNING id"#,
     )
@@ -688,6 +741,7 @@ pub(super) async fn insert_thread_association(
     .bind(write.thread_id)
     .bind(canonical_id.as_uuid())
     .bind(write.created_at)
+    .bind(write.entry_kind.as_str())
     .fetch_optional(&mut *connection)
     .await
     .map_err(AppError::from)?;
@@ -699,8 +753,8 @@ pub(super) async fn insert_thread_association(
     // The channel already holds this message. That is the redelivery case; it is only an error if
     // the existing association names a *different* thread, which would mean one conversation had
     // been split in two for the same audience.
-    let existing: Option<(Uuid, Uuid)> = sqlx::query_as(
-        "SELECT id, thread_id FROM thread_messages WHERE channel_id = $1 AND message_id = $2",
+    let existing: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+        "SELECT id, thread_id, entry_kind FROM thread_messages WHERE channel_id = $1 AND message_id = $2",
     )
     .bind(scope.channel_id)
     .bind(canonical_id.as_uuid())
@@ -709,9 +763,16 @@ pub(super) async fn insert_thread_association(
     .map_err(AppError::from)?;
 
     match existing {
-        Some((association_id, thread_id)) if thread_id == write.thread_id => Ok(association_id),
-        Some((_, thread_id)) => Err(AppError::Conflict(format!(
-            "Message {canonical_id} is already part of thread {thread_id} in this channel"
+        Some((association_id, thread_id, entry_kind))
+            if thread_id == write.thread_id && entry_kind == write.entry_kind.as_str() =>
+        {
+            Ok(association_id)
+        }
+        Some((_, thread_id, _)) if thread_id != write.thread_id => Err(AppError::Conflict(
+            format!("Message {canonical_id} is already part of thread {thread_id} in this channel"),
+        )),
+        Some((_, _, entry_kind)) => Err(AppError::Conflict(format!(
+            "Message {canonical_id} already has entry kind '{entry_kind}' in this thread"
         ))),
         None => Err(AppError::Internal(
             "Message association vanished during its own insert".into(),
@@ -825,6 +886,7 @@ mod tests {
             sha256_hash: "deadbeef".into(),
             size_bytes: 2048,
             storage_key: Some(ObjectKey::from("attachments/invoice.pdf")),
+            source: None,
         }];
         let encoded = encode_attachments(&attachments).unwrap().unwrap();
 

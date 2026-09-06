@@ -8,10 +8,173 @@ use crate::entities::value_objects::MessageId;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
-    message::{AttachmentMetadata, MessageDirection, MessageParticipantKind, MessageRole},
+    message::{
+        AttachmentMetadata, AttachmentSource, MessageAudience, MessageDirection,
+        MessageParticipantKind, MessageRole, ThreadEntryKind,
+    },
     participant::IdentityProvenance,
     transport::{ExternalMessageKey, ExternalThreadKey},
 };
+
+#[tokio::test]
+async fn private_messages_cannot_enter_the_external_delivery_queue() {
+    let Some(fixture) = Fixture::new("private_delivery_guard").await else {
+        return;
+    };
+    let private = fixture
+        .persistence
+        .create_message(&MessageWrite::internal(
+            fixture.thread.id,
+            MessageAuthorWrite::Platform,
+            "Internal finding",
+            "Do not disclose this source material.",
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            CorrelationId::new(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(private.audience, MessageAudience::InternalOnly);
+    assert_eq!(private.entry_kind, ThreadEntryKind::Note);
+
+    let mut delivery = crate::adapters::persistence::test_support::delivery_fixture(
+        &fixture.persistence,
+        crate::adapters::persistence::test_support::DeliveryFixtureRequest::new(
+            fixture.company_id,
+            fixture.channel_id,
+            fixture.thread.id,
+            &format!("private-guard-{}", fixture.suffix),
+        ),
+    )
+    .await
+    .delivery;
+    delivery.message_id = private.canonical_id;
+
+    let mut tx = fixture.pool.begin().await.unwrap();
+    let refused =
+        crate::adapters::persistence::delivery::enqueue::insert_delivery_on(&mut tx, &delivery)
+            .await;
+    assert!(
+        refused.is_err(),
+        "the composite audience FK must fail closed"
+    );
+    tx.rollback().await.unwrap();
+
+    let widened =
+        sqlx::query("UPDATE messages SET audience = 'external_conversation' WHERE id = $1")
+            .bind(private.canonical_id.as_uuid())
+            .execute(&fixture.pool)
+            .await;
+    assert!(
+        widened.is_err(),
+        "stored private content cannot be widened in place"
+    );
+    let unknown_audience = sqlx::query("UPDATE messages SET audience = 'public-ish' WHERE id = $1")
+        .bind(private.canonical_id.as_uuid())
+        .execute(&fixture.pool)
+        .await;
+    assert!(unknown_audience.is_err());
+    let unknown_kind = sqlx::query("UPDATE thread_messages SET entry_kind = 'memo' WHERE id = $1")
+        .bind(private.id)
+        .execute(&fixture.pool)
+        .await;
+    assert!(unknown_kind.is_err());
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn legacy_unclassified_messages_remain_readable_but_not_deliverable() {
+    let Some(fixture) = Fixture::new("legacy_visibility").await else {
+        return;
+    };
+    let stored = fixture
+        .persistence
+        .create_message(&inbound_email(
+            fixture.thread.id,
+            email_metadata(&format!("<legacy-{}@partner.test>", fixture.suffix)),
+            "Old but still readable",
+        ))
+        .await
+        .unwrap();
+    sqlx::query("UPDATE messages SET audience = 'legacy_unclassified' WHERE id = $1")
+        .bind(stored.canonical_id.as_uuid())
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+    let read = fixture
+        .persistence
+        .get_thread_message(fixture.thread.id, stored.canonical_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(read.audience, MessageAudience::LegacyUnclassified);
+
+    let mut delivery = crate::adapters::persistence::test_support::delivery_fixture(
+        &fixture.persistence,
+        crate::adapters::persistence::test_support::DeliveryFixtureRequest::new(
+            fixture.company_id,
+            fixture.channel_id,
+            fixture.thread.id,
+            &format!("legacy-guard-{}", fixture.suffix),
+        ),
+    )
+    .await
+    .delivery;
+    delivery.message_id = stored.canonical_id;
+    let mut tx = fixture.pool.begin().await.unwrap();
+    assert!(
+        crate::adapters::persistence::delivery::enqueue::insert_delivery_on(&mut tx, &delivery)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn derived_attachments_cannot_publish_a_private_source() {
+    let Some(fixture) = Fixture::new("private_attachment_guard").await else {
+        return;
+    };
+    let private = fixture
+        .persistence
+        .create_message(&MessageWrite::internal(
+            fixture.thread.id,
+            MessageAuthorWrite::Platform,
+            "Private evidence",
+            "Evidence",
+            MessageDirection::Inbound,
+            MessageRole::System,
+            CorrelationId::new(),
+        ))
+        .await
+        .unwrap();
+    let publish = MessageWrite::internal(
+        fixture.thread.id,
+        MessageAuthorWrite::Platform,
+        "Customer answer",
+        "New wording based on private evidence.",
+        MessageDirection::Outbound,
+        MessageRole::Agent,
+        CorrelationId::new(),
+    )
+    .external_conversation()
+    .with_attachments(vec![AttachmentMetadata {
+        filename: "derived.pdf".into(),
+        content_type: "application/pdf".into(),
+        sha256_hash: "derived-hash".into(),
+        size_bytes: 42,
+        storage_key: None,
+        source: Some(AttachmentSource {
+            message_id: private.canonical_id,
+            sha256_hash: "source-hash".into(),
+        }),
+    }]);
+
+    let refused = fixture.persistence.create_message(&publish).await;
+    assert!(refused.is_err());
+    fixture.cleanup().await;
+}
 use crate::transport::ExternalCorrelationStore;
 use crate::use_cases::{
     company::CompanyPersistence,
@@ -41,7 +204,11 @@ async fn one_message_joins_several_threads_but_never_a_foreign_one() {
 
     let joined = fixture
         .persistence
-        .associate_message(second_thread.id, stored.canonical_id)
+        .associate_message(
+            second_thread.id,
+            stored.canonical_id,
+            crate::entities::message::ThreadEntryKind::Note,
+        )
         .await
         .unwrap();
 
@@ -72,7 +239,11 @@ async fn one_message_joins_several_threads_but_never_a_foreign_one() {
     let foreign_thread = fixture.extra_thread(foreign_channel.id, "Elsewhere").await;
     let refused = fixture
         .persistence
-        .associate_message(foreign_thread.id, stored.canonical_id)
+        .associate_message(
+            foreign_thread.id,
+            stored.canonical_id,
+            crate::entities::message::ThreadEntryKind::Note,
+        )
         .await;
     assert!(
         refused.is_err(),
@@ -419,6 +590,7 @@ async fn unreadable_stored_json_surfaces_as_an_application_error() {
                 sha256_hash: "abc123".into(),
                 size_bytes: 4096,
                 storage_key: None,
+                source: None,
             }]),
         )
         .await
@@ -634,6 +806,8 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
             attachments: Vec::new(),
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
+            audience: crate::entities::message::MessageAudience::ExternalConversation,
+            entry_kind: crate::entities::message::ThreadEntryKind::Delegation,
             correlation_id: CorrelationId::new(),
             participants: vec![participant(
                 MessageParticipantKind::To,
@@ -742,6 +916,8 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
             attachments: Vec::new(),
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
+            audience: crate::entities::message::MessageAudience::ExternalConversation,
+            entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
             correlation_id: CorrelationId::new(),
             participants: vec![participant(
                 MessageParticipantKind::To,
@@ -788,7 +964,11 @@ async fn a_deleted_association_takes_an_orphaned_payload_with_it() {
         .unwrap();
     fixture
         .persistence
-        .associate_message(second_thread.id, stored.canonical_id)
+        .associate_message(
+            second_thread.id,
+            stored.canonical_id,
+            crate::entities::message::ThreadEntryKind::Conversation,
+        )
         .await
         .unwrap();
 
