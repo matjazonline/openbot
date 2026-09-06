@@ -132,6 +132,7 @@ pub(crate) async fn mark_task_failed_on(
         TaskStopReason::Completed => TaskTransitionReason::Completed,
         TaskStopReason::OwnershipTransferred => TaskTransitionReason::OwnershipTransferred,
         TaskStopReason::AgentInstruction => TaskTransitionReason::AgentInstruction,
+        TaskStopReason::DelegationCancelled => TaskTransitionReason::DelegationCancelled,
     };
     // The lease names the run that failed, so the failure cannot be attributed to anyone else.
     let attribution =
@@ -191,6 +192,15 @@ pub(crate) async fn stop_task_on(
     actor: StopActor,
 ) -> AppResult<BackgroundTask> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
+    // Delegation commands and final dispatches lock outreach before task. Keep this generic stop
+    // in the same order so an operator action cannot deadlock a command racing on the same task.
+    sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM task_outreaches WHERE task_id = $1 ORDER BY id FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
     let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"UPDATE background_tasks
            SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
@@ -210,8 +220,21 @@ pub(crate) async fn stop_task_on(
     .await
     .map_err(AppError::from)?;
     sqlx::query(
-        r#"UPDATE task_outreaches SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-           WHERE task_id = $1 AND status IN ('waiting', 'timeout_pending_approval')"#,
+        r#"UPDATE task_outreaches
+           SET status = 'cancelled', version = version + 1, updated_at = CURRENT_TIMESTAMP
+           WHERE task_id = $1 AND status IN (
+               'waiting', 'threshold_met', 'timeout_pending_approval', 'proceed_partial'
+           )"#,
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    sqlx::query(
+        r#"UPDATE task_outreach_targets AS target SET status = 'cancelled'
+           FROM task_outreaches AS outreach
+           WHERE outreach.task_id = $1 AND target.outreach_id = outreach.id
+             AND target.status = 'active'"#,
     )
     .bind(id)
     .execute(&mut *tx)

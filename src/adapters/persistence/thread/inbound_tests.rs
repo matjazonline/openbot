@@ -954,6 +954,7 @@ async fn an_outreach_transition_failure_rolls_back_every_inbound_row_and_retry_s
             matched: OutreachReplyMatch {
                 outreach_id: Uuid::new_v4(),
                 task_id: Uuid::new_v4(),
+                target_id: Uuid::new_v4(),
                 target_email: "vendor@example.com".into(),
             },
         }],
@@ -1026,6 +1027,12 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
     .execute(&fixture.pool)
     .await
     .unwrap();
+    let target_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM task_outreach_targets WHERE outreach_id = $1")
+            .bind(outreach_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
 
     let key = format!("<outreach-response-{}@example.com>", fixture.suffix);
     let binding = fixture.email_binding_of(fixture.channel_id).await;
@@ -1058,6 +1065,7 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
             matched: OutreachReplyMatch {
                 outreach_id,
                 task_id: task.id,
+                target_id,
                 target_email: "vendor@example.com".into(),
             },
         }],

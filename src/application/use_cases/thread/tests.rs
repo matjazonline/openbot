@@ -411,6 +411,23 @@ impl AgentCapabilityReader for MockAgentPersistence {
 
 #[async_trait]
 impl TaskPersistence for MockTaskPersistence {
+    async fn execute_delegation_command(
+        &self,
+        _request: crate::task_queue::DelegationCommandRequest,
+    ) -> AppResult<crate::entities::delegation::DelegationCommandResult> {
+        unreachable!("thread fixture does not execute delegation controls")
+    }
+
+    async fn outreach_reassignment_context(
+        &self,
+        _company_id: Uuid,
+        _task_id: Uuid,
+        _outreach_id: Uuid,
+        _target_id: Uuid,
+    ) -> AppResult<Option<crate::task_queue::OutreachReassignmentContext>> {
+        unreachable!("thread fixture does not reassign delegation targets")
+    }
+
     async fn ask_owner_to_act(
         &self,
         _command: &crate::entities::internal_note::AskOwnerToAct,
@@ -526,6 +543,7 @@ impl TaskPersistence for MockTaskPersistence {
                     .and_then(|value| Uuid::parse_str(value).ok())
                     .unwrap(),
                 task_id: task.id,
+                target_id: Uuid::new_v4(),
                 target_email: target.into(),
             })
         }))

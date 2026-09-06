@@ -123,6 +123,9 @@ pub struct CollaborationTargetSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CollaborationSummary {
     pub task_id: Uuid,
+    pub outreach_id: Option<Uuid>,
+    /// Version fence to submit with a delegation control command.
+    pub outreach_version: Option<u64>,
     pub correlation_id: CorrelationId,
     pub owner: CollaborationOwner,
     pub status: OutreachBusinessStatus,
@@ -138,6 +141,7 @@ pub struct CollaborationSummary {
 
 /// Derive the target's public business status from authoritative source states.
 pub fn target_business_status(
+    target_status: Option<TargetBusinessStatus>,
     responded_at: Option<DateTime<Utc>>,
     outreach_status: OutreachStatus,
     delivery_status: Option<DeliveryStatus>,
@@ -145,6 +149,14 @@ pub fn target_business_status(
     expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,
 ) -> TargetBusinessStatus {
+    if let Some(
+        status @ (TargetBusinessStatus::Cancelled
+        | TargetBusinessStatus::Superseded
+        | TargetBusinessStatus::Expired),
+    ) = target_status
+    {
+        return status;
+    }
     if responded_at.is_some() {
         return TargetBusinessStatus::Responded;
     }
@@ -236,6 +248,7 @@ mod tests {
     fn response_wins_over_late_and_failed_delivery_history() {
         assert_eq!(
             target_business_status(
+                None,
                 Some(now()),
                 OutreachStatus::Waiting,
                 Some(DeliveryStatus::DeadLetter),
@@ -251,6 +264,7 @@ mod tests {
     fn ambiguous_provider_outcome_requires_a_decision() {
         assert_eq!(
             target_business_status(
+                None,
                 None,
                 OutreachStatus::Waiting,
                 Some(DeliveryStatus::OutcomeUnknown),
@@ -273,6 +287,7 @@ mod tests {
     fn superseded_delivery_is_not_reported_as_a_provider_failure() {
         assert_eq!(
             target_business_status(
+                None,
                 None,
                 OutreachStatus::Completed,
                 Some(DeliveryStatus::DeadLetter),
@@ -342,6 +357,7 @@ mod tests {
     fn expired_retry_is_reported_as_expired_not_sending() {
         assert_eq!(
             target_business_status(
+                None,
                 None,
                 OutreachStatus::Waiting,
                 Some(DeliveryStatus::Retryable),

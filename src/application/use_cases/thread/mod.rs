@@ -21,6 +21,7 @@ use crate::{
         company::Company,
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
+        delegation::{DelegationCommand, DelegationCommandResult, DelegationOperation},
         email_message::EmailMessageMetadata,
         internal_note::{
             AddInternalNote, AskOwnerOutcome, AskOwnerToAct, InternalNoteView, StartAgentTask,
@@ -42,14 +43,17 @@ use crate::{
     },
     infra::config::AppConfig,
     services::memory_coordinator::MemoryCoordinator,
-    task_queue::TaskPersistence,
+    task_queue::{
+        DelegationCommandRequest, OutreachTargetIdentity, OutreachTargetRequest, TaskPersistence,
+    },
     transport::{
         AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, CanonicalContent,
-        ComposedDelivery, DeliveryComposer, DeliveryCreation, DeliveryRequest,
-        ExternalCorrelationStore, InboundDraft, InboundEnvelope, InboundMessageCommitter,
-        InboundRouting, IngressDirectives, IngressPolicyFacts, InternalMailRelay,
-        InternalRelayMail, MessageDisposition, NewDelivery, ProtocolExtension, RelayDisposition,
-        StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest, ports::TransportRenderers,
+        ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryCreation, DeliveryPurpose,
+        DeliveryRequest, EmailDeliveryContext, EmailThreading, ExternalCorrelationStore,
+        InboundDraft, InboundEnvelope, InboundMessageCommitter, InboundRouting, IngressDirectives,
+        IngressPolicyFacts, InternalMailRelay, InternalRelayMail, MessageDisposition, NewDelivery,
+        ProtocolExtension, RelayDisposition, StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
+        ports::TransportRenderers,
     },
     use_cases::{
         agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
@@ -1520,6 +1524,135 @@ impl ThreadUseCases {
             command,
         )
         .await
+    }
+
+    /// Execute a recovery command, composing a replacement internal request first when the
+    /// operation is reassignment. Persistence still commits the old target, new question and new
+    /// delivery atomically.
+    pub async fn execute_delegation_command(
+        &self,
+        company: &Company,
+        task: &BackgroundTask,
+        command: DelegationCommand,
+    ) -> AppResult<DelegationCommandResult> {
+        let replacement = match command.operation {
+            DelegationOperation::ReassignInternalTarget {
+                outreach_id,
+                target_id,
+                new_channel_id,
+            } => Some(
+                self.compose_reassigned_target(
+                    company,
+                    task,
+                    outreach_id,
+                    target_id,
+                    new_channel_id,
+                    command.command_id,
+                )
+                .await?,
+            ),
+            _ => None,
+        };
+        self.task_persistence
+            .execute_delegation_command(DelegationCommandRequest {
+                command,
+                replacement,
+            })
+            .await
+    }
+
+    async fn compose_reassigned_target(
+        &self,
+        company: &Company,
+        task: &BackgroundTask,
+        outreach_id: Uuid,
+        target_id: Uuid,
+        new_channel_id: Uuid,
+        command_id: Uuid,
+    ) -> AppResult<OutreachTargetRequest> {
+        let context = self
+            .task_persistence
+            .outreach_reassignment_context(company.id, task.id, outreach_id, target_id)
+            .await?
+            .ok_or_else(|| AppError::Conflict("This target can no longer be reassigned.".into()))?;
+        let source = self
+            .channel_persistence
+            .get_by_id(task.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == company.id)
+            .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
+        let target = self
+            .channel_persistence
+            .get_by_id(new_channel_id)
+            .await?
+            .filter(|channel| channel.company_id == company.id && channel.enabled)
+            .ok_or_else(|| AppError::BadRequest("Choose an enabled internal channel.".into()))?;
+        let from = Channel::address_for(&source.slug, &company.slug, &self.config.app_domain_name);
+        let recipient = target.inbound_address(&company.slug, &self.config.app_domain_name);
+        let content = CanonicalContent::parse(&context.subject, &context.body)?;
+        let message_id = CanonicalMessageId::random();
+        let composed = self
+            .deliveries
+            .compose(DeliveryRequest {
+                company_id: company.id,
+                channel_id: source.id,
+                message_id,
+                task_id: Some(task.id),
+                correlation_id: context.correlation_id,
+                purpose: DeliveryPurpose::Outreach,
+                source_key: format!("task:{}:reassign:{command_id}", task.id),
+                content: &content,
+                context: DeliveryContext::Email(EmailDeliveryContext {
+                    from: from.clone(),
+                    from_name: Some(source.name.clone()),
+                    recipient_to: recipient.clone(),
+                    recipients_cc: Vec::new(),
+                    threading: EmailThreading::Standalone,
+                    relay: Some(crate::transport::EmailRelayTrace {
+                        source_channel_id: source.id,
+                        hop_count: 1,
+                        trace_channels: vec![source.id],
+                    }),
+                }),
+            })
+            .await?;
+        let mut message = MessageWrite {
+            id: message_id,
+            ..MessageWrite::internal(
+                context.thread_id,
+                MessageAuthorWrite::Platform,
+                context.subject,
+                context.body.clone(),
+                crate::entities::message::MessageDirection::Outbound,
+                MessageRole::Agent,
+                context.correlation_id,
+            )
+        }
+        .external_conversation()
+        .with_entry_kind(ThreadEntryKind::Delegation)
+        .with_participants(vec![
+            MessageParticipantWrite::new(
+                crate::entities::message::MessageParticipantKind::Sender,
+                qualified_email_identity(from.as_str())?,
+            ),
+            MessageParticipantWrite::new(
+                crate::entities::message::MessageParticipantKind::To,
+                qualified_email_identity(recipient.as_str())?,
+            ),
+        ]);
+        if let Some(provider_key) = composed.provider_key.as_ref() {
+            message = message.with_correlation(MessageCorrelation::Email(
+                EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
+                    .raw_bodies(Some(context.body), None),
+            ));
+        }
+        Ok(OutreachTargetRequest {
+            target: OutreachTargetIdentity::InternalChannel {
+                channel_id: new_channel_id,
+            },
+            request: message,
+            delivery: composed.delivery,
+        })
     }
 }
 

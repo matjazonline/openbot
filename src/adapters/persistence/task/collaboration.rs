@@ -52,9 +52,12 @@ struct CollaborationTaskDb {
 struct CollaborationTargetDb {
     id: Uuid,
     task_id: Uuid,
+    outreach_id: Uuid,
+    outreach_version: i64,
     outreach_status: String,
     required_threshold_percent: f64,
     expires_at: DateTime<Utc>,
+    target_status: String,
     target_kind: String,
     internal_channel_id: Option<Uuid>,
     internal_channel_name: Option<String>,
@@ -82,8 +85,11 @@ struct ProjectedOutreach {
     children: Vec<CollaborationTargetSummary>,
     statuses: Vec<TargetBusinessStatus>,
     stored_status: Option<OutreachStatus>,
+    outreach_id: Option<Uuid>,
+    outreach_version: Option<u64>,
     expires_at: Option<DateTime<Utc>>,
     threshold: f64,
+    eligible_total: usize,
 }
 
 struct RenderedTargetIdentity {
@@ -120,6 +126,8 @@ impl Projection<'_> {
             .map(|_| collaboration_progress(&projected));
         Ok(Some(CollaborationSummary {
             task_id,
+            outreach_id: projected.outreach_id,
+            outreach_version: projected.outreach_version,
             correlation_id: task.correlation_id.into(),
             owner,
             status: business_status,
@@ -153,11 +161,20 @@ impl Projection<'_> {
             .map(|row| OutreachStatus::from_str(&row.outreach_status))
             .transpose()
             .map_err(AppError::Internal)?;
+        let outreach_id = target_rows.first().map(|row| row.outreach_id);
+        let outreach_version = target_rows
+            .first()
+            .map(|row| positive_outreach_version(row.outreach_version))
+            .transpose()?;
         let expires_at = target_rows.first().map(|row| row.expires_at);
         let threshold = target_rows
             .first()
             .map(|row| row.required_threshold_percent)
             .unwrap_or_default();
+        let eligible_total = target_rows
+            .iter()
+            .filter(|row| matches!(row.target_status.as_str(), "active" | "responded"))
+            .count();
         let mut children = Vec::new();
         for (row, target_status) in target_rows.into_iter().zip(statuses.iter().copied()) {
             if self.remaining == 0 {
@@ -171,8 +188,11 @@ impl Projection<'_> {
             children,
             statuses,
             stored_status,
+            outreach_id,
+            outreach_version,
             expires_at,
             threshold,
+            eligible_total,
         })
     }
 
@@ -214,6 +234,8 @@ fn restricted_summary(
 ) -> CollaborationSummary {
     CollaborationSummary {
         task_id: task.id,
+        outreach_id: None,
+        outreach_version: None,
         correlation_id: task.correlation_id.into(),
         owner,
         status: task_business_status(status),
@@ -228,7 +250,7 @@ fn restricted_summary(
 }
 
 fn collaboration_progress(projected: &ProjectedOutreach) -> CollaborationProgress {
-    let total = projected.statuses.len();
+    let total = projected.eligible_total;
     let responded = projected
         .statuses
         .iter()
@@ -246,6 +268,18 @@ fn derive_target_status(
     stored: OutreachStatus,
     as_of: DateTime<Utc>,
 ) -> AppResult<TargetBusinessStatus> {
+    let explicit = match row.target_status.as_str() {
+        "active" | "responded" => None,
+        "cancelled" => Some(TargetBusinessStatus::Cancelled),
+        "superseded" => Some(TargetBusinessStatus::Superseded),
+        "expired" => Some(TargetBusinessStatus::Expired),
+        other => {
+            return Err(AppError::Internal(format!(
+                "collaboration target {} has invalid status {other}",
+                row.id
+            )));
+        }
+    };
     let delivery_status = row
         .delivery_status
         .as_deref()
@@ -259,6 +293,7 @@ fn derive_target_status(
         .transpose()
         .map_err(|error| AppError::Internal(error.to_string()))?;
     Ok(target_business_status(
+        explicit,
         row.responded_at,
         stored,
         delivery_status,
@@ -266,6 +301,13 @@ fn derive_target_status(
         row.expires_at,
         as_of,
     ))
+}
+
+fn positive_outreach_version(value: i64) -> AppResult<u64> {
+    u64::try_from(value)
+        .ok()
+        .filter(|version| *version > 0)
+        .ok_or_else(|| AppError::Internal(format!("invalid outreach version {value}")))
 }
 
 fn collaboration_owner(task: &CollaborationTaskDb, visible: bool) -> AppResult<CollaborationOwner> {
@@ -539,16 +581,18 @@ async fn load_collaboration_targets(
     sqlx::query_as::<_, CollaborationTargetDb>(
         r#"WITH latest_outreach AS (
                SELECT DISTINCT ON (outreach.task_id)
-                      outreach.id, outreach.task_id, outreach.status,
+                      outreach.id, outreach.task_id, outreach.status, outreach.version,
                       outreach.required_threshold_percent,
                       outreach.expires_at, outreach.created_at
                FROM task_outreaches AS outreach
                WHERE outreach.company_id = $1 AND outreach.task_id = ANY($2)
                ORDER BY outreach.task_id, outreach.created_at DESC, outreach.id DESC
            )
-           SELECT target.id, outreach.task_id, outreach.status AS outreach_status,
+           SELECT target.id, outreach.task_id, outreach.id AS outreach_id,
+                  outreach.version AS outreach_version, outreach.status AS outreach_status,
                   outreach.required_threshold_percent::double precision,
-                  outreach.expires_at, target.target_kind, target.internal_channel_id,
+                  outreach.expires_at, target.status AS target_status,
+                  target.target_kind, target.internal_channel_id,
                   channel.name AS internal_channel_name, target.external_transport,
                   target.external_namespace, target.external_subject, target.responded_at,
                   delivery.status AS delivery_status,
@@ -707,9 +751,12 @@ mod tests {
         CollaborationTargetDb {
             id: Uuid::new_v4(),
             task_id,
+            outreach_id: Uuid::new_v4(),
+            outreach_version: 1,
             outreach_status: OutreachStatus::Waiting.as_str().into(),
             required_threshold_percent: 100.0,
             expires_at: as_of() + chrono::Duration::hours(1),
+            target_status: "active".into(),
             target_kind: "internal_channel".into(),
             internal_channel_id: Some(channel_id),
             internal_channel_name: Some("Visible channel".into()),

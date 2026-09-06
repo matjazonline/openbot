@@ -378,6 +378,7 @@ pub enum TaskStopReason {
     LeaseLost,
     OwnershipTransferred,
     AgentInstruction,
+    DelegationCancelled,
 }
 
 impl TaskStopReason {
@@ -391,6 +392,7 @@ impl TaskStopReason {
             Self::LeaseLost => "lease_lost",
             Self::OwnershipTransferred => "ownership_transferred",
             Self::AgentInstruction => "agent_instruction",
+            Self::DelegationCancelled => "delegation_cancelled",
         }
     }
 }
@@ -414,6 +416,7 @@ impl FromStr for TaskStopReason {
             "lease_lost" => Ok(Self::LeaseLost),
             "ownership_transferred" => Ok(Self::OwnershipTransferred),
             "agent_instruction" => Ok(Self::AgentInstruction),
+            "delegation_cancelled" => Ok(Self::DelegationCancelled),
             other => Err(format!("Unknown task stop reason: {other}")),
         }
     }
@@ -923,6 +926,10 @@ pub enum TaskTransitionReason {
     OperatorResumed,
     OwnershipTransferred,
     AgentInstruction,
+    DelegationTargetCancelled,
+    DelegationCancelled,
+    DelegationReassigned,
+    DelegationPartial,
     /// The transition happened, but nothing on the write said why.
     ///
     /// Every caller that knows its cause states it, so this reason means a status changed through
@@ -958,6 +965,10 @@ impl TaskTransitionReason {
             Self::OperatorResumed => "operator_resumed",
             Self::OwnershipTransferred => "ownership_transferred",
             Self::AgentInstruction => "agent_instruction",
+            Self::DelegationTargetCancelled => "delegation_target_cancelled",
+            Self::DelegationCancelled => "delegation_cancelled",
+            Self::DelegationReassigned => "delegation_reassigned",
+            Self::DelegationPartial => "delegation_partial",
             Self::Unknown => "unknown",
         }
     }
@@ -987,6 +998,10 @@ impl FromStr for TaskTransitionReason {
             "operator_resumed" => Ok(Self::OperatorResumed),
             "ownership_transferred" => Ok(Self::OwnershipTransferred),
             "agent_instruction" => Ok(Self::AgentInstruction),
+            "delegation_target_cancelled" => Ok(Self::DelegationTargetCancelled),
+            "delegation_cancelled" => Ok(Self::DelegationCancelled),
+            "delegation_reassigned" => Ok(Self::DelegationReassigned),
+            "delegation_partial" => Ok(Self::DelegationPartial),
             "unknown" => Ok(Self::Unknown),
             other => Err(format!("Unknown task transition reason: {other}")),
         }
@@ -1005,6 +1020,8 @@ pub enum TaskTransitionActorKind {
     System,
     Worker,
     Operator,
+    Human,
+    Agent,
     Approval,
     Outreach,
 }
@@ -1015,6 +1032,8 @@ impl TaskTransitionActorKind {
             Self::System => "system",
             Self::Worker => "worker",
             Self::Operator => "operator",
+            Self::Human => "human",
+            Self::Agent => "agent",
             Self::Approval => "approval",
             Self::Outreach => "outreach",
         }
@@ -1029,6 +1048,8 @@ impl FromStr for TaskTransitionActorKind {
             "system" => Ok(Self::System),
             "worker" => Ok(Self::Worker),
             "operator" => Ok(Self::Operator),
+            "human" => Ok(Self::Human),
+            "agent" => Ok(Self::Agent),
             "approval" => Ok(Self::Approval),
             "outreach" => Ok(Self::Outreach),
             other => Err(format!("Unknown task transition actor kind: {other}")),
@@ -1097,6 +1118,8 @@ pub enum TransitionActor {
     System,
     Worker(Uuid),
     Operator(Uuid),
+    Human(Uuid),
+    Agent(Uuid),
     Approval(Uuid),
     Outreach(Uuid),
 }
@@ -1107,6 +1130,8 @@ impl TransitionActor {
             Self::System => TaskTransitionActorKind::System,
             Self::Worker(_) => TaskTransitionActorKind::Worker,
             Self::Operator(_) => TaskTransitionActorKind::Operator,
+            Self::Human(_) => TaskTransitionActorKind::Human,
+            Self::Agent(_) => TaskTransitionActorKind::Agent,
             Self::Approval(_) => TaskTransitionActorKind::Approval,
             Self::Outreach(_) => TaskTransitionActorKind::Outreach,
         }
@@ -1116,7 +1141,7 @@ impl TransitionActor {
     /// outreach is a *source*: it is identified by its row, reported below.
     pub fn actor_id(self) -> Option<Uuid> {
         match self {
-            Self::Worker(id) | Self::Operator(id) => Some(id),
+            Self::Worker(id) | Self::Operator(id) | Self::Human(id) | Self::Agent(id) => Some(id),
             Self::System | Self::Approval(_) | Self::Outreach(_) => None,
         }
     }
@@ -1124,14 +1149,24 @@ impl TransitionActor {
     pub fn approval_id(self) -> Option<Uuid> {
         match self {
             Self::Approval(id) => Some(id),
-            Self::System | Self::Worker(_) | Self::Operator(_) | Self::Outreach(_) => None,
+            Self::System
+            | Self::Worker(_)
+            | Self::Operator(_)
+            | Self::Human(_)
+            | Self::Agent(_)
+            | Self::Outreach(_) => None,
         }
     }
 
     pub fn outreach_id(self) -> Option<Uuid> {
         match self {
             Self::Outreach(id) => Some(id),
-            Self::System | Self::Worker(_) | Self::Operator(_) | Self::Approval(_) => None,
+            Self::System
+            | Self::Worker(_)
+            | Self::Operator(_)
+            | Self::Human(_)
+            | Self::Agent(_)
+            | Self::Approval(_) => None,
         }
     }
 }

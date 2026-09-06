@@ -37,6 +37,10 @@ use crate::{
         collaboration::CollaborationSummary,
         company::Company,
         correlation::CorrelationId,
+        delegation::{
+            DelegationActor, DelegationAuthority, DelegationCommand, DelegationOperation,
+            DelegationReason,
+        },
         task::{
             BackgroundTask, ResumeActor, StopActor, TaskBoardFilter, TaskChainBoard,
             TaskChainDetail, TaskFilter, TaskOwner, TaskOwnerCandidate, TaskOwnerFilter,
@@ -71,6 +75,10 @@ pub fn router() -> Router<AppState> {
         .route("/ui/tasks/{task_id}", get(task_pane))
         .route("/ui/tasks/{task_id}/stop", post(stop_task))
         .route("/ui/tasks/{task_id}/resume", post(resume_task))
+        .route(
+            "/ui/tasks/{task_id}/delegation/{operation}",
+            post(control_delegation),
+        )
         .route("/ui/tasks/{task_id}/claim", post(claim_task_ownership))
         .route("/ui/tasks/{task_id}/assign", post(assign_task_ownership))
         .route(
@@ -541,6 +549,116 @@ async fn resume_task(
 }
 
 #[derive(Debug, Deserialize)]
+struct DelegationControlForm {
+    command_id: Uuid,
+    expected_version: u64,
+    outreach_id: Uuid,
+    #[serde(default)]
+    target_id: Option<Uuid>,
+    #[serde(default)]
+    new_channel_id: Option<Uuid>,
+    #[serde(default)]
+    deadline_hours: Option<i64>,
+    reason: DelegationReason,
+    #[serde(default)]
+    reason_detail: Option<String>,
+}
+
+async fn control_delegation(
+    workspace: Workspace,
+    Path((task_id, operation)): Path<(Uuid, String)>,
+    Query(query): Query<TasksQuery>,
+    Form(form): Form<DelegationControlForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let task = view.require_task(task_id).await?;
+    let actor = workspace
+        .thread_use_cases
+        .principal_access_for_user(company.id, workspace.user_id)
+        .await?
+        .and_then(|access| access.principal_id)
+        .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
+    let operation = delegation_operation(&operation, &form)?;
+    let outcome = workspace
+        .thread_use_cases
+        .execute_delegation_command(
+            &company,
+            &task,
+            DelegationCommand {
+                company_id: company.id,
+                task_id,
+                command_id: form.command_id,
+                expected_version: form.expected_version,
+                actor: DelegationActor {
+                    principal_id: actor,
+                    authority: DelegationAuthority::CompanyManager,
+                },
+                reason: form.reason,
+                reason_detail: form.reason_detail,
+                operation,
+            },
+        )
+        .await;
+    view.after_write(
+        &task,
+        &query,
+        outcome.err().map(|error| match error {
+            AppError::Conflict(message) => format!("Delegation changed: {message}"),
+            other => format!("Could not apply delegation control: {other}"),
+        }),
+    )
+    .await
+}
+
+fn delegation_operation(
+    operation: &str,
+    form: &DelegationControlForm,
+) -> AppResult<DelegationOperation> {
+    let target_id = || {
+        form.target_id
+            .ok_or_else(|| AppError::BadRequest("A delegation target is required.".into()))
+    };
+    Ok(match operation {
+        "extend" => {
+            let hours = form.deadline_hours.ok_or_else(|| {
+                AppError::BadRequest("Choose a new response window in hours.".into())
+            })?;
+            if !(1..=720).contains(&hours) {
+                return Err(AppError::BadRequest(
+                    "The response window must be between 1 and 720 hours.".into(),
+                ));
+            }
+            DelegationOperation::ExtendOutreach {
+                outreach_id: form.outreach_id,
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(hours),
+            }
+        }
+        "cancel-target" => DelegationOperation::CancelTarget {
+            outreach_id: form.outreach_id,
+            target_id: target_id()?,
+        },
+        "cancel-outreach" => DelegationOperation::CancelOutreach {
+            outreach_id: form.outreach_id,
+        },
+        "reassign" => DelegationOperation::ReassignInternalTarget {
+            outreach_id: form.outreach_id,
+            target_id: target_id()?,
+            new_channel_id: form.new_channel_id.ok_or_else(|| {
+                AppError::BadRequest("Choose a replacement internal channel.".into())
+            })?,
+        },
+        "proceed-partial" => DelegationOperation::ProceedWithPartial {
+            outreach_id: form.outreach_id,
+        },
+        "stop-task" => DelegationOperation::StopTask {
+            outreach_id: form.outreach_id,
+        },
+        _ => return Err(AppError::NotFound("Delegation control not found.".into())),
+    })
+}
+
+#[derive(Debug, Deserialize)]
 struct OwnershipForm {
     command_id: Uuid,
     expected_ownership_version: u64,
@@ -769,10 +887,9 @@ impl TaskMonitorView<'_> {
     /// One filtered page of tasks, plus whether another follows it.
     async fn page(&self, filter: &TaskFilter) -> AppResult<(Vec<BackgroundTask>, bool)> {
         record_pagination_observation(self.monitoring, "tasks", filter.offset());
-        let visible_channel_ids = self
-            .channels()
-            .await?
-            .into_iter()
+        let visible_channels = self.channels().await?;
+        let visible_channel_ids = visible_channels
+            .iter()
             .map(|channel| channel.id)
             .collect::<Vec<_>>();
         let probed = self
@@ -810,10 +927,9 @@ impl TaskMonitorView<'_> {
     }
 
     async fn board(&self, filter: TaskBoardFilter) -> AppResult<TaskChainBoard> {
-        let visible_channel_ids = self
-            .channels()
-            .await?
-            .into_iter()
+        let visible_channels = self.channels().await?;
+        let visible_channel_ids = visible_channels
+            .iter()
             .map(|channel| channel.id)
             .collect::<Vec<_>>();
         self.thread_use_cases
@@ -924,10 +1040,9 @@ impl TaskMonitorView<'_> {
         // The transport is a separate process and never writes back into the task, so its state is
         // joined in here, at render time.
         let persistence = self.thread_use_cases.get_task_persistence().await;
-        let visible_channel_ids = self
-            .channels()
-            .await?
-            .into_iter()
+        let delegation_channels = self.channels().await?;
+        let visible_channel_ids = delegation_channels
+            .iter()
             .map(|channel| channel.id)
             .collect::<Vec<_>>();
         let mut collaboration = persistence
@@ -989,6 +1104,7 @@ impl TaskMonitorView<'_> {
             ownership_events: &ownership_events,
             owner_candidates: &owner_candidates,
             collaboration: collaboration.as_ref(),
+            delegation_channels: &delegation_channels,
         }))
     }
 

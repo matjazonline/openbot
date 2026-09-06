@@ -742,7 +742,11 @@ fn message_write(
         ));
     }
 
-    let is_delegation = envelope.directives.source_channel_id.is_some();
+    // An outreach response is delegated evidence even when it came from an external address. It
+    // stays private, including late and duplicate replies, and can never become customer-visible
+    // merely because the sender lacked an internal relay header.
+    let is_delegation =
+        envelope.directives.source_channel_id.is_some() || !request.outreach_transitions.is_empty();
     let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
     Ok(MessageWrite {
         id: CanonicalMessageId::random(),

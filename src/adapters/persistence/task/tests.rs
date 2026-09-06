@@ -19,6 +19,10 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
         correlation::CorrelationId,
+        delegation::{
+            DelegationActor, DelegationAuthority, DelegationCommand, DelegationOperation,
+            DelegationReason, DeliveryCancellation,
+        },
         internal_note::{
             AddInternalNote, AskOwnerOutcome, AskOwnerToAct, InternalNoteProvenance, StartAgentTask,
         },
@@ -35,6 +39,10 @@ use crate::{
         },
         transport::PrincipalId,
         value_objects::MessageId,
+    },
+    task_queue::{
+        CreateOutreachRequest, DelegationCommandRequest, OutreachTargetIdentity,
+        OutreachTargetRequest,
     },
     use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite, qualified_email_identity},
 };
@@ -3212,6 +3220,14 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
             &crate::entities::outreach::OutreachReplyMatch {
                 outreach_id,
                 task_id: task.id,
+                target_id: sqlx::query_scalar(
+                    "SELECT id FROM task_outreach_targets WHERE outreach_id = $1 AND email = $2",
+                )
+                .bind(outreach_id)
+                .bind("first@partner.test")
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
                 target_email: "first@partner.test".into(),
             },
             response.id,
@@ -4497,7 +4513,7 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
     mark_delivered(&pool, delivery_id).await;
     for statement in [
         "UPDATE human_approvals SET status = 'approved' WHERE task_id = $1",
-        "UPDATE task_outreaches SET status = 'completed' WHERE task_id = $1",
+        "UPDATE task_outreaches SET status = 'threshold_met' WHERE task_id = $1",
     ] {
         sqlx::query(statement)
             .bind(quiet.id)
@@ -5114,4 +5130,976 @@ async fn the_census_sees_each_kind_of_stuck_work() {
     .await
     .unwrap();
     assert_eq!(still_overdue, 0, "a task due now is not stuck");
+}
+
+struct DelegationFixture {
+    company: crate::entities::company::Company,
+    task: BackgroundTask,
+    outreach_id: Uuid,
+    target_ids: Vec<Uuid>,
+    delivery_ids: Vec<Uuid>,
+    target_emails: Vec<String>,
+    manager: PrincipalId,
+}
+
+async fn delegation_fixture(
+    persistence: &PostgresPersistence,
+    target_count: usize,
+    expires_at: DateTime<Utc>,
+) -> DelegationFixture {
+    let (company, channel) = seed_company_and_channel(persistence).await;
+    let task = enqueue_chain(persistence, company.id, channel.id, "delegation-control").await;
+    let lease = claim(persistence, task.id).await;
+    let thread_id = task.thread_id.unwrap();
+    let suffix = Uuid::new_v4().simple().to_string();
+    let mut targets = Vec::with_capacity(target_count);
+    let mut delivery_ids = Vec::with_capacity(target_count);
+    let mut target_emails = Vec::with_capacity(target_count);
+    for index in 0..target_count {
+        let email = format!("delegate-{index}-{suffix}@partner.test");
+        let key = format!("delegation-{suffix}-{index}");
+        let queued = delivery_fixture(
+            persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(task.id),
+                recipient: &email,
+                purpose: DeliveryPurpose::Outreach,
+                ..DeliveryFixtureRequest::new(company.id, channel.id, thread_id, &key)
+            },
+        )
+        .await;
+        delivery_ids.push(queued.delivery.id.as_uuid());
+        target_emails.push(email.clone());
+        targets.push(OutreachTargetRequest {
+            target: OutreachTargetIdentity::External {
+                identity: qualified_email_identity(&email).unwrap(),
+            },
+            request: email_write(EmailMessageDraft {
+                id: Uuid::new_v4(),
+                thread_id,
+                message_id: format!("<{key}@mailagents.test>").into(),
+                sender: "support@acme.mailagents.test".into(),
+                recipients_to: vec![email.into()],
+                subject: "Delegated question".into(),
+                clean_text_body: "Please answer".into(),
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                ..EmailMessageDraft::default()
+            }),
+            delivery: queued.delivery,
+        });
+    }
+    let outreach_id = Uuid::new_v4();
+    persistence
+        .create_outreach_and_pause(CreateOutreachRequest {
+            id: outreach_id,
+            lease,
+            company_id: company.id,
+            channel_id: channel.id,
+            correlation_id: task.correlation_id,
+            outreach_key: format!("delegation-{suffix}"),
+            required_threshold_percent: 100.0,
+            expires_at,
+            subject: "Delegated question".into(),
+            body: "Please answer".into(),
+            targets,
+        })
+        .await
+        .unwrap();
+    let target_ids = sqlx::query_scalar(
+        "SELECT id FROM task_outreach_targets WHERE outreach_id = $1 ORDER BY email",
+    )
+    .bind(outreach_id)
+    .fetch_all(&persistence.pool)
+    .await
+    .unwrap();
+    let manager = PrincipalId::new(
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
+            .bind(company.id)
+            .bind(company.user_id)
+            .fetch_one(&persistence.pool)
+            .await
+            .unwrap(),
+    );
+    DelegationFixture {
+        company,
+        task,
+        outreach_id,
+        target_ids,
+        delivery_ids,
+        target_emails,
+        manager,
+    }
+}
+
+fn delegation_command(
+    fixture: &DelegationFixture,
+    command_id: Uuid,
+    expected_version: u64,
+    reason: DelegationReason,
+    operation: DelegationOperation,
+) -> DelegationCommandRequest {
+    DelegationCommandRequest {
+        command: DelegationCommand {
+            company_id: fixture.company.id,
+            task_id: fixture.task.id,
+            command_id,
+            expected_version,
+            actor: DelegationActor {
+                principal_id: fixture.manager,
+                authority: DelegationAuthority::CompanyManager,
+            },
+            reason,
+            reason_detail: Some("database concurrency test".into()),
+            operation,
+        },
+        replacement: None,
+    }
+}
+
+#[tokio::test]
+async fn delegation_commands_are_idempotent_fenced_and_audited() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let command_id = Uuid::new_v4();
+    let request = delegation_command(
+        &fixture,
+        command_id,
+        1,
+        DelegationReason::TargetUnavailable,
+        DelegationOperation::CancelTarget {
+            outreach_id: fixture.outreach_id,
+            target_id: fixture.target_ids[0],
+        },
+    );
+    let (first, retry) = tokio::join!(
+        persistence.execute_delegation_command(request.clone()),
+        persistence.execute_delegation_command(request.clone()),
+    );
+    let first = first.unwrap();
+    assert_eq!(retry.unwrap(), first, "the UUID returns its stored result");
+    assert_eq!(first.outreach_version, 2);
+    assert_eq!(
+        first.delivery_cancellation,
+        DeliveryCancellation::UnsentCancelled
+    );
+
+    let mut changed = request.clone();
+    changed.command.reason = DelegationReason::IncorrectTarget;
+    assert!(matches!(
+        persistence.execute_delegation_command(changed).await,
+        Err(AppError::Conflict(_))
+    ));
+    let stale = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::DeadlineChanged,
+        DelegationOperation::ExtendOutreach {
+            outreach_id: fixture.outreach_id,
+            expires_at: Utc::now() + chrono::Duration::hours(24),
+        },
+    );
+    assert!(matches!(
+        persistence.execute_delegation_command(stale).await,
+        Err(AppError::Conflict(_))
+    ));
+    let audit: (String, String, String, i64, i64) = sqlx::query_as(
+        r#"SELECT actor_kind, authority, reason, from_version, to_version
+           FROM delegation_control_commands WHERE task_id = $1 AND command_id = $2"#,
+    )
+    .bind(fixture.task.id)
+    .bind(command_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        audit,
+        (
+            "person".into(),
+            "company_manager".into(),
+            "target_unavailable".into(),
+            1,
+            2
+        )
+    );
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn owning_agent_authority_is_limited_to_its_internal_delegation_scope() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let creator = PrincipalId::new(
+        sqlx::query_scalar("SELECT created_by_principal_id FROM task_outreaches WHERE id = $1")
+            .bind(fixture.outreach_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+    );
+    let mut extend = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::DeadlineChanged,
+        DelegationOperation::ExtendOutreach {
+            outreach_id: fixture.outreach_id,
+            expires_at: Utc::now() + chrono::Duration::hours(48),
+        },
+    );
+    extend.command.actor = DelegationActor {
+        principal_id: creator,
+        authority: DelegationAuthority::OwningAgent,
+    };
+    assert_eq!(
+        persistence
+            .execute_delegation_command(extend)
+            .await
+            .unwrap()
+            .outreach_version,
+        2
+    );
+    for operation in [
+        DelegationOperation::CancelTarget {
+            outreach_id: fixture.outreach_id,
+            target_id: fixture.target_ids[0],
+        },
+        DelegationOperation::ProceedWithPartial {
+            outreach_id: fixture.outreach_id,
+        },
+        DelegationOperation::CancelOutreach {
+            outreach_id: fixture.outreach_id,
+        },
+        DelegationOperation::StopTask {
+            outreach_id: fixture.outreach_id,
+        },
+    ] {
+        let mut denied = delegation_command(
+            &fixture,
+            Uuid::new_v4(),
+            2,
+            DelegationReason::NoLongerNeeded,
+            operation,
+        );
+        denied.command.actor = DelegationActor {
+            principal_id: creator,
+            authority: DelegationAuthority::OwningAgent,
+        };
+        assert!(matches!(
+            persistence.execute_delegation_command(denied).await,
+            Err(AppError::NotFound(_))
+        ));
+    }
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn cancel_target_serializes_with_delivery_claim() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::NoLongerNeeded,
+        DelegationOperation::CancelTarget {
+            outreach_id: fixture.outreach_id,
+            target_id: fixture.target_ids[0],
+        },
+    );
+    let delivery_id = fixture.delivery_ids[0];
+    let claim = async {
+        sqlx::query_scalar::<_, Uuid>(
+            r#"UPDATE message_deliveries
+               SET status = 'sending', execution_id = $2, owner_worker_id = $3,
+                   locked_at = CURRENT_TIMESTAMP,
+                   lock_expires_at = CURRENT_TIMESTAMP + interval '5 minutes',
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status IN ('pending', 'retryable') RETURNING id"#,
+        )
+        .bind(delivery_id)
+        .bind(Uuid::new_v4())
+        .bind(Uuid::new_v4())
+        .fetch_optional(&pool)
+        .await
+        .unwrap()
+    };
+    let (cancelled, claimed) = tokio::join!(persistence.execute_delegation_command(request), claim);
+    let cancelled = cancelled.unwrap();
+    assert_eq!(
+        cancelled.delivery_cancellation,
+        if claimed.is_some() {
+            DeliveryCancellation::MayHaveBeenReceived
+        } else {
+            DeliveryCancellation::UnsentCancelled
+        }
+    );
+    let status: String = sqlx::query_scalar("SELECT status FROM message_deliveries WHERE id = $1")
+        .bind(delivery_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        status,
+        if claimed.is_some() {
+            "sending"
+        } else {
+            "dead_letter"
+        }
+    );
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn proceed_partial_serializes_its_exact_snapshot_with_a_reply() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 2, Utc::now() + chrono::Duration::hours(96)).await;
+    let response = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<racing-reply-{}@partner.test>", Uuid::new_v4()).into(),
+            sender: fixture.target_emails[0].clone().into(),
+            subject: "Re: Delegated question".into(),
+            clean_text_body: "Available result".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    let matched = crate::entities::outreach::OutreachReplyMatch {
+        outreach_id: fixture.outreach_id,
+        task_id: fixture.task.id,
+        target_id: fixture.target_ids[0],
+        target_email: fixture.target_emails[0].clone().into(),
+    };
+    let request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::PartialResultsAccepted,
+        DelegationOperation::ProceedWithPartial {
+            outreach_id: fixture.outreach_id,
+        },
+    );
+    let (decision, reply) = tokio::join!(
+        persistence.execute_delegation_command(request),
+        persistence.record_outreach_reply(&matched, response.id),
+    );
+    let decision = decision.unwrap();
+    reply.unwrap();
+    let disposition: String = sqlx::query_scalar(
+        "SELECT disposition FROM task_outreach_replies WHERE response_association_id = $1",
+    )
+    .bind(response.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    match disposition.as_str() {
+        "counted" => assert_eq!(decision.response_association_ids, vec![response.id]),
+        "late" => assert!(decision.response_association_ids.is_empty()),
+        other => panic!("unexpected racing reply disposition {other}"),
+    }
+    let status: String = sqlx::query_scalar("SELECT status FROM task_outreaches WHERE id = $1")
+        .bind(fixture.outreach_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "proceed_partial");
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn extending_an_expired_outreach_serializes_with_the_timeout_sweep() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(1)).await;
+    sqlx::query(
+        r#"UPDATE task_outreaches
+           SET created_at = CURRENT_TIMESTAMP - interval '2 hours',
+               expires_at = CURRENT_TIMESTAMP - interval '1 second'
+           WHERE id = $1"#,
+    )
+    .bind(fixture.outreach_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let new_expiry = Utc::now() + chrono::Duration::hours(48);
+    let request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::DeadlineChanged,
+        DelegationOperation::ExtendOutreach {
+            outreach_id: fixture.outreach_id,
+            expires_at: new_expiry,
+        },
+    );
+    let (extended, swept) = tokio::join!(
+        persistence.execute_delegation_command(request),
+        persistence.mark_outreach_timeout_pending(fixture.outreach_id),
+    );
+    extended.unwrap();
+    swept.unwrap();
+    let (status, expires_at): (String, DateTime<Utc>) =
+        sqlx::query_as("SELECT status, expires_at FROM task_outreaches WHERE id = $1")
+            .bind(fixture.outreach_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(status, "waiting");
+    assert_eq!(expires_at, new_expiry);
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::WaitingForThirdPartyReply
+    );
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn internal_cancel_serializes_with_child_completion_and_revokes_old_execution() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let target_id = fixture.target_ids[0];
+    sqlx::query(
+        r#"UPDATE task_outreach_targets
+           SET target_kind = 'internal_channel', internal_channel_id = $2,
+               external_transport = NULL, external_namespace = NULL, external_subject = NULL
+           WHERE id = $1"#,
+    )
+    .bind(target_id)
+    .bind(fixture.task.channel_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let provider_key = format!("<internal-{}@mailagents.test>", Uuid::new_v4());
+    sqlx::query(
+        r#"UPDATE message_delivery_parts
+           SET status = 'delivered', provider_message_key = $2,
+               request_started_at = CURRENT_TIMESTAMP, delivered_at = CURRENT_TIMESTAMP
+           WHERE delivery_id = $1"#,
+    )
+    .bind(fixture.delivery_ids[0])
+    .bind(&provider_key)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"UPDATE message_deliveries SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP
+           WHERE id = $1"#,
+    )
+    .bind(fixture.delivery_ids[0])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let child_message = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<child-{}@mailagents.test>", Uuid::new_v4()).into(),
+            sender: "internal@mailagents.test".into(),
+            subject: "Internal request".into(),
+            clean_text_body: "Work on this".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    let binding_id: Uuid =
+        sqlx::query_scalar("SELECT destination_binding_id FROM message_deliveries WHERE id = $1")
+            .bind(fixture.delivery_ids[0])
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query(
+        r#"INSERT INTO external_messages
+               (id, company_id, binding_id, external_message_key, message_id)
+           VALUES ($1, $2, $3, $4, $5)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.company.id)
+    .bind(binding_id)
+    .bind(&provider_key)
+    .bind(child_message.canonical_id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    let child = persistence
+        .enqueue_task(NewTask {
+            targets: Vec::new(),
+            source: TaskSource::Message(child_message.canonical_id),
+            company_id: fixture.company.id,
+            channel_id: fixture.task.channel_id,
+            thread_id: Some(fixture.task.thread_id.unwrap()),
+            task_type: "internal-child".into(),
+            payload: serde_json::json!({}),
+            correlation_id: fixture.task.correlation_id,
+        })
+        .await
+        .unwrap();
+    let child_lease = claim(&persistence, child.id).await;
+    let request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::NoLongerNeeded,
+        DelegationOperation::CancelTarget {
+            outreach_id: fixture.outreach_id,
+            target_id,
+        },
+    );
+    let (cancelled, completed) = tokio::join!(
+        persistence.execute_delegation_command(request),
+        persistence.mark_task_completed(child_lease),
+    );
+    match (cancelled, completed.unwrap()) {
+        (Ok(_), false) => {
+            assert_eq!(
+                persistence
+                    .get_task_by_id(child.id)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .status,
+                TaskStatus::Stopped
+            );
+            assert!(
+                !persistence
+                    .renew_task_lease(child_lease, Utc::now() + chrono::Duration::minutes(5))
+                    .await
+                    .unwrap(),
+                "the cancelled child's old execution fence is revoked"
+            );
+        }
+        (Err(AppError::Conflict(_)), true) => assert_eq!(
+            persistence
+                .get_task_by_id(child.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TaskStatus::Completed
+        ),
+        other => panic!("race must have exactly one winner, got {other:?}"),
+    }
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn internal_reassignment_serializes_with_reply_and_preserves_old_target_history() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let target_id = fixture.target_ids[0];
+    sqlx::query(
+        r#"UPDATE task_outreach_targets
+           SET target_kind = 'internal_channel', internal_channel_id = $2,
+               external_transport = NULL, external_namespace = NULL, external_subject = NULL
+           WHERE id = $1"#,
+    )
+    .bind(target_id)
+    .bind(fixture.task.channel_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let agent_id = seed_channel_agent(&persistence, fixture.company.id, "replacement").await;
+    let replacement_channel = ChannelPersistence::create(
+        &persistence,
+        fixture.company.id,
+        ChannelWrite {
+            name: "Replacement".into(),
+            slug: format!("replacement-{}", Uuid::new_v4().simple()),
+            agent_ids: Some(vec![agent_id]),
+            enabled: false,
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let key = format!("replacement-{}", Uuid::new_v4().simple());
+    let mut queued = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(fixture.task.id),
+            recipient: "replacement@internal.test",
+            purpose: DeliveryPurpose::Outreach,
+            ..DeliveryFixtureRequest::new(
+                fixture.company.id,
+                fixture.task.channel_id,
+                fixture.task.thread_id.unwrap(),
+                &key,
+            )
+        },
+    )
+    .await;
+    let replacement_request = email_write(EmailMessageDraft {
+        id: Uuid::new_v4(),
+        thread_id: fixture.task.thread_id.unwrap(),
+        message_id: format!("<{key}@mailagents.test>").into(),
+        sender: "support@acme.mailagents.test".into(),
+        recipients_to: vec!["replacement@internal.test".into()],
+        subject: "Reassigned question".into(),
+        clean_text_body: "Please answer".into(),
+        direction: MessageDirection::Outbound,
+        role: MessageRole::Agent,
+        ..EmailMessageDraft::default()
+    });
+    queued.delivery.message_id = replacement_request.id;
+    let replacement = OutreachTargetRequest {
+        target: OutreachTargetIdentity::InternalChannel {
+            channel_id: replacement_channel.id,
+        },
+        request: replacement_request,
+        delivery: queued.delivery,
+    };
+    let response = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<reassign-race-{}@internal.test>", Uuid::new_v4()).into(),
+            sender: fixture.target_emails[0].clone().into(),
+            subject: "Re: Delegated question".into(),
+            clean_text_body: "Old target result".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    let matched = crate::entities::outreach::OutreachReplyMatch {
+        outreach_id: fixture.outreach_id,
+        task_id: fixture.task.id,
+        target_id,
+        target_email: fixture.target_emails[0].clone().into(),
+    };
+    let mut request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::IncorrectTarget,
+        DelegationOperation::ReassignInternalTarget {
+            outreach_id: fixture.outreach_id,
+            target_id,
+            new_channel_id: replacement_channel.id,
+        },
+    );
+    request.replacement = Some(replacement);
+    let (reassigned, replied) = tokio::join!(
+        persistence.execute_delegation_command(request),
+        persistence.record_outreach_reply(&matched, response.id),
+    );
+    replied.unwrap();
+    let old_status: String =
+        sqlx::query_scalar("SELECT status FROM task_outreach_targets WHERE id = $1")
+            .bind(target_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    match reassigned {
+        Ok(result) => {
+            assert_eq!(old_status, "superseded");
+            let replacement_id = result.replacement_target_id.unwrap();
+            let link: (String, Uuid) = sqlx::query_as(
+                "SELECT status, replaces_target_id FROM task_outreach_targets WHERE id = $1",
+            )
+            .bind(replacement_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(link, ("active".into(), target_id));
+            let disposition: String = sqlx::query_scalar(
+                "SELECT disposition FROM task_outreach_replies WHERE response_association_id = $1",
+            )
+            .bind(response.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(disposition, "late");
+        }
+        Err(AppError::Conflict(_)) => assert_eq!(old_status, "responded"),
+        other => panic!("unexpected reassignment race result: {other:?}"),
+    }
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn stop_task_serializes_with_final_dispatch_without_duplicate_customer_reply() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    persistence
+        .execute_delegation_command(delegation_command(
+            &fixture,
+            Uuid::new_v4(),
+            1,
+            DelegationReason::PartialResultsAccepted,
+            DelegationOperation::ProceedWithPartial {
+                outreach_id: fixture.outreach_id,
+            },
+        ))
+        .await
+        .unwrap();
+    let lease = claim(&persistence, fixture.task.id).await;
+    let reply = AgentReply {
+        message: MessageWrite::internal(
+            fixture.task.thread_id.unwrap(),
+            MessageAuthorWrite::Platform,
+            "Re: Final",
+            "Final answer",
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            fixture.task.correlation_id,
+        )
+        .external_conversation(),
+        also_in_threads: Vec::new(),
+    };
+    let side_thread = persistence
+        .create_thread(fixture.task.channel_id, "Stop race delivery", &[])
+        .await
+        .unwrap();
+    let mut delivery = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(fixture.task.id),
+            source_key: "stop-final-race",
+            ..DeliveryFixtureRequest::new(
+                fixture.company.id,
+                fixture.task.channel_id,
+                side_thread.id,
+                "stop-final-race",
+            )
+        },
+    )
+    .await
+    .delivery;
+    delivery.message_id = reply.message.id;
+    let stop = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        2,
+        DelegationReason::TaskStopped,
+        DelegationOperation::StopTask {
+            outreach_id: fixture.outreach_id,
+        },
+    );
+    let (stopped, dispatched) = tokio::join!(
+        persistence.execute_delegation_command(stop),
+        persistence.commit_agent_dispatch(AgentDispatchCommit {
+            lease,
+            reply: &reply,
+            deliveries: vec![delivery],
+            payload: serde_json::json!({"final": true}),
+            complete_outreach: true,
+        }),
+    );
+    match (stopped, dispatched.unwrap()) {
+        (Ok(_), DispatchCommit::LeaseLost) => assert_eq!(
+            persistence
+                .get_task_by_id(fixture.task.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TaskStatus::Stopped
+        ),
+        (Err(AppError::Conflict(_)), DispatchCommit::Committed { .. }) => assert_eq!(
+            persistence
+                .get_task_by_id(fixture.task.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TaskStatus::Completed
+        ),
+        other => panic!("stop/final-dispatch race must have one winner, got {other:?}"),
+    }
+    let replies: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM message_deliveries
+           WHERE task_id = $1 AND idempotency_key LIKE '%stop-final-race%'"#,
+    )
+    .bind(fixture.task.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        replies <= 1,
+        "the recovery path cannot queue a second customer reply"
+    );
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn database_enforces_complete_outreach_and_target_transition_matrices() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let outreach_states = [
+        "waiting",
+        "threshold_met",
+        "timeout_pending_approval",
+        "proceed_partial",
+        "cancelled",
+        "completed",
+    ];
+    let outreach_allowed = |from: &str, to: &str| {
+        from == to
+            || matches!(
+                (from, to),
+                (
+                    "waiting",
+                    "threshold_met" | "timeout_pending_approval" | "proceed_partial" | "cancelled"
+                ) | (
+                    "timeout_pending_approval",
+                    "waiting" | "threshold_met" | "proceed_partial" | "cancelled"
+                ) | (
+                    "threshold_met" | "proceed_partial",
+                    "completed" | "cancelled"
+                )
+            )
+    };
+    for from in outreach_states {
+        for to in outreach_states {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO task_outreaches
+                       (id, task_id, company_id, status, required_threshold_percent, expires_at,
+                        outreach_key, subject, body)
+                   VALUES ($1, $2, $3, $4, 100, CURRENT_TIMESTAMP + interval '1 day',
+                           $5, 'matrix', 'matrix')"#,
+            )
+            .bind(id)
+            .bind(fixture.task.id)
+            .bind(fixture.company.id)
+            .bind(from)
+            .bind(format!("matrix-{id}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+            let changed = sqlx::query("UPDATE task_outreaches SET status = $2 WHERE id = $1")
+                .bind(id)
+                .bind(to)
+                .execute(&pool)
+                .await;
+            assert_eq!(
+                changed.is_ok(),
+                outreach_allowed(from, to),
+                "{from} -> {to}"
+            );
+        }
+    }
+
+    let response = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<matrix-{}@partner.test>", Uuid::new_v4()).into(),
+            sender: "matrix@partner.test".into(),
+            subject: "Matrix".into(),
+            clean_text_body: "Matrix".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    let target_states = ["active", "responded", "cancelled", "superseded", "expired"];
+    for from in target_states {
+        for to in target_states {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO task_outreach_targets
+                       (id, outreach_id, company_id, email, target_kind,
+                        external_transport, external_namespace, external_subject, status,
+                        responded_at, response_association_id)
+                   VALUES ($1, $2, $3, $4, 'external', 'email', 'email', $4, $5,
+                           CASE WHEN $5 = 'responded' THEN CURRENT_TIMESTAMP END,
+                           CASE WHEN $5 = 'responded' THEN $6 END)"#,
+            )
+            .bind(id)
+            .bind(fixture.outreach_id)
+            .bind(fixture.company.id)
+            .bind(format!("matrix-{id}@partner.test"))
+            .bind(from)
+            .bind(response.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+            let changed = sqlx::query(
+                r#"UPDATE task_outreach_targets
+                   SET status = $2,
+                       responded_at = CASE WHEN $2 = 'responded' THEN CURRENT_TIMESTAMP END,
+                       response_association_id = CASE WHEN $2 = 'responded' THEN $3 END
+                   WHERE id = $1"#,
+            )
+            .bind(id)
+            .bind(to)
+            .bind(response.id)
+            .execute(&pool)
+            .await;
+            assert_eq!(
+                changed.is_ok(),
+                from == to || from == "active",
+                "{from} -> {to}"
+            );
+        }
+    }
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
 }

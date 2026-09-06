@@ -11,6 +11,7 @@ pub mod correlation;
 pub mod creation;
 pub mod cursor;
 pub mod dashboard;
+pub mod delegation;
 pub mod delivery;
 pub mod email_message;
 pub mod harness;

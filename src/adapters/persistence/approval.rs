@@ -281,13 +281,57 @@ impl ApprovalPersistence for PostgresPersistence {
             return Ok(None);
         };
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let approval = sqlx::query_as::<_, HumanApprovalDb>(&format!(
+        let candidate = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
                WHERE token = $1 AND status = 'pending' AND expires_at >= $2
-                 AND action_type = 'quorum_timeout'
-               FOR UPDATE"#
+                 AND action_type = 'quorum_timeout'"#
         ))
         .bind(token)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let Some(candidate) = candidate else {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Ok(None);
+        };
+        let task_id = candidate.task_id.ok_or_else(|| {
+            AppError::Internal("Quorum timeout approval is missing its task".into())
+        })?;
+        let outreach_id = candidate
+            .payload
+            .get("outreach_id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .ok_or_else(|| {
+                AppError::Internal("Quorum timeout approval is missing its outreach".into())
+            })?;
+        // Every task/outreach writer uses this order. Read the candidate first only to discover
+        // its ids, then prove it is still pending after the shared workflow rows are locked.
+        let locked_outreach = sqlx::query_scalar::<_, Uuid>(
+            r#"SELECT id FROM task_outreaches
+               WHERE id = $1 AND task_id = $2 FOR UPDATE"#,
+        )
+        .bind(outreach_id)
+        .bind(task_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if locked_outreach.is_none() {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Ok(None);
+        }
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE id = $1 FOR UPDATE")
+            .bind(task_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        let approval = sqlx::query_as::<_, HumanApprovalDb>(&format!(
+            r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
+               WHERE id = $1 AND status = 'pending' AND expires_at >= $2
+                 AND action_type = 'quorum_timeout' FOR UPDATE"#
+        ))
+        .bind(candidate.id)
         .bind(now)
         .fetch_optional(&mut *tx)
         .await
@@ -296,9 +340,6 @@ impl ApprovalPersistence for PostgresPersistence {
             tx.rollback().await.map_err(AppError::from)?;
             return Ok(None);
         };
-        let task_id = approval.task_id.ok_or_else(|| {
-            AppError::Internal("Quorum timeout approval is missing its task".into())
-        })?;
         // Every arm names the decision the human actually made. `reject` used to borrow
         // `operator_stopped`, which contradicted its own `approval` actor kind, and the `_` arm
         // filed anything it did not recognise as consent.
@@ -312,15 +353,27 @@ impl ApprovalPersistence for PostgresPersistence {
 
         let task_updated = match action {
             QuorumTimeoutAction::ProceedPartial => {
-                let outreach = sqlx::query(
-                    r#"UPDATE task_outreaches SET status = 'proceed_partial',
+                let outreach_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"UPDATE task_outreaches SET status = 'proceed_partial', version = version + 1,
                            updated_at = CURRENT_TIMESTAMP
-                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                       WHERE id = $1 AND task_id = $2 AND status = 'timeout_pending_approval'
+                       RETURNING id"#,
                 )
+                .bind(outreach_id)
                 .bind(task_id)
-                .execute(&mut *tx)
+                .fetch_optional(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
+                if let Some(outreach_id) = outreach_id {
+                    super::task::cancel_unsent_outreach_questions(&mut tx, outreach_id).await?;
+                    sqlx::query(
+                        "UPDATE task_outreach_targets SET status = 'expired' WHERE outreach_id = $1 AND status = 'active'",
+                    )
+                    .bind(outreach_id)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(AppError::from)?;
+                }
                 let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
                            wait_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
@@ -331,15 +384,17 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
-                outreach.rows_affected() == 1 && task.rows_affected() == 1
+                outreach_id.is_some() && task.rows_affected() == 1
             }
             QuorumTimeoutAction::Extend { hours } => {
                 let expires_at = now + chrono::Duration::hours(hours);
                 let outreach = sqlx::query(
-                    r#"UPDATE task_outreaches SET status = 'waiting', expires_at = $2,
+                    r#"UPDATE task_outreaches SET status = 'waiting', expires_at = $3,
+                           version = version + 1,
                            updated_at = CURRENT_TIMESTAMP
-                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                       WHERE id = $1 AND task_id = $2 AND status = 'timeout_pending_approval'"#,
                 )
+                .bind(outreach_id)
                 .bind(task_id)
                 .bind(expires_at)
                 .execute(&mut *tx)
@@ -359,30 +414,44 @@ impl ApprovalPersistence for PostgresPersistence {
                 outreach.rows_affected() == 1 && task.rows_affected() == 1
             }
             QuorumTimeoutAction::Reject => {
-                let outreach = sqlx::query(
-                    r#"UPDATE task_outreaches SET status = 'cancelled',
+                let outreach_id = sqlx::query_scalar::<_, Uuid>(
+                    r#"UPDATE task_outreaches SET status = 'cancelled', version = version + 1,
                            updated_at = CURRENT_TIMESTAMP
-                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                       WHERE id = $1 AND task_id = $2 AND status = 'timeout_pending_approval'
+                       RETURNING id"#,
                 )
+                .bind(outreach_id)
                 .bind(task_id)
-                .execute(&mut *tx)
+                .fetch_optional(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
                 // The questions this outreach had not yet sent are no longer wanted. Claimable
                 // rows only: one already in flight is owned by a worker holding a live lease, and
                 // writing past that fence would overwrite an outcome a provider had already given.
-                sqlx::query(
-                    r#"UPDATE message_deliveries
+                if let Some(outreach_id) = outreach_id {
+                    sqlx::query(
+                        r#"UPDATE message_deliveries AS delivery
                           SET status = 'dead_letter', attempt_count = max_attempts,
                               last_error_class = 'superseded',
                               last_error_detail = 'The outreach this delivery belonged to was rejected',
                               updated_at = CURRENT_TIMESTAMP
-                        WHERE task_id = $1 AND status IN ('pending', 'retryable')"#,
-                )
-                .bind(task_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
+                         FROM task_outreach_targets AS target
+                        WHERE target.outreach_id = $1
+                          AND target.delivery_id = delivery.id
+                          AND delivery.status IN ('pending', 'retryable')"#,
+                    )
+                    .bind(outreach_id)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(AppError::from)?;
+                    sqlx::query(
+                        "UPDATE task_outreach_targets SET status = 'cancelled' WHERE outreach_id = $1 AND status = 'active'",
+                    )
+                    .bind(outreach_id)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(AppError::from)?;
+                }
                 let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'stopped', wait_expires_at = NULL,
                            worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
@@ -394,7 +463,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
-                outreach.rows_affected() == 1 && task.rows_affected() == 1
+                outreach_id.is_some() && task.rows_affected() == 1
             }
         };
         if !task_updated {
@@ -1014,7 +1083,7 @@ mod tests {
                     action_type: QUORUM_TIMEOUT_ACTION.to_string(),
                     title: "Outreach timed out".to_string(),
                     summary: "Received 1/4 responses.".to_string(),
-                    payload: serde_json::json!({}),
+                    payload: serde_json::json!({ "outreach_id": outreach_id }),
                 },
                 message: &notice,
                 delivery,

@@ -16,7 +16,10 @@ use crate::entities::task::{
 use crate::entities::transport::{
     ChannelBindingId, DeliveryId, DeliveryPartId, ExternalMessageKey, FailureClass, PrincipalId,
 };
-use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
+use crate::use_cases::thread::{
+    qualified_email_identity,
+    test_support::{EmailMessageDraft, stored_email_view},
+};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -3842,6 +3845,7 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
 
     assert!(html.contains("id=\"task-pane\""));
@@ -3880,11 +3884,82 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
     assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
     assert!(!stopped_html.contains("/stop?"));
     // A task whose channel is gone still renders, falling back to the raw id.
     assert!(stopped_html.contains(&stopped.channel_id.to_string()));
+}
+
+#[test]
+fn task_detail_delegation_controls_name_irreversible_external_consequences() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let task = monitored_task(
+        company.id,
+        channel.id,
+        TaskStatus::WaitingForThirdPartyReply,
+    );
+    let now = Utc::now();
+    let summary = CollaborationSummary {
+        task_id: task.id,
+        outreach_id: Some(Uuid::new_v4()),
+        outreach_version: Some(7),
+        correlation_id: task.correlation_id,
+        owner: CollaborationOwner {
+            kind: CollaborationOwnerKind::Agent,
+            principal_id: Some(PrincipalId::random()),
+            label: "Triage".into(),
+            available: true,
+        },
+        status: OutreachBusinessStatus::Waiting,
+        progress: Some(CollaborationProgress {
+            responded: 0,
+            required: 1,
+            total: 1,
+        }),
+        expires_at: Some(now + chrono::Duration::hours(96)),
+        next_action: None,
+        children: vec![CollaborationTargetSummary {
+            id: Uuid::new_v4(),
+            target: CollaborationTarget::External {
+                identity: qualified_email_identity("vendor@example.test").unwrap(),
+            },
+            label: "vendor@example.test".into(),
+            status: TargetBusinessStatus::Waiting,
+            responded_at: None,
+            next_action: None,
+            child: None,
+        }],
+        as_of: now,
+        truncated: false,
+        detail_href: None,
+    };
+    let html = task_detail_pane(&TaskDetailPane {
+        company_id: company.id,
+        task: &task,
+        channel: Some(&channel),
+        deliveries: &[],
+        delivery_error: None,
+        attempts: &[],
+        attempts_error: None,
+        error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
+        collaboration: Some(&summary),
+        delegation_channels: std::slice::from_ref(&channel),
+    });
+    assert!(html.contains("Delegation controls"));
+    assert!(html.contains("expected_version\" value=\"7"));
+    assert!(html.contains("Cancel waiting"));
+    assert!(html.contains("Cancel outreach waiting"));
+    assert!(html.contains("Stop task"));
+    assert!(html.contains("may already have been received"));
+    assert!(html.contains("do not recall email"));
+    assert!(!html.to_lowercase().contains("recall email</button>"));
+    assert!(html.contains("hx-target=\"#task-pane\""));
 }
 
 #[test]
@@ -3969,6 +4044,7 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
 
     assert!(html.contains("Latest execution"));
@@ -4099,6 +4175,7 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
 
     // Verify token stats
@@ -5041,6 +5118,7 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
 
     // The task reads as completed, so the delivery section is the only thing that can tell an
@@ -5070,6 +5148,7 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
+        delegation_channels: &[],
     });
     assert!(!quiet.contains("Delivery"));
 }
@@ -6229,6 +6308,8 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
         outreaches: Vec::new(),
         collaboration: Some(CollaborationSummary {
             task_id: task.id,
+            outreach_id: Some(Uuid::new_v4()),
+            outreach_version: Some(1),
             correlation_id: task.correlation_id,
             owner: CollaborationOwner {
                 kind: CollaborationOwnerKind::Agent,

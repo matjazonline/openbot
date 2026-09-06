@@ -72,6 +72,7 @@ impl OutreachProgress {
 pub struct OutreachReplyMatch {
     pub outreach_id: Uuid,
     pub task_id: Uuid,
+    pub target_id: Uuid,
     pub target_email: EmailAddress,
 }
 

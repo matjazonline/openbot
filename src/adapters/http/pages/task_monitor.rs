@@ -54,6 +54,7 @@ pub struct TaskDetailPane<'a> {
     pub ownership_events: &'a [TaskOwnershipEvent],
     pub owner_candidates: &'a [TaskOwnerCandidate],
     pub collaboration: Option<&'a CollaborationSummary>,
+    pub delegation_channels: &'a [Channel],
 }
 
 /// The `/ui/tasks` URL for a given selection, i.e. what a click on it should leave in the address
@@ -405,6 +406,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                 {error_html}
                 {ownership_controls}
                 {collaboration}
+                {delegation_controls}
                 {ownership_history}
                 {token_stats}
                 {latest_execution}
@@ -426,13 +428,25 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         task_id = task.id,
         reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         thread_link = task_thread_link(pane),
-        action_button = task_action_button(company_id, task),
+        action_button = task_action_button(
+            company_id,
+            task,
+            pane.collaboration.is_some_and(|summary| {
+                summary.outreach_id.is_some()
+                    && !matches!(
+                        summary.status,
+                        crate::entities::collaboration::OutreachBusinessStatus::Completed
+                            | crate::entities::collaboration::OutreachBusinessStatus::Cancelled
+                    )
+            })
+        ),
         error_html = form_error_banner(pane.error),
         ownership_controls = task_ownership_controls(pane),
         collaboration = pane
             .collaboration
             .map(super::task_board::collaboration_status)
             .unwrap_or_default(),
+        delegation_controls = delegation_controls(pane),
         ownership_history = task_ownership_history(pane.ownership_events),
         token_stats = task_token_stats(task, pane.attempts),
         latest_execution = task_latest_execution(task),
@@ -444,6 +458,113 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         deliveries = task_deliveries(pane),
         last_error = task_last_error(task),
         payload = render_message_task_parameters_html(&task.payload),
+    )
+}
+
+fn delegation_controls(pane: &TaskDetailPane<'_>) -> String {
+    let Some(summary) = pane.collaboration else {
+        return String::new();
+    };
+    let (Some(outreach_id), Some(version)) = (summary.outreach_id, summary.outreach_version) else {
+        return String::new();
+    };
+    if matches!(
+        summary.status,
+        crate::entities::collaboration::OutreachBusinessStatus::Completed
+            | crate::entities::collaboration::OutreachBusinessStatus::Cancelled
+    ) {
+        return String::new();
+    }
+    let base = |reason: &str| {
+        format!(
+            r#"<input type="hidden" name="command_id" value="{}"><input type="hidden" name="expected_version" value="{version}"><input type="hidden" name="outreach_id" value="{outreach_id}"><input type="hidden" name="reason" value="{reason}">"#,
+            Uuid::new_v4()
+        )
+    };
+    let task_id = pane.task.id;
+    let company_id = pane.company_id;
+    let can_change_waiting = matches!(
+        summary.status,
+        crate::entities::collaboration::OutreachBusinessStatus::Waiting
+            | crate::entities::collaboration::OutreachBusinessStatus::NeedsDecision
+            | crate::entities::collaboration::OutreachBusinessStatus::Failed
+    );
+    let target_controls = summary
+        .children
+        .iter()
+        .filter(|target| {
+            can_change_waiting
+                && !matches!(
+                    target.status,
+                    crate::entities::collaboration::TargetBusinessStatus::Responded
+                        | crate::entities::collaboration::TargetBusinessStatus::Cancelled
+                        | crate::entities::collaboration::TargetBusinessStatus::Superseded
+                        | crate::entities::collaboration::TargetBusinessStatus::Expired
+                )
+        })
+        .map(|target| {
+            let target_field = format!(
+                r#"<input type="hidden" name="target_id" value="{}">"#,
+                target.id
+            );
+            let warning = match target.target {
+                crate::entities::collaboration::CollaborationTarget::External { .. } => {
+                    "Cancels an unsent delivery when possible; otherwise only stops waiting. The external message may already have been received."
+                }
+                _ => "Stops waiting and revokes unfinished internal work. A completed result wins.",
+            };
+            let reassign = if let crate::entities::collaboration::CollaborationTarget::InternalChannel {
+                channel_id: current_channel_id,
+            } = target.target
+            {
+                let options = pane
+                    .delegation_channels
+                    .iter()
+                    .filter(|channel| channel.enabled && channel.id != current_channel_id)
+                    .map(|channel| {
+                        format!(
+                            r#"<option value="{}">{}</option>"#,
+                            channel.id,
+                            escape_html_text(&channel.name)
+                        )
+                    })
+                    .collect::<String>();
+                format!(
+                    r##"<form hx-post="/ui/tasks/{task_id}/delegation/reassign?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML" class="flex gap-2">{}{target}<select name="new_channel_id" class="select select-xs grow" required><option value="">Reassign to…</option>{options}</select><button class="btn btn-xs">Reassign</button></form>"##,
+                    base("incorrect_target"),
+                    target = target_field,
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                r##"<div class="rounded-box border border-base-300 p-2"><p class="text-xs font-semibold">{}</p><p class="mb-2 text-[11px] opacity-70">{warning}</p><div class="flex flex-wrap gap-2"><form hx-post="/ui/tasks/{task_id}/delegation/cancel-target?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML">{}{target}<button class="btn btn-warning btn-xs">Cancel waiting</button></form>{reassign}</div></div>"##,
+                escape_html_text(&target.label),
+                base("target_unavailable"),
+                target = target_field,
+            )
+        })
+        .collect::<String>();
+    let extend = if can_change_waiting {
+        format!(
+            r##"<form hx-post="/ui/tasks/{task_id}/delegation/extend?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML" class="flex gap-2">{}<input class="input input-xs w-28" type="number" min="1" max="720" name="deadline_hours" value="96" aria-label="New response window in hours"><button class="btn btn-xs">Extend deadline</button></form>"##,
+            base("deadline_changed"),
+        )
+    } else {
+        String::new()
+    };
+    let proceed_partial = if can_change_waiting {
+        format!(
+            r##"<form hx-post="/ui/tasks/{task_id}/delegation/proceed-partial?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML">{}<button class="btn btn-primary btn-xs">Proceed with partial</button></form>"##,
+            base("partial_results_accepted"),
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        r##"<section class="space-y-3 rounded-box border border-warning/30 bg-warning/5 p-4"><div><h3 class="text-xs font-bold uppercase opacity-60">Delegation controls</h3><p class="text-[11px] opacity-70">These actions change waiting or execution state. They do not recall email.</p></div>{extend}<div class="space-y-2">{target_controls}</div><div class="flex flex-wrap gap-2">{proceed_partial}<form hx-post="/ui/tasks/{task_id}/delegation/cancel-outreach?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML">{}<button class="btn btn-warning btn-xs">Cancel outreach waiting</button></form><form hx-post="/ui/tasks/{task_id}/delegation/stop-task?company_id={company_id}&amp;view=list&amp;task_id={task_id}" hx-target="#task-pane" hx-swap="outerHTML">{}<button class="btn btn-error btn-xs">Stop task</button></form></div></section>"##,
+        base("no_longer_needed"),
+        base("task_stopped"),
     )
 }
 
@@ -607,7 +728,19 @@ fn task_thread_link(pane: &TaskDetailPane<'_>) -> String {
 }
 
 /// Stop what is still running, resume what has given up; a finished task offers neither.
-fn task_action_button(company_id: Uuid, task: &BackgroundTask) -> String {
+fn task_action_button(
+    company_id: Uuid,
+    task: &BackgroundTask,
+    has_active_delegation_controls: bool,
+) -> String {
+    if has_active_delegation_controls
+        && matches!(
+            task.status,
+            TaskStatus::Pending | TaskStatus::Processing | TaskStatus::Failed
+        )
+    {
+        return String::new();
+    }
     let (path, label, style, confirm) = match task.status {
         TaskStatus::Pending | TaskStatus::Processing | TaskStatus::Failed => (
             "stop",

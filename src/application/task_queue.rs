@@ -18,6 +18,7 @@ use crate::{
     entities::{
         collaboration::CollaborationSummary,
         correlation::CorrelationId,
+        delegation::{DelegationCommand, DelegationCommandResult},
         internal_note::{AgentInstructionNote, AskOwnerOutcome, AskOwnerToAct, StartAgentTask},
         message::CanonicalMessageId,
         outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch},
@@ -193,6 +194,25 @@ pub struct CollaborationReadScope<'a> {
     pub visible_channel_ids: &'a [Uuid],
 }
 
+/// A delegation command plus the frozen request/delivery needed only by reassignment.
+///
+/// Keeping composition in the application layer means the PostgreSQL adapter never learns how to
+/// render transport payloads. The adapter verifies that the replacement's stable channel identity
+/// agrees with the semantic command before committing all rows in one transaction.
+#[derive(Debug, Clone)]
+pub struct DelegationCommandRequest {
+    pub command: DelegationCommand,
+    pub replacement: Option<OutreachTargetRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutreachReassignmentContext {
+    pub thread_id: Uuid,
+    pub correlation_id: CorrelationId,
+    pub subject: String,
+    pub body: String,
+}
+
 /// Everything one agent dispatch makes durable, so it can land as a single transaction.
 ///
 /// The reply message in each answered thread, the delivery that carries it, and the audit payload
@@ -253,6 +273,22 @@ pub enum DispatchCommit {
 }
 #[async_trait]
 pub trait TaskPersistence: Send + Sync {
+    /// Apply one serialized delegation recovery decision. Implementations must return the stored
+    /// result for an identical command UUID and reject UUID reuse with changed parameters.
+    async fn execute_delegation_command(
+        &self,
+        request: DelegationCommandRequest,
+    ) -> AppResult<DelegationCommandResult>;
+
+    /// Load the canonical request facts needed to compose a replacement transport delivery.
+    async fn outreach_reassignment_context(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+        outreach_id: Uuid,
+        target_id: Uuid,
+    ) -> AppResult<Option<OutreachReassignmentContext>>;
+
     /// One bounded, current snapshot. Implementations must return at most five nested task levels
     /// and one hundred combined task/target nodes, with `truncated` set when either limit is hit.
     async fn get_collaboration_summary(
