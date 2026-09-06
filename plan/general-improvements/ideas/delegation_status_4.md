@@ -2,37 +2,60 @@
 
 ## Expected result
 
-Users can see the complete collaboration state of a task: who owns it, which specialists or external parties were asked, what each request is waiting for, which results arrived, and what will resume the task. Nested delegation is understandable without exposing internal transport details.
+From one view, a user can answer who owns a task, who or what it is waiting on, what has arrived,
+what happens next, and when a decision becomes due. The view uses business language, remains useful
+for nested work, and does not expose provider or restricted-channel details.
 
-The status is derived from durable task, outreach, target, and message records rather than maintained as a second inconsistent workflow model.
+The status is derived from authoritative task, outreach, target, canonical-message,
+generic-delivery, approval, and ownership records. It is not a second workflow state machine.
 
-## Plan summary
+## Read model
 
-1. Define a read model for task owner, active outreach, targets, completion threshold, deadlines, replies, nested waits, and resume state.
-2. Map current `task_outreaches`, targets, outbox messages, internal channel deliveries, and background tasks into stable delegation statuses.
-3. Add efficient persistence queries and indexes for a task collaboration summary and optional timeline.
-4. Expose the read model through application/API boundaries without leaking provider or internal security metadata.
-5. Add mailbox and task UI components for waiting-on chips, progress, deadlines, partial results, and nested specialist work.
-6. Emit monitoring for stuck waits, unmatched responses, inconsistent target state, and overdue delegation.
-7. Test ordinary, nested, partial-quorum, timeout, duplicate-reply, and failed-delivery paths.
+- Add a transport-neutral `CollaborationSummary` containing task/correlation identity, current
+  owner, business status, progress, expiry, `next_action`, nested children, `as_of`, and a
+  `truncated` flag.
+- Represent targets as an internal principal/channel reference or an external qualified identity.
+  Do not expose an email-only target shape through the application/API boundary.
+- Use stable business statuses:
+  - outreach: `Waiting`, `ReadyToResume`, `NeedsDecision`, `Completed`, `Cancelled`, or `Failed`;
+  - target: `Preparing`, `Sending`, `Waiting`, `Responded`, `NeedsDecision`, `Failed`,
+    `Cancelled`, `Superseded`, or `Expired`;
+  - next action: actor/queue responsible, allowed action kind, due time, and authorized deep link.
+- Derive delivery-facing target states from `message_deliveries` and delivery parts, including
+  outcome-unknown as `NeedsDecision`; do not leak leases, provider payloads, credentials, or raw
+  errors.
+- Correlate a response with the exact target/request that caused it. A nested delegate never
+  becomes owner of the originating task merely because it owns a child task.
 
-## Scope decisions for the detailed plan
+## Authorization and bounded reads
 
-- Decide how much nested delegation detail ordinary teammates may view.
-- Define status names in business language rather than worker-state terminology.
-- Define when an internal delegate is shown as an agent, channel, or business function.
-- Specify eventual-consistency expectations while delivery and resume operations are in flight.
-- Decide whether the first release is read-only or includes status actions.
+- Apply viewer authorization at every referenced channel/thread. If a user may see the parent but
+  not a nested internal channel, render `Internal specialist` plus safe status instead of its name,
+  messages, or handoff details.
+- Return at most five nested levels and 100 nodes. Set `truncated=true` and provide a scoped detail
+  link when more data exists; never silently omit it.
+- V1 is read-only. Deadline, cancellation, partial-result, and reassignment mutations belong to the
+  following controls plan.
+- HTTP reads return one current database-derived snapshot with `as_of`. SSE events are
+  identifier-only wake-ups; reconnect and lag always re-query current state.
+- Instrument query duration and working-set size first. Add or change indexes only after recording
+  representative table statistics and `EXPLAIN (ANALYZE, BUFFERS)` evidence.
 
-## Dependencies and sequencing
+## UI and monitoring
 
-Consumes task ownership and message visibility. It should precede deadline/cancellation/reassignment controls because those actions need a trustworthy status surface.
+- Show compact waiting-on, progress, due/overdue, owner, and next-action indicators in mailbox and
+  task views. Detailed timelines load separately from mailbox-list summaries.
+- Emit bounded metrics/log classifications for stuck waits, unmatched replies, inconsistent source
+  states, delivery failure, outcome unknown, and overdue delegation. Keep tenant, message, and
+  target identifiers out of metric labels.
 
-## Acceptance signals
+## Test and acceptance plan
 
-- A user can answer “who has this and what are we waiting for?” from one view.
-- Status remains correct after retries and idempotent duplicate operations.
-- A specialist response is visibly correlated with the request that caused it.
-- Nested work does not imply that the specialist owns the original task.
-- Queries remain bounded and indexed for mailbox-list usage.
-
+- Cover ordinary, nested, partial-quorum, timeout, duplicate-response, failed-delivery,
+  outcome-unknown, cancelled, reassigned, and late-reply histories.
+- Verify status remains correct after retries and concurrent transitions and that `as_of` snapshots
+  reconcile after missed or coalesced SSE events.
+- Test restricted nested channels, external identities, disabled principals, cross-company IDs,
+  depth/node truncation, and provider-error redaction.
+- Record query plans for representative mailbox-list and detail cardinalities; enforce bounded reads
+  and visible truncation before adding any supporting index.

@@ -29,11 +29,13 @@ mailbox and API collaboration uses the first-class note operation.
 
 - Add a separate `AskOwnerToAct` command containing the active task ID, expected ownership version,
   selected note IDs, and a command UUID. Every note must belong to the same readable thread.
-- If the active task is agent-owned, append an auditable instruction event and safely resume or
-  queue that same task under its ownership fence. An idempotent retry cannot enqueue a second run.
-- If there is no active task, expose a separate `StartAgentTask` action that creates one for the
-  channel's current position-zero agent. If no eligible agent exists, leave an unassigned
-  operational work item rather than silently choosing one.
+- If the active task is agent-owned, append an auditable instruction linked to that task. Wake a
+  pending task; fence, cancel, and requeue a processing task so it rebuilds its prompt; leave an
+  approval/outreach-waiting task parked and include the instruction when its existing wait
+  resolves. An idempotent retry cannot start a second execution.
+- If there is no active non-terminal task, expose a separate `StartAgentTask` action that creates
+  one for the channel's current position-zero agent. If no eligible agent exists, leave an
+  unassigned operational work item rather than silently choosing one.
 - If the active task is human-owned or unassigned, require claim/transfer first. A note itself never
   changes ownership or task state.
 - Prompt assembly loads notes through a dedicated projection and labels author, timestamp,
@@ -61,4 +63,3 @@ mailbox and API collaboration uses the first-class note operation.
   disabled users, bounded text, and hostile rendered content.
 - The next explicit agent run receives each active selected note once, with accurate principal
   attribution and internal-only labelling.
-

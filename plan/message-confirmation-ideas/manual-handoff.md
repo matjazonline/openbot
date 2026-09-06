@@ -2,72 +2,102 @@
 
 ## Summary
 
-Add a durable, shared mailbox handoff workflow instead of per-user unread state.
+Add a durable shared-mailbox handoff workflow instead of per-user unread state.
 
-When an ordinary reply from someone outside the company reaches an existing thread, the channel's effective policy decides whether to run the agent immediately or store the message and mark the thread **Needs instruction**. Opening the thread does not clear it; only a team action does.
+When an ordinary outside reply reaches an existing thread, the channel's effective policy either
+runs the agent immediately or files the message and creates a **Needs instruction** work item.
+Opening the thread or reading a notification never clears the handoff; an explicit team action does.
 
-## Configuration and Policy
+This plan consumes the general-improvements audience, internal-note, response-draft, task-ownership,
+and operational-attention contracts rather than defining competing versions of them.
+
+## Configuration and policy
 
 - Add `ExternalReplyHandling::{Automatic, ManualHandoff}`.
-- Store `external_reply_handling` on companies, defaulting existing and new companies to `Automatic`.
-- Store nullable `external_reply_handling_override` on channels:
-  - `NULL`: inherit the company policy live.
-  - `Automatic`: always run immediately.
-  - `ManualHandoff`: always hold for the team.
-- Expose the company policy in company settings and a three-option inheritance selector in channel settings and JSON representations.
-- Treat a sender as outside when their resolved `CompanyMembership` is `None`; allowlisted customers remain outside.
-- Hold only messages that:
-  - Continue an existing thread.
-  - Would otherwise cause that channel to answer.
-  - Were not explicitly marked `FileOnly`/quiet.
-  - Are not correlated outreach/quorum replies.
-- New outside conversations and outreach replies retain their current automatic behavior.
-- For multi-channel messages, create handoffs only for manual channels while the existing task targets automatic channels normally.
+- Store `external_reply_handling` on companies and a nullable channel override:
+  - `NULL`: inherit the company policy live;
+  - `Automatic`: run the normal answering path;
+  - `ManualHandoff`: hold eligible replies for the team.
+- Preserve `Automatic` for existing and new companies. Expose company default and channel
+  inheritance in settings and JSON representations.
+- Treat a sender as outside when its resolved `CompanyMembership` is `None`; allowlisted customers
+  remain outside.
+- Hold only messages that continue an existing thread, would otherwise make that channel answer,
+  are not explicitly `FileOnly`, and are not correlated outreach/quorum replies.
+- New outside conversations and outreach replies retain current automatic behavior. For
+  multi-channel input, hold only manual channels while automatic channel targets proceed normally.
 
-## Shared Attention and Release Flow
+## Handoff state and responsibility
 
-- Add a tenant-scoped `thread_handoffs` table with one current row per thread, a generation UUID, source message, state, optional task/draft references, and timestamps.
-- States are `needs_instruction`, `drafting`, `replying`, and `draft_ready`, with database constraints enforcing which references are valid.
-- Persist the message, handoff transition, task targets, and outreach transitions in the existing atomic inbound commit.
-- A later outside reply replaces the current handoff generation. Completion from an older task must never clear or overwrite the newer handoff.
-- An authorized team message with normal `Answer` disposition releases the current handoff:
-  - `InAppOnly` moves it to `drafting`; successful dispatch moves it to `draft_ready`.
-  - `Send` moves it to `replying`; successful dispatch and durable delivery enqueue resolve it.
-  - A quiet/FileOnly team note leaves it untouched.
-- Terminal task failure or an explicit task stop returns a matching `drafting`/`replying` handoff to `needs_instruction`; retries keep the in-progress state.
-- Add an explicit **Generate draft** action. It creates a visible, team-attributed instruction such as "Generate a draft response for team review," queues an `InAppOnly` run, and follows the same fenced state transitions.
-- Extend the version-1 inbound task payload with a bounded, defaulted list of handoff generation IDs so old queued payloads remain readable.
-- A draft-ready agent message is labeled **Draft — not sent** and offers:
-  - **Send draft**: deliver the stored text unchanged.
-  - **Edit and send**: open an editable review composer, store the approved text as a new teammate-authored outbound message, and deliver it without rerunning the agent.
-  - **Dismiss**: clear the handoff and add an auditable system note.
-- Sending and dismissal lock and validate the handoff generation, then commit message metadata, provider correlation, delivery enqueue, and handoff removal atomically. Stable handoff-based idempotency keys prevent duplicate sends.
+- Add a tenant-scoped `thread_handoffs` row for the current handoff of a thread: generation UUID,
+  source message, state, optional responsible principal, business priority/due time, monotonic
+  version, and timestamps.
+- Append immutable handoff events for creation, generation replacement, claim/reassignment,
+  priority/due changes, drafting, draft readiness, publication, dismissal, and failure recovery.
+- Use `needs_instruction`, `drafting`, `replying`, and `draft_ready` as active states. Database
+  constraints enforce their valid references.
+- Default a new handoff to the channel team queue with `Normal` priority and no business due time.
+  Authorized teammates may claim/reassign it or set priority/due time through versioned,
+  idempotent, audited commands.
+- Persist the inbound external message, its `ExternalConversation` classification, handoff
+  transition, task targets, and outreach transitions in the existing atomic inbound commit.
+- A later outside reply creates a new handoff generation. An old task, draft, send, or dismiss
+  operation cannot mutate the newer generation.
+- Project `needs_instruction` and `draft_ready` into the shared `AttentionItem` read model.
+  `drafting` and `replying` remain visible non-actionable progress states.
 
-## Mailbox Notification
+## Generate, publish, and dismiss
 
-- Show durable action badges on thread rows and a prominent banner in the open thread:
-  - **Needs instruction**
-  - **Draft ready**
-- Show actionable counts beside each readable channel and the company mailbox selector. Only `needs_instruction` and `draft_ready` contribute to counts.
-- Add a PostgreSQL notification trigger for handoff changes and extend mailbox SSE events so badges and counts update across processes and connected teammates.
-- Re-query current state on connect, reconnect, or lag; events remain wake-ups rather than state.
-- Do not clear attention when a member merely opens the thread.
-- Do not add team notification emails in this version; email/push notifications can later consume the same durable handoff state.
+- A normal team reply with `Answer` disposition releases the matching generation:
+  - `InAppOnly` enters `drafting`;
+  - `Send` enters `replying` and follows ordinary external publication.
+  A quiet/FileOnly internal note never changes handoff state.
+- **Generate draft** writes a team-authored `InternalOnly` instruction through the shared note use
+  case and creates one fenced agent task. Completion writes a `ResponseDraft`, not an unsent
+  canonical message, and moves the matching generation to `draft_ready`.
+- Do not add handoff state or content to `InboundTaskPayloadV1`. Add an immutable,
+  tenant-scoped handoff-run correlation keyed by task ID and handoff generation; workers reload it
+  from persistence. This preserves stale-generation fencing without snapshotting entities in a
+  durable payload.
+- A draft-ready handoff offers:
+  - **Send draft**: publish the exact current draft version;
+  - **Edit and send**: create a new immutable version and publish it under the applicable review
+    policy;
+  - **Dismiss**: resolve the generation and append an auditable `InternalOnly` system event.
+- Send and dismiss lock the handoff generation/version and use a stable command UUID. Publication
+  creates one new `ExternalConversation` message and one logical delivery; retries cannot enqueue
+  another.
+- Resolve the handoff when the logical external delivery is durably enqueued. A later permanent or
+  outcome-unknown delivery failure becomes its own operational attention item rather than silently
+  reopening the completed editorial decision.
+- Terminal draft-task failure or explicit stop returns only the matching `drafting` generation to
+  `needs_instruction`; retryable failures keep it in progress.
 
-## Test Plan
+## Mailbox updates
 
-- Verify company inheritance, both channel overrides, migration defaults, and JSON/form round-trips.
-- Cover the policy matrix: team sender, outside sender, new thread, existing reply, quiet reply, passive CC, outreach reply, and mixed multi-channel routing.
-- Database-test that the external message and handoff commit together and that no task is created for held targets.
-- Add competing-claimant tests for duplicate inbound delivery, two simultaneous Generate draft actions, outside-reply versus team-instruction ordering, and stale task completion versus a newer handoff generation.
-- Verify drafting/replying success, retry, dead-letter, and stop transitions.
-- Verify exact send, edited send, dismissal, idempotent retries, outbound threading metadata, and authorization against another tenant or unreadable channel.
-- Verify initial mailbox rendering, live SSE updates, reconnect reconciliation, counts, and that opening a thread does not clear its badge.
-- Regenerate SQLx metadata and run formatting checks, offline compilation, migrations, the database-backed suite, and the repository stack-budget check.
+- Show durable **Needs instruction** and **Draft ready** badges on thread rows and a prominent
+  banner in the open thread, including responsible party, age, priority, and due/overdue state.
+- Counts come from the operational attention projection, not notification unread state. Merely
+  opening the thread does not change them.
+- Emit identifier-only PostgreSQL/SSE wake-ups after committed material changes. Subscribe before
+  querying and re-query on initial connect, reconnect, or lag.
+- Notification email/push behavior belongs to the final actionable-notifications plan.
 
-## Assumptions
+## Test plan
 
-- "Reply" means an accepted outside message attached to an existing thread, not a brand-new conversation.
-- Company policy uses live inheritance; changing it immediately affects channels without explicit overrides.
-- Shared action state is authoritative across the team; there is no per-member unread state.
-- Existing uncommitted outreach-allowlist work touching company and dispatch code must be preserved and integrated rather than overwritten.
+- Verify company inheritance, both channel overrides, migration defaults, and JSON/form round trips.
+- Cover team versus outside sender, new versus existing thread, quiet reply, passive CC, outreach
+  reply, and mixed multi-channel routing.
+- Database-test that held input and handoff commit together and no answering task exists until an
+  explicit release/generate action.
+- Add competing tests for duplicate inbound delivery, two Generate draft actions, outside reply
+  versus team instruction, stale task completion versus a newer generation, edit versus send, and
+  send versus dismiss.
+- Verify task correlation is loaded from durable rows rather than payload snapshots and that stale
+  workers cannot write a draft or clear a newer handoff.
+- Verify exact draft-version publication, logical-send idempotency, outbound threading, delivery
+  failure attention, restricted-channel authorization, and cross-company IDs.
+- Verify initial rendering, live reconciliation, counts, responsibility changes, and that opening or
+  reading a notification never clears attention.
+- Run formatting checks, offline compilation, migrations, SQLx preparation, the database-backed
+  suite, competing-claimant cases, and the stock-stack budget for worker-path changes.

@@ -67,4 +67,3 @@ draft foundation; delegation, review, operational work items, and notifications 
   stored audience is determined independently.
 - A user can identify each entry's audience and kind without inspecting transport headers or
   provider metadata.
-

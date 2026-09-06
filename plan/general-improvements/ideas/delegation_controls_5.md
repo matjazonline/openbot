@@ -2,38 +2,62 @@
 
 ## Expected result
 
-Authorized users and owning agents can manage outstanding delegated work. They can set or extend a deadline, cancel an unanswered request, reassign internal work to another specialist, and choose how the owning task proceeds with partial results. Late or duplicate replies are retained safely as context but cannot unexpectedly reopen or complete closed work.
+Authorized humans and owning agents can recover stalled delegated work without duplicating customer
+replies or pretending that externally sent messages can be recalled. Every operation has explicit
+authority, a version fence, a stable command UUID, typed actor/reason data, and an auditable result.
 
-All actions are race-safe, auditable, and compatible with task retries and existing timeout behavior.
+## Lifecycle and deadline decisions
 
-## Plan summary
+- Define and database-test the outreach and target transition matrices using the business statuses
+  from the read model. `Cancelled`, `Superseded`, `Responded`, and `Expired` are terminal for quorum
+  contribution.
+- Keep the current 96-hour default outreach timeout and 720-hour maximum in V1 for both internal
+  and external targets. Allow an explicit per-outreach deadline within the configured maximum;
+  collect elapsed-time data before introducing different defaults.
+- Keep the owning task's operational due time separate from outreach expiry and individual-target
+  delivery state. Extending outreach updates its expiry and maintenance scheduling but does not
+  silently change the task's business due time.
 
-1. Define outreach and target lifecycle states, terminal-state rules, and allowed transitions.
-2. Specify deadline semantics separately for the owning task, an outreach, and individual targets.
-3. Add use cases for extend, cancel, reassign, proceed-with-partial, and stop-task with authorization and idempotency.
-4. Make maintenance and reply-correlation paths safe when actions race with delivery, timeout, or incoming replies.
-5. Define reassignment as a new correlated request while preserving the cancelled target and audit history.
-6. Add UI actions with confirmation, reason capture, and a preview of consequences.
-7. Add notifications and monitoring for approaching deadlines, overdue work, cancellations, and failed reassignment.
-8. Test transition matrices, concurrent operations, late replies, partial quorum, and nested delegation.
+## Command behavior
 
-## Scope decisions for the detailed plan
+- Add versioned commands for `ExtendOutreach`, `CancelTarget`, `CancelOutreach`,
+  `ReassignInternalTarget`, `ProceedWithPartial`, and `StopTask`. Repeating the same UUID
+  returns its original result; changed parameters or a stale version conflict.
+- Human task owners and company managers may perform all commands. Owning agents may extend within
+  policy and cancel/reassign internal delegation they created. Proceed-with-partial and stopping
+  the owning task remain human-owner/manager actions in V1.
+- Cancelling internal work revokes a pending/processing child task through its execution and
+  ownership fences. If the child already completed, its result wins and cancellation reports a
+  conflict rather than rewriting history.
+- For an external target, cancel an unclaimed delivery when possible. Once sending, delivered, or
+  outcome-unknown, cancellation means only "stop waiting for this target" and the UI must state
+  that the external message may already have been received.
+- Reassignment is available only for internal targets. It marks the old target `Superseded`, creates
+  a new correlated request/child task, and preserves both histories. The old target can no longer
+  satisfy quorum.
+- Proceed-with-partial records the exact responses available at the decision version and resumes
+  once. A response racing with the command either commits before the locked snapshot and is
+  included, or commits afterward as late internal context.
+- Late or duplicate replies are retained as `InternalOnly` delegation context, correlated to the
+  original target, and never reopen or complete closed work.
 
-- Decide which actions agents may take autonomously versus requiring human approval.
-- Define whether cancellation can stop work already running in another agent or only detach the caller's wait.
-- Specify treatment of externally sent email, which cannot truly be recalled.
-- Define default timeout policy by internal versus external target.
-- Decide when partial context is sufficient to resume automatically.
+## UI and operations
 
-## Dependencies and sequencing
+- Expose controls only from the collaboration detail and operational work-item surfaces. Each form
+  includes expected version, command UUID, reason, and a preview of delivery/task consequences.
+- Distinguish `Cancel waiting`, `Cancel unsent delivery`, and `Stop task`; never label any of them
+  "recall email."
+- Produce authoritative work-item changes for decisions that need a human. Notification delivery is
+  deferred to the final notifications plan.
 
-Depends on the delegation status read model and task ownership. Notification behavior should be coordinated with plan part 7.
+## Test and acceptance plan
 
-## Acceptance signals
-
-- Every state transition is validated, idempotent, and recorded with its actor and reason.
-- A cancelled or reassigned target cannot satisfy quorum accidentally.
-- A late response is preserved but does not silently reopen a completed task.
-- Extending a deadline updates worker scheduling without duplicate task execution.
-- Users can safely recover from a stalled specialist without creating duplicate customer replies.
-
+- Database-test every allowed and forbidden transition plus actor/reason attribution and command
+  idempotency.
+- Add competing tests for cancel versus delivery claim, cancel versus internal completion,
+  reassign versus response, extend versus timeout sweep, proceed-partial versus response, and stop
+  versus final dispatch.
+- Prove cancelled/superseded targets cannot satisfy quorum, old workers cannot commit after internal
+  cancellation, and extension cannot create duplicate task execution.
+- Verify late replies are preserved privately, provider-unknown outcomes require a decision, and no
+  recovery path produces a second customer reply.
