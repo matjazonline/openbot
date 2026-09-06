@@ -14,7 +14,7 @@ use std::{
 
 use axum::{
     Form, Router,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::HeaderMap,
     response::{
         Html, IntoResponse, Response,
@@ -36,7 +36,10 @@ use crate::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
         message::CanonicalMessageId,
-        task::ThreadActivity,
+        task::{
+            TaskOwner, TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
+            TaskOwnershipOperation, TaskOwnershipReason, ThreadActivity,
+        },
         thread::Thread,
         user::{User, Viewer},
         value_objects::EmailAddress,
@@ -51,8 +54,8 @@ use crate::{
         channel::ChannelUseCases,
         company::CompanyUseCases,
         thread::{
-            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
-            qualified_email_identity,
+            CanonicalMessageIngress, HumanCompletionDraft, IngressOrigin, ReplyDelivery,
+            ThreadUseCases, qualified_email_identity,
         },
         user::UserUseCases,
     },
@@ -73,6 +76,14 @@ pub fn router() -> Router<AppState> {
         .route("/ui/threads/events", get(thread_column_stream))
         .route("/ui/compose", get(compose_form).post(create_thread))
         .route("/ui/reply", get(reply_form).post(send_reply))
+        .route(
+            "/ui/task-complete",
+            axum::routing::post(complete_human_task),
+        )
+        .route(
+            "/ui/task-ownership/{task_id}/{operation}",
+            axum::routing::post(change_visible_task_ownership),
+        )
 }
 
 /// What the mailbox shell has selected, all optional so `/ui` alone is a valid entry point.
@@ -145,6 +156,29 @@ pub struct ReplyForm {
     pub deliver: Option<String>,
     /// Present only when the message should be stored without running the agent.
     pub quiet: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct VisibleOwnershipForm {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub command_id: Uuid,
+    pub expected_ownership_version: u64,
+    pub owner: Option<String>,
+    pub reason_detail: Option<String>,
+    pub handoff_instruction: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct HumanCompletionForm {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub task_id: Uuid,
+    pub command_id: Uuid,
+    pub expected_ownership_version: u64,
+    pub text_body: String,
 }
 
 /// How the "deliver by email" toggle arrives on both send forms.
@@ -272,7 +306,12 @@ async fn page_activity(
     threads: &[Thread],
 ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
     let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-    thread_use_cases.thread_activity(&ids).await
+    Ok(thread_use_cases
+        .thread_work_summary(&ids)
+        .await?
+        .into_iter()
+        .filter_map(|(thread_id, summary)| summary.activity.map(|activity| (thread_id, activity)))
+        .collect())
 }
 
 /// Thread ids whose activity badges a newly connected column may already be displaying.
@@ -294,10 +333,10 @@ async fn thread_activity(
     thread_id: Uuid,
 ) -> AppResult<Option<ThreadActivity>> {
     Ok(thread_use_cases
-        .thread_activity(&[thread_id])
+        .thread_work_summary(&[thread_id])
         .await?
         .get(&thread_id)
-        .copied())
+        .and_then(|summary| summary.activity))
 }
 
 /// The face and name the agent side of a thread is drawn with.
@@ -325,17 +364,64 @@ async fn render_message_pane(
     channel: &Channel,
     thread: &Thread,
     agent: Option<&Agent>,
-    viewer_email: &EmailAddress,
+    viewer: &Viewer,
+    ownership_error: Option<&str>,
 ) -> AppResult<String> {
     let messages = thread_use_cases.get_thread_history(thread.id).await?;
+    let access = thread_use_cases
+        .principal_access_for_user(company_id, viewer.user_id)
+        .await?;
+    let viewer_principal_id = access.and_then(|context| context.principal_id);
+    let viewer_manages_tasks =
+        access.is_some_and(|context| context.membership.manages_company_operations());
+    let work = thread_use_cases
+        .thread_work_summary(&[thread.id])
+        .await?
+        .remove(&thread.id);
+    let may_read_handoff = work.as_ref().is_some_and(|summary| {
+        summary.ownership.owner.principal_id() == viewer_principal_id
+            || access.is_some_and(|context| context.membership.manages_company_operations())
+    });
+    let ownership_events = match (may_read_handoff, work.as_ref()) {
+        (true, Some(summary)) => {
+            thread_use_cases
+                .get_task_persistence()
+                .await
+                .list_task_ownership_events(company_id, summary.task_id)
+                .await?
+        }
+        _ => Vec::new(),
+    };
+    let private_handoff = ownership_events
+        .iter()
+        .rev()
+        .find_map(|event| event.handoff_instruction.as_deref());
+    let owner_candidates = match (may_read_handoff, work.as_ref()) {
+        (true, Some(summary)) => thread_use_cases
+            .get_task_persistence()
+            .await
+            .list_task_owner_candidates(company_id, channel.id)
+            .await?
+            .into_iter()
+            .filter(|candidate| candidate.owner != summary.ownership.owner)
+            .collect(),
+        _ => Vec::new(),
+    };
     Ok(pages::message_pane(&pages::MessagePane {
         company_id,
         channel,
         thread,
         messages: &messages,
         agent,
-        viewer_email,
-        activity: thread_activity(thread_use_cases, thread.id).await?,
+        viewer_email: &viewer.email,
+        activity: work.as_ref().and_then(|summary| summary.activity),
+        work,
+        viewer_principal_id,
+        viewer_manages_tasks,
+        ownership_controls_enabled: thread_use_cases.task_ownership_controls_enabled(),
+        private_handoff,
+        ownership_error,
+        owner_candidates: &owner_candidates,
     }))
 }
 
@@ -410,7 +496,8 @@ async fn mailbox_page(
                 channel,
                 thread,
                 agent.as_ref(),
-                &viewer.email,
+                &viewer,
+                None,
             )
             .await?
         }
@@ -543,7 +630,8 @@ async fn message_pane_fragment(
             &channel,
             &thread,
             agent.as_ref(),
-            &viewer.email,
+            &viewer,
+            None,
         )
         .await?,
     ))
@@ -733,14 +821,16 @@ async fn thread_column_stream(
         loop {
             if !stale_badges.is_empty() {
                 let ids: Vec<Uuid> = stale_badges.drain().collect();
-                match thread_use_cases.thread_activity(&ids).await {
+                match thread_use_cases.thread_work_summary(&ids).await {
                     Ok(activity) => {
                         for id in ids {
                             // A thread absent from the map has gone idle, and an empty payload is
                             // what clears its badge.
                             yield Ok(Event::default()
                                 .event(pages::thread_activity_event(id))
-                                .data(pages::thread_activity_mark(activity.get(&id).copied())));
+                                .data(pages::thread_activity_mark(
+                                    activity.get(&id).and_then(|summary| summary.activity),
+                                )));
                         }
                     }
                     Err(error) => {
@@ -759,8 +849,16 @@ async fn thread_column_stream(
                         // A streamed row must arrive with its badge already on it, or a thread
                         // bumped mid-run would blink back to "idle" until its next status change.
                         let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-                        let activity = match thread_use_cases.thread_activity(&ids).await {
-                            Ok(activity) => activity,
+                        let activity: HashMap<Uuid, ThreadActivity> = match thread_use_cases
+                            .thread_work_summary(&ids)
+                            .await
+                        {
+                            Ok(summary) => summary
+                                .into_iter()
+                                .filter_map(|(id, summary)| {
+                                    summary.activity.map(|activity| (id, activity))
+                                })
+                                .collect(),
                             Err(error) => {
                                 warn!(%error, %channel_id, "Thread activity query failed");
                                 return;
@@ -976,7 +1074,7 @@ async fn create_thread(
         &config.app_domain_name,
         &thread,
         agent.as_ref(),
-        &viewer.email,
+        &viewer,
     )
     .await
 }
@@ -1136,9 +1234,252 @@ async fn send_reply(
         &config.app_domain_name,
         &sent_thread,
         agent.as_ref(),
-        &viewer.email,
+        &viewer,
     )
     .await
+}
+
+async fn complete_human_task(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    viewer: Viewer,
+    Form(form): Form<HumanCompletionForm>,
+) -> AppResult<Response> {
+    if !config.task_ownership_controls_enabled() {
+        return Err(AppError::NotFound(
+            "Task ownership controls are disabled.".into(),
+        ));
+    }
+    let (company, channel) = load_viewable_channel(
+        &company_use_cases,
+        &channel_use_cases,
+        &viewer,
+        form.company_id,
+        form.channel_id,
+    )
+    .await?;
+    let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+    let task = thread_use_cases
+        .get_task_persistence()
+        .await
+        .get_task_by_id(form.task_id)
+        .await?
+        .filter(|task| {
+            task.company_id == company.id
+                && task.channel_id == channel.id
+                && task.thread_id == Some(thread.id)
+        })
+        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+    let owner = thread_use_cases
+        .principal_access_for_user(company.id, viewer.user_id)
+        .await?
+        .and_then(|access| access.principal_id)
+        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+
+    let outcome = thread_use_cases
+        .complete_human_owned_task(HumanCompletionDraft {
+            task: &task,
+            company: &company,
+            channel: &channel,
+            thread: &thread,
+            owner_principal_id: owner,
+            expected_ownership_version: form.expected_ownership_version,
+            command_id: form.command_id,
+            text_body: &form.text_body,
+        })
+        .await;
+    if let Err(error) = outcome {
+        return render_mailbox_ownership_error(
+            &thread_use_cases,
+            &agent_use_cases,
+            &viewer,
+            &company,
+            &channel,
+            &thread,
+            &error.to_string(),
+        )
+        .await;
+    }
+    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
+    sent_message_response(
+        &thread_use_cases,
+        company.id,
+        &channel,
+        &config.app_domain_name,
+        &thread,
+        agent.as_ref(),
+        &viewer,
+    )
+    .await
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
+async fn change_visible_task_ownership(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    viewer: Viewer,
+    Path((task_id, operation)): Path<(Uuid, String)>,
+    Form(form): Form<VisibleOwnershipForm>,
+) -> AppResult<Response> {
+    if !config.task_ownership_controls_enabled() {
+        return Err(AppError::NotFound(
+            "Task ownership controls are disabled.".into(),
+        ));
+    }
+    let (company, channel) = load_viewable_channel(
+        &company_use_cases,
+        &channel_use_cases,
+        &viewer,
+        form.company_id,
+        form.channel_id,
+    )
+    .await?;
+    let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+    let task = thread_use_cases
+        .get_task_persistence()
+        .await
+        .get_task_by_id(task_id)
+        .await?
+        .filter(|task| {
+            task.company_id == company.id
+                && task.channel_id == channel.id
+                && task.thread_id == Some(thread.id)
+        })
+        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+    let access = thread_use_cases
+        .principal_access_for_user(company.id, viewer.user_id)
+        .await?;
+    let actor = access
+        .and_then(|access| access.principal_id)
+        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+    let authority = if access.is_some_and(|access| access.membership.manages_company_operations()) {
+        TaskOwnershipAuthority::Manager
+    } else {
+        TaskOwnershipAuthority::CurrentOwner
+    };
+    let (operation, authority, new_owner, reason) = match operation.as_str() {
+        "claim" => (
+            TaskOwnershipOperation::Claim,
+            if authority == TaskOwnershipAuthority::Manager {
+                TaskOwnershipAuthority::Manager
+            } else {
+                TaskOwnershipAuthority::UnassignedClaimant
+            },
+            TaskOwner::Human(actor),
+            TaskOwnershipReason::SelfClaim,
+        ),
+        "release" => (
+            TaskOwnershipOperation::Release,
+            authority,
+            TaskOwner::Unassigned,
+            TaskOwnershipReason::Released,
+        ),
+        "transfer" => {
+            let owner = form
+                .owner
+                .as_deref()
+                .ok_or_else(|| AppError::BadRequest("Choose a task owner.".into()))?;
+            let (kind, id) = owner
+                .split_once(':')
+                .ok_or_else(|| AppError::BadRequest("Choose a valid task owner.".into()))?;
+            let id = Uuid::parse_str(id)
+                .map_err(|_| AppError::BadRequest("Choose a valid task owner.".into()))?;
+            let target = match kind {
+                "human" => TaskOwner::Human(id.into()),
+                "agent" => TaskOwner::Agent(id.into()),
+                _ => return Err(AppError::BadRequest("Choose a valid task owner.".into())),
+            };
+            (
+                TaskOwnershipOperation::Transfer,
+                authority,
+                target,
+                TaskOwnershipReason::Delegated,
+            )
+        }
+        _ => return Err(AppError::NotFound("Ownership action not found.".into())),
+    };
+    let outcome = thread_use_cases
+        .change_task_ownership(
+            &company,
+            &task,
+            TaskOwnershipCommand {
+                task_id,
+                company_id: company.id,
+                command_id: form.command_id,
+                expected_version: form.expected_ownership_version,
+                actor: TaskOwnershipActor {
+                    principal_id: actor,
+                    authority,
+                },
+                operation,
+                new_owner,
+                reason,
+                reason_detail: form.reason_detail,
+                handoff_instruction: form.handoff_instruction,
+            },
+        )
+        .await;
+    if let Err(error) = outcome {
+        return render_mailbox_ownership_error(
+            &thread_use_cases,
+            &agent_use_cases,
+            &viewer,
+            &company,
+            &channel,
+            &thread,
+            &error.to_string(),
+        )
+        .await;
+    }
+    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
+    sent_message_response(
+        &thread_use_cases,
+        company.id,
+        &channel,
+        &config.app_domain_name,
+        &thread,
+        agent.as_ref(),
+        &viewer,
+    )
+    .await
+}
+
+async fn render_mailbox_ownership_error(
+    thread_use_cases: &ThreadUseCases,
+    agent_use_cases: &AgentUseCases,
+    viewer: &Viewer,
+    company: &Company,
+    channel: &Channel,
+    thread: &Thread,
+    error: &str,
+) -> AppResult<Response> {
+    let agent = channel_agent(agent_use_cases, viewer, channel).await?;
+    Ok(Html(
+        render_message_pane(
+            thread_use_cases,
+            company.id,
+            channel,
+            thread,
+            agent.as_ref(),
+            viewer,
+            Some(error),
+        )
+        .await?,
+    )
+    .into_response())
 }
 
 /// What both send forms return: the thread's messages, with its column refreshed beside them.
@@ -1149,7 +1490,7 @@ async fn sent_message_response(
     app_domain_name: &str,
     thread: &Thread,
     agent: Option<&Agent>,
-    viewer_email: &EmailAddress,
+    viewer: &Viewer,
 ) -> AppResult<Response> {
     let pane = render_message_pane(
         thread_use_cases,
@@ -1157,7 +1498,8 @@ async fn sent_message_response(
         channel,
         thread,
         agent,
-        viewer_email,
+        viewer,
+        None,
     )
     .await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;

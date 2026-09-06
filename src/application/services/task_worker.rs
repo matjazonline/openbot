@@ -22,7 +22,7 @@ use crate::{
         },
         value_objects::EmailAddress,
     },
-    infra::config::AppConfig,
+    infra::{config::AppConfig, events::TaskWakeups},
     services::runtime_metrics::ActiveTaskExecutions,
     task_queue::{
         Leased, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome, while_leased,
@@ -123,6 +123,7 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
     interval: Duration,
     mut shutdown: broadcast::Receiver<()>,
     concurrency: usize,
+    wakeups: Option<TaskWakeups>,
     mut claim: Claim,
     execute: Execute,
 ) where
@@ -173,6 +174,7 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
         if running.is_empty() {
             tokio::select! {
                 _ = shutdown.recv() => break,
+                _ = wait_for_ready(&wakeups) => next_poll = Instant::now(),
                 _ = sleep_until(next_poll) => {}
             }
         } else if running.len() >= concurrency {
@@ -184,6 +186,7 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
             tokio::select! {
                 _ = shutdown.recv() => break,
                 result = running.join_next() => report_task_join(result),
+                _ = wait_for_ready(&wakeups) => next_poll = Instant::now(),
                 _ = sleep_until(next_poll) => {}
             }
         }
@@ -195,6 +198,36 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
     );
     while let Some(result) = running.join_next().await {
         report_task_join(Some(result));
+    }
+}
+
+async fn wait_for_ready(wakeups: &Option<TaskWakeups>) {
+    match wakeups {
+        Some(wakeups) => wakeups.ready().await,
+        None => std::future::pending().await,
+    }
+}
+
+async fn wait_for_shutdown(shutdown: &mut Option<broadcast::Receiver<()>>) {
+    match shutdown {
+        Some(shutdown) => {
+            let _ = shutdown.recv().await;
+        }
+        None => std::future::pending().await,
+    }
+}
+
+async fn wait_for_ownership_change(changes: &mut Option<broadcast::Receiver<Uuid>>, task_id: Uuid) {
+    let Some(changes) = changes else {
+        std::future::pending().await
+    };
+    loop {
+        match changes.recv().await {
+            Ok(changed_task_id) if changed_task_id == task_id => return,
+            Ok(_) => {}
+            Err(broadcast::error::RecvError::Lagged(_)) => return,
+            Err(broadcast::error::RecvError::Closed) => std::future::pending().await,
+        }
     }
 }
 
@@ -278,6 +311,7 @@ pub struct TaskWorker {
     task_concurrency: usize,
     agent_run_timeout: std::time::Duration,
     active_task_executions: ActiveTaskExecutions,
+    task_wakeups: Option<TaskWakeups>,
 }
 
 impl TaskWorker {
@@ -297,6 +331,7 @@ impl TaskWorker {
             task_concurrency: 1,
             agent_run_timeout: std::time::Duration::from_secs(300),
             active_task_executions: ActiveTaskExecutions::default(),
+            task_wakeups: None,
         }
     }
 
@@ -331,6 +366,11 @@ impl TaskWorker {
 
     pub fn with_active_task_executions(mut self, gauge: ActiveTaskExecutions) -> Self {
         self.active_task_executions = gauge;
+        self
+    }
+
+    pub fn with_task_wakeups(mut self, wakeups: TaskWakeups) -> Self {
+        self.task_wakeups = Some(wakeups);
         self
     }
 
@@ -395,19 +435,29 @@ impl TaskWorker {
 
     async fn run_task_loop(self: Arc<Self>, shutdown: broadcast::Receiver<()>) {
         let concurrency = self.task_concurrency;
+        let task_wakeups = self.task_wakeups.clone();
         let claimant = Arc::clone(&self);
         let executor = self;
         run_bounded_task_loop(
             TASK_POLL_INTERVAL,
             shutdown,
             concurrency,
+            task_wakeups,
             move |available| {
                 let worker = Arc::clone(&claimant);
                 async move { worker.claim_pending_task_batch(available).await }
             },
             move |task, shutdown| {
                 let worker = Arc::clone(&executor);
-                async move { worker.process_claimed_task(task, Some(shutdown)).await }
+                let ownership_changes = worker
+                    .task_wakeups
+                    .as_ref()
+                    .map(TaskWakeups::subscribe_ownership);
+                async move {
+                    worker
+                        .process_claimed_task(task, Some(shutdown), ownership_changes)
+                        .await
+                }
             },
         )
         .await;
@@ -435,6 +485,7 @@ impl TaskWorker {
         &self,
         task: BackgroundTask,
         mut shutdown: Option<broadcast::Receiver<()>>,
+        mut ownership_changes: Option<broadcast::Receiver<Uuid>>,
     ) {
         // A row this worker just claimed always carries its lease; the constraint on
         // `background_tasks` makes a `processing` row without one unrepresentable. Bailing rather
@@ -452,14 +503,16 @@ impl TaskWorker {
         let attempt = TaskAttemptRef::of(&task, lease);
         let execution = self.execute_single_task_with_lease(&task, lease, attempt);
         tokio::pin!(execution);
-        let outcome = match shutdown.as_mut() {
-            Some(shutdown) => tokio::select! {
-                outcome = &mut execution => outcome,
-                _ = shutdown.recv() => TaskExecutionOutcome::Interrupted(
-                    "Task execution interrupted by shutdown".into(),
-                ),
-            },
-            None => execution.await,
+        let outcome = tokio::select! {
+            outcome = &mut execution => outcome,
+            _ = wait_for_shutdown(&mut shutdown) => TaskExecutionOutcome::Interrupted(
+                "Task execution interrupted by shutdown".into(),
+            ),
+            _ = wait_for_ownership_change(&mut ownership_changes, task.id) => {
+                TaskExecutionOutcome::Interrupted(
+                    "Task execution interrupted because ownership changed".into(),
+                )
+            }
         };
         let duration_ms = start_time.elapsed().as_millis() as u64;
         self.close_out_task(&task, lease, attempt, outcome, duration_ms)
@@ -471,7 +524,7 @@ impl TaskWorker {
         let tasks = self.claim_pending_task_batch(1).await?;
         let claimed = tasks.len();
         for task in tasks {
-            self.process_claimed_task(task, None).await;
+            self.process_claimed_task(task, None, None).await;
         }
         Ok(polled(claimed, 1))
     }
@@ -800,7 +853,10 @@ impl TaskWorker {
             thread_id,
             // The sweep holds no lease: this task is already parked awaiting third-party replies,
             // and the quorum timeout is what moves it on to awaiting a human.
-            suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+            suspension: Some(TaskSuspension::AlreadySuspended {
+                task_id: task.id,
+                ownership: task.ownership,
+            }),
             correlation_id: task.correlation_id,
             approver_email,
         };
@@ -1213,10 +1269,11 @@ mod tests {
     use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::correlation::CorrelationId;
-    use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
+    use crate::entities::task::{NewTask, TaskOwner, TaskOwnership};
+    use crate::entities::transport::PrincipalId;
     use crate::entities::value_objects::MessageId;
-    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
+    use crate::task_queue::{AgentDispatchCommit, DispatchCommit, OwnedAgentExecution};
     use crate::transport::NewDelivery;
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
     use crate::use_cases::thread::test_support::{EmailMessageDraft, InMemoryThreads, email_write};
@@ -1473,6 +1530,9 @@ mod tests {
     #[derive(Default)]
     struct MockTaskPersistence {
         tasks: Mutex<Vec<BackgroundTask>>,
+        /// Business id of the agent that owns newly enqueued work. Production derives this from
+        /// channel position zero in the insert transaction; tests state it explicitly.
+        owner_agent_id: Mutex<Option<Uuid>>,
         /// Lease renewals seen, so a test can prove the heartbeat actually fired.
         renewals: Mutex<usize>,
         /// How many renewals to grant before reporting the lease gone. `None` grants every one.
@@ -1483,8 +1543,42 @@ mod tests {
         queued_deliveries: Mutex<Vec<NewDelivery>>,
     }
 
+    impl MockTaskPersistence {
+        fn set_owner_agent(&self, agent_id: Uuid) {
+            *self.owner_agent_id.lock().unwrap() = Some(agent_id);
+        }
+    }
+
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn owned_agent_execution(
+            &self,
+            company_id: Uuid,
+            channel_id: Uuid,
+            lease: TaskLeaseRef,
+        ) -> AppResult<Option<OwnedAgentExecution>> {
+            let tasks = self.tasks.lock().unwrap();
+            let Some(_) = tasks.iter().find(|task| {
+                task.id == lease.task_id
+                    && task.company_id == company_id
+                    && task.channel_id == channel_id
+                    && task.status == TaskStatus::Processing
+                    && task.worker_id == Some(lease.worker_id)
+                    && task.execution_generation == Some(lease.execution_generation)
+                    && task.ownership.owner == lease.claimed_owner
+                    && task.ownership.version == lease.ownership_version
+            }) else {
+                return Ok(None);
+            };
+            let Some(agent_id) = *self.owner_agent_id.lock().unwrap() else {
+                return Ok(None);
+            };
+            Ok(Some(OwnedAgentExecution {
+                agent_id,
+                handoff_instruction: None,
+            }))
+        }
+
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
@@ -1572,6 +1666,15 @@ mod tests {
                 correlation_id,
             }: NewTask,
         ) -> AppResult<BackgroundTask> {
+            let ownership = self
+                .owner_agent_id
+                .lock()
+                .unwrap()
+                .map(|agent_id| TaskOwnership {
+                    owner: TaskOwner::Agent(PrincipalId::new(agent_id)),
+                    version: 1,
+                })
+                .unwrap_or_default();
             let task = BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
@@ -1584,6 +1687,7 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                ownership,
                 worker_id: None,
                 execution_generation: None,
                 locked_at: None,
@@ -1604,14 +1708,6 @@ mod tests {
                 .iter()
                 .find(|t| t.id == id)
                 .cloned())
-        }
-
-        async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
-            let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
-                t.payload = payload;
-            }
-            Ok(())
         }
 
         /// Mirrors the real reaper: an expired lease costs an attempt and the row goes back to
@@ -1814,6 +1910,7 @@ mod tests {
             Duration::from_secs(3600),
             shutdown_rx,
             4,
+            None,
             move |available| {
                 observed_claim_sizes.lock().unwrap().push(available);
                 let count = claim_remaining
@@ -1879,6 +1976,7 @@ mod tests {
             Duration::ZERO,
             shutdown_rx,
             1,
+            None,
             move |_| {
                 let call = observed_claim_calls.fetch_add(1, Ordering::SeqCst);
                 async move { Ok(if call == 0 { vec![()] } else { Vec::new() }) }
@@ -2026,6 +2124,8 @@ mod tests {
             task_id: Uuid::new_v4(),
             worker_id: Uuid::new_v4(),
             execution_generation: Uuid::new_v4(),
+            claimed_owner: Default::default(),
+            ownership_version: 1,
         });
 
         // 1000s of work against a 900s lease: beats land at 300s, 600s and 900s.
@@ -2059,6 +2159,8 @@ mod tests {
             task_id: Uuid::new_v4(),
             worker_id: Uuid::new_v4(),
             execution_generation: Uuid::new_v4(),
+            claimed_owner: Default::default(),
+            ownership_version: 1,
         });
         let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -2246,6 +2348,7 @@ mod tests {
         let agent_id = Uuid::new_v4();
 
         let task_persistence = Arc::new(MockTaskPersistence::default());
+        task_persistence.set_owner_agent(agent_id);
         let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
         let company = crate::entities::company::Company {
@@ -2421,6 +2524,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
         let agent_id = Uuid::new_v4();
+        task_persistence.set_owner_agent(agent_id);
 
         let company = Company {
             channel_defaults: Default::default(),
@@ -2570,6 +2674,7 @@ mod tests {
         let thread_id = Uuid::new_v4();
         let trigger = MessageId::new("<TRIGGER123@domain.com>");
         let agent_id = Uuid::new_v4();
+        task_persistence.set_owner_agent(agent_id);
 
         let company = Company {
             channel_defaults: Default::default(),
@@ -2797,6 +2902,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
         let agent_id = Uuid::new_v4();
+        task_persistence.set_owner_agent(agent_id);
 
         let company = Company {
             channel_defaults: Default::default(),

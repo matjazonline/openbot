@@ -703,6 +703,13 @@ impl ThreadPersistence for PostgresPersistence {
         views::latest_email_reply_context(&self.pool, thread_id).await
     }
 
+    async fn latest_replyable_email_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        views::latest_replyable_email_context(&self.pool, thread_id).await
+    }
+
     async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>> {
         views::latest_thread_rfc_message_id(&self.pool, thread_id).await
     }

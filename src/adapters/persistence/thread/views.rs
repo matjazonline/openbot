@@ -424,15 +424,63 @@ pub(super) async fn latest_email_reply_context(
     .await
     .map_err(AppError::from)?;
 
-    let Some(row) = row else {
-        return Ok(None);
-    };
+    Ok(row.map(email_reply_context))
+}
+
+/// Find the external inbound turn a human completion is answering. Internal quiet context and
+/// agent messages may be newer in the canonical thread, but neither supplies a customer address
+/// and neither may redirect the final response.
+pub(super) async fn latest_replyable_email_context(
+    pool: &PgPool,
+    thread_id: Uuid,
+) -> AppResult<Option<EmailReplyContext>> {
+    let row = sqlx::query_as::<_, EmailReplyContextDb>(
+        r#"SELECT message.id AS canonical_id,
+                  author_identity.transport AS author_transport,
+                  author_identity.subject AS author_subject,
+                  email.rfc_message_id,
+                  email.references_list,
+                  COALESCE((
+                      SELECT array_agg(identity.subject ORDER BY participant.position)
+                        FROM message_participants AS participant
+                        JOIN participant_identities AS identity
+                          ON (identity.company_id, identity.id) =
+                             (participant.company_id, participant.participant_identity_id)
+                       WHERE participant.company_id = message.company_id
+                         AND participant.message_id = message.id
+                         AND participant.kind = 'cc'
+                         AND identity.transport = 'email'
+                  ), ARRAY[]::text[]) AS cc
+             FROM thread_messages AS association
+             JOIN messages AS message
+               ON (message.company_id, message.id) =
+                  (association.company_id, association.message_id)
+             JOIN participant_identities AS author_identity
+               ON (author_identity.company_id, author_identity.id) =
+                  (message.company_id, message.authored_identity_id)
+              AND author_identity.transport = 'email'
+             JOIN email_message_metadata AS email
+               ON (email.company_id, email.message_id) = (message.company_id, message.id)
+            WHERE association.thread_id = $1
+              AND message.direction = 'inbound'
+            ORDER BY association.created_at DESC, association.id DESC
+            LIMIT 1"#,
+    )
+    .bind(thread_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(row.map(email_reply_context))
+}
+
+fn email_reply_context(row: EmailReplyContextDb) -> EmailReplyContext {
     let author_email = row
         .author_subject
         .filter(|_| row.author_transport.as_deref() == Some(TransportKind::Email.as_str()))
         .map(EmailAddress::from);
 
-    Ok(Some(EmailReplyContext {
+    EmailReplyContext {
         canonical_id: CanonicalMessageId::new(row.canonical_id),
         author_email,
         rfc_message_id: row.rfc_message_id.map(MessageId::from),
@@ -443,7 +491,7 @@ pub(super) async fn latest_email_reply_context(
             .map(MessageId::from)
             .collect(),
         cc: row.cc.into_iter().map(EmailAddress::from).collect(),
-    }))
+    }
 }
 
 /// The newest RFC Message-ID in a thread, looking back past turns with no email headers.

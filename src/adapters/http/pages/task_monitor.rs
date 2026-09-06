@@ -7,6 +7,7 @@
 //! and sends the list along out of band, so the new status shows up in both places at once.
 
 use super::*;
+use crate::entities::task::TaskOwnerFilter;
 
 /// The task list in the sidebar: what one filtered page of tasks looks like.
 pub struct TaskMonitorList<'a> {
@@ -24,6 +25,7 @@ pub struct TaskMonitorPage<'a> {
     pub companies: &'a [Company],
     /// The company's channels, as the sidebar's channel filter offers them.
     pub channels: &'a [Channel],
+    pub owner_candidates: &'a [TaskOwnerCandidate],
     pub list: &'a TaskMonitorList<'a>,
     /// Pre-rendered right-hand pane: one task's detail, or a placeholder.
     pub pane_html: &'a str,
@@ -48,6 +50,9 @@ pub struct TaskDetailPane<'a> {
     pub attempts_error: Option<&'a str>,
     /// Why a stop or resume did not happen, when one was asked for and refused.
     pub error: Option<&'a str>,
+    pub ownership_controls_enabled: bool,
+    pub ownership_events: &'a [TaskOwnershipEvent],
+    pub owner_candidates: &'a [TaskOwnerCandidate],
 }
 
 /// The `/ui/tasks` URL for a given selection, i.e. what a click on it should leave in the address
@@ -63,6 +68,12 @@ pub fn task_monitor_query(
     }
     if let Some(status) = filter.status {
         params.push(format!("status={}", status.as_str()));
+    }
+    if let Some(owner) = filter.owner {
+        params.push(match owner {
+            TaskOwnerFilter::Principal(principal_id) => format!("owner={principal_id}"),
+            TaskOwnerFilter::Unassigned => "owner=unassigned".to_string(),
+        });
     }
     if filter.sort_asc {
         params.push("sort=asc".to_string());
@@ -115,7 +126,12 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
         {pane_html}
         "##,
         header = sidebar_header("Tasks", "Background worker execution queue and states."),
-        filters = task_filter_form(company.id, page.channels, page.list.filter),
+        filters = task_filter_form(
+            company.id,
+            page.channels,
+            page.owner_candidates,
+            page.list.filter,
+        ),
         list_html = task_monitor_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
         company_id = company.id,
@@ -134,7 +150,12 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
 ///
 /// The form sits outside `#task-list`, so a swap never takes the controls out from under the
 /// pointer; a change resets to the first page simply by not sending one.
-fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter) -> String {
+fn task_filter_form(
+    company_id: Uuid,
+    channels: &[Channel],
+    owner_candidates: &[TaskOwnerCandidate],
+    filter: &TaskFilter,
+) -> String {
     let channel_options = channel_filter_options(channels, filter.channel_id);
 
     let status_options: String = TASK_STATUS_FILTERS
@@ -146,6 +167,24 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
                 selected = selected_when(filter.status == Some(*status)),
                 label = task_status_label(*status),
             )
+        })
+        .collect();
+    let owner_options: String = owner_candidates
+        .iter()
+        .filter_map(|candidate| {
+            let principal_id = candidate.owner.principal_id()?;
+            Some(format!(
+                r##"<option value="{value}"{selected}>{kind}: {label}</option>"##,
+                value = principal_id,
+                selected =
+                    selected_when(filter.owner == Some(TaskOwnerFilter::Principal(principal_id))),
+                kind = match candidate.owner {
+                    TaskOwner::Human(_) => "Human",
+                    TaskOwner::Agent(_) => "Agent",
+                    TaskOwner::Unassigned => return None,
+                },
+                label = escape_html_text(&candidate.label),
+            ))
         })
         .collect();
 
@@ -164,6 +203,11 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
                     <option value="">All statuses</option>
                     {status_options}
                 </select>
+                <select name="owner" class="select select-sm w-full" aria-label="Filter by owner">
+                    <option value="">All owners</option>
+                    <option value="unassigned"{unassigned_selected}>Unassigned</option>
+                    {owner_options}
+                </select>
                 <select name="sort" class="select select-sm w-full" aria-label="Sort by time">
                     <option value="desc"{newest_selected}>Newest first</option>
                     <option value="asc"{oldest_selected}>Oldest first</option>
@@ -173,6 +217,7 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
         limit = filter.limit(),
         newest_selected = selected_when(!filter.sort_asc),
         oldest_selected = selected_when(filter.sort_asc),
+        unassigned_selected = selected_when(filter.owner == Some(TaskOwnerFilter::Unassigned)),
     )
 }
 
@@ -252,6 +297,7 @@ fn task_menu_entry(list: &TaskMonitorList<'_>, task: &BackgroundTask) -> String 
                             <span class="badge badge-sm shrink-0 {status_style}">{status_label}</span>
                             <span class="min-w-0 truncate text-xs">{task_type}</span>
                         </span>
+                        <span class="badge badge-ghost badge-xs">{owner}</span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{enqueued}{tokens}</span>
                     </a>
                 </li>
@@ -266,6 +312,7 @@ fn task_menu_entry(list: &TaskMonitorList<'_>, task: &BackgroundTask) -> String 
         status_style = task_status_style(task.status),
         status_label = task_status_label(task.status),
         task_type = escape_html_text(&task.task_type),
+        owner = task_owner_label(task),
         enqueued = enqueued_at(task),
     )
 }
@@ -340,6 +387,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                 <div class="min-w-0 grow basis-48">
                     <h2 class="flex items-center gap-2 truncate text-xl font-bold">
                         <span class="badge {status_style}">{status_label}</span>
+                        <span class="badge badge-outline">{owner_label}</span>
                         <span class="truncate">{task_type}</span>
                     </h2>
                     <p class="truncate font-mono text-xs opacity-60">{task_id}</p>
@@ -354,6 +402,8 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
             </div>
             <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
+                {ownership_controls}
+                {ownership_history}
                 {token_stats}
                 {latest_execution}
                 {facts}
@@ -369,12 +419,15 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         "##,
         status_style = task_status_style(task.status),
         status_label = task_status_label(task.status),
+        owner_label = task_owner_label(task),
         task_type = escape_html_text(&task.task_type),
         task_id = task.id,
         reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         thread_link = task_thread_link(pane),
         action_button = task_action_button(company_id, task),
         error_html = form_error_banner(pane.error),
+        ownership_controls = task_ownership_controls(pane),
+        ownership_history = task_ownership_history(pane.ownership_events),
         token_stats = task_token_stats(task, pane.attempts),
         latest_execution = task_latest_execution(task),
         facts = task_facts(pane),
@@ -385,6 +438,150 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         deliveries = task_deliveries(pane),
         last_error = task_last_error(task),
         payload = render_message_task_parameters_html(&task.payload),
+    )
+}
+
+fn task_owner_label(task: &BackgroundTask) -> String {
+    match task.ownership.owner {
+        TaskOwner::Agent(_) if task.status == TaskStatus::Processing => "Agent working".into(),
+        TaskOwner::Agent(_) => "Agent assigned".into(),
+        TaskOwner::Human(_) => "Assigned to teammate".into(),
+        TaskOwner::Unassigned => "Unassigned".into(),
+    }
+}
+
+fn ownership_form_fields(task: &BackgroundTask) -> String {
+    format!(
+        r#"<input type="hidden" name="command_id" value="{command_id}">
+           <input type="hidden" name="expected_ownership_version" value="{version}">"#,
+        command_id = Uuid::new_v4(),
+        version = task.ownership.version,
+    )
+}
+
+fn task_ownership_controls(pane: &TaskDetailPane<'_>) -> String {
+    if !pane.ownership_controls_enabled || pane.task.status == TaskStatus::Completed {
+        return String::new();
+    }
+    let task = pane.task;
+    let base = format!("/ui/tasks/{}", task.id);
+    let query = format!("company_id={}&view=list", pane.company_id);
+    let common = ownership_form_fields(task);
+    let quick_action = match task.ownership.owner {
+        TaskOwner::Unassigned => format!(
+            r##"<form hx-post="{base}/claim?{query}" hx-target="#task-pane" hx-swap="outerHTML">
+                    {common}<button class="btn btn-primary btn-sm" type="submit">Claim for myself</button>
+                </form>"##,
+        ),
+        TaskOwner::Human(id) | TaskOwner::Agent(id) => format!(
+            r##"<div class="min-w-0 text-xs opacity-70">Principal <span class="font-mono">{id}</span> · version {version}</div>
+                <form hx-post="{base}/release?{query}" hx-target="#task-pane" hx-swap="outerHTML">
+                    {common}<button class="btn btn-outline btn-sm" type="submit">Release</button>
+                </form>"##,
+            version = task.ownership.version,
+        ),
+    };
+    let operation = if task.ownership.owner == TaskOwner::Unassigned {
+        "assign"
+    } else {
+        "transfer"
+    };
+    let handoff = if operation == "transfer" {
+        r#"<textarea class="textarea w-full" name="handoff_instruction" maxlength="8192" required
+                placeholder="Private handoff: what should the new owner do next?"></textarea>"#
+    } else {
+        ""
+    };
+    let owner_options: String = pane
+        .owner_candidates
+        .iter()
+        .filter(|candidate| candidate.owner != task.ownership.owner)
+        .map(|candidate| {
+            let Some(id) = candidate.owner.principal_id() else {
+                return String::new();
+            };
+            format!(
+                r#"<option value="{}:{}">{} · {}</option>"#,
+                candidate.owner.as_str(),
+                id.as_uuid(),
+                escape_html_text(&candidate.label),
+                candidate.owner.as_str(),
+            )
+        })
+        .collect();
+    format!(
+        r##"<section class="space-y-3 rounded-box border border-base-300 bg-base-200 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div><h3 class="text-xs font-semibold uppercase opacity-60">Task owner</h3>
+                    <p class="text-sm">{owner}</p></div>{quick_action}
+            </div>
+            <details><summary class="cursor-pointer text-sm font-medium">{operation_label} by principal</summary>
+                <form class="mt-3 grid gap-2" hx-post="{base}/{operation}?{query}"
+                    hx-target="#task-pane" hx-swap="outerHTML">
+                    {transfer_common}
+                    <select class="select w-full" name="owner" required>
+                        <option value="">Choose an eligible owner</option>{owner_options}
+                    </select>
+                    {handoff}
+                    <input class="input w-full" name="reason_detail" maxlength="512"
+                        placeholder="Optional reason detail">
+                    <button class="btn btn-primary btn-sm justify-self-start" type="submit">{operation_label}</button>
+                </form>
+            </details>
+        </section>"##,
+        owner = task_owner_label(task),
+        operation_label = if operation == "transfer" {
+            "Transfer"
+        } else {
+            "Assign"
+        },
+        transfer_common = ownership_form_fields(task),
+        owner_options = owner_options,
+    )
+}
+
+fn task_ownership_history(events: &[TaskOwnershipEvent]) -> String {
+    if events.is_empty() {
+        return String::new();
+    }
+    let rows: String = events
+        .iter()
+        .rev()
+        .map(|event| {
+            let previous = event
+                .previous_owner_label
+                .as_deref()
+                .unwrap_or_else(|| event.previous_owner.as_str());
+            let next = event
+                .new_owner_label
+                .as_deref()
+                .unwrap_or_else(|| event.new_owner.as_str());
+            let detail = event.reason_detail.as_deref().map_or_else(String::new, |detail| {
+                format!(r#"<p class="text-xs opacity-70">{}</p>"#, escape_html_text(detail))
+            });
+            let handoff = event.handoff_instruction.as_deref().map_or_else(
+                String::new,
+                |instruction| {
+                    format!(
+                        r#"<div class="mt-2 rounded-box bg-base-200 p-2 text-xs"><span class="font-semibold">Private handoff</span><p class="whitespace-pre-wrap">{}</p></div>"#,
+                        escape_html_text(instruction)
+                    )
+                },
+            );
+            format!(
+                r#"<li class="border-l-2 border-base-300 pl-3"><div class="flex flex-wrap items-center gap-2 text-sm">
+                    <span class="font-medium">{operation}</span><span>{previous} → {next}</span>
+                    <time class="text-xs opacity-50">{occurred}</time></div>{detail}{handoff}</li>"#,
+                operation = escape_html_text(event.operation.as_str()),
+                previous = escape_html_text(previous),
+                next = escape_html_text(next),
+                occurred = format_date_time(event.occurred_at),
+            )
+        })
+        .collect();
+    format!(
+        r#"<section class="rounded-box border border-base-300 p-4"><h3 class="mb-3 text-xs font-semibold uppercase opacity-60">Ownership history</h3>
+            <ol class="space-y-3">{rows}</ol></section>"#
     )
 }
 

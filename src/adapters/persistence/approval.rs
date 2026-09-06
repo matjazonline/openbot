@@ -146,6 +146,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 // lease for anyone to match. A caller with no lease gets NULL binds, which makes
                 // the first branch unsatisfiable -- so it can only ever act on the second.
                 let lease = suspension.lease();
+                let ownership = suspension.ownership();
                 let attribution = TransitionAttribution::new(
                     TaskTransitionReason::ApprovalRequested,
                     TransitionActor::Approval(db.id),
@@ -155,6 +156,8 @@ impl ApprovalPersistence for PostgresPersistence {
                        SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                            lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
                        WHERE id = $1 AND company_id = $2
+                         AND owner_principal_id IS NOT DISTINCT FROM $5
+                         AND ownership_version = $6
                          AND (
                              ($3::uuid IS NOT NULL
                               AND status = 'processing'
@@ -169,6 +172,10 @@ impl ApprovalPersistence for PostgresPersistence {
                 .bind(subject.company_id)
                 .bind(lease.map(|lease| lease.worker_id))
                 .bind(lease.map(|lease| lease.execution_generation))
+                .bind(ownership.owner.principal_id().map(|id| id.as_uuid()))
+                .bind(i64::try_from(ownership.version).map_err(|_| {
+                    AppError::Conflict("Ownership version exhausted.".into())
+                })?)
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
@@ -472,6 +479,7 @@ mod tests {
     use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
     use crate::entities::approval::{ApprovalAction, ApprovalSubject, QUORUM_TIMEOUT_ACTION};
     use crate::entities::correlation::CorrelationId;
+    use crate::entities::creation::CreationProvenance;
     use crate::entities::message::{MessageDirection, MessageRole};
     use crate::entities::task::{NewTask, TaskTransitionReason};
     use crate::entities::transport::DeliveryPurpose;
@@ -479,11 +487,33 @@ mod tests {
     use crate::transport::NewDelivery;
     use crate::use_cases::thread::{MessageAuthorWrite, MessageWrite};
     use crate::use_cases::{
+        agent::{AgentPersistence, AgentWrite},
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
         thread::ThreadPersistence,
         user::UserPersistence,
     };
+
+    async fn seed_channel_agent(
+        persistence: &PostgresPersistence,
+        company_id: Uuid,
+        label: &str,
+    ) -> Uuid {
+        let suffix = Uuid::new_v4().simple().to_string();
+        AgentPersistence::create(
+            persistence,
+            company_id,
+            AgentWrite {
+                name: format!("{label} agent"),
+                slug: format!("{label}-agent-{suffix}"),
+                created_by: Some(CreationProvenance::system()),
+                ..AgentWrite::default()
+            },
+        )
+        .await
+        .expect("test channel agent is created")
+        .id
+    }
 
     /// Parking a task is a leased write, and the two callers that do it are not equivalent.
     ///
@@ -592,12 +622,14 @@ mod tests {
         )
         .await
         .unwrap();
+        let agent_id = seed_channel_agent(&persistence, company.id, "park").await;
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
                 name: "Park".into(),
                 slug: "park".into(),
+                agent_ids: Some(vec![agent_id]),
                 enabled: false,
                 ..ChannelWrite::default()
             },
@@ -663,7 +695,10 @@ mod tests {
         // Nor may a caller holding no lease at all park a task that is still running.
         assert!(
             park(
-                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+                Some(TaskSuspension::AlreadySuspended {
+                    task_id: task.id,
+                    ownership: task.ownership,
+                }),
                 "unleased-step"
             )
             .await
@@ -710,7 +745,10 @@ mod tests {
         // this is the quorum-timeout path.
         assert!(
             park(
-                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+                Some(TaskSuspension::AlreadySuspended {
+                    task_id: task.id,
+                    ownership: task.ownership,
+                }),
                 "sweep-step"
             )
             .await
@@ -751,12 +789,14 @@ mod tests {
         )
         .await
         .unwrap();
+        let agent_id = seed_channel_agent(&persistence, company.id, "approval").await;
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
                 name: "Approval".into(),
                 slug: "approval".into(),
+                agent_ids: Some(vec![agent_id]),
                 enabled: false,
                 ..ChannelWrite::default()
             },
@@ -871,12 +911,14 @@ mod tests {
         )
         .await
         .unwrap();
+        let agent_id = seed_channel_agent(&persistence, company.id, "quorum").await;
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
                 name: "Quorum".into(),
                 slug: "quorum".into(),
+                agent_ids: Some(vec![agent_id]),
                 enabled: false,
                 ..ChannelWrite::default()
             },
@@ -912,15 +954,18 @@ mod tests {
                 .await
                 .unwrap()
         );
+        let lease = crate::entities::task::TaskLeaseRef::of(
+            &persistence.get_task_by_id(task.id).await.unwrap().unwrap(),
+        )
+        .unwrap();
         let outreach_id = Uuid::new_v4();
         persistence
             .create_outreach_and_pause(CreateOutreachRequest {
                 correlation_id: task.correlation_id,
                 id: outreach_id,
-                task_id: task.id,
+                lease,
                 company_id: company.id,
                 channel_id: channel.id,
-                worker_id,
                 outreach_key: "quorum-reject".into(),
                 required_threshold_percent: 100.0,
                 expires_at: Utc::now() + chrono::Duration::hours(1),
@@ -951,7 +996,10 @@ mod tests {
 
         let token = Uuid::new_v4();
         let quorum_subject = ApprovalSubject {
-            suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+            suspension: Some(TaskSuspension::AlreadySuspended {
+                task_id: task.id,
+                ownership: task.ownership,
+            }),
             ..approval_subject(&company, &channel, thread.id, &email)
         };
         let (notice, delivery) =

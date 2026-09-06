@@ -42,6 +42,7 @@ pub struct ProfileDraft<'a> {
 pub enum ProfileForm {
     Identity,
     Password,
+    Notifications,
 }
 
 /// How a submit went, attached to the form that made it.
@@ -84,6 +85,7 @@ pub struct ProfilePane<'a> {
     pub methods: &'a LoginMethods,
     pub google_enabled: bool,
     pub apple_enabled: bool,
+    pub task_assignment_email_enabled: bool,
     pub outcome: ProfileOutcome<'a>,
 }
 
@@ -129,6 +131,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
             </div>
             {identity}
             {login_methods}
+            {notifications}
             {password}
         </div>
         "##,
@@ -138,7 +141,32 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         joined = super::format_date(user.created_at),
         identity = identity_section(draft, pane.pending, &pane.outcome),
         login_methods = login_methods_section(pane),
+        notifications = notification_preferences_section(pane),
         password = password_section(pane.user, pane.pending, pane.methods, &pane.outcome),
+    )
+}
+
+fn notification_preferences_section(pane: &ProfilePane<'_>) -> String {
+    format!(
+        r##"<section class="mb-6 rounded-box border border-base-300 p-5">
+            <h2 class="text-lg font-semibold">Notifications</h2>
+            <p class="mb-4 text-sm opacity-70">Choose which direct task assignments are emailed to you.</p>
+            {banner}
+            <form hx-put="/ui/profile/notifications" hx-target="#profile-pane" hx-swap="outerHTML">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" name="task_assignment_email_enabled" value="true"
+                        class="toggle toggle-primary"{checked}>
+                    <span>Email me when someone else assigns a task to me</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm mt-3">Save notifications</button>
+            </form>
+        </section>"##,
+        banner = pane.outcome.banner(ProfileForm::Notifications),
+        checked = if pane.task_assignment_email_enabled {
+            " checked"
+        } else {
+            ""
+        },
     )
 }
 

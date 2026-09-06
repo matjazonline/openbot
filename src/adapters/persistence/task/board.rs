@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use tracing::warn;
 use uuid::Uuid;
 
+use super::ownership::list_chain_ownership_events_on;
 use super::*;
 use crate::adapters::persistence::delivery::read::deliveries_for_tasks;
 use crate::app_error::{AppError, AppResult};
@@ -281,6 +282,7 @@ pub(crate) const CHAIN_DETAIL_MAX_TASKS: i64 = 200;
 pub(crate) const CHAIN_DETAIL_MAX_ATTEMPTS: i64 = 1_000;
 pub(crate) const CHAIN_DETAIL_MAX_DELIVERIES: i64 = 1_000;
 pub(crate) const CHAIN_DETAIL_MAX_EVENTS: i64 = 200;
+pub(crate) const CHAIN_DETAIL_MAX_OWNERSHIP_EVENTS: i64 = 200;
 pub(crate) const CHAIN_DETAIL_MAX_APPROVALS: i64 = 200;
 pub(crate) const CHAIN_DETAIL_MAX_OUTREACHES: i64 = 200;
 
@@ -492,7 +494,8 @@ pub(crate) async fn chain_detail_on(
 
     let mut task_rows = sqlx::query_as::<_, BackgroundTaskDb>(
         r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                  payload, retry_count, max_retries, last_error, worker_id,
+                  payload, retry_count, max_retries, last_error, owner_principal_id,
+                  owner_principal_kind, ownership_version, worker_id,
                   execution_generation, locked_at, lock_expires_at, run_at, created_at,
                   updated_at
            FROM background_tasks
@@ -580,6 +583,15 @@ pub(crate) async fn chain_detail_on(
         .map(TryInto::try_into)
         .collect::<AppResult<Vec<_>>>()?;
 
+    let mut ownership_events = list_chain_ownership_events_on(
+        pool,
+        company_id,
+        &task_ids,
+        probe_limit(CHAIN_DETAIL_MAX_OWNERSHIP_EVENTS),
+    )
+    .await?;
+    truncated |= trim_to_limit(&mut ownership_events, CHAIN_DETAIL_MAX_OWNERSHIP_EVENTS);
+
     let mut approvals =
         sqlx::query_as::<_, (Uuid, Uuid, String, String, DateTime<Utc>, DateTime<Utc>)>(
             r#"SELECT approval.id, approval.task_id, approval.status, approval.action_title,
@@ -662,6 +674,7 @@ pub(crate) async fn chain_detail_on(
         agent_names,
         tasks,
         events,
+        ownership_events,
         approvals,
         outreaches,
         truncated,

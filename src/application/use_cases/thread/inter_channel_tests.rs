@@ -528,6 +528,13 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         .await
         .expect("the task is claimable")
     );
+    let lease = crate::entities::task::TaskLeaseRef::of(
+        &TaskPersistence::get_task_by_id(fx.persistence.as_ref(), task_a)
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
 
     // The question A asks B: one canonical message, and one delivery carrying it. Both are written
     // by the transaction that parks A's task, exactly as the outreach tool composes them.
@@ -550,10 +557,9 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         CreateOutreachRequest {
             correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
-            task_id: task_a,
+            lease,
             company_id: fx.company.id,
             channel_id: fx.channel_a.id,
-            worker_id,
             outreach_key: "delegate-to-b".into(),
             required_threshold_percent: 100.0,
             expires_at: Utc::now() + chrono::Duration::hours(96),

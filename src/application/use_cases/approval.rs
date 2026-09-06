@@ -899,13 +899,6 @@ mod tests {
         ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
             Ok(Some(suspended_task(id)))
         }
-        async fn update_task_payload(
-            &self,
-            _id: Uuid,
-            _payload: serde_json::Value,
-        ) -> AppResult<()> {
-            Ok(())
-        }
         async fn claim_pending_tasks(
             &self,
             _worker_id: Uuid,
@@ -967,6 +960,7 @@ mod tests {
             retry_count: 0,
             max_retries: 3,
             last_error: None,
+            ownership: Default::default(),
             worker_id: None,
             execution_generation: None,
             locked_at: None,
@@ -1139,6 +1133,7 @@ mod tests {
                     thread_id,
                     suspension: Some(crate::entities::task::TaskSuspension::AlreadySuspended {
                         task_id: Uuid::new_v4(),
+                        ownership: Default::default(),
                     }),
                     correlation_id: CorrelationId::new(),
                     approver_email: EmailAddress::from("manager@acme.com"),

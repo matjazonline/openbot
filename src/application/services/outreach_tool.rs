@@ -39,11 +39,10 @@ pub use crate::entities::tool_catalogue::OUTREACH_TOOL_ID;
 
 #[derive(Debug, Clone)]
 pub struct OutreachToolContext {
-    pub task_id: Uuid,
+    pub lease: crate::entities::task::TaskLeaseRef,
     /// The chain the running task belongs to, so every email this tool sends and every reply it
     /// waits for stays on the trail of the run that asked for them.
     pub correlation_id: CorrelationId,
-    pub worker_id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
     /// Immutable callable-sibling scope captured with the running agent's capability snapshot.
@@ -203,12 +202,12 @@ impl OutreachAndAwaitQuorumTool {
             .persistence
             .create_outreach_and_pause(CreateOutreachRequest {
                 id: Uuid::new_v4(),
-                task_id: self.context.task_id,
+                lease: self.context.lease,
                 company_id: self.context.company_id,
                 channel_id: self.context.channel_id,
                 correlation_id: self.context.correlation_id,
-                worker_id: self.context.worker_id,
-                outreach_key: request.idempotency_key(self.context.task_id, &canonical_targets),
+                outreach_key: request
+                    .idempotency_key(self.context.lease.task_id, &canonical_targets),
                 required_threshold_percent: request.threshold_percent,
                 expires_at: Utc::now() + Duration::hours(request.timeout_hours as i64),
                 subject: request.subject.to_string(),
@@ -394,13 +393,13 @@ impl OutreachAndAwaitQuorumTool {
                 company_id: self.context.company_id,
                 channel_id: self.context.channel_id,
                 message_id,
-                task_id: Some(self.context.task_id),
+                task_id: Some(self.context.lease.task_id),
                 correlation_id: self.context.correlation_id,
                 purpose: DeliveryPurpose::Outreach,
                 // The task and the target's position, so an agent retrying the same tool call
                 // re-derives the keys the first call used and mails nobody twice. The recipient is
                 // already part of the key the composer builds, so two targets never collide.
-                source_key: format!("task:{}:outreach:{position}", self.context.task_id),
+                source_key: format!("task:{}:outreach:{position}", self.context.lease.task_id),
                 content: &content,
                 context: DeliveryContext::Email(context),
             })
@@ -766,9 +765,14 @@ mod tests {
         sub_agent_scope: SubAgentScope,
     ) -> Result<Vec<NormalizedOutreachTarget>, String> {
         let context = OutreachToolContext {
-            task_id: Uuid::new_v4(),
+            lease: crate::entities::task::TaskLeaseRef {
+                task_id: Uuid::new_v4(),
+                worker_id: Uuid::new_v4(),
+                execution_generation: Uuid::new_v4(),
+                claimed_owner: Default::default(),
+                ownership_version: 1,
+            },
             correlation_id: CorrelationId::new(),
-            worker_id: Uuid::new_v4(),
             company_id,
             channel_id: source_channel_id,
             sub_agent_scope,

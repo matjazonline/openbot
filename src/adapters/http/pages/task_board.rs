@@ -332,6 +332,7 @@ struct TimelineEntry {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum TimelineKind {
     StatusEvent,
+    OwnershipEvent,
     Attempt,
     Delivery,
     Approval,
@@ -354,6 +355,41 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 r##"<li class="border-l-2 border-primary pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{}</strong> → <strong>{}</strong></div><div class="font-mono text-[11px] opacity-65">{}</div></li>"##,
                 format_time(event.transitioned_at), short_id(event.task_id),
                 from, task_status_label(event.to_status), escape_html_text(&event.reason.to_string())
+            ),
+        });
+    }
+    for event in &detail.ownership_events {
+        let previous = event
+            .previous_owner_label
+            .clone()
+            .unwrap_or_else(|| event.previous_owner.as_str().to_string());
+        let next = event
+            .new_owner_label
+            .clone()
+            .unwrap_or_else(|| event.new_owner.as_str().to_string());
+        let handoff = event
+            .handoff_instruction
+            .as_deref()
+            .map(|instruction| {
+                format!(
+                    r##"<div class="mt-1 rounded bg-base-200 p-2 text-[11px]">Private handoff: {}</div>"##,
+                    escape_html_text(instruction)
+                )
+            })
+            .unwrap_or_default();
+        entries.push(TimelineEntry {
+            at: event.occurred_at,
+            task_id: event.task_id,
+            kind: TimelineKind::OwnershipEvent,
+            sequence: i32::try_from(event.sequence).unwrap_or(i32::MAX),
+            html: format!(
+                r##"<li class="border-l-2 border-secondary pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Ownership {}</strong></div><div class="text-[11px] opacity-65">{} → {} · {}</div>{handoff}</li>"##,
+                format_time(event.occurred_at),
+                short_id(event.task_id),
+                escape_html_text(event.operation.as_str()),
+                escape_html_text(&previous),
+                escape_html_text(&next),
+                escape_html_text(event.reason.as_str()),
             ),
         });
     }

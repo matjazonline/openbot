@@ -54,6 +54,22 @@ use super::{
     support::{DirectoryCache, build_prompt_text, outbound_reference_ids, rfc_message_id},
 };
 
+fn append_private_handoff(prompt: &mut String, handoff: Option<&str>) -> AppResult<()> {
+    let Some(handoff) = handoff else {
+        return Ok(());
+    };
+    let encoded = serde_json::to_string(handoff).map_err(|error| {
+        AppError::Internal(format!(
+            "Could not encode the private task handoff: {error}"
+        ))
+    })?;
+    prompt.push_str(
+        "\n\nPrivate task handoff (ownership metadata; do not quote or expose it unless the task requires it):\n",
+    );
+    prompt.push_str(&encoded);
+    Ok(())
+}
+
 /// How this dispatch's reply reaches the outside world.
 ///
 /// Replaces a `send_email: bool` crossed with `ingest.task_id: Option<Uuid>`. That matrix had two
@@ -374,19 +390,22 @@ impl ThreadUseCases {
                 AppError::NotFound(format!("Channel {} not found", payload.channel_id))
             })?;
 
-        let first_agent_id = channel
-            .agent_ids
-            .as_ref()
-            .and_then(|ids| ids.first().copied())
+        let ownership = self
+            .task_persistence
+            .owned_agent_execution(payload.company_id, payload.channel_id, lease)
+            .await?
             .ok_or_else(|| {
-                AppError::Internal("Enabled channel has no active agent at position 0.".to_string())
+                AppError::Conflict("Task ownership changed before agent execution.".into())
             })?;
         let agents = self
             .agent_persistence
             .as_ref()
             .ok_or_else(|| AppError::Internal("Agent persistence is unavailable.".to_string()))?;
-        let agent = agents.get_by_id(first_agent_id).await?.ok_or_else(|| {
-            AppError::NotFound(format!("Active agent {first_agent_id} was not found."))
+        let agent = agents.get_by_id(ownership.agent_id).await?.ok_or_else(|| {
+            AppError::NotFound(format!(
+                "Owning agent {} was not found.",
+                ownership.agent_id
+            ))
         })?;
 
         // Idempotency Guard: Check if an outbound reply for this prompt message was already sent
@@ -443,6 +462,7 @@ impl ThreadUseCases {
         })?;
 
         let mut prompt = payload.prompt.clone();
+        append_private_handoff(&mut prompt, ownership.handoff_instruction.as_deref())?;
         if let Some(memory) = self.memory.as_ref()
             && let Some(recalled) = memory
                 .recall(MemoryRecallInput {
@@ -825,6 +845,16 @@ impl ThreadUseCases {
             AppError::Internal("Agent capability persistence is unavailable.".into())
         })?;
         let mut agent_cache: HashMap<Uuid, Option<Agent>> = HashMap::new();
+        let primary = matches.first().ok_or_else(|| {
+            AppError::Internal("Agent dispatch has no primary channel match.".into())
+        })?;
+        let ownership = self
+            .task_persistence
+            .owned_agent_execution(primary.company.id, primary.channel.id, lease)
+            .await?
+            .ok_or_else(|| {
+                AppError::Conflict("Task ownership changed before agent execution.".into())
+            })?;
 
         for (index, channel_match) in matches.iter().enumerate() {
             let history = self
@@ -832,7 +862,11 @@ impl ThreadUseCases {
                 .list_agent_history(channel_match.thread.id)
                 .await?;
             let loaded_agent = self
-                .first_agent_for(channel_match, &mut agent_cache)
+                .agent_for_channel(
+                    channel_match,
+                    (index == 0).then_some(ownership.agent_id),
+                    &mut agent_cache,
+                )
                 .await?;
             let agent_id = loaded_agent.id;
             let agent = Some(loaded_agent);
@@ -870,6 +904,12 @@ impl ThreadUseCases {
                 None => prompt_text.clone(),
             };
             let mut agent_prompt = prompt_text.clone();
+            if index == 0 {
+                append_private_handoff(
+                    &mut agent_prompt,
+                    ownership.handoff_instruction.as_deref(),
+                )?;
+            }
             if let Some(memory) = self.memory.as_ref() {
                 let task_id = ingest.task_id.ok_or_else(|| {
                     AppError::Internal("Memory recall requires a durable task id.".into())
@@ -934,8 +974,7 @@ impl ThreadUseCases {
                             self.outreach_context_for(
                                 channel_match,
                                 envelope,
-                                task_id,
-                                lease.worker_id,
+                                lease,
                                 run_correlation_id,
                                 params.spec().sub_agents.clone(),
                             ),
@@ -1043,9 +1082,10 @@ impl ThreadUseCases {
         }
     }
 
-    async fn first_agent_for(
+    async fn agent_for_channel(
         &self,
         channel_match: &ChannelMatch,
+        task_owner_agent_id: Option<Uuid>,
         cache: &mut HashMap<Uuid, Option<Agent>>,
     ) -> AppResult<Agent> {
         let Some(persistence) = self.agent_persistence.as_ref() else {
@@ -1053,12 +1093,13 @@ impl ThreadUseCases {
                 "Agent persistence is unavailable for an enabled channel.".into(),
             ));
         };
-        let Some(&agent_id) = channel_match
-            .channel
-            .agent_ids
-            .as_ref()
-            .and_then(|ids| ids.first())
-        else {
+        let Some(agent_id) = task_owner_agent_id.or_else(|| {
+            channel_match
+                .channel
+                .agent_ids
+                .as_ref()
+                .and_then(|ids| ids.first().copied())
+        }) else {
             return Err(AppError::Internal(format!(
                 "Enabled channel '{}' has no active agent at position 0.",
                 channel_match.channel.slug
@@ -1151,15 +1192,13 @@ impl ThreadUseCases {
         &self,
         channel_match: &ChannelMatch,
         envelope: &InboundEnvelope,
-        task_id: Uuid,
-        worker_id: Uuid,
+        lease: TaskLeaseRef,
         correlation_id: CorrelationId,
         sub_agent_scope: crate::entities::harness::SubAgentScope,
     ) -> OutreachToolContext {
         OutreachToolContext {
-            task_id,
+            lease,
             correlation_id,
-            worker_id,
             company_id: channel_match.company.id,
             channel_id: channel_match.channel.id,
             sub_agent_scope,

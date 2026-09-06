@@ -141,6 +141,40 @@ impl UserPersistence for PostgresPersistence {
         Ok(db.into())
     }
 
+    async fn task_assignment_email_enabled(&self, id: Uuid) -> AppResult<bool> {
+        sqlx::query_scalar(
+            r#"SELECT COALESCE((
+                   SELECT task_assignment_email_enabled
+                   FROM user_notification_preferences
+                   WHERE user_id = $1
+               ), TRUE)"#,
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)
+    }
+
+    async fn set_task_assignment_email_enabled(&self, id: Uuid, enabled: bool) -> AppResult<()> {
+        let result = sqlx::query(
+            r#"INSERT INTO user_notification_preferences (
+                   user_id, task_assignment_email_enabled, updated_at
+               ) SELECT id, $2, CURRENT_TIMESTAMP FROM users WHERE id = $1
+               ON CONFLICT (user_id) DO UPDATE
+               SET task_assignment_email_enabled = EXCLUDED.task_assignment_email_enabled,
+                   updated_at = CURRENT_TIMESTAMP"#,
+        )
+        .bind(id)
+        .bind(enabled)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound("User not found".into()));
+        }
+        Ok(())
+    }
+
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,

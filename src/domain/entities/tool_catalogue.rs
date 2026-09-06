@@ -1,7 +1,7 @@
 //! The library of tools an agent may be granted.
 //!
 //! It is a compile-time const rather than a table because there is nothing to store: the
-//! `ai-agents` built-ins are a hardcoded array upstream, and our three native tools are consts in
+//! `ai-agents` built-ins are a hardcoded array upstream, and our four native tools are consts in
 //! `src/application/services/*_tool.rs`. A table would only be a slower copy of this file that an
 //! operator could edit into granting `command`.
 //!
@@ -16,6 +16,7 @@ use crate::entities::value_objects::ToolId;
 pub const OUTREACH_TOOL_ID: &str = "outreach_and_await_quorum";
 pub const CREATE_AGENT_CHANNEL_TOOL_ID: &str = "create_agent_channel";
 pub const AGENT_DIRECTORY_TOOL_ID: &str = "list_company_agents";
+pub const TASK_OWNERSHIP_TOOL_ID: &str = "transfer_or_release_task";
 
 /// Every `ai-agents` built-in this platform will ever put in a `tools:` list.
 ///
@@ -164,6 +165,12 @@ pub const TOOL_CATALOGUE: &[CatalogueTool] = &[
         label: "Create a specialist agent",
         description: "Permanently create another agent in this company, with its own channel \
                       address, and delegate to it.",
+        source: ToolSource::Native,
+    },
+    CatalogueTool {
+        id: TASK_OWNERSHIP_TOOL_ID,
+        label: "Transfer or release this task",
+        description: "Transfer owned work with a private handoff, or release it unassigned and end the current run.",
         source: ToolSource::Native,
     },
 ];
@@ -337,7 +344,7 @@ mod tests {
             );
             seen.push(tool.id);
         }
-        assert_eq!(seen.len(), ALLOWED_BUILTIN_TOOL_IDS.len() + 3);
+        assert_eq!(seen.len(), ALLOWED_BUILTIN_TOOL_IDS.len() + 4);
     }
 
     #[test]
@@ -357,6 +364,7 @@ mod tests {
             OUTREACH_TOOL_ID,
             AGENT_DIRECTORY_TOOL_ID,
             CREATE_AGENT_CHANNEL_TOOL_ID,
+            TASK_OWNERSHIP_TOOL_ID,
         ] {
             assert!(
                 CatalogueTool::get(&ToolId::from(id)).is_some(),

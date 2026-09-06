@@ -18,7 +18,7 @@ use crate::{
     infra::{
         argon2_password_hasher,
         config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
-        events::MailboxEvents,
+        events::{MailboxEvents, TaskWakeups},
         postgres_persistence,
     },
     services::{
@@ -251,6 +251,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
         })?;
     let inbound_event_wakeups = InboundEventWakeups::new();
+    let task_wakeups = TaskWakeups::new();
     let inbound_event_worker = Arc::new(
         InboundEventWorker::new(
             postgres_arc.clone(),
@@ -312,6 +313,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         inbound_event_worker,
         inbound_event_inbox,
         inbound_event_wakeups,
+        task_wakeups,
         dashboard_persistence: postgres_arc.clone(),
         database_query_health,
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),

@@ -16,7 +16,10 @@ use serde_json::Value;
 
 use crate::app_error::{AppError, AppResult};
 use crate::entities::{
-    tool_catalogue::{AGENT_DIRECTORY_TOOL_ID, CREATE_AGENT_CHANNEL_TOOL_ID, OUTREACH_TOOL_ID},
+    tool_catalogue::{
+        AGENT_DIRECTORY_TOOL_ID, CREATE_AGENT_CHANNEL_TOOL_ID, OUTREACH_TOOL_ID,
+        TASK_OWNERSHIP_TOOL_ID,
+    },
     value_objects::ToolId,
 };
 use crate::services::{
@@ -24,6 +27,7 @@ use crate::services::{
     agent_directory_tool::ListCompanyAgentsTool,
     harness::{HarnessToolHost, NativeToolDeclaration, ToolInvocation},
     outreach_tool::OutreachAndAwaitQuorumTool,
+    task_ownership_tool::TaskOwnershipTool,
 };
 
 /// The native tools one run can serve.
@@ -37,6 +41,7 @@ pub struct NativeToolHost {
     outreach: Option<OutreachAndAwaitQuorumTool>,
     directory: Option<ListCompanyAgentsTool>,
     channels: Option<CreateAgentChannelTool>,
+    ownership: Option<TaskOwnershipTool>,
     /// Built once at construction, in catalogue order, because a harness reads it per run and
     /// each entry carries a generated JSON schema.
     declarations: Vec<NativeToolDeclaration>,
@@ -65,6 +70,12 @@ impl NativeToolHost {
         self
     }
 
+    pub fn with_task_ownership(mut self, tool: TaskOwnershipTool) -> Self {
+        self.ownership = Some(tool);
+        self.rebuild_declarations();
+        self
+    }
+
     /// Whether this run has any native tool at all. The runner skips attaching the host when not,
     /// so a harness is never handed an empty one to reason about.
     pub fn is_empty(&self) -> bool {
@@ -84,6 +95,9 @@ impl NativeToolHost {
         if self.channels.is_some() {
             declarations.push(CreateAgentChannelTool::declaration());
         }
+        if self.ownership.is_some() {
+            declarations.push(TaskOwnershipTool::declaration());
+        }
         self.declarations = declarations;
     }
 }
@@ -94,7 +108,7 @@ impl HarnessToolHost for NativeToolHost {
         &self.declarations
     }
 
-    async fn invoke(&self, id: &ToolId, args: Value) -> AppResult<ToolInvocation> {
+    async fn invoke(&self, id: &ToolId, call_id: &str, args: Value) -> AppResult<ToolInvocation> {
         // An id this host never declared is a harness fault, not a model one: it means something
         // offered the model a tool nobody here can serve. It is an `Err` rather than a failed
         // invocation so it reads as the wiring bug it is instead of as advice to the model.
@@ -116,6 +130,10 @@ impl HarnessToolHost for NativeToolHost {
                 Some(tool) => Ok(tool.call(args).await),
                 None => Err(unavailable()),
             },
+            TASK_OWNERSHIP_TOOL_ID => match self.ownership.as_ref() {
+                Some(tool) => Ok(tool.call(call_id, args).await),
+                None => Err(unavailable()),
+            },
             _ => Err(unavailable()),
         }
     }
@@ -133,7 +151,11 @@ mod tests {
         assert!(host.available().is_empty());
 
         let error = host
-            .invoke(&ToolId::from(OUTREACH_TOOL_ID), serde_json::json!({}))
+            .invoke(
+                &ToolId::from(OUTREACH_TOOL_ID),
+                "call-1",
+                serde_json::json!({}),
+            )
             .await
             .expect_err("a tool this run cannot serve is a wiring fault");
         assert!(matches!(error, AppError::Internal(_)), "{error:?}");
@@ -144,7 +166,7 @@ mod tests {
         let host = NativeToolHost::new();
 
         let error = host
-            .invoke(&ToolId::from("command"), serde_json::json!({}))
+            .invoke(&ToolId::from("command"), "call-1", serde_json::json!({}))
             .await
             .expect_err("nothing outside the catalogue is dispatchable");
         assert!(error.to_string().contains("command"));
@@ -158,6 +180,7 @@ mod tests {
             OutreachAndAwaitQuorumTool::declaration(),
             ListCompanyAgentsTool::declaration(),
             CreateAgentChannelTool::declaration(),
+            TaskOwnershipTool::declaration(),
         ] {
             assert!(
                 crate::entities::tool_catalogue::CatalogueTool::get(&declaration.id).is_some(),

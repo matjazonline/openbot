@@ -16,6 +16,7 @@ use crate::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskSource,
             TaskStopReason, TaskTarget, TaskTransitionReason, TransitionActor,
         },
+        transport::PrincipalId,
     },
 };
 
@@ -27,7 +28,18 @@ pub(crate) const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
        lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP,
        transition_reason = 'claimed', transition_actor_kind = 'worker',
        transition_actor_id = $2, transition_approval_id = NULL, transition_outreach_id = NULL
-   WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#;
+   WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP
+     AND owner_principal_kind = 'agent'
+     AND EXISTS (
+         SELECT 1 FROM principals AS owner
+         JOIN channel_agents AS assignment
+           ON assignment.company_id = background_tasks.company_id
+          AND assignment.channel_id = background_tasks.channel_id
+          AND assignment.agent_id = owner.agent_id
+         WHERE owner.company_id = background_tasks.company_id
+           AND owner.id = background_tasks.owner_principal_id
+           AND owner.kind = 'agent'
+     )"#;
 /// Open the ledger row for one attempt.
 ///
 /// The conflict is not an error and not a duplicate: a task whose lease lapsed is re-claimed with
@@ -118,6 +130,7 @@ pub(crate) async fn mark_task_failed_on(
         TaskStopReason::Shutdown => TaskTransitionReason::Shutdown,
         TaskStopReason::LeaseLost => TaskTransitionReason::LeaseLost,
         TaskStopReason::Completed => TaskTransitionReason::Completed,
+        TaskStopReason::OwnershipTransferred => TaskTransitionReason::OwnershipTransferred,
     };
     // The lease names the run that failed, so the failure cannot be attributed to anyone else.
     let attribution =
@@ -129,6 +142,7 @@ pub(crate) async fn mark_task_failed_on(
                lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
            WHERE id = $4 AND status = 'processing' AND worker_id = $5
              AND execution_generation = $6
+             AND owner_principal_id = $7 AND ownership_version = $8
              AND lock_expires_at > CURRENT_TIMESTAMP"#,
         attribution = attribution.set_clause(),
     ))
@@ -138,6 +152,17 @@ pub(crate) async fn mark_task_failed_on(
     .bind(failure.lease.task_id)
     .bind(failure.lease.worker_id)
     .bind(failure.lease.execution_generation)
+    .bind(
+        failure
+            .lease
+            .claimed_owner
+            .agent_principal_id()
+            .map(PrincipalId::as_uuid),
+    )
+    .bind(
+        i64::try_from(failure.lease.ownership_version)
+            .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
+    )
     .execute(pool)
     .await
     .map_err(AppError::from)?;
@@ -172,7 +197,8 @@ pub(crate) async fn stop_task_on(
            WHERE id = $1
              AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                     payload, retry_count, max_retries, last_error, worker_id,
+                     payload, retry_count, max_retries, last_error, owner_principal_id,
+                     owner_principal_kind, ownership_version, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
         attribution = TransitionAttribution::stopped(actor).set_clause(),
@@ -263,7 +289,8 @@ pub(crate) async fn resume_task_on(
            WHERE id = $1
              AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                     payload, retry_count, max_retries, last_error, worker_id,
+                     payload, retry_count, max_retries, last_error, owner_principal_id,
+                     owner_principal_kind, ownership_version, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
         attribution = TransitionAttribution::resumed(actor).set_clause(),
@@ -302,7 +329,8 @@ pub(crate) async fn insert_task(
     // Neither branch touches `correlation_id`: a redelivered cause joins the chain its first
     // delivery started rather than overwriting it with a fresher one.
     const RETURNING: &str = "RETURNING id, company_id, channel_id, thread_id, correlation_id, \
-         task_type, status, payload, retry_count, max_retries, last_error, worker_id, \
+         task_type, status, payload, retry_count, max_retries, last_error, owner_principal_id, \
+         owner_principal_kind, ownership_version, worker_id, \
          execution_generation, locked_at, lock_expires_at, run_at, created_at, updated_at";
     let conflict = match source {
         TaskSource::Message(_) => {

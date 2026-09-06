@@ -6,7 +6,85 @@ use uuid::Uuid;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::runtime_metrics::MachineIdentity;
+use crate::entities::transport::PrincipalId;
 use crate::entities::transport::RecipientRole;
+
+/// The business principal accountable for a task. This is deliberately separate from
+/// [`TaskLeaseRef::worker_id`], which identifies an application process for a short-lived run.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(tag = "kind", content = "principal_id", rename_all = "snake_case")]
+pub enum TaskOwner {
+    Human(PrincipalId),
+    Agent(PrincipalId),
+    #[default]
+    Unassigned,
+}
+
+/// An agent tool names targets by the business entity ids it can discover, not internal
+/// principal ids. Persistence resolves this selector inside the company boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskOwnerTarget {
+    HumanUser(Uuid),
+    Agent(Uuid),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskOwnerCandidate {
+    pub owner: TaskOwner,
+    pub label: String,
+}
+
+impl TaskOwner {
+    pub const fn principal_id(self) -> Option<PrincipalId> {
+        match self {
+            Self::Human(id) | Self::Agent(id) => Some(id),
+            Self::Unassigned => None,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Human(_) => "human",
+            Self::Agent(_) => "agent",
+            Self::Unassigned => "unassigned",
+        }
+    }
+
+    pub const fn is_agent(self) -> bool {
+        matches!(self, Self::Agent(_))
+    }
+
+    pub const fn agent_principal_id(self) -> Option<PrincipalId> {
+        match self {
+            Self::Agent(id) => Some(id),
+            Self::Human(_) | Self::Unassigned => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskOwnership {
+    pub owner: TaskOwner,
+    pub version: u64,
+}
+
+impl Default for TaskOwnership {
+    fn default() -> Self {
+        Self {
+            owner: TaskOwner::Unassigned,
+            version: 1,
+        }
+    }
+}
+
+/// The task selected by the mailbox's activity ordering, with ownership from that exact row.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThreadWorkSummary {
+    pub task_id: Uuid,
+    pub ownership: TaskOwnership,
+    pub owner_label: Option<String>,
+    pub activity: Option<ThreadActivity>,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -165,6 +243,8 @@ pub struct TaskLeaseRef {
     pub task_id: Uuid,
     pub worker_id: Uuid,
     pub execution_generation: Uuid,
+    pub claimed_owner: TaskOwner,
+    pub ownership_version: u64,
 }
 
 impl TaskLeaseRef {
@@ -175,6 +255,8 @@ impl TaskLeaseRef {
             task_id: task.id,
             worker_id: task.worker_id?,
             execution_generation: task.execution_generation?,
+            claimed_owner: task.ownership.owner,
+            ownership_version: task.ownership.version,
         })
     }
 }
@@ -191,14 +273,17 @@ pub enum TaskSuspension {
     Leased(TaskLeaseRef),
     /// A sweep parking a task that is already suspended and so, by
     /// `background_tasks_lease_check`, holds no lease. It may never park a running task.
-    AlreadySuspended { task_id: Uuid },
+    AlreadySuspended {
+        task_id: Uuid,
+        ownership: TaskOwnership,
+    },
 }
 
 impl TaskSuspension {
     pub fn task_id(self) -> Uuid {
         match self {
             TaskSuspension::Leased(lease) => lease.task_id,
-            TaskSuspension::AlreadySuspended { task_id } => task_id,
+            TaskSuspension::AlreadySuspended { task_id, .. } => task_id,
         }
     }
 
@@ -208,6 +293,16 @@ impl TaskSuspension {
         match self {
             TaskSuspension::Leased(lease) => Some(lease),
             TaskSuspension::AlreadySuspended { .. } => None,
+        }
+    }
+
+    pub fn ownership(self) -> TaskOwnership {
+        match self {
+            TaskSuspension::Leased(lease) => TaskOwnership {
+                owner: lease.claimed_owner,
+                version: lease.ownership_version,
+            },
+            TaskSuspension::AlreadySuspended { ownership, .. } => ownership,
         }
     }
 }
@@ -281,6 +376,7 @@ pub enum TaskStopReason {
     TimedOut,
     Shutdown,
     LeaseLost,
+    OwnershipTransferred,
 }
 
 impl TaskStopReason {
@@ -292,6 +388,7 @@ impl TaskStopReason {
             Self::TimedOut => "timed_out",
             Self::Shutdown => "shutdown",
             Self::LeaseLost => "lease_lost",
+            Self::OwnershipTransferred => "ownership_transferred",
         }
     }
 }
@@ -313,6 +410,7 @@ impl FromStr for TaskStopReason {
             "timed_out" => Ok(Self::TimedOut),
             "shutdown" => Ok(Self::Shutdown),
             "lease_lost" => Ok(Self::LeaseLost),
+            "ownership_transferred" => Ok(Self::OwnershipTransferred),
             other => Err(format!("Unknown task stop reason: {other}")),
         }
     }
@@ -580,6 +678,7 @@ pub struct BackgroundTask {
     pub retry_count: i32,
     pub max_retries: i32,
     pub last_error: Option<String>,
+    pub ownership: TaskOwnership,
     pub worker_id: Option<Uuid>,
     /// Set only while the row is `processing`. Minted at claim time, it is what a write from a
     /// superseded run fails to match -- see [`TaskLeaseRef`].
@@ -589,6 +688,193 @@ pub struct BackgroundTask {
     pub run_at: chrono::DateTime<chrono::Utc>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskOwnershipOperation {
+    InitialAssignment,
+    Claim,
+    Assign,
+    Transfer,
+    Release,
+    OwnerRemoved,
+}
+
+impl TaskOwnershipOperation {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InitialAssignment => "initial_assignment",
+            Self::Claim => "claim",
+            Self::Assign => "assign",
+            Self::Transfer => "transfer",
+            Self::Release => "release",
+            Self::OwnerRemoved => "owner_removed",
+        }
+    }
+}
+
+impl FromStr for TaskOwnershipOperation {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "initial_assignment" => Ok(Self::InitialAssignment),
+            "claim" => Ok(Self::Claim),
+            "assign" => Ok(Self::Assign),
+            "transfer" => Ok(Self::Transfer),
+            "release" => Ok(Self::Release),
+            "owner_removed" => Ok(Self::OwnerRemoved),
+            other => Err(format!("Unknown task ownership operation: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskOwnershipReason {
+    InitialAssignment,
+    SelfClaim,
+    ManualAssignment,
+    Delegated,
+    WorkloadRebalance,
+    OwnerUnavailable,
+    Released,
+    OwnerRemoved,
+}
+
+impl TaskOwnershipReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InitialAssignment => "initial_assignment",
+            Self::SelfClaim => "self_claim",
+            Self::ManualAssignment => "manual_assignment",
+            Self::Delegated => "delegated",
+            Self::WorkloadRebalance => "workload_rebalance",
+            Self::OwnerUnavailable => "owner_unavailable",
+            Self::Released => "released",
+            Self::OwnerRemoved => "owner_removed",
+        }
+    }
+}
+
+impl FromStr for TaskOwnershipReason {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "initial_assignment" => Ok(Self::InitialAssignment),
+            "self_claim" => Ok(Self::SelfClaim),
+            "manual_assignment" => Ok(Self::ManualAssignment),
+            "delegated" => Ok(Self::Delegated),
+            "workload_rebalance" => Ok(Self::WorkloadRebalance),
+            "owner_unavailable" => Ok(Self::OwnerUnavailable),
+            "released" => Ok(Self::Released),
+            "owner_removed" => Ok(Self::OwnerRemoved),
+            other => Err(format!("Unknown task ownership reason: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskOwnershipAuthority {
+    Manager,
+    CurrentOwner,
+    UnassignedClaimant,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskOwnershipActor {
+    pub principal_id: PrincipalId,
+    pub authority: TaskOwnershipAuthority,
+}
+
+/// One idempotent ownership mutation. `command_id` is stable across retries and
+/// `expected_version` makes a different command against an older view fail closed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskOwnershipCommand {
+    pub task_id: Uuid,
+    pub company_id: Uuid,
+    pub command_id: Uuid,
+    pub expected_version: u64,
+    pub actor: TaskOwnershipActor,
+    pub operation: TaskOwnershipOperation,
+    pub new_owner: TaskOwner,
+    pub reason: TaskOwnershipReason,
+    pub reason_detail: Option<String>,
+    pub handoff_instruction: Option<String>,
+}
+
+impl TaskOwnershipCommand {
+    pub const MAX_REASON_DETAIL_BYTES: usize = 512;
+    pub const MAX_HANDOFF_BYTES: usize = 8 * 1024;
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.expected_version == 0 {
+            return Err("Expected ownership version must be positive.".into());
+        }
+        if self
+            .reason_detail
+            .as_ref()
+            .is_some_and(|detail| detail.len() > Self::MAX_REASON_DETAIL_BYTES)
+        {
+            return Err("Ownership reason detail exceeds 512 bytes.".into());
+        }
+        let handoff = self
+            .handoff_instruction
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if handoff.is_some_and(|value| value.len() > Self::MAX_HANDOFF_BYTES) {
+            return Err("Ownership handoff instruction exceeds 8 KiB.".into());
+        }
+        if self.operation == TaskOwnershipOperation::Transfer && handoff.is_none() {
+            return Err("A transfer requires a private handoff instruction.".into());
+        }
+        if self.operation != TaskOwnershipOperation::Transfer && self.handoff_instruction.is_some()
+        {
+            return Err("Only transfers may carry a handoff instruction.".into());
+        }
+        match self.operation {
+            TaskOwnershipOperation::Claim | TaskOwnershipOperation::Assign
+                if self.new_owner == TaskOwner::Unassigned =>
+            {
+                Err("A claim or assignment requires an owner.".into())
+            }
+            TaskOwnershipOperation::Transfer if self.new_owner == TaskOwner::Unassigned => {
+                Err("A transfer requires a new owner; use release to unassign work.".into())
+            }
+            TaskOwnershipOperation::Release if self.new_owner != TaskOwner::Unassigned => {
+                Err("A release must leave the task unassigned.".into())
+            }
+            TaskOwnershipOperation::InitialAssignment | TaskOwnershipOperation::OwnerRemoved => {
+                Err("System ownership operations cannot be submitted as commands.".into())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskOwnershipEvent {
+    pub id: Uuid,
+    pub task_id: Uuid,
+    pub company_id: Uuid,
+    pub sequence: u64,
+    pub from_version: u64,
+    pub to_version: u64,
+    pub command_id: Uuid,
+    pub operation: TaskOwnershipOperation,
+    pub actor_principal_id: Option<PrincipalId>,
+    pub previous_owner: TaskOwner,
+    pub previous_owner_label: Option<String>,
+    pub new_owner: TaskOwner,
+    pub new_owner_label: Option<String>,
+    pub reason: TaskOwnershipReason,
+    pub reason_detail: Option<String>,
+    pub handoff_instruction: Option<String>,
+    pub occurred_at: DateTime<Utc>,
 }
 
 impl BackgroundTask {
@@ -632,6 +918,7 @@ pub enum TaskTransitionReason {
     OutreachExtended,
     OperatorStopped,
     OperatorResumed,
+    OwnershipTransferred,
     /// The transition happened, but nothing on the write said why.
     ///
     /// Every caller that knows its cause states it, so this reason means a status changed through
@@ -665,6 +952,7 @@ impl TaskTransitionReason {
             Self::OutreachExtended => "outreach_extended",
             Self::OperatorStopped => "operator_stopped",
             Self::OperatorResumed => "operator_resumed",
+            Self::OwnershipTransferred => "ownership_transferred",
             Self::Unknown => "unknown",
         }
     }
@@ -692,6 +980,7 @@ impl FromStr for TaskTransitionReason {
             "outreach_extended" => Ok(Self::OutreachExtended),
             "operator_stopped" => Ok(Self::OperatorStopped),
             "operator_resumed" => Ok(Self::OperatorResumed),
+            "ownership_transferred" => Ok(Self::OwnershipTransferred),
             "unknown" => Ok(Self::Unknown),
             other => Err(format!("Unknown task transition reason: {other}")),
         }
@@ -1102,6 +1391,7 @@ pub struct TaskChainDetail {
     pub agent_names: Vec<String>,
     pub tasks: Vec<TaskChainTaskDetail>,
     pub events: Vec<TaskStatusEvent>,
+    pub ownership_events: Vec<TaskOwnershipEvent>,
     pub approvals: Vec<TaskApprovalContext>,
     pub outreaches: Vec<TaskOutreachContext>,
     /// Set when any of the pane's bounded reads had more rows to give.
@@ -1119,6 +1409,7 @@ pub struct TaskChainDetail {
 pub struct TaskFilter {
     pub channel_id: Option<Uuid>,
     pub status: Option<TaskStatus>,
+    pub owner: Option<TaskOwnerFilter>,
     /// Oldest first when set; the list is newest first otherwise.
     pub sort_asc: bool,
     page: usize,
@@ -1141,12 +1432,18 @@ impl TaskFilter {
         Self {
             channel_id,
             status,
+            owner: None,
             sort_asc,
             page: page.unwrap_or(1).max(1),
             limit: limit
                 .unwrap_or(Self::DEFAULT_PAGE_SIZE)
                 .clamp(1, Self::MAX_PAGE_SIZE),
         }
+    }
+
+    pub const fn with_owner(mut self, owner: Option<TaskOwnerFilter>) -> Self {
+        self.owner = owner;
+        self
     }
 
     pub fn page(&self) -> usize {
@@ -1184,6 +1481,12 @@ impl TaskFilter {
             ..self
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskOwnerFilter {
+    Principal(PrincipalId),
+    Unassigned,
 }
 
 #[cfg(test)]

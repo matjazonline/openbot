@@ -44,6 +44,10 @@ use super::ui::{load_account, load_readable_company, workspace_user};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/profile", get(profile_page).put(update_profile))
+        .route(
+            "/ui/profile/notifications",
+            put(update_notification_preferences),
+        )
         .route("/ui/profile/password", put(change_password))
         .route("/ui/profile/password/setup", put(set_password))
         .route(
@@ -88,6 +92,11 @@ pub struct CodeForm {
     pub code: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct NotificationPreferencesForm {
+    pub task_assignment_email_enabled: Option<String>,
+}
+
 /// The account and everything waiting on a code for it, which is what any pane render needs.
 ///
 /// Loaded together because they are one answer: a pane showing the stored address but not the
@@ -96,6 +105,7 @@ struct Account {
     user: User,
     pending: Vec<PendingChange>,
     methods: LoginMethods,
+    task_assignment_email_enabled: bool,
 }
 
 impl Account {
@@ -104,6 +114,9 @@ impl Account {
             user: load_account(user_use_cases, user_id).await?,
             pending: user_use_cases.pending_account_changes(user_id).await?,
             methods: user_use_cases.login_methods(user_id).await?,
+            task_assignment_email_enabled: user_use_cases
+                .task_assignment_email_enabled(user_id)
+                .await?,
         })
     }
 
@@ -119,6 +132,7 @@ impl Account {
             methods: &self.methods,
             google_enabled: GoogleOAuthConfig::from_env().is_some(),
             apple_enabled: AppleOAuthConfig::from_env().is_some(),
+            task_assignment_email_enabled: self.task_assignment_email_enabled,
             outcome,
         })
     }
@@ -141,6 +155,29 @@ impl Account {
             ),
         ))
     }
+}
+
+#[instrument(skip(user_use_cases, user, form))]
+async fn update_notification_preferences(
+    State(user_use_cases): State<Arc<UserUseCases>>,
+    user: AuthenticatedUser,
+    Form(form): Form<NotificationPreferencesForm>,
+) -> AppResult<Html<String>> {
+    let enabled = matches!(
+        form.task_assignment_email_enabled.as_deref(),
+        Some("true" | "on")
+    );
+    user_use_cases
+        .set_task_assignment_email_enabled(user.id, enabled)
+        .await?;
+    let account = Account::load(&user_use_cases, user.id).await?;
+    Ok(Html(account.pane(
+        None,
+        pages::ProfileOutcome::Saved(
+            pages::ProfileForm::Notifications,
+            "Notification preferences saved.",
+        ),
+    )))
 }
 
 /// GET /ui/profile - The account's own settings (Protected).

@@ -14,7 +14,6 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use serde_json::Value;
 use sqlx::postgres::types::PgInterval;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
@@ -35,12 +34,15 @@ use crate::{
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRecord,
             TaskAttemptRef, TaskAttemptStatus, TaskBoardFilter, TaskChainBoard, TaskChainDetail,
-            TaskFailure, TaskLeaseRef, TaskStatus, TaskStatusEvent, TaskStatusEventCursor,
-            TaskStopReason, TaskTransitionReason, ThreadActivity, TokenUsage, TransitionActor,
+            TaskFailure, TaskFilter, TaskLeaseRef, TaskOwner, TaskOwnerCandidate, TaskOwnerFilter,
+            TaskOwnerTarget, TaskOwnership, TaskOwnershipCommand, TaskOwnershipEvent, TaskStatus,
+            TaskStatusEvent, TaskStatusEventCursor, TaskStopReason, TaskTransitionReason,
+            ThreadActivity, ThreadWorkSummary, TokenUsage, TransitionActor,
         },
-        transport::DeliveryId,
+        transport::{DeliveryId, PrincipalId},
         value_objects::MessageId,
     },
+    task_queue::{AssignmentNotificationRecipient, HumanTaskCompletion, HumanTaskCompletionResult},
     transport::{DeliveryCreation, NewDelivery},
 };
 
@@ -190,10 +192,10 @@ pub(crate) async fn record_outreach_reply_on(
 
 #[async_trait]
 impl TaskPersistence for PostgresPersistence {
-    async fn list_thread_activity(
+    async fn list_thread_work_summary(
         &self,
         thread_ids: &[Uuid],
-    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
         if thread_ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -210,14 +212,19 @@ impl TaskPersistence for PostgresPersistence {
         //
         // `stopped` and `failed` stay out. Neither is an answer, so neither should bury one.
         let rows = sqlx::query_as::<_, ThreadActivityDb>(
-            r#"SELECT DISTINCT ON (thread_id) thread_id, status, lock_expires_at
-               FROM background_tasks
-               WHERE thread_id = ANY($1)
-                 AND status IN ('pending', 'processing', 'pending_approval',
+            r#"SELECT DISTINCT ON (task.thread_id) task.thread_id, task.id AS task_id,
+                      task.status, task.lock_expires_at, task.owner_principal_id,
+                      task.owner_principal_kind, task.ownership_version,
+                      owner.display_label AS owner_label
+               FROM background_tasks AS task
+               LEFT JOIN principals AS owner
+                 ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
+               WHERE task.thread_id = ANY($1)
+                 AND task.status IN ('pending', 'processing', 'pending_approval',
                                 'waiting_for_third_party_reply', 'dead_letter', 'completed')
-               ORDER BY thread_id,
-                        status IN ('dead_letter', 'completed'),
-                        updated_at DESC, id DESC"#,
+               ORDER BY task.thread_id,
+                        task.status IN ('dead_letter', 'completed'),
+                        task.updated_at DESC, task.id DESC"#,
         )
         .bind(thread_ids)
         .fetch_all(&self.pool)
@@ -229,9 +236,25 @@ impl TaskPersistence for PostgresPersistence {
             .map(|row| {
                 let status = TaskStatus::from_str(&row.status)
                     .map_err(|error| AppError::Internal(error.to_string()))?;
+                let owner = task_owner_from_db(
+                    row.owner_principal_id,
+                    row.owner_principal_kind.as_deref(),
+                    &format!("thread work task {}", row.task_id),
+                )?;
+                let version = u64::try_from(row.ownership_version).map_err(|_| {
+                    AppError::Internal(format!(
+                        "Invalid ownership version for task {}: {}",
+                        row.task_id, row.ownership_version
+                    ))
+                })?;
                 Ok((
                     row.thread_id,
-                    ThreadActivity::from_task(status, row.lock_expires_at, now),
+                    ThreadWorkSummary {
+                        task_id: row.task_id,
+                        ownership: TaskOwnership { owner, version },
+                        owner_label: row.owner_label,
+                        activity: ThreadActivity::from_task(status, row.lock_expires_at, now),
+                    },
                 ))
             })
             // `completed` is queried for its position in that ordering, not for a badge: reaching
@@ -239,8 +262,10 @@ impl TaskPersistence for PostgresPersistence {
             // show. Dropping every `None` also keeps a status added to the query later from
             // turning into a badge nobody chose.
             .filter_map(|entry: AppResult<_>| match entry {
-                Ok((thread_id, Some(activity))) => Some(Ok((thread_id, activity))),
-                Ok((_, None)) => None,
+                Ok((thread_id, summary)) if summary.activity.is_some() => {
+                    Some(Ok((thread_id, summary)))
+                }
+                Ok((_, _)) => None,
                 Err(error) => Some(Err(error)),
             })
             .collect()
@@ -260,6 +285,8 @@ impl TaskPersistence for PostgresPersistence {
                FROM background_tasks
                WHERE id = $7 AND company_id = $8
                  AND status = 'processing' AND worker_id = $9
+                 AND execution_generation = $10
+                 AND owner_principal_id = $11 AND ownership_version = $12
                  AND lock_expires_at > CURRENT_TIMESTAMP
                ON CONFLICT (task_id, outreach_key) DO UPDATE
                    SET outreach_key = EXCLUDED.outreach_key
@@ -273,9 +300,21 @@ impl TaskPersistence for PostgresPersistence {
         .bind(request.expires_at)
         .bind(&request.subject)
         .bind(&request.body)
-        .bind(request.task_id)
+        .bind(request.lease.task_id)
         .bind(request.company_id)
-        .bind(request.worker_id)
+        .bind(request.lease.worker_id)
+        .bind(request.lease.execution_generation)
+        .bind(
+            request
+                .lease
+                .claimed_owner
+                .agent_principal_id()
+                .map(PrincipalId::as_uuid),
+        )
+        .bind(
+            i64::try_from(request.lease.ownership_version)
+                .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
+        )
         .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?
@@ -321,13 +360,26 @@ impl TaskPersistence for PostgresPersistence {
                        updated_at = CURRENT_TIMESTAMP, {attribution}
                    WHERE id = $2 AND company_id = $3
                      AND status = 'processing' AND worker_id = $4
+                     AND execution_generation = $5
+                     AND owner_principal_id = $6 AND ownership_version = $7
                      AND lock_expires_at > CURRENT_TIMESTAMP"#,
                 attribution = attribution.set_clause(),
             ))
             .bind(outreach.expires_at)
-            .bind(request.task_id)
+            .bind(request.lease.task_id)
             .bind(request.company_id)
-            .bind(request.worker_id)
+            .bind(request.lease.worker_id)
+            .bind(request.lease.execution_generation)
+            .bind(
+                request
+                    .lease
+                    .claimed_owner
+                    .agent_principal_id()
+                    .map(PrincipalId::as_uuid),
+            )
+            .bind(i64::try_from(request.lease.ownership_version).map_err(|_| {
+                AppError::Conflict("Ownership version exhausted.".into())
+            })?)
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -832,7 +884,8 @@ impl TaskPersistence for PostgresPersistence {
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                       retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
+                       retry_count, max_retries, last_error, owner_principal_id,
+                       owner_principal_kind, ownership_version, worker_id, execution_generation, locked_at, lock_expires_at,
                        run_at, created_at, updated_at
                FROM background_tasks WHERE id = $1"#,
         )
@@ -845,6 +898,200 @@ impl TaskPersistence for PostgresPersistence {
             Some(d) => Ok(Some(d.try_into()?)),
             None => Ok(None),
         }
+    }
+
+    async fn owned_agent_execution(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+        lease: TaskLeaseRef,
+    ) -> AppResult<Option<OwnedAgentExecution>> {
+        let Some(owner_id) = lease.claimed_owner.agent_principal_id() else {
+            return Ok(None);
+        };
+        let ownership_version = i64::try_from(lease.ownership_version)
+            .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?;
+        let row = sqlx::query_as::<_, (Uuid, Option<String>)>(
+            r#"SELECT principal.agent_id,
+                      (SELECT event.handoff_instruction
+                       FROM task_ownership_events AS event
+                       WHERE event.task_id = task.id
+                         AND event.new_owner_principal_id = task.owner_principal_id
+                         AND event.operation = 'transfer'
+                       ORDER BY event.sequence DESC LIMIT 1) AS handoff_instruction
+               FROM background_tasks AS task
+               JOIN principals AS principal
+                 ON principal.company_id = task.company_id
+                AND principal.id = task.owner_principal_id
+                AND principal.kind = 'agent'
+               JOIN channel_agents AS assignment
+                 ON assignment.company_id = task.company_id
+                AND assignment.channel_id = task.channel_id
+                AND assignment.agent_id = principal.agent_id
+               WHERE task.company_id = $1 AND task.channel_id = $2 AND task.id = $3
+                 AND task.status = 'processing' AND task.worker_id = $4
+                 AND task.execution_generation = $5
+                 AND task.owner_principal_id = $6 AND task.ownership_version = $7
+                 AND task.lock_expires_at > CURRENT_TIMESTAMP"#,
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .bind(lease.task_id)
+        .bind(lease.worker_id)
+        .bind(lease.execution_generation)
+        .bind(owner_id.as_uuid())
+        .bind(ownership_version)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(
+            row.map(|(agent_id, handoff_instruction)| OwnedAgentExecution {
+                agent_id,
+                handoff_instruction,
+            }),
+        )
+    }
+
+    async fn change_task_ownership(
+        &self,
+        command: TaskOwnershipCommand,
+    ) -> AppResult<TaskOwnershipEvent> {
+        change_task_ownership_on(&self.pool, command, None).await
+    }
+
+    async fn change_task_ownership_with_notification(
+        &self,
+        command: TaskOwnershipCommand,
+        notification: Option<crate::transport::NewStandaloneDelivery>,
+    ) -> AppResult<TaskOwnershipEvent> {
+        change_task_ownership_on(&self.pool, command, notification).await
+    }
+
+    async fn assignment_notification_recipient(
+        &self,
+        company_id: Uuid,
+        principal_id: PrincipalId,
+    ) -> AppResult<Option<AssignmentNotificationRecipient>> {
+        let recipient: Option<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT users.id, users.email
+               FROM principals AS principal
+               JOIN users ON users.id = principal.user_id
+               LEFT JOIN user_notification_preferences AS preference
+                 ON preference.user_id = users.id
+               WHERE principal.company_id = $1 AND principal.id = $2
+                 AND principal.kind = 'person'
+                 AND COALESCE(preference.task_assignment_email_enabled, TRUE)"#,
+        )
+        .bind(company_id)
+        .bind(principal_id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(
+            recipient.map(|(user_id, email)| AssignmentNotificationRecipient {
+                user_id,
+                email: email.into(),
+            }),
+        )
+    }
+
+    async fn list_task_ownership_events(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<Vec<TaskOwnershipEvent>> {
+        list_task_ownership_events_on(&self.pool, company_id, task_id).await
+    }
+
+    async fn resolve_task_owner_target(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+        target: TaskOwnerTarget,
+    ) -> AppResult<Option<TaskOwner>> {
+        let (kind, subject_id) = match target {
+            TaskOwnerTarget::HumanUser(id) => ("person", id),
+            TaskOwnerTarget::Agent(id) => ("agent", id),
+        };
+        let principal_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT principal.id
+               FROM principals AS principal
+               WHERE principal.company_id = $1 AND principal.kind = $2
+                 AND (($2 = 'person' AND principal.user_id = $3)
+                      OR ($2 = 'agent' AND principal.agent_id = $3))
+                 AND ($2 <> 'agent' OR EXISTS (
+                     SELECT 1 FROM channel_agents AS assignment
+                     WHERE assignment.company_id = principal.company_id
+                       AND assignment.channel_id = $4
+                       AND assignment.agent_id = principal.agent_id
+                 ))"#,
+        )
+        .bind(company_id)
+        .bind(kind)
+        .bind(subject_id)
+        .bind(channel_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(principal_id.map(|id| match target {
+            TaskOwnerTarget::HumanUser(_) => TaskOwner::Human(PrincipalId::new(id)),
+            TaskOwnerTarget::Agent(_) => TaskOwner::Agent(PrincipalId::new(id)),
+        }))
+    }
+
+    async fn list_task_owner_candidates(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Vec<TaskOwnerCandidate>> {
+        let rows: Vec<(Uuid, String, String)> = sqlx::query_as(
+            r#"SELECT principal.id, principal.kind, principal.display_label
+               FROM principals AS principal
+               JOIN channels AS channel
+                 ON channel.company_id = principal.company_id AND channel.id = $2
+               LEFT JOIN company_members AS member
+                 ON member.company_id = principal.company_id
+                AND member.user_id = principal.user_id
+               WHERE principal.company_id = $1 AND (
+                   (principal.kind = 'agent' AND EXISTS (
+                       SELECT 1 FROM channel_agents AS assignment
+                       WHERE assignment.company_id = principal.company_id
+                         AND assignment.channel_id = $2
+                         AND assignment.agent_id = principal.agent_id
+                   ))
+                   OR
+                   (principal.kind = 'person' AND member.user_id IS NOT NULL AND (
+                       member.role = 'owner' OR channel.access_mode IN ('team', 'public')
+                       OR EXISTS (
+                           SELECT 1 FROM channel_principal_grants AS channel_grant
+                           WHERE channel_grant.company_id = principal.company_id
+                             AND channel_grant.channel_id = $2
+                             AND channel_grant.principal_id = principal.id
+                             AND channel_grant.capability = 'view'
+                       )
+                   ))
+               )
+               ORDER BY principal.kind DESC, lower(principal.display_label), principal.id"#,
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        rows.into_iter()
+            .map(|(id, kind, label)| {
+                let owner = match kind.as_str() {
+                    "person" => TaskOwner::Human(PrincipalId::new(id)),
+                    "agent" => TaskOwner::Agent(PrincipalId::new(id)),
+                    other => {
+                        return Err(AppError::Internal(format!(
+                            "Invalid eligible owner kind: {other}"
+                        )));
+                    }
+                };
+                Ok(TaskOwnerCandidate { owner, label })
+            })
+            .collect()
     }
 
     async fn list_task_attempts(
@@ -931,21 +1178,6 @@ impl TaskPersistence for PostgresPersistence {
             .collect()
     }
 
-    async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()> {
-        sqlx::query(
-            r#"UPDATE background_tasks
-               SET payload = $1, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $2"#,
-        )
-        .bind(payload)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        Ok(())
-    }
-
     async fn commit_agent_dispatch(
         &self,
         commit: AgentDispatchCommit<'_>,
@@ -960,12 +1192,24 @@ impl TaskPersistence for PostgresPersistence {
                SET payload = $1, updated_at = CURRENT_TIMESTAMP
                WHERE id = $2 AND status = 'processing' AND worker_id = $3
                   AND execution_generation = $4
+                  AND owner_principal_id = $5 AND ownership_version = $6
                   AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(commit.payload)
         .bind(commit.lease.task_id)
         .bind(commit.lease.worker_id)
         .bind(commit.lease.execution_generation)
+        .bind(
+            commit
+                .lease
+                .claimed_owner
+                .agent_principal_id()
+                .map(PrincipalId::as_uuid),
+        )
+        .bind(
+            i64::try_from(commit.lease.ownership_version)
+                .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
+        )
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -1012,6 +1256,122 @@ impl TaskPersistence for PostgresPersistence {
         Ok(DispatchCommit::Committed { deliveries })
     }
 
+    async fn complete_human_task(
+        &self,
+        completion: HumanTaskCompletion<'_>,
+    ) -> AppResult<HumanTaskCompletionResult> {
+        let expected_version = i64::try_from(completion.expected_ownership_version)
+            .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?;
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let task: Option<(String, Option<Uuid>, Option<String>, i64, Option<Uuid>)> =
+            sqlx::query_as(
+                r#"SELECT status, owner_principal_id, owner_principal_kind,
+                          ownership_version, thread_id
+                   FROM background_tasks
+                   WHERE company_id = $1 AND id = $2
+                   FOR UPDATE"#,
+            )
+            .bind(completion.company_id)
+            .bind(completion.task_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        let (status, owner_id, owner_kind, version, thread_id) =
+            task.ok_or_else(|| AppError::NotFound("Task not found.".into()))?;
+
+        let prior: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+            r#"SELECT message_id, command_id, command_fingerprint
+               FROM human_task_completions WHERE task_id = $1"#,
+        )
+        .bind(completion.task_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if let Some((message_id, command_id, fingerprint)) = prior {
+            if command_id != completion.command_id || fingerprint != completion.command_fingerprint
+            {
+                return Err(AppError::Conflict(
+                    "This task was already completed with another response.".into(),
+                ));
+            }
+            return Ok(HumanTaskCompletionResult {
+                message_id: CanonicalMessageId::new(message_id),
+                deliveries: Vec::new(),
+            });
+        }
+
+        if status != "pending" {
+            return Err(AppError::Conflict(
+                "Only pending work can be completed by its human owner.".into(),
+            ));
+        }
+        if owner_id != Some(completion.owner_principal_id.as_uuid())
+            || owner_kind.as_deref() != Some("person")
+        {
+            return Err(AppError::NotFound("Task not found.".into()));
+        }
+        if version != expected_version {
+            return Err(AppError::Conflict(format!(
+                "Ownership changed from version {} to {}; refresh and try again.",
+                completion.expected_ownership_version, version
+            )));
+        }
+        if thread_id != Some(completion.message.thread_id)
+            || completion.deliveries.iter().any(|delivery| {
+                delivery.company_id != completion.company_id
+                    || delivery.task_id != Some(completion.task_id)
+                    || delivery.message_id != completion.message.id
+            })
+        {
+            return Err(AppError::BadRequest(
+                "The completion response does not belong to this task.".into(),
+            ));
+        }
+
+        let stored = insert_message_on(&mut tx, completion.message).await?;
+        let mut deliveries = Vec::with_capacity(completion.deliveries.len());
+        for delivery in &completion.deliveries {
+            deliveries.push(insert_delivery_on(&mut tx, delivery).await?);
+        }
+        sqlx::query(
+            r#"UPDATE background_tasks
+               SET status = 'completed', transition_reason = 'completed',
+                   transition_actor_kind = 'human', transition_actor_id = $3,
+                   transition_approval_id = NULL, transition_outreach_id = NULL,
+                   worker_id = NULL, execution_generation = NULL, locked_at = NULL,
+                   lock_expires_at = NULL, wait_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE company_id = $1 AND id = $2"#,
+        )
+        .bind(completion.company_id)
+        .bind(completion.task_id)
+        .bind(completion.owner_principal_id.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        sqlx::query(
+            r#"INSERT INTO human_task_completions (
+                   task_id, company_id, command_id, command_fingerprint,
+                   owner_principal_id, ownership_version, message_id
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+        )
+        .bind(completion.task_id)
+        .bind(completion.company_id)
+        .bind(completion.command_id)
+        .bind(completion.command_fingerprint)
+        .bind(completion.owner_principal_id.as_uuid())
+        .bind(expected_version)
+        .bind(stored.canonical_id.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(HumanTaskCompletionResult {
+            message_id: stored.canonical_id,
+            deliveries,
+        })
+    }
+
     async fn renew_task_lease(
         &self,
         lease: TaskLeaseRef,
@@ -1022,12 +1382,23 @@ impl TaskPersistence for PostgresPersistence {
                SET lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'processing' AND worker_id = $2
                  AND execution_generation = $4
+                 AND owner_principal_id = $5 AND ownership_version = $6
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(lease.task_id)
         .bind(lease.worker_id)
         .bind(lock_expires_at)
         .bind(lease.execution_generation)
+        .bind(
+            lease
+                .claimed_owner
+                .agent_principal_id()
+                .map(PrincipalId::as_uuid),
+        )
+        .bind(
+            i64::try_from(lease.ownership_version)
+                .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
+        )
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -1099,6 +1470,17 @@ impl TaskPersistence for PostgresPersistence {
                           ) AS company_round
                    FROM background_tasks
                    WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
+                     AND owner_principal_kind = 'agent'
+                     AND EXISTS (
+                         SELECT 1 FROM principals AS owner
+                         JOIN channel_agents AS assignment
+                           ON assignment.company_id = background_tasks.company_id
+                          AND assignment.channel_id = background_tasks.channel_id
+                          AND assignment.agent_id = owner.agent_id
+                         WHERE owner.company_id = background_tasks.company_id
+                           AND owner.id = background_tasks.owner_principal_id
+                           AND owner.kind = 'agent'
+                     )
                ), claimable AS (
                    SELECT task.id
                    FROM background_tasks AS task
@@ -1125,7 +1507,8 @@ impl TaskPersistence for PostgresPersistence {
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
                          task.correlation_id, task.task_type, task.status, task.payload,
                          task.retry_count,
-                         task.max_retries, task.last_error, task.worker_id, task.execution_generation, task.locked_at,
+                         task.max_retries, task.last_error, task.owner_principal_id,
+                         task.owner_principal_kind, task.ownership_version, task.worker_id, task.execution_generation, task.locked_at,
                          task.lock_expires_at, task.run_at, task.created_at, task.updated_at"#,
         )
         .bind(limit)
@@ -1169,11 +1552,21 @@ impl TaskPersistence for PostgresPersistence {
                    transition_outreach_id = NULL
                WHERE id = $1 AND status = 'processing' AND worker_id = $2
                  AND execution_generation = $3
+                 AND owner_principal_id = $4 AND ownership_version = $5
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(lease.task_id)
         .bind(lease.worker_id)
         .bind(lease.execution_generation)
+        .bind(
+            lease
+                .claimed_owner
+                .agent_principal_id()
+                .map(PrincipalId::as_uuid),
+        )
+        .bind(i64::try_from(lease.ownership_version).map_err(|_| {
+            AppError::Conflict("Ownership version exhausted.".into())
+        })?)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -1215,7 +1608,8 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
             r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
+                      retry_count, max_retries, last_error, owner_principal_id,
+                      owner_principal_kind, ownership_version, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks WHERE company_id = "#,
         );
@@ -1248,5 +1642,58 @@ impl TaskPersistence for PostgresPersistence {
             tasks.push(db.try_into()?);
         }
         Ok(tasks)
+    }
+
+    async fn list_company_tasks_filtered_page(
+        &self,
+        company_id: Uuid,
+        filter: &TaskFilter,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<BackgroundTask>> {
+        let mut query = QueryBuilder::<Postgres>::new(
+            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
+                      retry_count, max_retries, last_error, owner_principal_id,
+                      owner_principal_kind, ownership_version, worker_id, execution_generation,
+                      locked_at, lock_expires_at, run_at, created_at, updated_at
+               FROM background_tasks WHERE company_id = "#,
+        );
+        query.push_bind(company_id);
+        if let Some(channel_id) = filter.channel_id {
+            query.push(" AND channel_id = ").push_bind(channel_id);
+        }
+        if let Some(status) = filter.status {
+            query.push(" AND status = ").push_bind(status.as_str());
+        }
+        match filter.owner {
+            Some(TaskOwnerFilter::Principal(principal_id)) => {
+                query
+                    .push(" AND owner_principal_id = ")
+                    .push_bind(principal_id.as_uuid());
+            }
+            Some(TaskOwnerFilter::Unassigned) => {
+                query.push(" AND owner_principal_id IS NULL");
+            }
+            None => {}
+        }
+        if filter.sort_asc {
+            query.push(" ORDER BY created_at ASC, id ASC");
+        } else {
+            query.push(" ORDER BY created_at DESC, id DESC");
+        }
+        query
+            .push(" LIMIT ")
+            .push_bind(limit)
+            .push(" OFFSET ")
+            .push_bind(offset);
+
+        query
+            .build_query_as::<BackgroundTaskDb>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect()
     }
 }

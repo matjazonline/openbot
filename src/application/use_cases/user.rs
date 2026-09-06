@@ -117,6 +117,14 @@ pub trait UserPersistence: Send + Sync {
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;
 
+    async fn task_assignment_email_enabled(&self, _id: Uuid) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    async fn set_task_assignment_email_enabled(&self, _id: Uuid, _enabled: bool) -> AppResult<()> {
+        Ok(())
+    }
+
     /// Stores the account's profile picture, or clears it with `None`. `Ok(None)` means no such
     /// user, so a stale session cannot silently write nothing.
     async fn update_avatar_url(
@@ -643,6 +651,20 @@ impl UserUseCases {
     #[instrument(skip(self))]
     pub async fn get_user_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
         self.persistence.get_by_id(id).await
+    }
+
+    pub async fn task_assignment_email_enabled(&self, id: Uuid) -> AppResult<bool> {
+        self.persistence.task_assignment_email_enabled(id).await
+    }
+
+    pub async fn set_task_assignment_email_enabled(
+        &self,
+        id: Uuid,
+        enabled: bool,
+    ) -> AppResult<()> {
+        self.persistence
+            .set_task_assignment_email_enabled(id, enabled)
+            .await
     }
 
     /// Saves the account's own details: what it is called, where its mail goes, and its picture.

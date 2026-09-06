@@ -11,7 +11,7 @@ use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use axum::{
     Router,
-    extract::{FromRequestParts, Path, Query, State},
+    extract::{Form, FromRequestParts, Path, Query, State},
     http::request::Parts,
     response::{
         Html, IntoResponse, Response, Sse,
@@ -38,8 +38,11 @@ use crate::{
         correlation::CorrelationId,
         task::{
             BackgroundTask, ResumeActor, StopActor, TaskBoardFilter, TaskChainBoard,
-            TaskChainDetail, TaskFilter,
+            TaskChainDetail, TaskFilter, TaskOwner, TaskOwnerCandidate, TaskOwnerFilter,
+            TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
+            TaskOwnershipOperation, TaskOwnershipReason,
         },
+        transport::PrincipalId,
         value_objects::EmailAddress,
     },
     infra::{config::AppConfig, events::MailboxEvents},
@@ -66,6 +69,13 @@ pub fn router() -> Router<AppState> {
         .route("/ui/tasks/{task_id}", get(task_pane))
         .route("/ui/tasks/{task_id}/stop", post(stop_task))
         .route("/ui/tasks/{task_id}/resume", post(resume_task))
+        .route("/ui/tasks/{task_id}/claim", post(claim_task_ownership))
+        .route("/ui/tasks/{task_id}/assign", post(assign_task_ownership))
+        .route(
+            "/ui/tasks/{task_id}/transfer",
+            post(transfer_task_ownership),
+        )
+        .route("/ui/tasks/{task_id}/release", post(release_task_ownership))
 }
 
 /// What the workspace has selected and filtered by, all optional so `/ui/tasks` alone is a valid
@@ -86,6 +96,7 @@ pub struct TasksQuery {
     pub channel_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub status: Option<String>,
+    pub owner: Option<String>,
     pub sort: Option<String>,
     pub page: Option<usize>,
     pub limit: Option<usize>,
@@ -104,6 +115,13 @@ impl TasksQuery {
             self.page,
             self.limit,
         )
+        .with_owner(match self.owner.as_deref() {
+            Some("unassigned") => Some(TaskOwnerFilter::Unassigned),
+            Some(value) => Uuid::parse_str(value)
+                .ok()
+                .map(|id| TaskOwnerFilter::Principal(PrincipalId::new(id))),
+            None => None,
+        })
     }
 
     fn board_filter(&self) -> TaskBoardFilter {
@@ -221,6 +239,7 @@ async fn tasks_page(
 
     let filter = query.filter();
     let (tasks, has_next) = view.page(&filter).await?;
+    let owner_candidates = view.owner_candidates(&channels).await?;
 
     // A task the filters exclude is still worth showing: the URL named it, and it may well be on
     // another page of this same list.
@@ -243,6 +262,7 @@ async fn tasks_page(
         user: &workspace_user,
         companies: &companies,
         channels: &channels,
+        owner_candidates: &owner_candidates,
         list: &list,
         pane_html: &pane_html,
     })))
@@ -518,6 +538,176 @@ async fn resume_task(
     .await
 }
 
+#[derive(Debug, Deserialize)]
+struct OwnershipForm {
+    command_id: Uuid,
+    expected_ownership_version: u64,
+    #[serde(default)]
+    owner: Option<String>,
+    #[serde(default)]
+    reason: Option<TaskOwnershipReason>,
+    #[serde(default)]
+    reason_detail: Option<String>,
+    #[serde(default)]
+    handoff_instruction: Option<String>,
+}
+
+async fn claim_task_ownership(
+    workspace: Workspace,
+    Path(task_id): Path<Uuid>,
+    Query(query): Query<TasksQuery>,
+    Form(form): Form<OwnershipForm>,
+) -> AppResult<Response> {
+    mutate_task_ownership(
+        workspace,
+        task_id,
+        query,
+        form,
+        TaskOwnershipOperation::Claim,
+    )
+    .await
+}
+
+async fn assign_task_ownership(
+    workspace: Workspace,
+    Path(task_id): Path<Uuid>,
+    Query(query): Query<TasksQuery>,
+    Form(form): Form<OwnershipForm>,
+) -> AppResult<Response> {
+    mutate_task_ownership(
+        workspace,
+        task_id,
+        query,
+        form,
+        TaskOwnershipOperation::Assign,
+    )
+    .await
+}
+
+async fn transfer_task_ownership(
+    workspace: Workspace,
+    Path(task_id): Path<Uuid>,
+    Query(query): Query<TasksQuery>,
+    Form(form): Form<OwnershipForm>,
+) -> AppResult<Response> {
+    mutate_task_ownership(
+        workspace,
+        task_id,
+        query,
+        form,
+        TaskOwnershipOperation::Transfer,
+    )
+    .await
+}
+
+async fn release_task_ownership(
+    workspace: Workspace,
+    Path(task_id): Path<Uuid>,
+    Query(query): Query<TasksQuery>,
+    Form(form): Form<OwnershipForm>,
+) -> AppResult<Response> {
+    mutate_task_ownership(
+        workspace,
+        task_id,
+        query,
+        form,
+        TaskOwnershipOperation::Release,
+    )
+    .await
+}
+
+async fn mutate_task_ownership(
+    workspace: Workspace,
+    task_id: Uuid,
+    query: TasksQuery,
+    form: OwnershipForm,
+    operation: TaskOwnershipOperation,
+) -> AppResult<Response> {
+    if !workspace.config.task_ownership_controls_enabled() {
+        return Err(AppError::NotFound(
+            "Task ownership controls are disabled.".into(),
+        ));
+    }
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let task = view.require_task(task_id).await?;
+    let actor = workspace
+        .thread_use_cases
+        .principal_access_for_user(company.id, workspace.user_id)
+        .await?
+        .and_then(|context| context.principal_id)
+        .ok_or_else(|| AppError::NotFound("Task not found.".into()))?;
+
+    let new_owner = match operation {
+        TaskOwnershipOperation::Claim => TaskOwner::Human(actor),
+        TaskOwnershipOperation::Release => TaskOwner::Unassigned,
+        TaskOwnershipOperation::Assign | TaskOwnershipOperation::Transfer => {
+            let owner = form.owner.as_deref().ok_or_else(|| {
+                AppError::BadRequest("Choose a teammate or agent to own the task.".into())
+            })?;
+            let (kind, id) = owner
+                .split_once(':')
+                .ok_or_else(|| AppError::BadRequest("Choose a valid task owner.".into()))?;
+            let id = Uuid::parse_str(id)
+                .map_err(|_| AppError::BadRequest("Choose a valid task owner.".into()))?;
+            match kind {
+                "human" => TaskOwner::Human(id.into()),
+                "agent" => TaskOwner::Agent(id.into()),
+                _ => {
+                    return Err(AppError::BadRequest(
+                        "Owner kind must be human or agent.".into(),
+                    ));
+                }
+            }
+        }
+        TaskOwnershipOperation::InitialAssignment | TaskOwnershipOperation::OwnerRemoved => {
+            return Err(AppError::BadRequest(
+                "System ownership operations are unavailable.".into(),
+            ));
+        }
+    };
+    let reason = form.reason.unwrap_or(match operation {
+        TaskOwnershipOperation::Claim => TaskOwnershipReason::SelfClaim,
+        TaskOwnershipOperation::Assign => TaskOwnershipReason::ManualAssignment,
+        TaskOwnershipOperation::Transfer => TaskOwnershipReason::Delegated,
+        TaskOwnershipOperation::Release => TaskOwnershipReason::Released,
+        TaskOwnershipOperation::InitialAssignment => TaskOwnershipReason::InitialAssignment,
+        TaskOwnershipOperation::OwnerRemoved => TaskOwnershipReason::OwnerRemoved,
+    });
+    let outcome = workspace
+        .thread_use_cases
+        .change_task_ownership(
+            &company,
+            &task,
+            TaskOwnershipCommand {
+                task_id,
+                company_id: company.id,
+                command_id: form.command_id,
+                expected_version: form.expected_ownership_version,
+                actor: TaskOwnershipActor {
+                    principal_id: actor,
+                    authority: TaskOwnershipAuthority::Manager,
+                },
+                operation,
+                new_owner,
+                reason,
+                reason_detail: form.reason_detail,
+                handoff_instruction: form.handoff_instruction,
+            },
+        )
+        .await;
+
+    view.after_write(
+        &task,
+        &query,
+        outcome.err().map(|error| match error {
+            AppError::Conflict(message) => format!("Ownership changed: {message}"),
+            other => format!("Could not change task ownership: {other}"),
+        }),
+    )
+    .await
+}
+
 /// Everything the workspace renders from, so each handler names its data once.
 struct TaskMonitorView<'a> {
     channel_use_cases: &'a ChannelUseCases,
@@ -541,17 +731,35 @@ impl TaskMonitorView<'_> {
         record_pagination_observation(self.monitoring, "tasks", filter.offset());
         let probed = self
             .thread_use_cases
-            .list_company_tasks_page(
+            .list_company_tasks_filtered_page(
                 self.company.id,
-                filter.channel_id,
-                filter.status,
-                filter.sort_asc,
+                filter,
                 filter.offset(),
                 filter.probe_limit(),
             )
             .await?;
 
         Ok(filter.split_probe(probed))
+    }
+
+    async fn owner_candidates(&self, channels: &[Channel]) -> AppResult<Vec<TaskOwnerCandidate>> {
+        let persistence = self.thread_use_cases.get_task_persistence().await;
+        let mut candidates = Vec::new();
+        for channel in channels {
+            candidates.extend(
+                persistence
+                    .list_task_owner_candidates(self.company.id, channel.id)
+                    .await?,
+            );
+        }
+        candidates.sort_by(|left, right| {
+            left.label
+                .to_lowercase()
+                .cmp(&right.label.to_lowercase())
+                .then_with(|| left.owner.as_str().cmp(right.owner.as_str()))
+        });
+        candidates.dedup_by_key(|candidate| candidate.owner);
+        Ok(candidates)
     }
 
     async fn board(&self, filter: TaskBoardFilter) -> AppResult<TaskChainBoard> {
@@ -658,6 +866,12 @@ impl TaskMonitorView<'_> {
                 )
             }
         };
+        let ownership_events = persistence
+            .list_task_ownership_events(self.company.id, task.id)
+            .await?;
+        let owner_candidates = persistence
+            .list_task_owner_candidates(self.company.id, task.channel_id)
+            .await?;
 
         Ok(pages::task_detail_pane(&pages::TaskDetailPane {
             company_id: self.company.id,
@@ -668,6 +882,9 @@ impl TaskMonitorView<'_> {
             attempts: &attempts,
             attempts_error,
             error,
+            ownership_controls_enabled: self.config.task_ownership_controls_enabled(),
+            ownership_events: &ownership_events,
+            owner_candidates: &owner_candidates,
         }))
     }
 
@@ -851,6 +1068,7 @@ mod tests {
             task_id: None,
             channel_id: None,
             status: None,
+            owner: None,
             sort: None,
             page: None,
             limit: None,

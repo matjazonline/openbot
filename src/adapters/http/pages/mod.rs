@@ -28,10 +28,11 @@ use crate::entities::{
     task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
         TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail, TaskChainTaskDetail,
-        TaskFilter, TaskStatus, ThreadActivity,
+        TaskFilter, TaskOwner, TaskOwnerCandidate, TaskOwnershipEvent, TaskStatus, ThreadActivity,
+        ThreadWorkSummary,
     },
     thread::Thread,
-    transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, TransportKind},
+    transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, PrincipalId, TransportKind},
     user::User,
     value_objects::{AvatarUrl, EmailAddress, ModelName},
 };

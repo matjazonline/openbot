@@ -9,9 +9,11 @@ use uuid::Uuid;
 use crate::adapters::persistence::test_support::{
     DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_machine, test_pool,
 };
+use crate::app_error::AppError;
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskFailureOutcome;
 use crate::entities::transport::{DeliveryPurpose, DeliveryStatus};
+use crate::task_queue::HumanTaskCompletion;
 use crate::transport::{DeliveryCreation, NewDelivery};
 use crate::{
     adapters::persistence::PostgresPersistence,
@@ -22,10 +24,13 @@ use crate::{
         task::{
             BackgroundTask, ChainStage, NewTask, ResumeActor, StopActor, TaskAttemptOutcome,
             TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus, TaskBoardFilter,
-            TaskChainCard, TaskChainCounts, TaskFailure, TaskLeaseRef, TaskSource, TaskStatus,
-            TaskStatusEvent, TaskStopReason, TaskTransitionActorKind, TaskTransitionReason,
-            ThreadActivity, TokenUsage,
+            TaskChainCard, TaskChainCounts, TaskFailure, TaskLeaseRef, TaskOwner,
+            TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
+            TaskOwnershipOperation, TaskOwnershipReason, TaskSource, TaskStatus, TaskStatusEvent,
+            TaskStopReason, TaskTransitionActorKind, TaskTransitionReason, ThreadActivity,
+            TokenUsage,
         },
+        transport::PrincipalId,
         value_objects::MessageId,
     },
     use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite},
@@ -40,7 +45,9 @@ use crate::{
 /// lifecycle assertion still expects no `unknown` rows of its own.
 const CLEAR_TRANSITION: &str = "transition_reason = NULL, transition_actor_kind = NULL, \
          transition_actor_id = NULL, transition_approval_id = NULL, transition_outreach_id = NULL";
+use crate::entities::creation::CreationProvenance;
 use crate::use_cases::{
+    agent::{AgentPersistence, AgentWrite},
     channel::{ChannelPersistence, ChannelWrite},
     company::{CompanyPersistence, CompanyWrite},
     thread::ThreadPersistence,
@@ -53,6 +60,383 @@ fn quorum_threshold_rounds_up() {
     assert_eq!(required_response_count(3, 50.0), 2);
     assert_eq!(required_response_count(4, 50.0), 2);
     assert_eq!(required_response_count(10, 20.0), 2);
+}
+
+fn ownership_command(
+    task: &BackgroundTask,
+    actor: PrincipalId,
+    authority: TaskOwnershipAuthority,
+    operation: TaskOwnershipOperation,
+    new_owner: TaskOwner,
+) -> TaskOwnershipCommand {
+    TaskOwnershipCommand {
+        task_id: task.id,
+        company_id: task.company_id,
+        command_id: Uuid::new_v4(),
+        expected_version: task.ownership.version,
+        actor: TaskOwnershipActor {
+            principal_id: actor,
+            authority,
+        },
+        operation,
+        new_owner,
+        reason: match operation {
+            TaskOwnershipOperation::Claim => TaskOwnershipReason::SelfClaim,
+            TaskOwnershipOperation::Assign => TaskOwnershipReason::ManualAssignment,
+            TaskOwnershipOperation::Transfer => TaskOwnershipReason::Delegated,
+            TaskOwnershipOperation::Release => TaskOwnershipReason::Released,
+            TaskOwnershipOperation::InitialAssignment | TaskOwnershipOperation::OwnerRemoved => {
+                TaskOwnershipReason::OwnerRemoved
+            }
+        },
+        reason_detail: None,
+        handoff_instruction: (operation == TaskOwnershipOperation::Transfer)
+            .then(|| "Continue from the existing thread and answer the open request.".into()),
+    }
+}
+
+#[tokio::test]
+async fn competing_ownership_claims_are_versioned_and_idempotent() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(&persistence, company.id, channel.id, "ownership-claims").await;
+    assert!(matches!(task.ownership.owner, TaskOwner::Agent(_)));
+
+    let manager_id = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let released = persistence
+        .change_task_ownership(ownership_command(
+            &task,
+            manager_id,
+            TaskOwnershipAuthority::Manager,
+            TaskOwnershipOperation::Release,
+            TaskOwner::Unassigned,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(released.to_version, 2);
+
+    let suffix = Uuid::new_v4().simple().to_string();
+    let member_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')",
+    )
+    .bind(member_id)
+    .bind(format!("claimant-{suffix}"))
+    .bind(format!("claimant-{suffix}@example.test"))
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company.id)
+    .bind(member_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let member_principal = PrincipalId::random();
+    sqlx::query(
+        "INSERT INTO principals (id, company_id, kind, user_id, display_label) \
+         VALUES ($1, $2, 'person', $3, 'Claimant')",
+    )
+    .bind(member_principal.as_uuid())
+    .bind(company.id)
+    .bind(member_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert!(
+        persistence
+            .assignment_notification_recipient(company.id, member_principal)
+            .await
+            .unwrap()
+            .is_some(),
+        "assignment email defaults on"
+    );
+    sqlx::query(
+        "INSERT INTO user_notification_preferences (user_id, task_assignment_email_enabled) \
+         VALUES ($1, FALSE)",
+    )
+    .bind(member_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert!(
+        persistence
+            .assignment_notification_recipient(company.id, member_principal)
+            .await
+            .unwrap()
+            .is_none(),
+        "the recipient's disabled preference suppresses assignment email"
+    );
+
+    let unassigned = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    let first = ownership_command(
+        &unassigned,
+        manager_id,
+        TaskOwnershipAuthority::UnassignedClaimant,
+        TaskOwnershipOperation::Claim,
+        TaskOwner::Human(manager_id),
+    );
+    let second = ownership_command(
+        &unassigned,
+        member_principal,
+        TaskOwnershipAuthority::UnassignedClaimant,
+        TaskOwnershipOperation::Claim,
+        TaskOwner::Human(member_principal),
+    );
+    let (first_result, second_result) = tokio::join!(
+        persistence.change_task_ownership(first.clone()),
+        persistence.change_task_ownership(second.clone())
+    );
+    assert_eq!(
+        usize::from(first_result.is_ok()) + usize::from(second_result.is_ok()),
+        1
+    );
+
+    let (winning_command, event) = match (first_result, second_result) {
+        (Ok(event), Err(AppError::Conflict(_))) => (first, event),
+        (Err(AppError::Conflict(_)), Ok(event)) => (second, event),
+        outcomes => panic!("one claimant should win and one should conflict: {outcomes:?}"),
+    };
+    let replay = persistence
+        .change_task_ownership(winning_command.clone())
+        .await
+        .unwrap();
+    assert_eq!(replay.id, event.id, "a retry returns its original event");
+    let mut mismatched = winning_command;
+    mismatched.reason_detail = Some("different payload".into());
+    assert!(matches!(
+        persistence.change_task_ownership(mismatched).await,
+        Err(AppError::Conflict(_))
+    ));
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn agent_transfer_revokes_the_old_execution_and_preserves_private_handoff() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(&persistence, company.id, channel.id, "ownership-transfer").await;
+    let lease = claim(&persistence, task.id).await;
+
+    let second_agent = AgentPersistence::create(
+        &persistence,
+        company.id,
+        AgentWrite {
+            name: "Second Agent".into(),
+            slug: format!("second-agent-{}", Uuid::new_v4().simple()),
+            created_by: Some(CreationProvenance::system()),
+            ..AgentWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) \
+         VALUES ($1, $2, $3, 1)",
+    )
+    .bind(company.id)
+    .bind(channel.id)
+    .bind(second_agent.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let second_principal = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2",
+        )
+        .bind(company.id)
+        .bind(second_agent.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let manager = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+
+    let processing = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    let command = ownership_command(
+        &processing,
+        manager,
+        TaskOwnershipAuthority::Manager,
+        TaskOwnershipOperation::Transfer,
+        TaskOwner::Agent(second_principal),
+    );
+    let event = persistence.change_task_ownership(command).await.unwrap();
+    assert_eq!(
+        event.handoff_instruction.as_deref(),
+        Some("Continue from the existing thread and answer the open request.")
+    );
+
+    let transferred = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    assert_eq!(transferred.status, TaskStatus::Pending);
+    assert_eq!(
+        transferred.ownership.owner,
+        TaskOwner::Agent(second_principal)
+    );
+    assert!(transferred.worker_id.is_none());
+    assert!(
+        !persistence
+            .renew_task_lease(lease, Utc::now() + chrono::Duration::minutes(5))
+            .await
+            .unwrap()
+    );
+    assert!(
+        persistence
+            .owned_agent_execution(company.id, channel.id, lease)
+            .await
+            .unwrap()
+            .is_none(),
+        "the old owner cannot resolve an execution after transfer"
+    );
+    assert!(
+        !persistence.mark_task_completed(lease).await.unwrap(),
+        "the stale owner cannot close the task"
+    );
+    assert!(
+        !persistence
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: "stale owner",
+                next_run_at: Utc::now(),
+                outcome: TaskFailureOutcome::Retry,
+                reason: TaskStopReason::RetryableFailure,
+            })
+            .await
+            .unwrap(),
+        "the stale owner cannot record a failure"
+    );
+    assert!(
+        sqlx::query("UPDATE task_ownership_events SET reason_detail = 'tampered' WHERE id = $1")
+            .bind(event.id)
+            .execute(&pool)
+            .await
+            .is_err()
+    );
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn human_completion_commits_one_reply_delivery_and_terminal_transition() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(&persistence, company.id, channel.id, "human-completion").await;
+    let owner = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let transferred = persistence
+        .change_task_ownership(ownership_command(
+            &task,
+            owner,
+            TaskOwnershipAuthority::Manager,
+            TaskOwnershipOperation::Transfer,
+            TaskOwner::Human(owner),
+        ))
+        .await
+        .unwrap();
+    let owned = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    let thread_id = owned.thread_id.unwrap();
+    let message = MessageWrite::internal(
+        thread_id,
+        MessageAuthorWrite::Principal(owner),
+        "Re: human completion",
+        "The final answer.",
+        MessageDirection::Outbound,
+        MessageRole::Human,
+        owned.correlation_id,
+    );
+    let mut delivery = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(task.id),
+            ..DeliveryFixtureRequest::new(company.id, channel.id, thread_id, "human-completion")
+        },
+    )
+    .await
+    .delivery;
+    delivery.message_id = message.id;
+    delivery.correlation_id = owned.correlation_id;
+
+    let command_id = Uuid::new_v4();
+    let complete = || HumanTaskCompletion {
+        task_id: task.id,
+        company_id: company.id,
+        owner_principal_id: owner,
+        expected_ownership_version: transferred.to_version,
+        command_id,
+        command_fingerprint: "same-completion".into(),
+        message: &message,
+        deliveries: vec![delivery.clone()],
+    };
+    let first = persistence.complete_human_task(complete()).await.unwrap();
+    let replay = persistence.complete_human_task(complete()).await.unwrap();
+    assert_eq!(first.message_id, replay.message_id);
+    assert_eq!(first.deliveries.len(), 1);
+    assert!(replay.deliveries.is_empty());
+    assert_eq!(
+        persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Completed
+    );
+    let delivery_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM message_deliveries WHERE task_id = $1 AND message_id = $2",
+    )
+    .bind(task.id)
+    .bind(message.id.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(delivery_count, 1);
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -302,12 +686,14 @@ async fn guarded_transitions_emit_only_on_success_and_operator_actions_record_th
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "actors").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Actors".into(),
             slug: "actors".into(),
+            agent_ids: Some(vec![agent_id]),
             enabled: false,
             ..ChannelWrite::default()
         },
@@ -756,17 +1142,16 @@ async fn an_operator_stop_after_an_outreach_drops_the_outreach_source() {
     let operator = Uuid::new_v4();
     let task = enqueue_chain(&persistence, company.id, channel.id, "outreach-operator").await;
     let worker_id = Uuid::new_v4();
-    claim_as(&persistence, task.id, worker_id).await;
+    let lease = claim_as(&persistence, task.id, worker_id).await;
 
     let outreach_id = Uuid::new_v4();
     let progress = persistence
         .create_outreach_and_pause(CreateOutreachRequest {
             correlation_id: task.correlation_id,
             id: outreach_id,
-            task_id: task.id,
+            lease,
             company_id: company.id,
             channel_id: channel.id,
-            worker_id,
             outreach_key: "attribution-outreach".into(),
             required_threshold_percent: 100.0,
             expires_at: Utc::now() + chrono::Duration::hours(24),
@@ -1012,12 +1397,14 @@ async fn pending_claims_take_one_company_round_before_a_second_task_from_a_backl
         )
         .await
         .unwrap();
+        let agent_id = seed_channel_agent(&persistence, company.id, label).await;
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
                 name: label.into(),
                 slug: label.into(),
+                agent_ids: Some(vec![agent_id]),
                 enabled: false,
                 ..ChannelWrite::default()
             },
@@ -1197,11 +1584,18 @@ async fn thread_activity_reports_the_latest_task_per_thread() {
     set_status(current.id, "processing", Some(live_lease)).await;
 
     let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-    let activity = persistence.list_thread_activity(&ids).await.unwrap();
+    let activity = persistence.list_thread_work_summary(&ids).await.unwrap();
 
-    assert_eq!(activity.get(&threads[0].id), Some(&ThreadActivity::Working));
     assert_eq!(
-        activity.get(&threads[1].id),
+        activity
+            .get(&threads[0].id)
+            .and_then(|summary| summary.activity.as_ref()),
+        Some(&ThreadActivity::Working)
+    );
+    assert_eq!(
+        activity
+            .get(&threads[1].id)
+            .and_then(|summary| summary.activity.as_ref()),
         Some(&ThreadActivity::WaitingApproval)
     );
     assert_eq!(
@@ -1210,7 +1604,9 @@ async fn thread_activity_reports_the_latest_task_per_thread() {
         "a finished thread reports nothing at all, rather than an idle badge"
     );
     assert_eq!(
-        activity.get(&threads[3].id),
+        activity
+            .get(&threads[3].id)
+            .and_then(|summary| summary.activity.as_ref()),
         Some(&ThreadActivity::Working),
         "the newest task wins over an older dead letter on the same thread"
     );
@@ -1218,7 +1614,7 @@ async fn thread_activity_reports_the_latest_task_per_thread() {
     // Asking again after a failure and getting an answer settles the thread: the run that
     // worked is its last word, and the dead letter behind it is history rather than a badge.
     set_status(current.id, "completed", None).await;
-    let activity = persistence.list_thread_activity(&ids).await.unwrap();
+    let activity = persistence.list_thread_work_summary(&ids).await.unwrap();
     assert_eq!(
         activity.get(&threads[3].id),
         None,
@@ -1227,9 +1623,11 @@ async fn thread_activity_reports_the_latest_task_per_thread() {
 
     // The failure still stands on its own while nothing has answered it.
     set_status(current.id, "stopped", None).await;
-    let activity = persistence.list_thread_activity(&ids).await.unwrap();
+    let activity = persistence.list_thread_work_summary(&ids).await.unwrap();
     assert_eq!(
-        activity.get(&threads[3].id),
+        activity
+            .get(&threads[3].id)
+            .and_then(|summary| summary.activity.as_ref()),
         Some(&ThreadActivity::Failed),
         "a run that was stopped rather than answered leaves the failure showing"
     );
@@ -1242,12 +1640,17 @@ async fn thread_activity_reports_the_latest_task_per_thread() {
         Some(Utc::now() - chrono::Duration::minutes(5)),
     )
     .await;
-    let activity = persistence.list_thread_activity(&ids).await.unwrap();
-    assert_eq!(activity.get(&threads[0].id), Some(&ThreadActivity::Queued));
+    let activity = persistence.list_thread_work_summary(&ids).await.unwrap();
+    assert_eq!(
+        activity
+            .get(&threads[0].id)
+            .and_then(|summary| summary.activity.as_ref()),
+        Some(&ThreadActivity::Queued)
+    );
 
     assert!(
         persistence
-            .list_thread_activity(&[])
+            .list_thread_work_summary(&[])
             .await
             .unwrap()
             .is_empty(),
@@ -1294,12 +1697,14 @@ async fn an_expired_task_lease_costs_an_attempt_and_eventually_dead_letters() {
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "reaper").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Reaper".into(),
             slug: "reaper".into(),
+            agent_ids: Some(vec![agent_id]),
             enabled: false,
             ..ChannelWrite::default()
         },
@@ -1467,12 +1872,14 @@ async fn a_superseded_run_cannot_renew_write_or_close_the_task() {
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "fence").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Fence".into(),
             slug: "fence".into(),
+            agent_ids: Some(vec![agent_id]),
             enabled: false,
             ..ChannelWrite::default()
         },
@@ -1612,12 +2019,14 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "commit").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Commit".into(),
             slug: "commit".into(),
+            agent_ids: Some(vec![agent_id]),
             enabled: false,
             ..ChannelWrite::default()
         },
@@ -1863,12 +2272,14 @@ async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_recl
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "queue").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Queue".into(),
             slug: "queue".into(),
+            agent_ids: Some(vec![agent_id]),
             enabled: false,
             ..ChannelWrite::default()
         },
@@ -2037,12 +2448,14 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
     )
     .await
     .unwrap();
+    let agent_id = seed_channel_agent(&persistence, company.id, "outreach").await;
     let channel = ChannelPersistence::create(
         &persistence,
         company.id,
         ChannelWrite {
             name: "Outreach".into(),
             slug: "outreach".into(),
+            agent_ids: Some(vec![agent_id]),
             participant_emails: Some(vec![owner_email.clone()]),
             enabled: false,
             ..ChannelWrite::default()
@@ -2080,6 +2493,8 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             .await
             .unwrap()
     );
+    let lease =
+        TaskLeaseRef::of(&persistence.get_task_by_id(task.id).await.unwrap().unwrap()).unwrap();
     let outreach_id = Uuid::new_v4();
     let target_email = "vendor@supplier.example";
     let asked = delivery_fixture(
@@ -2099,10 +2514,9 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .create_outreach_and_pause(CreateOutreachRequest {
             correlation_id: CorrelationId::new(),
             id: outreach_id,
-            task_id: task.id,
+            lease,
             company_id: company.id,
             channel_id: channel.id,
-            worker_id,
             outreach_key: "integration-outreach".into(),
             required_threshold_percent: 100.0,
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
@@ -2266,6 +2680,8 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
             .await
             .unwrap()
     );
+    let lease =
+        TaskLeaseRef::of(&persistence.get_task_by_id(task.id).await.unwrap().unwrap()).unwrap();
 
     // Two targets, a quorum of one: the second question is queued and then never wanted.
     let suffix = Uuid::new_v4().simple().to_string();
@@ -2314,10 +2730,9 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
         .create_outreach_and_pause(CreateOutreachRequest {
             correlation_id: task.correlation_id,
             id: outreach_id,
-            task_id: task.id,
+            lease,
             company_id: company.id,
             channel_id: channel.id,
-            worker_id,
             outreach_key: format!("quorum-{suffix}"),
             required_threshold_percent: 50.0,
             expires_at: Utc::now() + chrono::Duration::hours(24),
@@ -2423,6 +2838,8 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
             .await
             .unwrap()
     );
+    let lease =
+        TaskLeaseRef::of(&persistence.get_task_by_id(task.id).await.unwrap().unwrap()).unwrap();
 
     let suffix = Uuid::new_v4().simple().to_string();
     let queued = delivery_fixture(
@@ -2477,10 +2894,9 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
         .create_outreach_and_pause(CreateOutreachRequest {
             correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
-            task_id: task.id,
+            lease,
             company_id: company.id,
             channel_id: channel.id,
-            worker_id,
             outreach_key: format!("mark-{suffix}"),
             required_threshold_percent: 100.0,
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
@@ -2528,6 +2944,27 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
         .unwrap();
 }
 
+async fn seed_channel_agent(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    label: &str,
+) -> Uuid {
+    let suffix = Uuid::new_v4().simple().to_string();
+    AgentPersistence::create(
+        persistence,
+        company_id,
+        AgentWrite {
+            name: format!("{label} agent"),
+            slug: format!("{label}-agent-{suffix}"),
+            created_by: Some(CreationProvenance::system()),
+            ..AgentWrite::default()
+        },
+    )
+    .await
+    .expect("test channel agent is created")
+    .id
+}
+
 /// A company and an enabled channel to hang tasks off, with a unique slug per call so
 /// database-backed tests do not collide with each other or with a previous run.
 async fn seed_company_and_channel(
@@ -2558,12 +2995,25 @@ async fn seed_company_and_channel(
     )
     .await
     .unwrap();
+    let agent = AgentPersistence::create(
+        persistence,
+        company.id,
+        AgentWrite {
+            name: "Chain Agent".into(),
+            slug: format!("chain-agent-{suffix}"),
+            created_by: Some(CreationProvenance::system()),
+            ..AgentWrite::default()
+        },
+    )
+    .await
+    .unwrap();
     let channel = ChannelPersistence::create(
         persistence,
         company.id,
         ChannelWrite {
             name: "Chain".into(),
             slug: "chain".into(),
+            agent_ids: Some(vec![agent.id]),
             enabled: false,
             ..ChannelWrite::default()
         },

@@ -109,8 +109,12 @@ impl Tool for NativeToolShim {
     /// already built with, and reading it here would give one tool two sources of its own bounds
     /// -- which differ the moment a second harness compiles the policy differently. The host's is
     /// the one that applies whichever runtime is calling.
-    async fn execute(&self, args: Value, _ctx: ToolExecutionContext) -> ToolResult {
-        match self.host.invoke(&self.declaration.id, args).await {
+    async fn execute(&self, args: Value, ctx: ToolExecutionContext) -> ToolResult {
+        match self
+            .host
+            .invoke(&self.declaration.id, &ctx.call_id, args)
+            .await
+        {
             Ok(invocation) if invocation.success => {
                 if invocation.suspends_run() {
                     self.suspended.store(true, Ordering::SeqCst);
@@ -206,6 +210,7 @@ mod tests {
         async fn invoke(
             &self,
             _id: &crate::entities::value_objects::ToolId,
+            _call_id: &str,
             _args: Value,
         ) -> AppResult<crate::services::harness::ToolInvocation> {
             Ok(crate::services::harness::ToolInvocation::suspended(

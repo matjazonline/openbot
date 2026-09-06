@@ -24,12 +24,14 @@ use crate::{
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRecord,
             TaskAttemptRef, TaskBoardFilter, TaskChainBoard, TaskChainDetail, TaskFailure,
-            TaskLeaseRef, TaskStatus, TaskStatusEvent, TaskStatusEventCursor, ThreadActivity,
+            TaskFilter, TaskLeaseRef, TaskOwner, TaskOwnerCandidate, TaskOwnerTarget,
+            TaskOwnershipCommand, TaskOwnershipEvent, TaskStatus, TaskStatusEvent,
+            TaskStatusEventCursor, ThreadWorkSummary,
         },
         transport::DeliveryId,
         value_objects::{EmailAddress, MessageId},
     },
-    transport::{DeliveryCreation, NewDelivery},
+    transport::{DeliveryCreation, NewDelivery, NewStandaloneDelivery},
     use_cases::thread::{AgentReply, MessageWrite, TaskChannelTarget},
 };
 
@@ -57,6 +59,14 @@ pub struct TaskLease {
     /// Which task, held by which worker, for which run.
     pub reference: TaskLeaseRef,
     ttl: chrono::Duration,
+}
+
+/// Execution-only projection for an agent-owned task. The handoff is private ownership metadata,
+/// never a canonical thread message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnedAgentExecution {
+    pub agent_id: Uuid,
+    pub handoff_instruction: Option<String>,
 }
 
 impl TaskLease {
@@ -146,14 +156,13 @@ pub struct OutreachTargetRequest {
 #[derive(Debug, Clone)]
 pub struct CreateOutreachRequest {
     pub id: Uuid,
-    pub task_id: Uuid,
+    pub lease: TaskLeaseRef,
     pub company_id: Uuid,
     /// The channel every target is asked as.
     pub channel_id: Uuid,
     /// The chain the outreaching task belongs to, so the mail this sends and the replies it
     /// provokes stay on the same trail as the run that asked for them.
     pub correlation_id: CorrelationId,
-    pub worker_id: Uuid,
     pub outreach_key: String,
     pub required_threshold_percent: f64,
     pub expires_at: DateTime<Utc>,
@@ -182,6 +191,31 @@ pub struct AgentDispatchCommit<'a> {
     pub complete_outreach: bool,
 }
 
+/// A human owner's externally published final answer. The task fence, canonical message,
+/// delivery, and completion transition commit together.
+pub struct HumanTaskCompletion<'a> {
+    pub task_id: Uuid,
+    pub company_id: Uuid,
+    pub owner_principal_id: crate::entities::transport::PrincipalId,
+    pub expected_ownership_version: u64,
+    pub command_id: Uuid,
+    pub command_fingerprint: String,
+    pub message: &'a MessageWrite,
+    pub deliveries: Vec<NewDelivery>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HumanTaskCompletionResult {
+    pub message_id: CanonicalMessageId,
+    pub deliveries: Vec<DeliveryCreation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssignmentNotificationRecipient {
+    pub user_id: Uuid,
+    pub email: EmailAddress,
+}
+
 /// What [`TaskPersistence::commit_agent_dispatch`] did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchCommit {
@@ -199,10 +233,10 @@ pub trait TaskPersistence: Send + Sync {
     /// Batched deliberately: the thread column renders up to a full page of rows at once, and one
     /// query per row would be a page-load's worth of round trips. Threads with nothing in flight
     /// are simply absent from the map.
-    async fn list_thread_activity(
+    async fn list_thread_work_summary(
         &self,
         _thread_ids: &[Uuid],
-    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
         Ok(HashMap::new())
     }
 
@@ -329,6 +363,74 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>>;
 
+    /// Resolve the agent behind the owner captured by this lease and its latest handoff. A stale
+    /// lease or an ineligible owner returns `None`, so execution fails closed.
+    async fn owned_agent_execution(
+        &self,
+        _company_id: Uuid,
+        _channel_id: Uuid,
+        _lease: TaskLeaseRef,
+    ) -> AppResult<Option<OwnedAgentExecution>> {
+        Ok(None)
+    }
+
+    /// Apply one audited, version-fenced ownership command. Implementations must serialize
+    /// competing commands per task and treat a repeated command id as an idempotent retry.
+    async fn change_task_ownership(
+        &self,
+        _command: TaskOwnershipCommand,
+    ) -> AppResult<TaskOwnershipEvent> {
+        Err(AppError::Internal(
+            "Task ownership persistence is not configured".into(),
+        ))
+    }
+
+    async fn change_task_ownership_with_notification(
+        &self,
+        command: TaskOwnershipCommand,
+        notification: Option<NewStandaloneDelivery>,
+    ) -> AppResult<TaskOwnershipEvent> {
+        if notification.is_some() {
+            return Err(AppError::Internal(
+                "Atomic assignment notification persistence is not configured".into(),
+            ));
+        }
+        self.change_task_ownership(command).await
+    }
+
+    async fn assignment_notification_recipient(
+        &self,
+        _company_id: Uuid,
+        _principal_id: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<AssignmentNotificationRecipient>> {
+        Ok(None)
+    }
+
+    async fn list_task_ownership_events(
+        &self,
+        _company_id: Uuid,
+        _task_id: Uuid,
+    ) -> AppResult<Vec<TaskOwnershipEvent>> {
+        Ok(Vec::new())
+    }
+
+    async fn resolve_task_owner_target(
+        &self,
+        _company_id: Uuid,
+        _channel_id: Uuid,
+        _target: TaskOwnerTarget,
+    ) -> AppResult<Option<TaskOwner>> {
+        Ok(None)
+    }
+
+    async fn list_task_owner_candidates(
+        &self,
+        _company_id: Uuid,
+        _channel_id: Uuid,
+    ) -> AppResult<Vec<TaskOwnerCandidate>> {
+        Ok(Vec::new())
+    }
+
     /// Every execution attempt for one company-owned task, oldest first.
     ///
     /// The company predicate is part of the query because the task id originates in a browser
@@ -352,8 +454,6 @@ pub trait TaskPersistence: Send + Sync {
         task_id: Uuid,
     ) -> AppResult<Vec<TaskChannelTarget>>;
 
-    async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()>;
-
     /// Commit one dispatch's entire visible effect, or none of it.
     ///
     /// No default: a double that silently reported success would let the dispatch believe it had
@@ -362,6 +462,15 @@ pub trait TaskPersistence: Send + Sync {
         &self,
         commit: AgentDispatchCommit<'_>,
     ) -> AppResult<DispatchCommit>;
+
+    async fn complete_human_task(
+        &self,
+        _completion: HumanTaskCompletion<'_>,
+    ) -> AppResult<HumanTaskCompletionResult> {
+        Err(AppError::Internal(
+            "Human task completion persistence is not configured".into(),
+        ))
+    }
 
     /// Extend this run's lease. `false` means the run no longer owns the task and must stop.
     ///
@@ -483,5 +592,28 @@ pub trait TaskPersistence: Send + Sync {
             .skip(offset.max(0) as usize)
             .take(limit.max(0) as usize)
             .collect())
+    }
+
+    async fn list_company_tasks_filtered_page(
+        &self,
+        company_id: Uuid,
+        filter: &TaskFilter,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<BackgroundTask>> {
+        if filter.owner.is_some() {
+            return Err(AppError::Internal(
+                "Task-owner filtering is not configured".into(),
+            ));
+        }
+        self.list_company_tasks_page(
+            company_id,
+            filter.channel_id,
+            filter.status,
+            filter.sort_asc,
+            offset,
+            limit,
+        )
+        .await
     }
 }

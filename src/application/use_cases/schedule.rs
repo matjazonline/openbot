@@ -1287,6 +1287,7 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                ownership: Default::default(),
                 worker_id: None,
                 execution_generation: None,
                 locked_at: None,
@@ -1299,13 +1300,6 @@ mod tests {
             Ok(task)
         }
         async fn get_task_by_id(&self, _id: Uuid) -> AppResult<Option<BackgroundTask>> {
-            unimplemented!()
-        }
-        async fn update_task_payload(
-            &self,
-            _id: Uuid,
-            _payload: serde_json::Value,
-        ) -> AppResult<()> {
             unimplemented!()
         }
         async fn claim_pending_tasks(

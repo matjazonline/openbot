@@ -181,6 +181,7 @@ fn a_message_is_matched_to_its_task_by_canonical_id() {
         retry_count: 0,
         max_retries: 3,
         last_error: None,
+        ownership: Default::default(),
         worker_id: None,
         execution_generation: None,
         locked_at: None,
@@ -580,6 +581,13 @@ fn a_detail_column_with_nothing_open_says_so() {
         agent: None,
         viewer_email: &email,
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
     assert!(!occupied.contains("data-pane-empty"));
 }
@@ -2369,6 +2377,13 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     assert!(html.contains("chat chat-start"));
@@ -2474,6 +2489,13 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     // The connection lives on the pane, so every existing pane swap tears it down and rebuilds it
@@ -2507,6 +2529,13 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     assert!(html.contains(&format!(
@@ -2802,6 +2831,13 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
@@ -2852,6 +2888,13 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: Some(ThreadActivity::Working),
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     assert!(html.contains(
@@ -3193,6 +3236,13 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     assert!(html.contains(&format!(
@@ -3365,6 +3415,13 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         agent: None,
         viewer_email: &mailbox_account_email(),
         activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        ownership_controls_enabled: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
     });
 
     // Rendered with the scope the pane itself uses, so the comparison is of the markup rather
@@ -3473,6 +3530,7 @@ fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> Bac
         retry_count: 1,
         max_retries: 3,
         last_error: None,
+        ownership: Default::default(),
         worker_id: None,
         execution_generation: None,
         locked_at: None,
@@ -3509,6 +3567,7 @@ fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
         user: &mailbox_user(&email),
         companies: std::slice::from_ref(&company),
         channels: std::slice::from_ref(&channel),
+        owner_candidates: &[],
         list: &list,
         pane_html: &pane,
     });
@@ -3531,6 +3590,8 @@ fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
     )));
     assert!(html.contains(r##"<option value="completed" selected>Completed</option>"##));
     assert!(html.contains(r##"<option value="desc" selected>Newest first</option>"##));
+    assert!(html.contains(r##"aria-label="Filter by owner""##));
+    assert!(html.contains(r##"<option value="unassigned">Unassigned</option>"##));
 }
 
 #[test]
@@ -3720,6 +3781,9 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         task: &task,
         channel: Some(&channel),
         error: Some("Failed to stop task: worker unreachable"),
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
 
     assert!(html.contains("id=\"task-pane\""));
@@ -3754,6 +3818,9 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         attempts: &[],
         attempts_error: None,
         error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
     assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
     assert!(!stopped_html.contains("/stop?"));
@@ -3839,6 +3906,9 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
         attempts: &attempts,
         attempts_error: Some("Execution attempts were partially unavailable"),
         error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
 
     assert!(html.contains("Latest execution"));
@@ -3916,6 +3986,7 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         retry_count: 0,
         max_retries: 3,
         last_error: None,
+        ownership: Default::default(),
         worker_id: Some(Uuid::new_v4()),
         execution_generation: Some(generation),
         locked_at: None,
@@ -3964,6 +4035,9 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         attempts: &attempts,
         attempts_error: None,
         error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
 
     // Verify token stats
@@ -4902,6 +4976,9 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         task: &task,
         channel: Some(&channel),
         error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
 
     // The task reads as completed, so the delivery section is the only thing that can tell an
@@ -4927,6 +5004,9 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         task: &task,
         channel: Some(&channel),
         error: None,
+        ownership_controls_enabled: false,
+        ownership_events: &[],
+        owner_candidates: &[],
     });
     assert!(!quiet.contains("Delivery"));
 }
@@ -5396,6 +5476,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         user: &user,
         companies: &companies,
         channels: &[],
+        owner_candidates: &[],
         list: &TaskMonitorList {
             company: &company,
             tasks: &[],
@@ -5488,6 +5569,7 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5527,6 +5609,7 @@ fn an_oauth_only_profile_can_add_password_and_connect_available_providers() {
         },
         google_enabled: true,
         apple_enabled: true,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5556,6 +5639,7 @@ fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Identity,
             "An account already uses the address 'taken@example.com'.",
@@ -5585,6 +5669,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Saved(ProfileForm::Password, "Your password has been changed."),
     });
     let (details, password) = saved
@@ -5604,6 +5689,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Password,
             "That is not your current password.",
@@ -5650,6 +5736,7 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5736,6 +5823,7 @@ fn a_section_waiting_on_a_code_asks_for_it_instead_of_offering_its_form_again() 
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5770,6 +5858,7 @@ fn a_pending_password_change_leaves_the_account_details_form_alone() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5799,6 +5888,7 @@ fn a_pending_address_is_never_shown_as_the_account_s_own() {
         },
         google_enabled: false,
         apple_enabled: false,
+        task_assignment_email_enabled: true,
         outcome: ProfileOutcome::Saved(
             ProfileForm::Identity,
             "Your name and picture are saved. Check the new address for the code.",
@@ -6071,6 +6161,7 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
             deliveries: Vec::new(),
         }],
         events: vec![event],
+        ownership_events: Vec::new(),
         approvals: Vec::new(),
         outreaches: Vec::new(),
         truncated: false,
@@ -6098,6 +6189,7 @@ fn a_truncated_chain_pane_says_so_and_a_complete_one_does_not() {
         agent_names: vec!["Triage".into()],
         tasks: Vec::new(),
         events: Vec::new(),
+        ownership_events: Vec::new(),
         approvals: Vec::new(),
         outreaches: Vec::new(),
         truncated: true,

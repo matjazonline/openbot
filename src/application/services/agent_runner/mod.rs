@@ -43,6 +43,7 @@ use crate::services::llm_guardrail::GuardrailCheck;
 use crate::services::native_tools::NativeToolHost;
 use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
 use crate::services::prompt_fence::UntrustedFence;
+use crate::services::task_ownership_tool::{TaskOwnershipTool, TaskOwnershipToolContext};
 use crate::task_queue::TaskPersistence;
 use crate::transport::DeliveryComposer;
 use crate::use_cases::approval::ApprovalUseCases;
@@ -425,6 +426,29 @@ impl<'a> AgentRunner<'a> {
 
             let mut context = context;
             context.sub_agent_scope = self.params.spec().sub_agents.clone();
+            if let Some(config) = self
+                .app_config
+                .as_ref()
+                .filter(|config| config.task_ownership_controls_enabled())
+            {
+                host = host.with_task_ownership(TaskOwnershipTool::new(
+                    task_persistence.clone(),
+                    deliveries.clone(),
+                    config.clone(),
+                    TaskOwnershipToolContext {
+                        company_id: context.company_id,
+                        channel_id: context.channel_id,
+                        lease: context.lease,
+                        company_name: self
+                            .company
+                            .as_ref()
+                            .map(|company| company.name.clone())
+                            .unwrap_or_else(|| context.company_slug.as_str().to_string()),
+                        thread_id: Some(context.thread_id),
+                        correlation_id: context.correlation_id,
+                    },
+                ));
+            }
             let mut outreach = OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,

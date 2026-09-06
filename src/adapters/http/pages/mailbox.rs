@@ -215,6 +215,14 @@ pub struct MessagePane<'a> {
     pub viewer_email: &'a EmailAddress,
     /// What this thread is doing right now, for the strip above the composer.
     pub activity: Option<ThreadActivity>,
+    pub work: Option<ThreadWorkSummary>,
+    pub viewer_principal_id: Option<PrincipalId>,
+    pub viewer_manages_tasks: bool,
+    pub ownership_controls_enabled: bool,
+    /// Private ownership metadata, provided only for the owner or a manager.
+    pub private_handoff: Option<&'a str>,
+    pub ownership_error: Option<&'a str>,
+    pub owner_candidates: &'a [TaskOwnerCandidate],
 }
 
 /// The detail pane showing the new-message form for a thread that is already open.
@@ -2209,6 +2217,8 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 {messages_html}
             </div>
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
+            {owner_panel}
+            {human_completion}
             {composer}
             {diagnostics_dialog}
         </section>
@@ -2223,8 +2233,196 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         after = after,
         messages_html = messages_html,
         activity_strip = thread_activity_strip(pane.activity),
+        owner_panel = task_owner_panel(pane),
+        human_completion = human_completion_composer(pane),
         composer = thread_composer(pane),
         diagnostics_dialog = DIAGNOSTICS_DIALOG,
+    )
+}
+
+fn task_owner_panel(pane: &MessagePane<'_>) -> String {
+    let Some(work) = pane.work.as_ref() else {
+        return String::new();
+    };
+    let viewer = pane.viewer_principal_id;
+    let (label, action) = match work.ownership.owner {
+        TaskOwner::Agent(_) => {
+            let label = if let Some(owner) = work.owner_label.as_deref() {
+                if pane.activity == Some(ThreadActivity::Working) {
+                    format!("{owner} working")
+                } else {
+                    format!("Assigned to {owner}")
+                }
+            } else if pane.activity == Some(ThreadActivity::Working) {
+                "Agent working".to_string()
+            } else {
+                "Assigned to an agent".to_string()
+            };
+            let action = pane.viewer_manages_tasks.then(|| {
+                format!(
+                    "{}{}",
+                    ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
+                    ownership_transfer_form(pane, work)
+                )
+            });
+            (label, action.unwrap_or_default())
+        }
+        TaskOwner::Human(owner) if Some(owner) == viewer => (
+            "Assigned to you".to_string(),
+            format!(
+                "{}{}",
+                ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
+                ownership_transfer_form(pane, work)
+            ),
+        ),
+        TaskOwner::Human(_) => {
+            let action = pane.viewer_manages_tasks.then(|| {
+                format!(
+                    "{}{}",
+                    ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
+                    ownership_transfer_form(pane, work)
+                )
+            });
+            (
+                work.owner_label
+                    .as_deref()
+                    .map(|owner| format!("Assigned to {owner}"))
+                    .unwrap_or_else(|| "Assigned to a teammate".to_string()),
+                action.unwrap_or_default(),
+            )
+        }
+        TaskOwner::Unassigned => (
+            "Unassigned".to_string(),
+            ownership_action_form(pane, work, "claim", "Claim task", "btn-primary"),
+        ),
+    };
+    let error = pane.ownership_error.map_or_else(String::new, |message| {
+        format!(
+            r#"<div class="alert alert-error mb-2 py-2 text-sm">{}</div>"#,
+            escape_html_text(message)
+        )
+    });
+    let handoff = pane.private_handoff.map_or_else(String::new, |instruction| {
+        format!(
+            r#"<div class="mt-2 rounded-box bg-base-200 p-3 text-sm"><span class="font-semibold">Private handoff</span><p class="mt-1 whitespace-pre-wrap">{}</p></div>"#,
+            escape_html_text(instruction)
+        )
+    });
+    format!(
+        r#"<section class="border-t border-base-300 px-4 py-3 sm:px-6">{error}
+            <div class="flex items-center justify-between gap-3"><span class="badge badge-outline">{label}</span>{action}</div>
+            {handoff}</section>"#
+    )
+}
+
+fn ownership_transfer_form(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> String {
+    if !pane.ownership_controls_enabled || pane.owner_candidates.is_empty() {
+        return String::new();
+    }
+    let options: String = pane
+        .owner_candidates
+        .iter()
+        .filter(|candidate| candidate.owner != work.ownership.owner)
+        .filter_map(|candidate| {
+            let id = candidate.owner.principal_id()?;
+            Some(format!(
+                r#"<option value="{}:{}">{} · {}</option>"#,
+                candidate.owner.as_str(),
+                id.as_uuid(),
+                escape_html_text(&candidate.label),
+                candidate.owner.as_str(),
+            ))
+        })
+        .collect();
+    if options.is_empty() {
+        return String::new();
+    }
+    format!(
+        r##"<details class="dropdown dropdown-end"><summary class="btn btn-ghost btn-sm">Transfer</summary>
+            <form class="dropdown-content z-10 mt-2 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
+                hx-post="/ui/task-ownership/{task_id}/transfer" hx-target="#detail-pane" hx-swap="outerHTML">
+                <input type="hidden" name="company_id" value="{company_id}">
+                <input type="hidden" name="channel_id" value="{channel_id}">
+                <input type="hidden" name="thread_id" value="{thread_id}">
+                <input type="hidden" name="command_id" value="{command_id}">
+                <input type="hidden" name="expected_ownership_version" value="{version}">
+                <select class="select select-sm w-full" name="owner" required>
+                    <option value="">Choose an eligible owner</option>{options}</select>
+                <textarea class="textarea textarea-sm w-full" name="handoff_instruction" required maxlength="8192"
+                    placeholder="Private handoff instruction"></textarea>
+                <input class="input input-sm w-full" name="reason_detail" maxlength="512" placeholder="Optional reason">
+                <button class="btn btn-primary btn-sm" type="submit">Transfer and end ownership</button>
+            </form></details>"##,
+        task_id = work.task_id,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+        command_id = Uuid::new_v4(),
+        version = work.ownership.version,
+    )
+}
+
+fn ownership_action_form(
+    pane: &MessagePane<'_>,
+    work: &ThreadWorkSummary,
+    operation: &str,
+    label: &str,
+    button_class: &str,
+) -> String {
+    if !pane.ownership_controls_enabled || pane.viewer_principal_id.is_none() {
+        return String::new();
+    }
+    format!(
+        r##"<form hx-post="/ui/task-ownership/{task_id}/{operation}" hx-target="#detail-pane" hx-swap="outerHTML">
+            <input type="hidden" name="company_id" value="{company_id}">
+            <input type="hidden" name="channel_id" value="{channel_id}">
+            <input type="hidden" name="thread_id" value="{thread_id}">
+            <input type="hidden" name="command_id" value="{command_id}">
+            <input type="hidden" name="expected_ownership_version" value="{version}">
+            <button class="btn {button_class} btn-sm" type="submit">{label}</button></form>"##,
+        task_id = work.task_id,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+        command_id = Uuid::new_v4(),
+        version = work.ownership.version,
+    )
+}
+
+fn human_completion_composer(pane: &MessagePane<'_>) -> String {
+    let Some(work) = pane.work.as_ref() else {
+        return String::new();
+    };
+    let TaskOwner::Human(owner) = work.ownership.owner else {
+        return String::new();
+    };
+    if !pane.ownership_controls_enabled
+        || Some(owner) != pane.viewer_principal_id
+        || pane.activity != Some(ThreadActivity::Queued)
+    {
+        return String::new();
+    }
+    format!(
+        r##"<form class="border-t border-warning/40 bg-warning/10 px-4 py-4 sm:px-6"
+                hx-post="/ui/task-complete" hx-target="#detail-pane" hx-swap="outerHTML">
+            <input type="hidden" name="company_id" value="{company_id}">
+            <input type="hidden" name="channel_id" value="{channel_id}">
+            <input type="hidden" name="thread_id" value="{thread_id}">
+            <input type="hidden" name="task_id" value="{task_id}">
+            <input type="hidden" name="command_id" value="{command_id}">
+            <input type="hidden" name="expected_ownership_version" value="{version}">
+            <div class="mb-2"><p class="font-semibold">Send final response as task owner</p>
+                <p class="text-xs opacity-70">This sends externally and completes the task. It is separate from the quiet context form below.</p></div>
+            <textarea name="text_body" class="textarea min-h-24 w-full" required
+                placeholder="Write the final response that will be sent…"></textarea>
+            <button type="submit" class="btn btn-warning btn-sm mt-2">Send and complete</button>
+        </form>"##,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+        task_id = work.task_id,
+        command_id = Uuid::new_v4(),
+        version = work.ownership.version,
     )
 }
 

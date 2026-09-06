@@ -178,6 +178,7 @@ async fn serve() -> anyhow::Result<()> {
         .with_task_concurrency(task_worker_concurrency)
         .with_agent_run_timeout(agent_run_timeout_from_env())
         .with_active_task_executions(active_task_executions)
+        .with_task_wakeups(app_state.task_wakeups.clone())
         .with_schedules(app_state.schedule_use_cases.clone())
         .with_monitoring(app_state.monitoring.clone()),
     );
@@ -214,6 +215,7 @@ async fn serve() -> anyhow::Result<()> {
         app_state.db.clone(),
         app_state.events.clone(),
         app_state.inbound_event_wakeups.clone(),
+        app_state.task_wakeups.clone(),
         shutdown_rx.resubscribe(),
     ));
 

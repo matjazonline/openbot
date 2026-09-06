@@ -551,6 +551,7 @@ impl TaskPersistence for MockTaskPersistence {
             retry_count: 0,
             max_retries: 3,
             last_error: None,
+            ownership: Default::default(),
             worker_id: None,
             execution_generation: None,
             locked_at: None,
@@ -575,14 +576,6 @@ impl TaskPersistence for MockTaskPersistence {
             .iter()
             .find(|t| t.id == id)
             .cloned())
-    }
-
-    async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
-        let mut list = self.tasks.lock().unwrap();
-        if let Some(t) = list.iter_mut().find(|t| t.id == id) {
-            t.payload = payload;
-        }
-        Ok(())
     }
 
     async fn claim_pending_tasks(
@@ -4897,6 +4890,8 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
                 task_id: ingest.task_id.unwrap_or_else(Uuid::new_v4),
                 worker_id: Uuid::new_v4(),
                 execution_generation: Uuid::new_v4(),
+                claimed_owner: Default::default(),
+                ownership_version: 1,
             },
             CorrelationId::new(),
         )

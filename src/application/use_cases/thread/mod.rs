@@ -26,7 +26,9 @@ use crate::{
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
         },
-        task::{ThreadActivity, TokenUsage},
+        task::{
+            BackgroundTask, TaskOwnershipCommand, TaskOwnershipEvent, ThreadWorkSummary, TokenUsage,
+        },
         thread::Thread,
         transport::{
             ChannelSelector, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
@@ -54,6 +56,8 @@ use crate::{
 
 mod dispatch;
 pub use dispatch::{AgentReply, DispatchOutcome};
+mod human_completion;
+pub use human_completion::HumanCompletionDraft;
 mod ingest;
 pub use ingest::{
     CanonicalMessageIngress, InboundMessage, InboundPreflight, IngestRejection, IngressOrigin,
@@ -348,6 +352,15 @@ pub trait ThreadPersistence: Send + Sync {
         &self,
         thread_id: Uuid,
     ) -> AppResult<Option<EmailReplyContext>>;
+
+    /// The newest inbound email turn a human final response can safely answer, looking past
+    /// internal notes and agent turns that have no external author address.
+    async fn latest_replyable_email_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        self.latest_email_reply_context(thread_id).await
+    }
 
     /// The newest RFC Message-ID in a thread, looking back past turns with no email headers.
     async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>>;
@@ -864,6 +877,15 @@ impl ThreadUseCases {
             .await
     }
 
+    pub async fn latest_replyable_email_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        self.thread_persistence
+            .latest_replyable_email_context(thread_id)
+            .await
+    }
+
     /// The newest RFC Message-ID in a thread, looking back past turns with no email headers.
     pub async fn latest_thread_rfc_message_id(
         &self,
@@ -1283,6 +1305,18 @@ impl ThreadUseCases {
             .await
     }
 
+    pub async fn list_company_tasks_filtered_page(
+        &self,
+        company_id: Uuid,
+        filter: &crate::entities::task::TaskFilter,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+        self.task_persistence
+            .list_company_tasks_filtered_page(company_id, filter, offset, limit)
+            .await
+    }
+
     pub async fn get_task_persistence(&self) -> Arc<dyn TaskPersistence> {
         self.task_persistence.clone()
     }
@@ -1291,11 +1325,48 @@ impl ThreadUseCases {
     ///
     /// Threads with nothing in flight are absent from the map rather than present-and-idle, so a
     /// caller renders "no badge" by finding nothing.
-    pub async fn thread_activity(
+    pub async fn thread_work_summary(
         &self,
         thread_ids: &[Uuid],
-    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
-        self.task_persistence.list_thread_activity(thread_ids).await
+    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
+        self.task_persistence
+            .list_thread_work_summary(thread_ids)
+            .await
+    }
+
+    pub async fn principal_access_for_user(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<Option<crate::entities::participant::PrincipalAccessContext>> {
+        self.participant_persistence
+            .access_context_for_user(company_id, user_id)
+            .await
+    }
+
+    pub fn task_ownership_controls_enabled(&self) -> bool {
+        self.config.task_ownership_controls_enabled()
+    }
+
+    pub async fn change_task_ownership(
+        &self,
+        company: &Company,
+        task: &BackgroundTask,
+        command: TaskOwnershipCommand,
+    ) -> AppResult<TaskOwnershipEvent> {
+        crate::services::task_assignment_notification::change_ownership_with_assignment_notification(
+            self.task_persistence.as_ref(),
+            &self.deliveries,
+            &self.config,
+            crate::services::task_assignment_notification::AssignmentNotificationContext {
+                company_name: &company.name,
+                channel_id: task.channel_id,
+                thread_id: task.thread_id,
+                correlation_id: task.correlation_id,
+            },
+            command,
+        )
+        .await
     }
 }
 

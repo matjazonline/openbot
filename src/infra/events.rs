@@ -17,6 +17,7 @@ use crate::services::inbound_event_worker::InboundEventWakeups;
 use serde::Deserialize;
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
+use tokio::sync::Notify;
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -37,6 +38,8 @@ const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
 /// duplicated notification costs at most one poll interval. It shares this connection rather than
 /// opening its own because a pure latency hint does not justify a second dedicated listener.
 const INBOUND_EVENT_CHANNEL: &str = "inbound_event_ready";
+const TASK_READY_CHANNEL: &str = "task_ready";
+const TASK_OWNERSHIP_CHANNEL: &str = "task_ownership_changed";
 
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
 /// loss here — a lagged subscriber re-queries from its cursor and catches up in one round trip —
@@ -60,6 +63,50 @@ pub struct ThreadScope {
 pub struct TaskChainScope {
     pub company_id: Uuid,
     pub correlation_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+struct TaskOwnershipScope {
+    task_id: Uuid,
+}
+
+/// Cross-process latency hints for task claims and revocation. PostgreSQL remains authoritative;
+/// a missed hint costs one poll interval, while every stale write is still ownership-fenced.
+#[derive(Clone)]
+pub struct TaskWakeups {
+    ready: std::sync::Arc<Notify>,
+    ownership: broadcast::Sender<Uuid>,
+}
+
+impl TaskWakeups {
+    pub fn new() -> Self {
+        Self {
+            ready: std::sync::Arc::new(Notify::new()),
+            ownership: broadcast::channel(BROADCAST_CAPACITY).0,
+        }
+    }
+
+    pub async fn ready(&self) {
+        self.ready.notified().await;
+    }
+
+    pub fn notify_ready(&self) {
+        self.ready.notify_waiters();
+    }
+
+    pub fn subscribe_ownership(&self) -> broadcast::Receiver<Uuid> {
+        self.ownership.subscribe()
+    }
+
+    fn ownership_changed(&self, task_id: Uuid) {
+        let _ = self.ownership.send(task_id);
+    }
+}
+
+impl Default for TaskWakeups {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Something a connected mailbox may need to redraw.
@@ -152,6 +199,7 @@ pub async fn run_mailbox_event_listener(
     pool: PgPool,
     events: MailboxEvents,
     inbound_events: InboundEventWakeups,
+    task_wakeups: TaskWakeups,
     mut shutdown: broadcast::Receiver<()>,
 ) {
     loop {
@@ -160,7 +208,7 @@ pub async fn run_mailbox_event_listener(
                 info!("Thread message listener shutting down");
                 return;
             }
-            result = listen_until_error(&pool, &events, &inbound_events) => {
+            result = listen_until_error(&pool, &events, &inbound_events, &task_wakeups) => {
                 // `listen_until_error` only returns on failure; `PgListener` handles ordinary
                 // reconnects internally without surfacing them here.
                 if let Err(err) = result {
@@ -180,6 +228,7 @@ async fn listen_until_error(
     pool: &PgPool,
     events: &MailboxEvents,
     inbound_events: &InboundEventWakeups,
+    task_wakeups: &TaskWakeups,
 ) -> Result<(), sqlx::Error> {
     let mut listener = PgListener::connect_with(pool).await?;
     // One connection serves every channel; `PgListener` re-issues each LISTEN on reconnect.
@@ -189,6 +238,8 @@ async fn listen_until_error(
             ACTIVITY_CHANNEL,
             TASK_CHAIN_CHANNEL,
             INBOUND_EVENT_CHANNEL,
+            TASK_READY_CHANNEL,
+            TASK_OWNERSHIP_CHANNEL,
         ])
         .await?;
     info!("Listening for mailbox notifications");
@@ -199,6 +250,17 @@ async fn listen_until_error(
         // the idle poll of a worker that may be in another process entirely.
         if notification.channel() == INBOUND_EVENT_CHANNEL {
             inbound_events.notify();
+            continue;
+        }
+        if notification.channel() == TASK_READY_CHANNEL {
+            task_wakeups.notify_ready();
+            continue;
+        }
+        if notification.channel() == TASK_OWNERSHIP_CHANNEL {
+            match serde_json::from_str::<TaskOwnershipScope>(notification.payload()) {
+                Ok(scope) => task_wakeups.ownership_changed(scope.task_id),
+                Err(err) => warn!(error = %err, "Ignoring unparseable task ownership wake-up"),
+            }
             continue;
         }
         let parsed = match notification.channel() {
@@ -268,6 +330,14 @@ mod tests {
                 company_id: id(3),
                 correlation_id: id(4),
             }
+        );
+
+        let ownership_payload = r#"{
+            "task_id": "0a8f5f5e-0000-4000-8000-000000000005"
+        }"#;
+        assert_eq!(
+            serde_json::from_str::<TaskOwnershipScope>(ownership_payload).unwrap(),
+            TaskOwnershipScope { task_id: id(5) }
         );
     }
 

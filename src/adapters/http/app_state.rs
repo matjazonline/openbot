@@ -10,7 +10,10 @@ use crate::{
     },
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
-    infra::{config::AppConfig, events::MailboxEvents},
+    infra::{
+        config::AppConfig,
+        events::{MailboxEvents, TaskWakeups},
+    },
     services::{
         database_query_health::DatabaseQueryHealthService,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
@@ -61,6 +64,7 @@ pub struct AppState {
     pub inbound_event_inbox: Arc<dyn InboundEventInbox>,
     /// A latency hint after durable storage; polling remains authoritative.
     pub inbound_event_wakeups: InboundEventWakeups,
+    pub task_wakeups: TaskWakeups,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
     /// Shared across tabs so the operator query-statistics cache is process-wide.

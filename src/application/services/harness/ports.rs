@@ -260,7 +260,12 @@ pub trait HarnessToolHost: Send + Sync {
     ///
     /// A dispatcher, not a schema registry: `id` is one of the ids [`Self::available`] reported,
     /// and anything else is a harness that declared a tool this host never offered.
-    async fn invoke(&self, id: &ToolId, args: serde_json::Value) -> AppResult<ToolInvocation>;
+    async fn invoke(
+        &self,
+        id: &ToolId,
+        call_id: &str,
+        args: serde_json::Value,
+    ) -> AppResult<ToolInvocation>;
 }
 
 /// Everything a harness must know to offer one of our tools to a model.

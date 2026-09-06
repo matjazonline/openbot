@@ -14,9 +14,10 @@ use crate::{
     entities::runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
     entities::task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskChainCard,
-        TaskChainCounts, TaskStatus, TaskStatusEvent, TaskStopReason, TaskTransitionActorKind,
-        TaskTransitionReason,
+        TaskChainCounts, TaskOwner, TaskOwnership, TaskStatus, TaskStatusEvent, TaskStopReason,
+        TaskTransitionActorKind, TaskTransitionReason,
     },
+    entities::transport::PrincipalId,
 };
 
 #[derive(sqlx::FromRow, Debug)]
@@ -32,6 +33,9 @@ pub struct BackgroundTaskDb {
     pub retry_count: i32,
     pub max_retries: i32,
     pub last_error: Option<String>,
+    pub owner_principal_id: Option<Uuid>,
+    pub owner_principal_kind: Option<String>,
+    pub ownership_version: i64,
     pub worker_id: Option<Uuid>,
     pub execution_generation: Option<Uuid>,
     pub locked_at: Option<DateTime<Utc>>,
@@ -229,6 +233,18 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
         let status =
             TaskStatus::from_str(&db.status).map_err(|e| AppError::Internal(e.to_string()))?;
 
+        let owner = task_owner_from_db(
+            db.owner_principal_id,
+            db.owner_principal_kind.as_deref(),
+            &format!("background task {}", db.id),
+        )?;
+        let ownership_version = u64::try_from(db.ownership_version).map_err(|_| {
+            AppError::Internal(format!(
+                "Invalid ownership version for background task {}: {}",
+                db.id, db.ownership_version
+            ))
+        })?;
+
         Ok(BackgroundTask {
             id: db.id,
             company_id: db.company_id,
@@ -241,6 +257,10 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
             retry_count: db.retry_count,
             max_retries: db.max_retries,
             last_error: db.last_error,
+            ownership: TaskOwnership {
+                owner,
+                version: ownership_version,
+            },
             worker_id: db.worker_id,
             execution_generation: db.execution_generation,
             locked_at: db.locked_at,
@@ -251,10 +271,31 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
         })
     }
 }
+
+pub(crate) fn task_owner_from_db(
+    principal_id: Option<Uuid>,
+    principal_kind: Option<&str>,
+    row: &str,
+) -> AppResult<TaskOwner> {
+    match (principal_id, principal_kind) {
+        (Some(id), Some("person")) => Ok(TaskOwner::Human(PrincipalId::new(id))),
+        (Some(id), Some("agent")) => Ok(TaskOwner::Agent(PrincipalId::new(id))),
+        (None, None) => Ok(TaskOwner::Unassigned),
+        shape => Err(AppError::Internal(format!(
+            "Invalid ownership shape for {row}: {shape:?}"
+        ))),
+    }
+}
+
 /// One row of the per-thread activity lookup.
 #[derive(sqlx::FromRow)]
 pub(crate) struct ThreadActivityDb {
     pub(crate) thread_id: Uuid,
+    pub(crate) task_id: Uuid,
     pub(crate) status: String,
     pub(crate) lock_expires_at: Option<DateTime<Utc>>,
+    pub(crate) owner_principal_id: Option<Uuid>,
+    pub(crate) owner_principal_kind: Option<String>,
+    pub(crate) ownership_version: i64,
+    pub(crate) owner_label: Option<String>,
 }

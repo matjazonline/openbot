@@ -185,6 +185,21 @@ async fn latest_thread_rfc_message_id_reaches_past_turns_without_headers() {
         .expect("thread has messages");
     assert_eq!(latest_context.rfc_message_id, None);
 
+    let replyable = fixture
+        .persistence
+        .latest_replyable_email_context(fixture.thread.id)
+        .await
+        .unwrap()
+        .expect("the earlier inbound email remains replyable");
+    assert_eq!(
+        replyable.rfc_message_id.as_ref().map(MessageId::as_str),
+        Some(rfc.as_str())
+    );
+    assert_eq!(
+        replyable.author_email,
+        Some(EmailAddress::from("sender@partner.test"))
+    );
+
     let fallback_rfc = fixture
         .persistence
         .latest_thread_rfc_message_id(fixture.thread.id)
