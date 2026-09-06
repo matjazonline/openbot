@@ -14,6 +14,8 @@ list_company_agents
 
 `list_company_agents` is the read-only address book that makes delegation usable: it returns the sibling agent channels this agent may call, with each one's description. Without it, callable addresses have to be hardcoded into a system prompt and go stale silently when a channel is renamed or disabled.
 
+The server also installs an `agent-builder` definition into the global agent library after database migrations. Its definition lives in Rust, is inserted only when that library slug is absent, and guides a user through name, purpose, constraints, system prompt, least-privilege tool grants, and company skill selection before requesting approval to call `create_agent_channel`.
+
 ## How a tool reaches a model
 
 Each of the three lives in `src/application/services/*_tool.rs` and describes itself with a `declaration()` — its id, the copy the model reads, the JSON Schema of its arguments, and what it is safe to do with it. None of them names an agent runtime. `NativeToolHost` (`src/application/services/native_tools.rs`) assembles the ones a given run can actually serve, and the harness adapter turns each declaration into whatever its runtime declares tools with.
@@ -22,7 +24,7 @@ Which of the three a run can serve is decided by the contexts it was given: outr
 
 ## The platform allowlist
 
-Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Eleven of the runtime's thirty built-ins are on that list, plus the three above. The nineteen absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep`, `ask_user`, and unrestricted `http` — execute in this process, on this host, with no sandbox, or expose unchecked host networking. Inbound mail is an untrusted prompt source. The bounded `web_fetch` and `web_search` tools remain available for public-web reads.
+Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Ten of the runtime's thirty built-ins are on that list, plus the three above. The twenty absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep`, `ask_user`, `web_search`, and unrestricted `http` — execute in this process, on this host, with no sandbox, depend on an unavailable provider, or expose unchecked host networking. Inbound mail is an untrusted prompt source. The bounded `web_fetch` tool remains available for public-web reads.
 
 The list has no environment override and no per-company escape. A grant naming anything else is dropped when the configuration is compiled, whichever route it arrived by, and logged with the agent it belonged to. Revisit it when — and only when — a sandboxed harness exists to run those tools in.
 
@@ -56,7 +58,9 @@ The model calls `create_agent_channel` with:
   "name": "Contract Researcher",
   "slug": "contract-researcher",
   "description": "Researches contract terms and identifies material differences.",
-  "instructions": "Analyze the supplied contract question carefully. Cite the relevant clauses, distinguish facts from assumptions, and return a concise recommendation to the delegating agent."
+  "instructions": "Analyze the supplied contract question carefully. Cite the relevant clauses, distinguish facts from assumptions, and return a concise recommendation to the delegating agent.",
+  "granted_tool_ids": ["web_fetch", "text"],
+  "skill_slugs": ["contract-review"]
 }
 ```
 
@@ -66,13 +70,15 @@ The model calls `create_agent_channel` with:
 | `slug` | string | Valid unused agent and channel slug; normalized with the existing slug rules |
 | `description` | string | Non-empty summary shown by `list_company_agents` |
 | `instructions` | string | Non-empty system instructions for the new agent |
+| `granted_tool_ids` | string array, optional | Direct grants from the platform tool catalogue; defaults to none |
+| `skill_slugs` | string array, optional | Existing company-owned skill slugs, in execution order; defaults to none and is limited to 16 |
 
-The company, parent agent, source channel, and task are injected by the server and cannot be selected or spoofed by tool arguments. The parent cannot supply provider, model, credentials, participants, or arbitrary agent/channel configuration.
+The company, parent agent, source channel, and task are injected by the server and cannot be selected or spoofed by tool arguments. The parent cannot supply provider, model, credentials, participants, or arbitrary agent/channel configuration. Tool ids are checked against the platform allowlist, and every requested skill must already belong to the company.
 
 One transaction creates:
 
-- an agent with the supplied name, slug, description, and instructions;
-- an enabled, team-only channel with third-party additions disabled;
+- an agent with the supplied name, slug, description, instructions, direct tool grants, and skills;
+- an enabled personal channel using the company's channel defaults;
 - the channel-to-agent assignment; and
 - the idempotency record for the current task and normalized request.
 

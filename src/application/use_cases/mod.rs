@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod approval;
+pub mod builtin_agent_library;
 pub mod channel;
 pub mod company;
 pub mod company_invite;

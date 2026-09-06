@@ -619,3 +619,19 @@ fn the_base_tool_policy_matches_what_the_tools_default_to_on_their_own() {
         Some(crate::services::agent_directory_tool::DEFAULT_DIRECTORY_MAX_RESULTS as u64)
     );
 }
+
+#[test]
+fn agent_creation_approval_shows_every_selected_capability() {
+    let config = base_agent_config_with_observability(false);
+
+    assert_eq!(
+        config["hitl"]["tools"]["create_agent_channel"]["approval_context"],
+        json!([
+            "name",
+            "slug",
+            "description",
+            "granted_tool_ids",
+            "skill_slugs"
+        ])
+    );
+}

@@ -250,7 +250,13 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> Value {
             "tools": {
                 "create_agent_channel": {
                     "require_approval": true,
-                    "approval_context": ["name", "slug", "description"]
+                    "approval_context": [
+                        "name",
+                        "slug",
+                        "description",
+                        "granted_tool_ids",
+                        "skill_slugs"
+                    ]
                 },
                 "outreach_and_await_quorum": {
                     "require_approval": true,
