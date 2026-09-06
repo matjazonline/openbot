@@ -377,6 +377,7 @@ pub enum TaskStopReason {
     Shutdown,
     LeaseLost,
     OwnershipTransferred,
+    AgentInstruction,
 }
 
 impl TaskStopReason {
@@ -389,6 +390,7 @@ impl TaskStopReason {
             Self::Shutdown => "shutdown",
             Self::LeaseLost => "lease_lost",
             Self::OwnershipTransferred => "ownership_transferred",
+            Self::AgentInstruction => "agent_instruction",
         }
     }
 }
@@ -411,6 +413,7 @@ impl FromStr for TaskStopReason {
             "shutdown" => Ok(Self::Shutdown),
             "lease_lost" => Ok(Self::LeaseLost),
             "ownership_transferred" => Ok(Self::OwnershipTransferred),
+            "agent_instruction" => Ok(Self::AgentInstruction),
             other => Err(format!("Unknown task stop reason: {other}")),
         }
     }
@@ -919,6 +922,7 @@ pub enum TaskTransitionReason {
     OperatorStopped,
     OperatorResumed,
     OwnershipTransferred,
+    AgentInstruction,
     /// The transition happened, but nothing on the write said why.
     ///
     /// Every caller that knows its cause states it, so this reason means a status changed through
@@ -953,6 +957,7 @@ impl TaskTransitionReason {
             Self::OperatorStopped => "operator_stopped",
             Self::OperatorResumed => "operator_resumed",
             Self::OwnershipTransferred => "ownership_transferred",
+            Self::AgentInstruction => "agent_instruction",
             Self::Unknown => "unknown",
         }
     }
@@ -981,6 +986,7 @@ impl FromStr for TaskTransitionReason {
             "operator_stopped" => Ok(Self::OperatorStopped),
             "operator_resumed" => Ok(Self::OperatorResumed),
             "ownership_transferred" => Ok(Self::OwnershipTransferred),
+            "agent_instruction" => Ok(Self::AgentInstruction),
             "unknown" => Ok(Self::Unknown),
             other => Err(format!("Unknown task transition reason: {other}")),
         }

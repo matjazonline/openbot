@@ -235,7 +235,6 @@ pub struct ReplyPane<'a> {
     pub sender_email: &'a str,
     pub text_body: &'a str,
     pub deliver: bool,
-    pub quiet: bool,
     pub error: Option<&'a str>,
 }
 
@@ -249,7 +248,6 @@ pub struct ComposePane<'a> {
     pub subject: &'a str,
     pub text_body: &'a str,
     pub deliver: bool,
-    pub quiet: bool,
     pub error: Option<&'a str>,
 }
 
@@ -2212,6 +2210,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                         class="btn btn-outline btn-sm">Open in Simulator</a>
                 </div>
             </div>
+            {pane_error}
             <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
                 sse-swap="message" hx-swap="beforeend">
                 {messages_html}
@@ -2219,6 +2218,8 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
             {owner_panel}
             {human_completion}
+            {note_actions}
+            {note_composer}
             {composer}
             {diagnostics_dialog}
         </section>
@@ -2232,9 +2233,17 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         channel_id = pane.channel.id,
         after = after,
         messages_html = messages_html,
+        pane_error = pane
+            .ownership_error
+            .map_or_else(String::new, |message| format!(
+                r#"<div class="alert alert-error mx-4 mt-3 py-2 text-sm sm:mx-6">{}</div>"#,
+                escape_html_text(message)
+            )),
         activity_strip = thread_activity_strip(pane.activity),
         owner_panel = task_owner_panel(pane),
         human_completion = human_completion_composer(pane),
+        note_actions = internal_note_actions(pane),
+        note_composer = internal_note_composer(pane),
         composer = thread_composer(pane),
         diagnostics_dialog = DIAGNOSTICS_DIALOG,
     )
@@ -2472,15 +2481,83 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
                     <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-xs">
                     <span class="text-xs opacity-60">Deliver the agent reply by email (off keeps it in-app)</span>
                 </label>
-                <label class="label mt-1 cursor-pointer justify-start gap-2 p-0">
-                    <input type="checkbox" name="quiet" value="true" class="checkbox checkbox-primary checkbox-xs">
-                    <span class="text-xs opacity-60">Send quietly (save to history without running the agent)</span>
-                </label>
             </form>
         "##,
         company_id = pane.company_id,
         channel_id = pane.channel.id,
         thread_id = pane.thread.id,
+    )
+}
+
+fn internal_note_composer(pane: &MessagePane<'_>) -> String {
+    format!(
+        r##"<form class="border-t border-info/40 bg-info/5 px-4 py-3 sm:px-6"
+                hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
+            <input type="hidden" name="company_id" value="{company_id}">
+            <input type="hidden" name="channel_id" value="{channel_id}">
+            <input type="hidden" name="thread_id" value="{thread_id}">
+            <input type="hidden" name="command_id" value="{command_id}">
+            <div class="mb-2"><p class="font-semibold text-info">Internal note</p>
+                <p class="text-xs opacity-70">Private context only. This does not run the agent, send anything, or change task ownership.</p></div>
+            <div class="flex items-end gap-2">
+                <textarea name="text_body" rows="2" required maxlength="65536"
+                    class="textarea min-h-16 flex-1 text-sm" placeholder="Add private context for teammates…"></textarea>
+                <button type="submit" class="btn btn-info btn-sm">
+                    <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                    <span class="[.htmx-request_&]:hidden">Add note</span>
+                    <span class="hidden [.htmx-request_&]:inline">Adding…</span>
+                </button>
+            </div>
+        </form>"##,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+        command_id = Uuid::new_v4(),
+    )
+}
+
+fn internal_note_actions(pane: &MessagePane<'_>) -> String {
+    let (action, task_id, version) = match pane.work.as_ref() {
+        Some(work) if matches!(work.ownership.owner, TaskOwner::Agent(_)) => {
+            ("ask", Some(work.task_id), Some(work.ownership.version))
+        }
+        None => ("start", None, None),
+        Some(_) => return String::new(),
+    };
+    let task_fields = task_id.map_or_else(String::new, |task_id| {
+        format!(
+            r#"<input type="hidden" name="task_id" value="{task_id}">
+               <input type="hidden" name="expected_ownership_version" value="{}">"#,
+            version.expect("an existing task has an ownership version")
+        )
+    });
+    let label = if action == "ask" {
+        "Ask owner to use selected notes"
+    } else {
+        "Start agent task with selected notes"
+    };
+    format!(
+        r##"<form id="ask-agent-form" class="border-t border-info/30 px-4 py-3 sm:px-6"
+                hx-post="/ui/internal-notes/{action}" hx-target="#detail-pane" hx-swap="outerHTML">
+            <input type="hidden" name="company_id" value="{company_id}">
+            <input type="hidden" name="channel_id" value="{channel_id}">
+            <input type="hidden" name="thread_id" value="{thread_id}">
+            <input type="hidden" name="command_id" value="{command_id}">
+            {task_fields}
+            <button type="submit" class="btn btn-outline btn-info btn-sm">
+                <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                <span class="[.htmx-request_&]:hidden">{label}</span>
+                <span class="hidden [.htmx-request_&]:inline">Requesting…</span>
+            </button>
+            <span class="ml-2 text-xs opacity-60">Select active internal notes above first.</span>
+        </form>"##,
+        action = action,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+        command_id = Uuid::new_v4(),
+        task_fields = task_fields,
+        label = label,
     )
 }
 
@@ -2513,7 +2590,12 @@ pub fn message_bubble_chat(
         (Some(viewer), Some(author)) => author.eq_ignore_ascii_case(viewer.as_ref()),
         _ => false,
     };
-    let body = if is_agent {
+    let note_state = message.internal_note.as_ref();
+    let is_internal_note = message.entry_kind == ThreadEntryKind::Note
+        && message.audience == MessageAudience::InternalOnly;
+    let body = if note_state.is_some_and(|note| note.tombstoned_at.is_some()) {
+        r#"<div class="italic opacity-60">This internal note was removed. Its audit record is retained.</div>"#.to_string()
+    } else if is_agent {
         format!(
             r##"<div class="{MARKDOWN_CONTENT_STYLES}">{}</div>"##,
             render_markdown(&message.body)
@@ -2532,6 +2614,46 @@ pub fn message_bubble_chat(
         _ => (message.author.display(), None),
     };
 
+    let note_controls = note_state.map_or_else(String::new, |note| {
+        if !note.is_active() {
+            return if note.tombstoned_at.is_some() {
+                r#"<span class="badge badge-ghost badge-xs">removed</span>"#.into()
+            } else {
+                r#"<span class="badge badge-ghost badge-xs">superseded</span>"#.into()
+            };
+        }
+        format!(
+            r##"<label class="label cursor-pointer gap-1 p-0 text-xs">
+                    <input type="checkbox" form="ask-agent-form" name="note_ids" value="{note_id}"
+                        class="checkbox checkbox-info checkbox-xs"> use with agent
+                </label>
+                <details class="dropdown dropdown-end"><summary class="link link-hover text-xs">correct</summary>
+                    <form class="dropdown-content z-20 mt-1 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
+                        hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
+                        <input type="hidden" name="company_id" value="{company_id}">
+                        <input type="hidden" name="channel_id" value="{channel_id}">
+                        <input type="hidden" name="thread_id" value="{thread_id}">
+                        <input type="hidden" name="command_id" value="{correct_command}">
+                        <input type="hidden" name="supersedes_note_id" value="{note_id}">
+                        <textarea name="text_body" required maxlength="65536" class="textarea w-full">{body}</textarea>
+                        <button class="btn btn-info btn-sm" type="submit">Save correction</button>
+                    </form></details>
+                <form hx-post="/ui/internal-notes/{note_id}/tombstone" hx-target="#detail-pane" hx-swap="outerHTML">
+                    <input type="hidden" name="company_id" value="{company_id}">
+                    <input type="hidden" name="channel_id" value="{channel_id}">
+                    <input type="hidden" name="thread_id" value="{thread_id}">
+                    <input type="hidden" name="command_id" value="{remove_command}">
+                    <button class="link link-error text-xs" type="submit">remove</button>
+                </form>"##,
+            note_id = note.id,
+            company_id = scope.company_id,
+            channel_id = scope.channel_id,
+            thread_id = message.thread_id,
+            correct_command = Uuid::new_v4(),
+            remove_command = Uuid::new_v4(),
+            body = escape_html_text(&message.body),
+        )
+    });
     format!(
         r##"
                 <div class="chat {side}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
@@ -2540,7 +2662,8 @@ pub fn message_bubble_chat(
                         {channel_glyph}{writer}{transport_badge}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
-                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
+                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{internal_label}{body}{attachments}</div>
+                    <div class="flex flex-wrap items-center gap-2">{note_controls}</div>
                     <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}{tasks}</div>
                 </div>
         "##,
@@ -2555,7 +2678,19 @@ pub fn message_bubble_chat(
             message.audience.as_str(),
             message.entry_kind.as_str()
         ),
-        bubble_class = if is_viewer { "chat-bubble-primary" } else { "" },
+        bubble_class = if is_internal_note {
+            "border border-info/40 bg-info/10 text-base-content"
+        } else if is_viewer {
+            "chat-bubble-primary"
+        } else {
+            ""
+        },
+        internal_label = if is_internal_note {
+            r#"<div class="mb-1 text-[10px] font-bold uppercase tracking-wider text-info">Internal only</div>"#
+        } else {
+            ""
+        },
+        note_controls = note_controls,
         channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
         transport_badge =
             transport_badge(message.author.transport, message.author.handle.as_deref()),
@@ -2704,15 +2839,11 @@ fn readonly_field(label: &str, value: &str) -> String {
 /// The delivery toggle and the Send / Cancel row, shared by both send forms.
 ///
 /// Only Cancel differs between them, so it arrives as the htmx attributes that undo this form.
-fn send_form_footer(deliver: bool, quiet: bool, cancel_attributes: &str) -> String {
+fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String {
     format!(
         r##"<label class="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-sm" {deliver_checked}>
                         <span class="text-xs opacity-70">Deliver the agent reply by email (off keeps it in-app)</span>
-                    </label>
-                    <label class="label cursor-pointer justify-start gap-3">
-                        <input type="checkbox" name="quiet" value="true" class="checkbox checkbox-primary checkbox-sm" {quiet_checked}>
-                        <span class="text-xs opacity-70">Send quietly (save to history without running the agent)</span>
                     </label>
                     <div class="flex items-center gap-3 pt-2">
                         <button type="submit" class="btn btn-primary">
@@ -2723,7 +2854,6 @@ fn send_form_footer(deliver: bool, quiet: bool, cancel_attributes: &str) -> Stri
                         <button type="button" class="btn btn-ghost" {cancel_attributes}>Cancel</button>
                     </div>"##,
         deliver_checked = if deliver { "checked" } else { "" },
-        quiet_checked = if quiet { "checked" } else { "" },
     )
 }
 
@@ -2767,7 +2897,6 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
-            pane.quiet,
             &format!(
                 r##"hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                             hx-target="#thread-column" hx-swap="outerHTML" hx-sync="#thread-column:replace""##,
@@ -2820,7 +2949,6 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
-            pane.quiet,
             &format!(
                 r##"hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                             hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace""##,

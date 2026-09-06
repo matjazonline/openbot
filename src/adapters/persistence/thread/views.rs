@@ -22,6 +22,7 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         cursor::MessageCursor,
+        internal_note::{InternalNoteProvenance, InternalNoteView},
         message::{
             CanonicalMessageId, MessageAudience, MessageDirection, MessageRole, ThreadEntryKind,
         },
@@ -103,10 +104,38 @@ struct ThreadMessageDb {
     entry_kind: String,
     created_at: DateTime<Utc>,
     correlation_id: Uuid,
+    note_id: Option<Uuid>,
+    note_author_principal_id: Option<Uuid>,
+    note_provenance: Option<String>,
+    supersedes_note_id: Option<Uuid>,
+    superseded_by_note_id: Option<Uuid>,
+    tombstoned_at: Option<DateTime<Utc>>,
 }
 
 impl ThreadMessageDb {
     fn into_view(self, task_id: Option<Uuid>) -> AppResult<ThreadMessageView> {
+        let internal_note = match (
+            self.note_id,
+            self.note_author_principal_id,
+            self.note_provenance,
+        ) {
+            (Some(id), Some(author_principal_id), Some(provenance)) => Some(InternalNoteView {
+                id,
+                author_principal_id: PrincipalId::new(author_principal_id),
+                provenance: InternalNoteProvenance::from_str(&provenance)
+                    .map_err(AppError::Internal)?,
+                supersedes_note_id: self.supersedes_note_id,
+                superseded_by_note_id: self.superseded_by_note_id,
+                tombstoned_at: self.tombstoned_at,
+            }),
+            (None, None, None) => None,
+            _ => {
+                return Err(AppError::Internal(format!(
+                    "Incomplete internal note metadata for message {}",
+                    self.canonical_id
+                )));
+            }
+        };
         Ok(ThreadMessageView {
             id: self.id,
             canonical_id: CanonicalMessageId::new(self.canonical_id),
@@ -124,6 +153,7 @@ impl ThreadMessageDb {
                 .map_err(|error| AppError::Internal(error.to_string()))?,
             entry_kind: ThreadEntryKind::from_str(&self.entry_kind)
                 .map_err(|error| AppError::Internal(error.to_string()))?,
+            internal_note,
             created_at: self.created_at,
         })
     }
@@ -195,9 +225,19 @@ fn thread_message_select() -> String {
            message.audience,
            association.entry_kind,
            association.created_at,
-           message.correlation_id
+           message.correlation_id,
+           note.id AS note_id,
+           note.author_principal_id AS note_author_principal_id,
+           note.provenance AS note_provenance,
+           note.supersedes_note_id,
+           successor.id AS superseded_by_note_id,
+           tombstone.created_at AS tombstoned_at
     FROM thread_messages AS association
 {AUTHOR_JOINS}
+    LEFT JOIN internal_notes AS note
+      ON (note.company_id, note.message_id) = (message.company_id, message.id)
+    LEFT JOIN internal_notes AS successor ON successor.supersedes_note_id = note.id
+    LEFT JOIN internal_note_tombstones AS tombstone ON tombstone.note_id = note.id
 "#
     )
 }
@@ -348,10 +388,15 @@ pub(super) async fn list_agent_history(
                  JOIN principals AS author
                    ON (author.company_id, author.id) =
                       (message.company_id, message.author_principal_id)
-                 LEFT JOIN participant_identities AS author_identity
+                LEFT JOIN participant_identities AS author_identity
                    ON (author_identity.company_id, author_identity.id) =
                       (message.company_id, message.authored_identity_id)
                 WHERE association.thread_id = $1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM internal_notes AS private_note
+                       WHERE private_note.company_id = association.company_id
+                         AND private_note.message_id = association.message_id
+                  )
                 ORDER BY association.created_at DESC, association.id DESC
                 LIMIT $2
            ) recent

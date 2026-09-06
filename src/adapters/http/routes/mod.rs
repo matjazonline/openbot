@@ -20,6 +20,7 @@ pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
 pub mod ui_deliveries;
+mod ui_internal_notes;
 pub mod ui_invites;
 pub mod ui_message_diagnostics;
 pub mod ui_profile;

@@ -22,6 +22,10 @@ use crate::{
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
         email_message::EmailMessageMetadata,
+        internal_note::{
+            AddInternalNote, AskOwnerOutcome, AskOwnerToAct, InternalNoteView, StartAgentTask,
+            TombstoneInternalNote,
+        },
         message::{CanonicalMessageId, Message, MessageRole, ThreadEntryKind},
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
@@ -375,6 +379,20 @@ pub trait ThreadPersistence: Send + Sync {
         company_id: Uuid,
         association_id: Uuid,
     ) -> AppResult<Option<MessageAuditView>>;
+
+    /// Create one private note and its immutable lifecycle row in the same transaction.
+    async fn create_internal_note(
+        &self,
+        command: &AddInternalNote,
+        actor: crate::entities::transport::PrincipalId,
+    ) -> AppResult<ThreadMessageView>;
+
+    /// Record removal without deleting or rewriting the canonical note body.
+    async fn tombstone_internal_note(
+        &self,
+        command: &TombstoneInternalNote,
+        actor: crate::entities::transport::PrincipalId,
+    ) -> AppResult<InternalNoteView>;
 }
 
 #[derive(Clone)]
@@ -1190,6 +1208,132 @@ impl ThreadUseCases {
 
     pub async fn save_message(&self, message: &MessageWrite) -> AppResult<Message> {
         self.thread_persistence.create_message(message).await
+    }
+
+    pub async fn add_internal_note(
+        &self,
+        command: AddInternalNote,
+        actor: crate::entities::participant::PrincipalAccessContext,
+    ) -> AppResult<ThreadMessageView> {
+        command.validate().map_err(AppError::BadRequest)?;
+        let principal_id = actor
+            .principal_id
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        let channel = self
+            .channel_persistence
+            .get_by_id(command.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == command.company_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        if !channel.viewer_access(actor) {
+            return Err(AppError::NotFound("Thread not found.".into()));
+        }
+        let thread = self
+            .thread_persistence
+            .get_thread_by_id(command.thread_id)
+            .await?
+            .filter(|thread| thread.channel_id == channel.id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        debug_assert_eq!(thread.channel_id, command.channel_id);
+        self.thread_persistence
+            .create_internal_note(&command, principal_id)
+            .await
+    }
+
+    pub async fn tombstone_internal_note(
+        &self,
+        command: TombstoneInternalNote,
+        actor: crate::entities::participant::PrincipalAccessContext,
+    ) -> AppResult<InternalNoteView> {
+        let principal_id = actor
+            .principal_id
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        let channel = self
+            .channel_persistence
+            .get_by_id(command.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == command.company_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        if !channel.viewer_access(actor) {
+            return Err(AppError::NotFound("Thread not found.".into()));
+        }
+        let thread = self
+            .thread_persistence
+            .get_thread_by_id(command.thread_id)
+            .await?
+            .filter(|thread| thread.channel_id == channel.id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        debug_assert_eq!(thread.channel_id, command.channel_id);
+        self.thread_persistence
+            .tombstone_internal_note(&command, principal_id)
+            .await
+    }
+
+    pub async fn ask_owner_to_act(
+        &self,
+        command: AskOwnerToAct,
+        actor: crate::entities::participant::PrincipalAccessContext,
+    ) -> AppResult<AskOwnerOutcome> {
+        command.validate().map_err(AppError::BadRequest)?;
+        let principal_id = actor
+            .principal_id
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        let channel = self
+            .channel_persistence
+            .get_by_id(command.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == command.company_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        if !channel.viewer_access(actor) {
+            return Err(AppError::NotFound("Thread not found.".into()));
+        }
+        self.thread_persistence
+            .get_thread_by_id(command.thread_id)
+            .await?
+            .filter(|thread| thread.channel_id == command.channel_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        let task = self
+            .task_persistence
+            .get_task_by_id(command.task_id)
+            .await?
+            .filter(|task| {
+                task.company_id == command.company_id
+                    && task.channel_id == command.channel_id
+                    && task.thread_id == Some(command.thread_id)
+            })
+            .ok_or_else(|| AppError::NotFound("Active task not found.".into()))?;
+        debug_assert_eq!(task.id, command.task_id);
+        self.task_persistence
+            .ask_owner_to_act(&command, principal_id)
+            .await
+    }
+
+    pub async fn start_agent_task(
+        &self,
+        command: StartAgentTask,
+        actor: crate::entities::participant::PrincipalAccessContext,
+    ) -> AppResult<BackgroundTask> {
+        command.validate().map_err(AppError::BadRequest)?;
+        let principal_id = actor
+            .principal_id
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        let channel = self
+            .channel_persistence
+            .get_by_id(command.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == command.company_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        if !channel.viewer_access(actor) {
+            return Err(AppError::NotFound("Thread not found.".into()));
+        }
+        self.thread_persistence
+            .get_thread_by_id(command.thread_id)
+            .await?
+            .filter(|thread| thread.channel_id == command.channel_id)
+            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
+        self.task_persistence
+            .start_agent_task(&command, principal_id)
+            .await
     }
 
     /// Attach a message that is already stored to another of its company's threads.

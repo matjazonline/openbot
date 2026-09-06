@@ -11,7 +11,7 @@
 //! has observed it.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -28,6 +28,7 @@ use crate::{
         creation::CreationProvenance,
         cursor::{MessageCursor, ThreadCursor},
         email_message::EmailMessageMetadata,
+        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
         message::{
             AttachmentMetadata, CanonicalMessageId, Message, MessageAuthor, MessageDirection,
             MessageParticipant, MessageParticipantKind, MessageRole,
@@ -188,6 +189,9 @@ struct Store {
     /// recorded but actually handed to a transport.
     deliveries: Vec<NewDelivery>,
     standalone_deliveries: Vec<NewStandaloneDelivery>,
+    notes: HashMap<Uuid, (CanonicalMessageId, InternalNoteView)>,
+    note_commands: HashMap<Uuid, (String, CanonicalMessageId)>,
+    tombstone_commands: HashMap<Uuid, (String, Uuid)>,
 }
 
 /// An in-memory [`ThreadPersistence`].
@@ -804,6 +808,15 @@ impl ThreadPersistence for InMemoryThreads {
 
     async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>> {
         let mut messages = self.thread_messages(thread_id);
+        let private_note_messages: HashSet<_> = self
+            .store
+            .lock()
+            .unwrap()
+            .notes
+            .values()
+            .map(|(message_id, _)| *message_id)
+            .collect();
+        messages.retain(|message| !private_note_messages.contains(&message.canonical_id));
         if messages.len() > THREAD_HISTORY_LIMIT {
             messages.drain(..messages.len() - THREAD_HISTORY_LIMIT);
         }
@@ -880,6 +893,122 @@ impl ThreadPersistence for InMemoryThreads {
         // message" and concluding the authorization worked.
         unimplemented!("MessageAuditView is exercised against the database, not this double")
     }
+
+    async fn create_internal_note(
+        &self,
+        command: &AddInternalNote,
+        actor: PrincipalId,
+    ) -> AppResult<ThreadMessageView> {
+        let fingerprint = format!(
+            "{}:{}:{}:{}:{}:{:?}",
+            command.company_id,
+            command.channel_id,
+            command.thread_id,
+            command.text.trim(),
+            actor,
+            command.supersedes_note_id
+        );
+        let existing_command = {
+            self.store
+                .lock()
+                .unwrap()
+                .note_commands
+                .get(&command.command_id)
+                .cloned()
+        };
+        if let Some((existing, message_id)) = existing_command {
+            if existing != fingerprint {
+                return Err(AppError::Conflict(
+                    "Internal-note command id was already used with different parameters.".into(),
+                ));
+            }
+            return self
+                .get_thread_message_view(command.thread_id, message_id)
+                .await?
+                .ok_or_else(|| AppError::Internal("Stored internal note is missing.".into()));
+        }
+        let write = MessageWrite::internal(
+            command.thread_id,
+            MessageAuthorWrite::Principal(actor),
+            "Internal note",
+            command.text.trim(),
+            MessageDirection::Inbound,
+            MessageRole::Human,
+            CorrelationId::new(),
+        );
+        let message = self.create_message(&write).await?;
+        let note = InternalNoteView {
+            id: Uuid::new_v4(),
+            author_principal_id: actor,
+            provenance: command.provenance,
+            supersedes_note_id: command.supersedes_note_id,
+            superseded_by_note_id: None,
+            tombstoned_at: None,
+        };
+        let mut store = self.store.lock().unwrap();
+        if let Some(previous) = command.supersedes_note_id {
+            let Some((_, old)) = store.notes.get_mut(&previous) else {
+                return Err(AppError::Conflict(
+                    "Only an active note can be corrected.".into(),
+                ));
+            };
+            if !old.is_active() {
+                return Err(AppError::Conflict(
+                    "Only an active note can be corrected.".into(),
+                ));
+            }
+            old.superseded_by_note_id = Some(note.id);
+        }
+        store
+            .note_commands
+            .insert(command.command_id, (fingerprint, message.canonical_id));
+        store
+            .notes
+            .insert(note.id, (message.canonical_id, note.clone()));
+        drop(store);
+        let mut view = thread_message_view(&message);
+        view.internal_note = Some(note);
+        Ok(view)
+    }
+
+    async fn tombstone_internal_note(
+        &self,
+        command: &TombstoneInternalNote,
+        actor: PrincipalId,
+    ) -> AppResult<InternalNoteView> {
+        let fingerprint = format!(
+            "{}:{}:{}:{}:{}",
+            command.company_id, command.channel_id, command.thread_id, command.note_id, actor
+        );
+        let mut store = self.store.lock().unwrap();
+        if let Some((existing, note_id)) = store.tombstone_commands.get(&command.command_id) {
+            if existing != &fingerprint || *note_id != command.note_id {
+                return Err(AppError::Conflict(
+                    "Tombstone command id was already used with different parameters.".into(),
+                ));
+            }
+            return store
+                .notes
+                .get(&command.note_id)
+                .map(|(_, note)| note.clone())
+                .ok_or_else(|| AppError::NotFound("Internal note not found.".into()));
+        }
+        let note = store
+            .notes
+            .get_mut(&command.note_id)
+            .ok_or_else(|| AppError::NotFound("Internal note not found.".into()))?;
+        if note.1.tombstoned_at.is_some() {
+            return Err(AppError::Conflict(
+                "That internal note has already been removed.".into(),
+            ));
+        }
+        note.1.tombstoned_at = Some(Utc::now());
+        let result = note.1.clone();
+        store
+            .tombstone_commands
+            .insert(command.command_id, (fingerprint, command.note_id));
+        Ok(result)
+    }
 }
 
 /// The email-shaped stored message projected the way the SQL reads project it.
@@ -910,6 +1039,7 @@ fn thread_message_view(message: &Message) -> ThreadMessageView {
         role: message.role,
         audience: message.audience,
         entry_kind: message.entry_kind,
+        internal_note: None,
         created_at: message.created_at,
     }
 }

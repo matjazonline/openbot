@@ -481,6 +481,34 @@ pub(crate) async fn insert_message_on(
     )
     .await?;
 
+    // Quiet transport ingress is compatibility syntax for the first-class operation. Its stable
+    // provider-correlated canonical id is also the stable command id, so a redelivery cannot
+    // create a second lifecycle row. First-class UI/API writes insert richer provenance through
+    // `thread::internal_note` instead.
+    if write.entry_kind == ThreadEntryKind::Note
+        && write.audience == MessageAudience::InternalOnly
+        && matches!(write.correlation, MessageCorrelation::Email(_))
+    {
+        let fingerprint = format!("{:x}", Sha256::digest(content_hash));
+        sqlx::query(
+            r#"INSERT INTO internal_notes (
+                    id, company_id, channel_id, thread_id, message_id, command_id,
+                    command_fingerprint, author_principal_id, provenance
+               ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, 'email_quiet_ingress')
+               ON CONFLICT (company_id, message_id) DO NOTHING"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(scope.company_id)
+        .bind(scope.channel_id)
+        .bind(write.thread_id)
+        .bind(canonical_id.as_uuid())
+        .bind(fingerprint)
+        .bind(author.principal_id.as_uuid())
+        .execute(&mut *connection)
+        .await
+        .map_err(AppError::from)?;
+    }
+
     sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
         .bind(write.thread_id)
         .execute(&mut *connection)

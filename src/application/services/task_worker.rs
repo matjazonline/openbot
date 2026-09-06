@@ -1557,6 +1557,35 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn ask_owner_to_act(
+            &self,
+            _command: &crate::entities::internal_note::AskOwnerToAct,
+            _actor: crate::entities::transport::PrincipalId,
+        ) -> AppResult<crate::entities::internal_note::AskOwnerOutcome> {
+            Err(crate::app_error::AppError::Internal(
+                "agent instructions are not used by this worker double".into(),
+            ))
+        }
+
+        async fn start_agent_task(
+            &self,
+            _command: &crate::entities::internal_note::StartAgentTask,
+            _actor: crate::entities::transport::PrincipalId,
+        ) -> AppResult<BackgroundTask> {
+            Err(crate::app_error::AppError::Internal(
+                "agent task starts are not used by this worker double".into(),
+            ))
+        }
+
+        async fn claim_agent_instruction_notes(
+            &self,
+            _company_id: Uuid,
+            _thread_id: Uuid,
+            _lease: TaskLeaseRef,
+        ) -> AppResult<Vec<crate::entities::internal_note::AgentInstructionNote>> {
+            Ok(Vec::new())
+        }
+
         async fn owned_agent_execution(
             &self,
             company_id: Uuid,

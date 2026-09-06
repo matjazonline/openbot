@@ -220,7 +220,7 @@ pub async fn test_pool() -> Option<PgPool> {
 
     MIGRATED
         .get_or_init(|| async {
-            sqlx::migrate!()
+            sqlx::migrate!("./migrations")
                 .run(&pool)
                 .await
                 .expect("the test database accepts this checkout's migrations");

@@ -742,6 +742,8 @@ fn message_write(
         ));
     }
 
+    let is_delegation = envelope.directives.source_channel_id.is_some();
+    let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
     Ok(MessageWrite {
         id: CanonicalMessageId::random(),
         thread_id: primary_thread_id,
@@ -751,18 +753,20 @@ fn message_write(
         attachments: envelope.attachments.to_vec(),
         direction: MessageDirection::Inbound,
         // A relayed message is another agent talking, not a person.
-        role: if envelope.directives.source_channel_id.is_some() {
+        role: if is_delegation {
             MessageRole::Agent
         } else {
             MessageRole::Human
         },
-        audience: if envelope.directives.source_channel_id.is_some() {
+        audience: if is_delegation || is_note {
             crate::entities::message::MessageAudience::InternalOnly
         } else {
             crate::entities::message::MessageAudience::ExternalConversation
         },
-        entry_kind: if envelope.directives.source_channel_id.is_some() {
+        entry_kind: if is_delegation {
             crate::entities::message::ThreadEntryKind::Delegation
+        } else if is_note {
+            crate::entities::message::ThreadEntryKind::Note
         } else {
             crate::entities::message::ThreadEntryKind::Conversation
         },

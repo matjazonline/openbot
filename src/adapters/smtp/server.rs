@@ -1165,6 +1165,35 @@ mod tests {
 
     #[async_trait]
     impl crate::task_queue::TaskPersistence for MockTaskPersistence {
+        async fn ask_owner_to_act(
+            &self,
+            _command: &crate::entities::internal_note::AskOwnerToAct,
+            _actor: crate::entities::transport::PrincipalId,
+        ) -> AppResult<crate::entities::internal_note::AskOwnerOutcome> {
+            Err(crate::app_error::AppError::Internal(
+                "agent instructions are not used by this SMTP double".into(),
+            ))
+        }
+
+        async fn start_agent_task(
+            &self,
+            _command: &crate::entities::internal_note::StartAgentTask,
+            _actor: crate::entities::transport::PrincipalId,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
+            Err(crate::app_error::AppError::Internal(
+                "agent task starts are not used by this SMTP double".into(),
+            ))
+        }
+
+        async fn claim_agent_instruction_notes(
+            &self,
+            _company_id: Uuid,
+            _thread_id: Uuid,
+            _lease: crate::entities::task::TaskLeaseRef,
+        ) -> AppResult<Vec<crate::entities::internal_note::AgentInstructionNote>> {
+            Ok(Vec::new())
+        }
+
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,

@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod board;
+mod instructions;
 mod operations;
 mod outreach;
 mod ownership;

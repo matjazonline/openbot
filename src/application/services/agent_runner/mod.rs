@@ -26,6 +26,7 @@ use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::approval::ApprovalSubject;
 use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::internal_note::AgentInstructionNote;
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::entities::task::TokenUsage;
 use crate::infra::config::AppConfig;
@@ -59,6 +60,7 @@ pub struct AgentRunner<'a> {
     /// Subject of the message `prompt` came from, if it has one.
     subject: Option<&'a str>,
     history: &'a [AgentHistoryMessage],
+    internal_notes: &'a [AgentInstructionNote],
     params: &'a ResolvedAgentCapabilities,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalSubject>,
@@ -96,6 +98,7 @@ impl<'a> AgentRunner<'a> {
             prompt,
             subject: None,
             history: &[],
+            internal_notes: &[],
             params,
             approval_use_cases: None,
             approval_context: None,
@@ -133,6 +136,11 @@ impl<'a> AgentRunner<'a> {
 
     pub fn history(mut self, history: &'a [AgentHistoryMessage]) -> Self {
         self.history = history;
+        self
+    }
+
+    pub fn internal_notes(mut self, notes: &'a [AgentInstructionNote]) -> Self {
+        self.internal_notes = notes;
         self
     }
 
@@ -273,6 +281,7 @@ impl<'a> AgentRunner<'a> {
             message: self.prompt,
             subject: self.subject,
             history: self.history,
+            internal_notes: self.internal_notes,
             upstream: self.upstream_pipeline_context.as_deref(),
             recipient_role: self.recipient_role,
         }

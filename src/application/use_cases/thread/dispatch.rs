@@ -443,6 +443,10 @@ impl ThreadUseCases {
             .thread_persistence
             .list_agent_history(payload.thread_id)
             .await?;
+        let instruction_notes = self
+            .task_persistence
+            .claim_agent_instruction_notes(task.company_id, payload.thread_id, lease)
+            .await?;
 
         let capability_reader = self.agent_capability_reader.as_ref().ok_or_else(|| {
             AppError::Internal("Agent capability persistence is unavailable.".into())
@@ -483,6 +487,7 @@ impl ThreadUseCases {
         let mut runner = AgentRunner::new(&prompt, &params)
             .subject(Some(&payload.subject))
             .history(&history)
+            .internal_notes(&instruction_notes)
             .approval_use_cases(self.approval_use_cases.clone())
             .approval_context(Some(
                 self.approval_context_for_channel(
@@ -862,6 +867,10 @@ impl ThreadUseCases {
             .ok_or_else(|| {
                 AppError::Conflict("Task ownership changed before agent execution.".into())
             })?;
+        let instruction_notes = self
+            .task_persistence
+            .claim_agent_instruction_notes(primary.company.id, primary.thread.id, lease)
+            .await?;
 
         for (index, channel_match) in matches.iter().enumerate() {
             let history = self
@@ -947,6 +956,7 @@ impl ThreadUseCases {
                     let mut runner = AgentRunner::new(&agent_prompt, &params)
                         .subject(Some(envelope.content.subject()))
                         .history(&history)
+                        .internal_notes(if index == 0 { &instruction_notes } else { &[] })
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
                             self.approval_context_for(

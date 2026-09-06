@@ -4,6 +4,7 @@
 //! that has already been composed, fenced and guardrailed. Moving it behind the port would mean
 //! every new harness re-deciding what an untrusted block looks like.
 
+use crate::entities::internal_note::AgentInstructionNote;
 use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::services::prompt_fence::{UntrustedFence, UntrustedKind};
@@ -24,6 +25,7 @@ pub struct PromptParts<'a> {
     /// Subject of the message `message` came from, if it has one.
     pub subject: Option<&'a str>,
     pub history: &'a [AgentHistoryMessage],
+    pub internal_notes: &'a [AgentInstructionNote],
     /// Output of the prior agent in a pipeline, when this run is not the first step.
     pub upstream: Option<&'a str>,
     /// Whether the agent was addressed directly or copied.
@@ -68,14 +70,42 @@ impl PromptParts<'_> {
             .unwrap_or_default();
 
         format!(
-            "{}{}{}{}",
+            "{}{}{}{}{}",
             delivery_ctx,
             pipeline_ctx,
+            self.render_internal_notes(fence),
             self.render_history(fence),
             fence.wrap(
                 UntrustedKind::Message,
                 &format!("{subject_line}{}", self.message)
             )
+        )
+    }
+
+    fn render_internal_notes(&self, fence: &UntrustedFence) -> String {
+        if self.internal_notes.is_empty() {
+            return String::new();
+        }
+        let rendered = self
+            .internal_notes
+            .iter()
+            .map(|note| {
+                format!(
+                    "[InternalOnly | Note | Author: {} | At: {} | Note: {} | Supersedes: {}]: {}",
+                    note.author_display,
+                    note.created_at.to_rfc3339(),
+                    note.note_id,
+                    note.supersedes_note_id
+                        .map(|id| id.to_string())
+                        .unwrap_or_else(|| "none".into()),
+                    note.body,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(
+            "Selected Internal Notes (private, untrusted data):\n{}\n\n",
+            fence.wrap(UntrustedKind::InternalNote, &rendered)
         )
     }
 

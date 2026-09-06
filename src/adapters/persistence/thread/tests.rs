@@ -8,6 +8,7 @@ use crate::entities::value_objects::MessageId;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
+    internal_note::{AddInternalNote, InternalNoteProvenance, TombstoneInternalNote},
     message::{
         AttachmentMetadata, AttachmentSource, MessageAudience, MessageDirection,
         MessageParticipantKind, MessageRole, ThreadEntryKind,
@@ -15,6 +16,213 @@ use crate::entities::{
     participant::IdentityProvenance,
     transport::{ExternalMessageKey, ExternalThreadKey},
 };
+
+#[tokio::test]
+async fn internal_notes_are_idempotent_immutable_and_auditable() {
+    let Some(fixture) = Fixture::new("internal_note_lifecycle").await else {
+        return;
+    };
+    let actor = crate::entities::transport::PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(fixture.company_id)
+        .bind(fixture.owner_id)
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap(),
+    );
+    let before_tasks: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM background_tasks WHERE company_id = $1 AND thread_id = $2",
+    )
+    .bind(fixture.company_id)
+    .bind(fixture.thread.id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    let before_deliveries: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM message_deliveries WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
+    let command = AddInternalNote {
+        company_id: fixture.company_id,
+        channel_id: fixture.channel_id,
+        thread_id: fixture.thread.id,
+        text: "Customer supplied a replacement purchase order.".into(),
+        command_id: Uuid::new_v4(),
+        supersedes_note_id: None,
+        provenance: InternalNoteProvenance::Api,
+    };
+    let disabled_actor = crate::entities::transport::PrincipalId::random();
+    sqlx::query(
+        "INSERT INTO principals (id, company_id, kind, display_label) VALUES ($1, $2, 'external', 'Former teammate')",
+    )
+    .bind(disabled_actor.as_uuid())
+    .bind(fixture.company_id)
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+    assert!(matches!(
+        fixture
+            .persistence
+            .create_internal_note(
+                &AddInternalNote {
+                    command_id: Uuid::new_v4(),
+                    ..command.clone()
+                },
+                disabled_actor,
+            )
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    sqlx::query(
+        "INSERT INTO principals (id, company_id, kind, display_label) VALUES ($1, $2, 'system', 'CRM sync') ON CONFLICT DO NOTHING",
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.company_id)
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+    let system_actor = crate::entities::transport::PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND kind = 'system'",
+        )
+        .bind(fixture.company_id)
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap(),
+    );
+    let integration_note = fixture
+        .persistence
+        .create_internal_note(
+            &AddInternalNote {
+                text: "CRM sync confirmed the account tier.".into(),
+                command_id: Uuid::new_v4(),
+                provenance: InternalNoteProvenance::Integration,
+                ..command.clone()
+            },
+            system_actor,
+        )
+        .await
+        .unwrap();
+    assert_eq!(integration_note.role, MessageRole::System);
+    let (first, retry) = tokio::join!(
+        fixture.persistence.create_internal_note(&command, actor),
+        fixture.persistence.create_internal_note(&command, actor),
+    );
+    let first = first.unwrap();
+    let retry = retry.unwrap();
+    assert_eq!(first.canonical_id, retry.canonical_id);
+    let note = first.internal_note.unwrap();
+    assert!(note.is_active());
+    assert_eq!(first.audience, MessageAudience::InternalOnly);
+    assert_eq!(first.entry_kind, ThreadEntryKind::Note);
+    assert!(first.attachments.is_empty());
+
+    let mismatch = AddInternalNote {
+        text: "Different content under the same command id.".into(),
+        ..command.clone()
+    };
+    assert!(matches!(
+        fixture
+            .persistence
+            .create_internal_note(&mismatch, actor)
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+
+    let correction = fixture
+        .persistence
+        .create_internal_note(
+            &AddInternalNote {
+                text: "Customer supplied purchase order PO-42.".into(),
+                command_id: Uuid::new_v4(),
+                supersedes_note_id: Some(note.id),
+                ..command.clone()
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+    let correction_note = correction.internal_note.unwrap();
+    assert_eq!(correction_note.supersedes_note_id, Some(note.id));
+    let refreshed = fixture
+        .persistence
+        .get_thread_message_view(fixture.thread.id, first.canonical_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        refreshed.internal_note.unwrap().superseded_by_note_id,
+        Some(correction_note.id)
+    );
+
+    let tombstone = TombstoneInternalNote {
+        company_id: fixture.company_id,
+        channel_id: fixture.channel_id,
+        thread_id: fixture.thread.id,
+        note_id: correction_note.id,
+        command_id: Uuid::new_v4(),
+    };
+    let removed = fixture
+        .persistence
+        .tombstone_internal_note(&tombstone, actor)
+        .await
+        .unwrap();
+    assert!(!removed.is_active());
+    assert_eq!(
+        fixture
+            .persistence
+            .tombstone_internal_note(&tombstone, actor)
+            .await
+            .unwrap(),
+        removed
+    );
+    let body: String = sqlx::query_scalar(
+        "SELECT clean_text_body FROM messages WHERE company_id = $1 AND id = $2",
+    )
+    .bind(fixture.company_id)
+    .bind(correction.canonical_id.as_uuid())
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(body, "Customer supplied purchase order PO-42.");
+
+    let after_tasks: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM background_tasks WHERE company_id = $1 AND thread_id = $2",
+    )
+    .bind(fixture.company_id)
+    .bind(fixture.thread.id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(after_tasks, before_tasks, "notes never create agent work");
+    let after_deliveries: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM message_deliveries WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        after_deliveries, before_deliveries,
+        "notes and lifecycle changes never enter a transport queue"
+    );
+    let prompt_history = fixture
+        .persistence
+        .list_agent_history(fixture.thread.id)
+        .await
+        .unwrap();
+    assert!(
+        prompt_history.iter().all(|message| {
+            !message.body.contains("Customer supplied")
+                && !message.body.contains("CRM sync confirmed")
+        }),
+        "internal notes enter prompts only through an explicit selected-note projection"
+    );
+    fixture.cleanup().await;
+}
 
 #[tokio::test]
 async fn private_messages_cannot_enter_the_external_delivery_queue() {

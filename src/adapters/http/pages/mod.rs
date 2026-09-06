@@ -22,7 +22,9 @@ use crate::entities::{
         MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
         default_memory_max_results,
     },
-    message::{AttachmentMetadata, MessageDirection, MessageRole},
+    message::{
+        AttachmentMetadata, MessageAudience, MessageDirection, MessageRole, ThreadEntryKind,
+    },
     message_view::{EmailReplyContext, MessageAuditView, ThreadMessageView},
     runtime_metrics::MachineIdentity,
     task::{

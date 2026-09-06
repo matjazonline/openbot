@@ -8,6 +8,7 @@
 mod email_metadata;
 mod external;
 mod inbound;
+mod internal_note;
 mod message;
 mod views;
 
@@ -52,6 +53,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         cursor::{MessageCursor, ThreadCursor},
+        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
         message::{CanonicalMessageId, Message, MessageRole},
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
@@ -722,5 +724,21 @@ impl ThreadPersistence for PostgresPersistence {
         association_id: Uuid,
     ) -> AppResult<Option<MessageAuditView>> {
         views::get_message_audit(&self.pool, company_id, association_id).await
+    }
+
+    async fn create_internal_note(
+        &self,
+        command: &AddInternalNote,
+        actor: PrincipalId,
+    ) -> AppResult<ThreadMessageView> {
+        internal_note::create_internal_note(&self.pool, command, actor).await
+    }
+
+    async fn tombstone_internal_note(
+        &self,
+        command: &TombstoneInternalNote,
+        actor: PrincipalId,
+    ) -> AppResult<InternalNoteView> {
+        internal_note::tombstone_internal_note(&self.pool, command, actor).await
     }
 }

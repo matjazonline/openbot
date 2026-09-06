@@ -131,6 +131,7 @@ pub(crate) async fn mark_task_failed_on(
         TaskStopReason::LeaseLost => TaskTransitionReason::LeaseLost,
         TaskStopReason::Completed => TaskTransitionReason::Completed,
         TaskStopReason::OwnershipTransferred => TaskTransitionReason::OwnershipTransferred,
+        TaskStopReason::AgentInstruction => TaskTransitionReason::AgentInstruction,
     };
     // The lease names the run that failed, so the failure cannot be attributed to anyone else.
     let attribution =

@@ -1,6 +1,7 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
+use crate::entities::internal_note::{InternalNoteProvenance, InternalNoteView};
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::message_view::{AuthorView, ExternalMessageRef};
 use crate::entities::runtime_metrics::{MachineId, MachineRegion};
@@ -2433,8 +2434,50 @@ fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
         role: MessageRole::Human,
         audience: crate::entities::message::MessageAudience::ExternalConversation,
         entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
+        internal_note: None,
         created_at: Utc::now(),
     }
+}
+
+#[test]
+fn internal_note_markup_is_unmistakable_escaped_and_hides_removed_text() {
+    let thread_id = Uuid::new_v4();
+    let note_id = Uuid::new_v4();
+    let mut note = mailbox_message_view(
+        thread_id,
+        r#"<img src=x onerror="steal()"> private customer secret"#,
+    );
+    note.audience = crate::entities::message::MessageAudience::InternalOnly;
+    note.entry_kind = crate::entities::message::ThreadEntryKind::Note;
+    note.author.label = r#"Owner <script>alert(1)</script>"#.into();
+    note.internal_note = Some(InternalNoteView {
+        id: note_id,
+        author_principal_id: note.author.principal_id,
+        provenance: InternalNoteProvenance::HumanUi,
+        supersedes_note_id: None,
+        superseded_by_note_id: None,
+        tombstoned_at: None,
+    });
+    let scope = MessageScope {
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+    };
+
+    let active = message_bubble_chat(&note, None, None, scope);
+    assert!(active.contains("Internal only"));
+    assert!(active.contains("internal_only / note"));
+    assert!(active.contains("use with agent"));
+    assert!(active.contains("&lt;img src=x onerror=&quot;steal()&quot;&gt;"));
+    assert!(active.contains("Owner &lt;script&gt;alert(1)&lt;/script&gt;"));
+    assert!(!active.contains("<img src=x"));
+    assert!(!active.contains("<script>alert"));
+
+    note.internal_note.as_mut().unwrap().tombstoned_at = Some(Utc::now());
+    let removed = message_bubble_chat(&note, None, None, scope);
+    assert!(removed.contains("This internal note was removed"));
+    assert!(removed.contains("removed</span>"));
+    assert!(!removed.contains("private customer secret"));
+    assert!(!removed.contains("use with agent"));
 }
 
 /// An agent's answer as a page reads it: authored by the agent's principal, over no transport.
@@ -3441,8 +3484,9 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
     assert!(pane.contains(
         message_bubble_chat(&message, None, Some(&mailbox_account_email()), scope).trim()
     ));
-    assert!(pane.contains("name=\"quiet\" value=\"true\""));
-    assert!(pane.contains("save to history without running the agent"));
+    assert!(!pane.contains("name=\"quiet\""));
+    assert!(pane.contains("hx-post=\"/ui/internal-notes\""));
+    assert!(pane.contains("Private context only. This does not run the agent"));
 }
 
 #[test]
@@ -3459,7 +3503,6 @@ fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {
         sender_email: "owner@example.com",
         text_body: "Draft reply",
         deliver: true,
-        quiet: true,
         error: Some("Channel rejected the message"),
     });
 
@@ -3470,9 +3513,7 @@ fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {
     assert!(html.contains("value=\"Re: Question &lt;script&gt;\" readonly"));
     assert!(html.contains("Draft reply</textarea>"));
     assert!(html.contains("toggle toggle-primary toggle-sm\" checked"));
-    assert!(html.contains(
-        "name=\"quiet\" value=\"true\" class=\"checkbox checkbox-primary checkbox-sm\" checked"
-    ));
+    assert!(!html.contains("name=\"quiet\""));
     assert!(html.contains("Channel rejected the message"));
 
     // Cancel puts the thread's messages back in the pane it replaced.
@@ -3495,7 +3536,6 @@ fn compose_pane_shows_the_channel_address_and_errors() {
         subject: "Draft subject",
         text_body: "Draft body",
         deliver: true,
-        quiet: true,
         error: Some("Channel rejected the message"),
     });
 
@@ -3504,9 +3544,7 @@ fn compose_pane_shows_the_channel_address_and_errors() {
     assert!(html.contains("value=\"Draft subject\""));
     assert!(html.contains("Draft body</textarea>"));
     assert!(html.contains("toggle toggle-primary toggle-sm\" checked"));
-    assert!(html.contains(
-        "name=\"quiet\" value=\"true\" class=\"checkbox checkbox-primary checkbox-sm\" checked"
-    ));
+    assert!(!html.contains("name=\"quiet\""));
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Channel rejected the message"));
     assert!(html.contains("hx-post=\"/ui/compose\""));

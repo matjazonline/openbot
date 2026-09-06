@@ -17,6 +17,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         correlation::CorrelationId,
+        internal_note::{AgentInstructionNote, AskOwnerOutcome, AskOwnerToAct, StartAgentTask},
         message::CanonicalMessageId,
         outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch},
         runtime_metrics::MachineIdentity,
@@ -365,6 +366,30 @@ pub trait TaskPersistence: Send + Sync {
     async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask>;
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>>;
+
+    /// Append selected private context to an agent-owned task and apply the status-specific wake
+    /// protocol atomically with the audit row.
+    async fn ask_owner_to_act(
+        &self,
+        command: &AskOwnerToAct,
+        actor: crate::entities::transport::PrincipalId,
+    ) -> AppResult<AskOwnerOutcome>;
+
+    /// Start work for selected notes only when this thread has no active task.
+    async fn start_agent_task(
+        &self,
+        command: &StartAgentTask,
+        actor: crate::entities::transport::PrincipalId,
+    ) -> AppResult<BackgroundTask>;
+
+    /// Claim pending note instructions under the live execution fence. A later execution cannot
+    /// receive the same instruction because consumption records this generation transactionally.
+    async fn claim_agent_instruction_notes(
+        &self,
+        company_id: Uuid,
+        thread_id: Uuid,
+        lease: TaskLeaseRef,
+    ) -> AppResult<Vec<AgentInstructionNote>>;
 
     /// Resolve the agent behind the owner captured by this lease and its latest handoff. A stale
     /// lease or an ineligible owner returns `None`, so execution fails closed.

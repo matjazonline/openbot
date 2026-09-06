@@ -48,7 +48,6 @@ use crate::{
         config::AppConfig,
         events::{MailboxEvent, MailboxEvents},
     },
-    transport::MessageDisposition,
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
@@ -76,6 +75,7 @@ pub fn router() -> Router<AppState> {
         .route("/ui/threads/events", get(thread_column_stream))
         .route("/ui/compose", get(compose_form).post(create_thread))
         .route("/ui/reply", get(reply_form).post(send_reply))
+        .merge(super::ui_internal_notes::router())
         .route(
             "/ui/task-complete",
             axum::routing::post(complete_human_task),
@@ -140,8 +140,6 @@ pub struct ComposeForm {
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
-    /// Present only when the message should be stored without running the agent.
-    pub quiet: Option<String>,
 }
 
 /// A further message in a thread that is already open; its subject comes from the thread.
@@ -154,8 +152,6 @@ pub struct ReplyForm {
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
-    /// Present only when the message should be stored without running the agent.
-    pub quiet: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -344,7 +340,7 @@ async fn thread_activity(
 /// A reply is stored with the *channel's* address as its sender, not the agent that wrote it, so
 /// the agent is only unambiguous while the channel runs exactly one. With a stack of them the
 /// messages stay on the address they were sent from -- better a plain address than the wrong face.
-async fn channel_agent(
+pub(super) async fn channel_agent(
     agent_use_cases: &AgentUseCases,
     viewer: &Viewer,
     channel: &Channel,
@@ -358,7 +354,7 @@ async fn channel_agent(
         .await
 }
 
-async fn render_message_pane(
+pub(super) async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
     company_id: Uuid,
     channel: &Channel,
@@ -964,7 +960,6 @@ async fn compose_form(
         subject: "",
         text_body: "",
         deliver: false,
-        quiet: false,
         error: None,
     })))
 }
@@ -1014,7 +1009,6 @@ async fn create_thread(
     let subject = form.subject.unwrap_or_default();
     let text_body = form.text_body.unwrap_or_default();
     let deliver = delivery_requested(form.deliver.as_deref());
-    let quiet = delivery_requested(form.quiet.as_deref());
 
     let compose_error = |message: String| {
         Html(pages::compose_pane(&pages::ComposePane {
@@ -1025,7 +1019,6 @@ async fn create_thread(
             subject: &subject,
             text_body: &text_body,
             deliver,
-            quiet,
             error: Some(&message),
         }))
         .into_response()
@@ -1046,12 +1039,7 @@ async fn create_thread(
         IngressOrigin::TrustedApplication,
     )
     .with_subject(&subject)
-    .with_reply_delivery(delivery_mode(deliver))
-    .with_disposition(if quiet {
-        MessageDisposition::FileOnly
-    } else {
-        MessageDisposition::Answer
-    });
+    .with_reply_delivery(delivery_mode(deliver));
 
     let ingest = match thread_use_cases.ingest_canonical(ingress).await {
         Ok(ingest) => ingest,
@@ -1118,7 +1106,6 @@ async fn reply_form(
         sender_email: &sender_email,
         text_body: "",
         deliver: false,
-        quiet: false,
         error: None,
     })))
 }
@@ -1167,7 +1154,6 @@ async fn send_reply(
 
     let text_body = form.text_body.unwrap_or_default();
     let deliver = delivery_requested(form.deliver.as_deref());
-    let quiet = delivery_requested(form.quiet.as_deref());
 
     let reply_error = |message: String| {
         Html(pages::reply_pane(&pages::ReplyPane {
@@ -1178,7 +1164,6 @@ async fn send_reply(
             sender_email: &sender_email,
             text_body: &text_body,
             deliver,
-            quiet,
             error: Some(&message),
         }))
         .into_response()
@@ -1202,12 +1187,7 @@ async fn send_reply(
         IngressOrigin::TrustedApplication,
     )
     .with_target_thread(thread.id)
-    .with_reply_delivery(delivery_mode(deliver))
-    .with_disposition(if quiet {
-        MessageDisposition::FileOnly
-    } else {
-        MessageDisposition::Answer
-    });
+    .with_reply_delivery(delivery_mode(deliver));
 
     if let Some(reply_to) = reply_to_message_id {
         ingress = ingress.with_reply_to_message(reply_to);

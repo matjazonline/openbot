@@ -203,6 +203,24 @@ pub(crate) async fn record_outreach_reply_on(
     ))
 }
 
+pub(crate) async fn get_task_by_id_on(
+    pool: &sqlx::PgPool,
+    id: Uuid,
+) -> AppResult<Option<BackgroundTask>> {
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+        r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
+                  retry_count, max_retries, last_error, owner_principal_id,
+                  owner_principal_kind, ownership_version, worker_id, execution_generation,
+                  locked_at, lock_expires_at, run_at, created_at, updated_at
+           FROM background_tasks WHERE id = $1"#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .map_err(AppError::from)?;
+    db.map(TryInto::try_into).transpose()
+}
+
 #[async_trait]
 impl TaskPersistence for PostgresPersistence {
     async fn list_thread_work_summary(
@@ -895,22 +913,33 @@ impl TaskPersistence for PostgresPersistence {
     }
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
-        let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                       retry_count, max_retries, last_error, owner_principal_id,
-                       owner_principal_kind, ownership_version, worker_id, execution_generation, locked_at, lock_expires_at,
-                       run_at, created_at, updated_at
-               FROM background_tasks WHERE id = $1"#,
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        get_task_by_id_on(&self.pool, id).await
+    }
 
-        match db {
-            Some(d) => Ok(Some(d.try_into()?)),
-            None => Ok(None),
-        }
+    async fn ask_owner_to_act(
+        &self,
+        command: &crate::entities::internal_note::AskOwnerToAct,
+        actor: PrincipalId,
+    ) -> AppResult<crate::entities::internal_note::AskOwnerOutcome> {
+        super::instructions::ask_owner_to_act(&self.pool, command, actor).await
+    }
+
+    async fn start_agent_task(
+        &self,
+        command: &crate::entities::internal_note::StartAgentTask,
+        actor: PrincipalId,
+    ) -> AppResult<BackgroundTask> {
+        super::instructions::start_agent_task(&self.pool, command, actor).await
+    }
+
+    async fn claim_agent_instruction_notes(
+        &self,
+        company_id: Uuid,
+        thread_id: Uuid,
+        lease: TaskLeaseRef,
+    ) -> AppResult<Vec<crate::entities::internal_note::AgentInstructionNote>> {
+        super::instructions::claim_agent_instruction_notes(&self.pool, company_id, thread_id, lease)
+            .await
     }
 
     async fn owned_agent_execution(

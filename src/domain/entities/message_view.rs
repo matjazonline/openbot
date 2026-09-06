@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::entities::{
     correlation::CorrelationId,
     cursor::MessageCursor,
+    internal_note::InternalNoteView,
     message::{
         AttachmentMetadata, CanonicalMessageId, MessageAudience, MessageDirection, MessageRole,
         ThreadEntryKind,
@@ -94,6 +95,7 @@ pub struct ThreadMessageView {
     pub role: MessageRole,
     pub audience: MessageAudience,
     pub entry_kind: ThreadEntryKind,
+    pub internal_note: Option<InternalNoteView>,
     pub created_at: DateTime<Utc>,
 }
 

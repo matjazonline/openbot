@@ -19,6 +19,9 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
         correlation::CorrelationId,
+        internal_note::{
+            AddInternalNote, AskOwnerOutcome, AskOwnerToAct, InternalNoteProvenance, StartAgentTask,
+        },
         outreach::OutreachStatus,
         stuck_work::StuckWorkThresholds,
         task::{
@@ -35,6 +38,280 @@ use crate::{
     },
     use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite},
 };
+
+#[tokio::test]
+async fn competing_ask_agent_retries_requeue_once_and_fence_the_old_run() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(&persistence, company.id, channel.id, "note-instruction").await;
+    let thread_id = task.thread_id.unwrap();
+    let actor = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let note = ThreadPersistence::create_internal_note(
+        &persistence,
+        &AddInternalNote {
+            company_id: company.id,
+            channel_id: channel.id,
+            thread_id,
+            text: "The replacement purchase order is PO-42.".into(),
+            command_id: Uuid::new_v4(),
+            supersedes_note_id: None,
+            provenance: InternalNoteProvenance::Api,
+        },
+        actor,
+    )
+    .await
+    .unwrap()
+    .internal_note
+    .unwrap();
+    let other_task = enqueue_chain(&persistence, company.id, channel.id, "other-note-thread").await;
+    let other_note = ThreadPersistence::create_internal_note(
+        &persistence,
+        &AddInternalNote {
+            company_id: company.id,
+            channel_id: channel.id,
+            thread_id: other_task.thread_id.unwrap(),
+            text: "This note belongs to a different thread.".into(),
+            command_id: Uuid::new_v4(),
+            supersedes_note_id: None,
+            provenance: InternalNoteProvenance::Api,
+        },
+        actor,
+    )
+    .await
+    .unwrap()
+    .internal_note
+    .unwrap();
+    let wrong_thread = AskOwnerToAct {
+        company_id: company.id,
+        channel_id: channel.id,
+        thread_id,
+        task_id: task.id,
+        expected_ownership_version: task.ownership.version,
+        note_ids: vec![other_note.id],
+        command_id: Uuid::new_v4(),
+    };
+    assert!(matches!(
+        persistence.ask_owner_to_act(&wrong_thread, actor).await,
+        Err(AppError::BadRequest(_))
+    ));
+    let cross_company = AskOwnerToAct {
+        company_id: Uuid::new_v4(),
+        note_ids: vec![note.id],
+        command_id: Uuid::new_v4(),
+        ..wrong_thread
+    };
+    assert!(matches!(
+        persistence.ask_owner_to_act(&cross_company, actor).await,
+        Err(AppError::NotFound(_))
+    ));
+    let old_lease = claim(&persistence, task.id).await;
+    let processing = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    let command = AskOwnerToAct {
+        company_id: company.id,
+        channel_id: channel.id,
+        thread_id,
+        task_id: task.id,
+        expected_ownership_version: processing.ownership.version,
+        note_ids: vec![note.id],
+        command_id: Uuid::new_v4(),
+    };
+    let (first, retry) = tokio::join!(
+        persistence.ask_owner_to_act(&command, actor),
+        persistence.ask_owner_to_act(&command, actor),
+    );
+    assert_eq!(first.unwrap(), AskOwnerOutcome::Requeued);
+    assert_eq!(retry.unwrap(), AskOwnerOutcome::Requeued);
+    let pending = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    assert_eq!(pending.status, TaskStatus::Pending);
+    assert!(pending.worker_id.is_none());
+    assert!(matches!(
+        persistence
+            .claim_agent_instruction_notes(company.id, thread_id, old_lease)
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+    assert!(
+        !persistence
+            .renew_task_lease(old_lease, Utc::now() + chrono::Duration::minutes(5))
+            .await
+            .unwrap()
+    );
+
+    let new_lease = claim(&persistence, task.id).await;
+    let selected = persistence
+        .claim_agent_instruction_notes(company.id, thread_id, new_lease)
+        .await
+        .unwrap();
+    assert_eq!(selected.len(), 1);
+    assert_eq!(selected[0].note_id, note.id);
+    assert!(selected[0].body.contains("PO-42"));
+    assert!(
+        persistence
+            .claim_agent_instruction_notes(company.id, thread_id, new_lease)
+            .await
+            .unwrap()
+            .is_empty(),
+        "one execution receives each selected note only once"
+    );
+    assert!(persistence.mark_task_completed(new_lease).await.unwrap());
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn start_agent_task_is_idempotent_and_delivers_selected_notes_to_its_first_run() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let completed = enqueue_chain(
+        &persistence,
+        company.id,
+        channel.id,
+        "completed-before-note",
+    )
+    .await;
+    let thread_id = completed.thread_id.unwrap();
+    let completed_lease = claim(&persistence, completed.id).await;
+    assert!(
+        persistence
+            .mark_task_completed(completed_lease)
+            .await
+            .unwrap()
+    );
+    let actor = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let note = ThreadPersistence::create_internal_note(
+        &persistence,
+        &AddInternalNote {
+            company_id: company.id,
+            channel_id: channel.id,
+            thread_id,
+            text: "Use contract revision 7, not revision 6.".into(),
+            command_id: Uuid::new_v4(),
+            supersedes_note_id: None,
+            provenance: InternalNoteProvenance::Api,
+        },
+        actor,
+    )
+    .await
+    .unwrap()
+    .internal_note
+    .unwrap();
+    let command = StartAgentTask {
+        company_id: company.id,
+        channel_id: channel.id,
+        thread_id,
+        note_ids: vec![note.id],
+        command_id: Uuid::new_v4(),
+    };
+    let started = persistence.start_agent_task(&command, actor).await.unwrap();
+    let retry = persistence.start_agent_task(&command, actor).await.unwrap();
+    assert_eq!(retry.id, started.id);
+    assert_eq!(started.status, TaskStatus::Pending);
+    assert!(matches!(started.ownership.owner, TaskOwner::Agent(_)));
+
+    let lease = claim(&persistence, started.id).await;
+    let notes = persistence
+        .claim_agent_instruction_notes(company.id, thread_id, lease)
+        .await
+        .unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].note_id, note.id);
+    assert!(notes[0].body.contains("revision 7"));
+    assert!(persistence.mark_task_completed(lease).await.unwrap());
+
+    let unassigned_channel = ChannelPersistence::create(
+        &persistence,
+        company.id,
+        ChannelWrite {
+            name: "No agent selected".into(),
+            slug: format!("no-agent-{}", Uuid::new_v4().simple()),
+            agent_ids: Some(Vec::new()),
+            enabled: false,
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let unassigned_thread = ThreadPersistence::create_thread(
+        &persistence,
+        unassigned_channel.id,
+        "Notes awaiting an owner",
+        &[],
+    )
+    .await
+    .unwrap();
+    let unassigned_note = ThreadPersistence::create_internal_note(
+        &persistence,
+        &AddInternalNote {
+            company_id: company.id,
+            channel_id: unassigned_channel.id,
+            thread_id: unassigned_thread.id,
+            text: "An operator must assign an agent before this can run.".into(),
+            command_id: Uuid::new_v4(),
+            supersedes_note_id: None,
+            provenance: InternalNoteProvenance::Api,
+        },
+        actor,
+    )
+    .await
+    .unwrap()
+    .internal_note
+    .unwrap();
+    let unassigned = persistence
+        .start_agent_task(
+            &StartAgentTask {
+                company_id: company.id,
+                channel_id: unassigned_channel.id,
+                thread_id: unassigned_thread.id,
+                note_ids: vec![unassigned_note.id],
+                command_id: Uuid::new_v4(),
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+    assert_eq!(unassigned.status, TaskStatus::Pending);
+    assert!(matches!(unassigned.ownership.owner, TaskOwner::Unassigned));
+    assert!(
+        !persistence
+            .claim_task(
+                unassigned.id,
+                Uuid::new_v4(),
+                Utc::now() + chrono::Duration::minutes(5),
+            )
+            .await
+            .unwrap(),
+        "unassigned work remains visible but cannot run under an invented owner"
+    );
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
 
 /// What a fixture that forces a status writes instead of an attribution. It has no cause to
 /// state, and leaving the columns out would carry the previous transition's into the event.
