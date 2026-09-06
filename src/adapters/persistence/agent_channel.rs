@@ -4,12 +4,16 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::{
         PostgresPersistence,
+        agent::insert_agent_on,
         channel::insert_email_allowlist_grants,
         integration::email_binding::{CanonicalEmailBinding, write_canonical_email_binding},
         participant::create_agent_principal_on,
     },
     app_error::{AppError, AppResult},
-    entities::{creation::CreationProvenance, value_objects::ChannelSlug},
+    entities::{
+        creation::CreationProvenance,
+        value_objects::{ChannelSlug, SkillSlug},
+    },
     services::agent_channel_tool::{
         AgentChannelProvisioning, ProvisionAgentChannelRequest, ProvisionedAgentChannel,
     },
@@ -19,7 +23,7 @@ use crate::{
 impl AgentChannelProvisioning for PostgresPersistence {
     async fn provision_agent_channel(
         &self,
-        request: ProvisionAgentChannelRequest,
+        mut request: ProvisionAgentChannelRequest,
     ) -> AppResult<ProvisionedAgentChannel> {
         let warnings = request.warnings.clone();
         let mut tx = self.pool().begin().await.map_err(AppError::from)?;
@@ -53,31 +57,12 @@ impl AgentChannelProvisioning for PostgresPersistence {
 
         let agent_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let agent_created_by = serde_json::to_value(&request.agent.created_by)
-            .map_err(|error| AppError::Internal(error.to_string()))?;
         let channel_created_by = serde_json::to_value(&request.channel.created_by)
             .map_err(|error| AppError::Internal(error.to_string()))?;
 
-        sqlx::query(
-            r#"INSERT INTO agents
-               (id, company_id, name, slug, system_prompt, description, created_by,
-                memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
-        )
-        .bind(agent_id)
-        .bind(request.company_id)
-        .bind(&request.agent.name)
-        .bind(&request.agent.slug)
-        .bind(&request.agent.system_prompt)
-        .bind(&request.agent.description)
-        .bind(agent_created_by)
-        .bind(request.agent.memory_enabled)
-        .bind(request.agent.memory_persistence_mode.as_str())
-        .bind(request.agent.memory_recall_mode.as_str())
-        .bind(i16::from(request.agent.memory_max_results))
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
+        request.agent.skill_ids =
+            company_skill_ids(&mut tx, request.company_id, &request.skill_slugs).await?;
+        insert_agent_on(&mut tx, agent_id, Some(request.company_id), &request.agent).await?;
         create_agent_principal_on(&mut tx, request.company_id, agent_id, &request.agent.name)
             .await?;
 
@@ -182,6 +167,45 @@ impl AgentChannelProvisioning for PostgresPersistence {
     }
 }
 
+async fn company_skill_ids(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    requested: &[SkillSlug],
+) -> AppResult<Vec<Uuid>> {
+    if requested.is_empty() {
+        return Ok(Vec::new());
+    }
+    let requested_values = requested
+        .iter()
+        .map(|slug| slug.as_str())
+        .collect::<Vec<_>>();
+    let available = sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT id, slug::text FROM skills \
+         WHERE company_id = $1 AND slug::text = ANY($2) FOR KEY SHARE",
+    )
+    .bind(company_id)
+    .bind(&requested_values)
+    .fetch_all(&mut **transaction)
+    .await
+    .map_err(AppError::from)?;
+
+    requested
+        .iter()
+        .map(|requested_slug| {
+            available
+                .iter()
+                .find(|(_, slug)| slug == requested_slug.as_str())
+                .map(|(id, _)| *id)
+                .ok_or_else(|| {
+                    AppError::BadRequest(format!(
+                        "Company skill '{}' does not exist.",
+                        requested_slug.as_str()
+                    ))
+                })
+        })
+        .collect()
+}
+
 fn channel_access_mode(participants: Option<&Vec<String>>) -> &'static str {
     match participants {
         Some(values)
@@ -201,14 +225,41 @@ mod tests {
     use super::*;
     use crate::{
         adapters::persistence::test_support::test_pool,
-        entities::creation::CreationProvenance,
+        entities::{creation::CreationProvenance, skill::SkillInstruction, value_objects::ToolId},
         use_cases::{
             agent::{AgentPersistence, AgentWrite},
             channel::{ChannelPersistence, ChannelWrite},
             company::{CompanyPersistence, CompanyWrite},
+            skill::{AgentCapabilityReader, SkillManagementPersistence, SkillWrite},
             user::UserPersistence,
         },
     };
+
+    async fn company_with_owner(
+        persistence: &PostgresPersistence,
+        suffix: &str,
+    ) -> (
+        crate::entities::user::User,
+        crate::entities::company::Company,
+    ) {
+        let email = format!("provision-{suffix}@example.com");
+        let user = persistence
+            .create_user(&format!("provision-{suffix}"), &email, "hash")
+            .await
+            .unwrap();
+        let company = CompanyPersistence::create(
+            persistence,
+            user.id,
+            CompanyWrite {
+                name: "Provisioning Co".into(),
+                slug: format!("provision-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        (user, company)
+    }
 
     #[tokio::test]
     async fn provisioning_is_atomic_attributed_and_idempotent() {
@@ -217,18 +268,19 @@ mod tests {
         };
         let persistence = PostgresPersistence::new(pool);
         let suffix = Uuid::new_v4().simple().to_string();
-        let email = format!("provision-{suffix}@example.com");
-        let user = persistence
-            .create_user(&format!("provision-{suffix}"), &email, "hash")
-            .await
-            .unwrap();
-        let company = CompanyPersistence::create(
+        let (user, company) = company_with_owner(&persistence, &suffix).await;
+        let skill = SkillManagementPersistence::create_company(
             &persistence,
-            user.id,
-            CompanyWrite {
-                name: "Provisioning Co".into(),
-                slug: format!("provision-{suffix}"),
-                ..CompanyWrite::default()
+            company.id,
+            SkillWrite {
+                slug: format!("review-{suffix}"),
+                name: "Review a request".into(),
+                description: "Applies the company's review procedure.".into(),
+                trigger: "When a request needs review.".into(),
+                instructions: vec![SkillInstruction::Prompt {
+                    text: "Apply the review procedure before answering.".into(),
+                }],
+                created_by: Some(CreationProvenance::user(user.id)),
             },
         )
         .await
@@ -281,11 +333,13 @@ mod tests {
             request_hash: "stable-request".into(),
             company_id: company.id,
             source_task_id: task_id,
+            skill_slugs: vec![skill.slug.clone()],
             agent: AgentWrite {
                 name: "Researcher".into(),
                 slug: "researcher".into(),
                 description: Some("Researches questions".into()),
                 system_prompt: Some("Research carefully".into()),
+                granted_tool_ids: vec![ToolId::from("web_fetch")],
                 created_by: Some(provenance.clone()),
                 ..AgentWrite::default()
             },
@@ -332,9 +386,53 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(agent.created_by, provenance);
+        assert_eq!(agent.granted_tool_ids, [ToolId::from("web_fetch")]);
+        let capabilities =
+            AgentCapabilityReader::load_for_execution(&persistence, company.id, agent.id)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(capabilities.skills.len(), 1);
+        assert_eq!(capabilities.skills[0].id, skill.id);
         assert_eq!(channel.created_by, provenance);
         assert_eq!(channel.agent_ids, Some(vec![agent.id]));
         assert!(channel.enabled);
         assert!(!channel.add_3rd_party);
+    }
+
+    #[tokio::test]
+    async fn skill_resolution_refuses_another_companys_skill() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let first_suffix = Uuid::new_v4().simple().to_string();
+        let second_suffix = Uuid::new_v4().simple().to_string();
+        let (_, first_company) = company_with_owner(&persistence, &first_suffix).await;
+        let (second_owner, second_company) = company_with_owner(&persistence, &second_suffix).await;
+        let skill = SkillManagementPersistence::create_company(
+            &persistence,
+            second_company.id,
+            SkillWrite {
+                slug: format!("private-{second_suffix}"),
+                name: "Private procedure".into(),
+                description: "Belongs only to the second company.".into(),
+                trigger: "When the second company requests it.".into(),
+                instructions: vec![SkillInstruction::Prompt {
+                    text: "Use the private procedure.".into(),
+                }],
+                created_by: Some(CreationProvenance::user(second_owner.id)),
+            },
+        )
+        .await
+        .unwrap();
+
+        let mut transaction = persistence.pool().begin().await.unwrap();
+        let error = company_skill_ids(&mut transaction, first_company.id, &[skill.slug])
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, AppError::BadRequest(_)));
+        assert!(error.to_string().contains("does not exist"));
     }
 }

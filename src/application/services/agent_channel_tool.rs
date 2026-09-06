@@ -10,10 +10,11 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
+        agent::MAX_AGENT_SKILLS,
         company::CompanyChannelDefaults,
         creation::CreationProvenance,
         transport::{ChannelSelector, TransportKind},
-        value_objects::{ChannelSlug, CompanySlug, ToolId},
+        value_objects::{ChannelSlug, CompanySlug, SkillSlug, ToolId},
     },
     services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     use_cases::{
@@ -45,6 +46,12 @@ struct CreateAgentChannelInput {
     slug: String,
     description: String,
     instructions: String,
+    /// Direct tool grants for the child. Skill-required tools are added by the harness.
+    #[serde(default)]
+    granted_tool_ids: Vec<String>,
+    /// Existing company-owned skills to attach, addressed by their stable human-readable slugs.
+    #[serde(default)]
+    skill_slugs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +60,7 @@ pub struct ProvisionAgentChannelRequest {
     pub company_id: Uuid,
     pub source_task_id: Uuid,
     pub agent: AgentWrite,
+    pub skill_slugs: Vec<SkillSlug>,
     pub channel: ChannelWrite,
     pub warnings: Vec<ProvisioningWarning>,
 }
@@ -104,11 +112,30 @@ impl CreateAgentChannelTool {
             self.context.source_channel_id,
             self.context.task_id,
         );
+        let mut skill_slugs = Vec::new();
+        for raw_slug in input.skill_slugs {
+            let normalized = raw_slug.trim().to_ascii_lowercase();
+            let slug = SkillSlug::parse(&normalized)?;
+            if !skill_slugs.contains(&slug) {
+                skill_slugs.push(slug);
+            }
+        }
+        if skill_slugs.len() > MAX_AGENT_SKILLS {
+            return Err(format!(
+                "An agent may carry at most {MAX_AGENT_SKILLS} skills."
+            ));
+        }
+
         let mut agent = AgentWrite {
             name: input.name.clone(),
             slug: input.slug.clone(),
             description: Some(description.into()),
             system_prompt: Some(instructions.into()),
+            granted_tool_ids: input
+                .granted_tool_ids
+                .into_iter()
+                .map(ToolId::from)
+                .collect(),
             created_by: Some(provenance.clone()),
             ..AgentWrite::default()
         };
@@ -128,6 +155,8 @@ impl CreateAgentChannelTool {
             "slug": agent.slug,
             "description": agent.description,
             "instructions": agent.system_prompt,
+            "granted_tool_ids": agent.granted_tool_ids,
+            "skill_slugs": skill_slugs,
         });
         let request_hash = format!("{:x}", Sha256::digest(canonical.to_string().as_bytes()));
         Ok(ProvisionAgentChannelRequest {
@@ -135,6 +164,7 @@ impl CreateAgentChannelTool {
             company_id: self.context.company_id,
             source_task_id: self.context.task_id,
             agent,
+            skill_slugs,
             channel: decision.channel,
             warnings: decision.warnings,
         })
@@ -151,7 +181,7 @@ impl CreateAgentChannelTool {
         NativeToolDeclaration {
             id: ToolId::from(CREATE_AGENT_CHANNEL_TOOL_ID),
             name: "Create Agent Channel",
-            description: "Permanently create a specialist agent and a callable channel for it in this company. The new agent inherits company model settings. After creation, delegate to the returned `channel` selector with outreach_and_await_quorum.",
+            description: "Permanently create a specialist agent and a callable channel for it in this company, with selected direct tool grants and existing company skills. Name skills by exact slug. The new agent inherits company model settings. The returned channel can be used with outreach_and_await_quorum when that tool is available.",
             input_schema: serde_json::to_value(schemars::schema_for!(CreateAgentChannelInput))
                 .unwrap_or_else(|_| serde_json::json!({})),
             safety: NativeToolSafety {
@@ -255,11 +285,15 @@ mod tests {
                 slug: "Research Helper".into(),
                 description: " Finds sources ".into(),
                 instructions: " Research carefully ".into(),
+                granted_tool_ids: vec!["web_fetch".into()],
+                skill_slugs: vec!["  SOURCE-REVIEW  ".into()],
             })
             .unwrap();
 
         assert_eq!(request.agent.slug, "research-helper");
         assert_eq!(request.agent.provider, None);
+        assert_eq!(request.agent.granted_tool_ids, [ToolId::from("web_fetch")]);
+        assert_eq!(request.skill_slugs, [SkillSlug::from("source-review")]);
         assert_eq!(request.channel.agent_ids, None);
         assert!(request.channel.enabled);
         assert!(request.channel.add_3rd_party);
@@ -277,6 +311,8 @@ mod tests {
                 slug: "helper".into(),
                 description: "Role".into(),
                 instructions: "Do work".into(),
+                granted_tool_ids: vec!["datetime".into()],
+                skill_slugs: vec!["review".into()],
             })
             .unwrap();
         let second = tool()
@@ -285,8 +321,22 @@ mod tests {
                 slug: "HELPER".into(),
                 description: " Role ".into(),
                 instructions: " Do work ".into(),
+                granted_tool_ids: vec!["datetime".into()],
+                skill_slugs: vec![" REVIEW ".into()],
             })
             .unwrap();
         assert_eq!(first.request_hash, second.request_hash);
+    }
+
+    #[test]
+    fn declaration_exposes_tools_and_skill_slugs_to_the_model() {
+        let schema = CreateAgentChannelTool::declaration().input_schema;
+        let properties = schema
+            .get("properties")
+            .and_then(Value::as_object)
+            .expect("the tool input has object properties");
+
+        assert!(properties.contains_key("granted_tool_ids"));
+        assert!(properties.contains_key("skill_slugs"));
     }
 }

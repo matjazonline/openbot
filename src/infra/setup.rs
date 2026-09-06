@@ -37,6 +37,7 @@ use crate::{
     use_cases::{
         agent::AgentUseCases,
         approval::ApprovalUseCases,
+        builtin_agent_library::install_builtin_agent_library,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
@@ -76,6 +77,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    install_builtin_agent_library(postgres_arc.as_ref()).await?;
     let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
     let memory_provider_activity = MemoryProviderActivity::default();
     // One registry entry and one configured-set entry per provider this deployment carries

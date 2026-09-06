@@ -20,6 +20,9 @@ use crate::{
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite, validate_effective_capabilities},
+        builtin_agent_library::{
+            BuiltinAgentDefinition, BuiltinAgentInstallOutcome, BuiltinAgentLibraryPersistence,
+        },
         skill::{AgentCapabilityReader, StoredAgentCapabilities},
     },
 };
@@ -332,6 +335,39 @@ fn capability_relationship_error(error: sqlx::Error) -> AppError {
             AppError::BadRequest("The selected sub-agent belongs to another company.".into())
         }
         _ => AppError::from(error),
+    }
+}
+
+#[async_trait]
+impl BuiltinAgentLibraryPersistence for PostgresPersistence {
+    async fn ensure_library_agent(
+        &self,
+        mut definition: BuiltinAgentDefinition,
+    ) -> AppResult<BuiltinAgentInstallOutcome> {
+        definition.write.normalize()?;
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let lock_key = format!("builtin-agent-library:{}", definition.write.slug);
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(lock_key)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
+
+        let already_present: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM agents WHERE company_id IS NULL AND slug = $1)",
+        )
+        .bind(&definition.write.slug)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if already_present {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(BuiltinAgentInstallOutcome::AlreadyPresent);
+        }
+
+        insert_agent_on(&mut transaction, definition.id, None, &definition.write).await?;
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(BuiltinAgentInstallOutcome::Created)
     }
 }
 
@@ -734,6 +770,9 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentWrite;
+    use crate::use_cases::builtin_agent_library::{
+        BuiltinAgentDefinition, BuiltinAgentInstallOutcome, BuiltinAgentLibraryPersistence,
+    };
     use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
@@ -765,6 +804,41 @@ mod tests {
 
         let error = Agent::try_from(db).expect_err("malformed provenance must be fallible");
         assert!(error.to_string().contains("agents.created_by"));
+    }
+
+    #[tokio::test]
+    async fn competing_builtin_installers_create_one_library_agent() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let definition = BuiltinAgentDefinition {
+            id: Uuid::new_v4(),
+            write: AgentWrite {
+                name: "Built-in test agent".into(),
+                slug: format!("builtin-{suffix}"),
+                system_prompt: Some("Test the startup installer.".into()),
+                ..AgentWrite::default()
+            },
+        };
+
+        let (first, second) = tokio::join!(
+            persistence.ensure_library_agent(definition.clone()),
+            persistence.ensure_library_agent(definition.clone())
+        );
+        let outcomes = [first.unwrap(), second.unwrap()];
+
+        assert!(outcomes.contains(&BuiltinAgentInstallOutcome::Created));
+        assert!(outcomes.contains(&BuiltinAgentInstallOutcome::AlreadyPresent));
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agents WHERE company_id IS NULL AND slug = $1",
+        )
+        .bind(&definition.write.slug)
+        .fetch_one(persistence.pool())
+        .await
+        .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[tokio::test]
