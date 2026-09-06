@@ -1049,11 +1049,12 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     let outreach_id = Uuid::new_v4();
     sqlx::query(
         r#"INSERT INTO task_outreaches (
-                id, task_id, outreach_key, status, required_threshold_percent,
+                id, company_id, task_id, outreach_key, status, required_threshold_percent,
                 expires_at, subject, body
-           ) VALUES ($1, $2, $3, 'waiting', 100.0, $4, 'Outreach', 'Outreach body')"#,
+           ) VALUES ($1, $2, $3, $4, 'waiting', 100.0, $5, 'Outreach', 'Outreach body')"#,
     )
     .bind(outreach_id)
+    .bind(fixture.company_id)
     .bind(task_id)
     .bind(&fixture.suffix)
     .bind(Utc::now() + chrono::Duration::hours(1))
@@ -1093,10 +1094,13 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     tx.commit().await.unwrap();
 
     sqlx::query(
-        "INSERT INTO task_outreach_targets (outreach_id, email, delivery_id, request_message_id) \
-         VALUES ($1, 'target@partner.test', $2, $3)",
+        "INSERT INTO task_outreach_targets (outreach_id, company_id, email, target_kind, \
+         external_transport, external_namespace, external_subject, delivery_id, \
+         request_message_id) VALUES ($1, $2, 'target@partner.test', 'external', 'email', \
+         'email', 'target@partner.test', $3, $4)",
     )
     .bind(outreach_id)
+    .bind(fixture.company_id)
     .bind(delivery_id.as_uuid())
     .bind(outreach_message_id.as_uuid())
     .execute(&fixture.pool)

@@ -1400,6 +1400,8 @@ pub struct TaskChainDetail {
     pub ownership_events: Vec<TaskOwnershipEvent>,
     pub approvals: Vec<TaskApprovalContext>,
     pub outreaches: Vec<TaskOutreachContext>,
+    /// Current business-language projection over the authoritative records above.
+    pub collaboration: Option<crate::entities::collaboration::CollaborationSummary>,
     /// Set when any of the pane's bounded reads had more rows to give.
     ///
     /// The pane says so rather than drawing a partial timeline that reads as a complete one — a

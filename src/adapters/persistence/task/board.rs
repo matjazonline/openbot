@@ -48,13 +48,21 @@ pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
                                          'outcome_unknown', 'dead_letter')
                               OR updated_at >= $3)
                    ) AS recent
-                   WHERE $2::uuid IS NULL OR EXISTS (
+                   WHERE EXISTS (
+                       SELECT 1
+                       FROM background_tasks AS visible_task
+                       WHERE visible_task.company_id = $1
+                         AND visible_task.correlation_id = recent.correlation_id
+                         AND visible_task.channel_id = ANY($5::uuid[])
+                   )
+                     AND ($2::uuid IS NULL OR EXISTS (
                        SELECT 1
                        FROM background_tasks AS filtered_task
                        WHERE filtered_task.company_id = $1
                          AND filtered_task.correlation_id = recent.correlation_id
                          AND filtered_task.channel_id = $2
-                   )"#;
+                         AND filtered_task.channel_id = ANY($5::uuid[])
+                   ))"#;
 
 /// The pre-pushdown selection: every chain in the company, filtered only by channel.
 ///
@@ -66,12 +74,20 @@ pub(crate) const BOARD_ELIGIBLE_EVERY_CHAIN: &str = r#"
                    SELECT DISTINCT task.correlation_id
                    FROM background_tasks AS task
                    WHERE task.company_id = $1
+                     AND EXISTS (
+                         SELECT 1
+                         FROM background_tasks AS visible_task
+                         WHERE visible_task.company_id = task.company_id
+                           AND visible_task.correlation_id = task.correlation_id
+                           AND visible_task.channel_id = ANY($5::uuid[])
+                     )
                      AND ($2::uuid IS NULL OR EXISTS (
                          SELECT 1
                          FROM background_tasks AS filtered_task
                          WHERE filtered_task.company_id = task.company_id
                            AND filtered_task.correlation_id = task.correlation_id
                            AND filtered_task.channel_id = $2
+                           AND filtered_task.channel_id = ANY($5::uuid[])
                      ))"#;
 
 /// The SQL representation of the board's stage precedence.
@@ -106,10 +122,11 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                ),
                task_rollup AS (
                    SELECT task.correlation_id,
-                          (array_agg(
+                          COALESCE((array_agg(
                               COALESCE(NULLIF(thread.subject, ''), task.task_type)
                               ORDER BY task.created_at, task.id
-                          ))[1] AS title,
+                          ) FILTER (WHERE task.channel_id = ANY($5::uuid[])))[1],
+                          'Task chain') AS title,
                           COUNT(*)::bigint AS total_tasks,
                           COUNT(*) FILTER (WHERE task.status = 'pending')::bigint AS pending,
                           COUNT(*) FILTER (WHERE task.status = 'processing')::bigint AS processing,
@@ -165,6 +182,7 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                    JOIN eligible ON eligible.correlation_id = task.correlation_id
                    JOIN channels AS channel
                      ON channel.company_id = task.company_id AND channel.id = task.channel_id
+                    AND channel.id = ANY($5::uuid[])
                    LEFT JOIN channel_agents AS assignment
                      ON assignment.company_id = channel.company_id
                     AND assignment.channel_id = channel.id
@@ -395,6 +413,7 @@ pub(crate) async fn chain_board_on(
     pool: &sqlx::PgPool,
     company_id: Uuid,
     filter: TaskBoardFilter,
+    visible_channel_ids: &[Uuid],
 ) -> AppResult<TaskChainBoard> {
     let started = Instant::now();
     let rows = sqlx::query_as::<_, TaskChainCardDb>(&BOARD_QUERY)
@@ -402,6 +421,7 @@ pub(crate) async fn chain_board_on(
         .bind(filter.channel_id)
         .bind(filter.terminal_since)
         .bind(filter.per_column_limit as i64)
+        .bind(visible_channel_ids)
         .fetch_all(pool)
         .await
         .map_err(AppError::from)?;
@@ -453,7 +473,7 @@ pub(crate) async fn chain_status_events_on(
 /// spent ~405 sequential trips to the database on a pane a viewer opens live.
 pub(crate) async fn chain_detail_on(
     pool: &sqlx::PgPool,
-    company_id: Uuid,
+    scope: crate::task_queue::CollaborationReadScope<'_>,
     correlation_id: CorrelationId,
 ) -> AppResult<Option<TaskChainDetail>> {
     let header = sqlx::query_as::<_, (String, Vec<String>, Vec<String>)>(
@@ -479,10 +499,12 @@ pub(crate) async fn chain_detail_on(
             AND assignment.channel_id = channel.id
            LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
            WHERE task.company_id = $1 AND task.correlation_id = $2
+             AND task.channel_id = ANY($3)
            GROUP BY task.correlation_id"#,
     )
-    .bind(company_id)
+    .bind(scope.company_id)
     .bind(correlation_id.as_uuid())
+    .bind(scope.visible_channel_ids)
     .fetch_optional(pool)
     .await
     .map_err(AppError::from)?;
@@ -499,13 +521,14 @@ pub(crate) async fn chain_detail_on(
                   execution_generation, locked_at, lock_expires_at, run_at, created_at,
                   updated_at
            FROM background_tasks
-           WHERE company_id = $1 AND correlation_id = $2
+           WHERE company_id = $1 AND correlation_id = $2 AND channel_id = ANY($4)
            ORDER BY created_at, id
            LIMIT $3"#,
     )
-    .bind(company_id)
+    .bind(scope.company_id)
     .bind(correlation_id.as_uuid())
     .bind(probe_limit(CHAIN_DETAIL_MAX_TASKS))
+    .bind(scope.visible_channel_ids)
     .fetch_all(pool)
     .await
     .map_err(AppError::from)?;
@@ -524,7 +547,7 @@ pub(crate) async fn chain_detail_on(
            ORDER BY attempt.task_id, attempt.attempt_number
            LIMIT $3"#,
     )
-    .bind(company_id)
+    .bind(scope.company_id)
     .bind(&task_ids)
     .bind(probe_limit(CHAIN_DETAIL_MAX_ATTEMPTS))
     .fetch_all(pool)
@@ -540,7 +563,7 @@ pub(crate) async fn chain_detail_on(
 
     let mut delivery_rows = deliveries_for_tasks(
         pool,
-        company_id,
+        scope.company_id,
         &task_ids,
         probe_limit(CHAIN_DETAIL_MAX_DELIVERIES),
     )
@@ -567,13 +590,18 @@ pub(crate) async fn chain_detail_on(
         })
         .collect::<AppResult<Vec<_>>>()?;
 
-    let mut event_rows = chain_status_events_query(
-        company_id,
-        correlation_id,
-        None,
-        probe_limit(CHAIN_DETAIL_MAX_EVENTS),
+    let mut event_rows = sqlx::query_as::<_, TaskStatusEventDb>(
+        r#"SELECT id, company_id, task_id, correlation_id, sequence, from_status, to_status,
+                  reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
+                  retry_count, run_at, execution_generation, transitioned_at
+           FROM task_status_events
+           WHERE company_id = $1 AND task_id = ANY($2)
+           ORDER BY transitioned_at, task_id, sequence, id
+           LIMIT $3"#,
     )
-    .build_query_as::<TaskStatusEventDb>()
+    .bind(scope.company_id)
+    .bind(&task_ids)
+    .bind(probe_limit(CHAIN_DETAIL_MAX_EVENTS))
     .fetch_all(pool)
     .await
     .map_err(AppError::from)?;
@@ -585,7 +613,7 @@ pub(crate) async fn chain_detail_on(
 
     let mut ownership_events = list_chain_ownership_events_on(
         pool,
-        company_id,
+        scope.company_id,
         &task_ids,
         probe_limit(CHAIN_DETAIL_MAX_OWNERSHIP_EVENTS),
     )
@@ -597,13 +625,14 @@ pub(crate) async fn chain_detail_on(
             r#"SELECT approval.id, approval.task_id, approval.status, approval.action_title,
                   approval.created_at, approval.updated_at
            FROM human_approvals AS approval
-           JOIN background_tasks AS task ON task.id = approval.task_id
-           WHERE task.company_id = $1 AND task.correlation_id = $2
+           JOIN background_tasks AS task
+             ON task.company_id = approval.company_id AND task.id = approval.task_id
+           WHERE task.company_id = $1 AND approval.task_id = ANY($2)
            ORDER BY approval.created_at, approval.id
            LIMIT $3"#,
         )
-        .bind(company_id)
-        .bind(correlation_id.as_uuid())
+        .bind(scope.company_id)
+        .bind(&task_ids)
         .bind(probe_limit(CHAIN_DETAIL_MAX_APPROVALS))
         .fetch_all(pool)
         .await
@@ -639,15 +668,17 @@ pub(crate) async fn chain_detail_on(
                   COUNT(target.*) FILTER (WHERE target.responded_at IS NOT NULL)::bigint,
                   outreach.expires_at, outreach.created_at
            FROM task_outreaches AS outreach
-           JOIN background_tasks AS task ON task.id = outreach.task_id
-           LEFT JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
-           WHERE task.company_id = $1 AND task.correlation_id = $2
+           JOIN background_tasks AS task
+             ON task.company_id = outreach.company_id AND task.id = outreach.task_id
+           LEFT JOIN task_outreach_targets AS target
+             ON target.company_id = outreach.company_id AND target.outreach_id = outreach.id
+           WHERE task.company_id = $1 AND outreach.task_id = ANY($2)
            GROUP BY outreach.id
            ORDER BY outreach.created_at, outreach.id
            LIMIT $3"#,
     )
-    .bind(company_id)
-    .bind(correlation_id.as_uuid())
+    .bind(scope.company_id)
+    .bind(&task_ids)
     .bind(probe_limit(CHAIN_DETAIL_MAX_OUTREACHES))
     .fetch_all(pool)
     .await
@@ -667,7 +698,7 @@ pub(crate) async fn chain_detail_on(
     truncated |= trim_to_limit(&mut outreaches, CHAIN_DETAIL_MAX_OUTREACHES);
 
     Ok(Some(TaskChainDetail {
-        company_id,
+        company_id: scope.company_id,
         correlation_id,
         title,
         channel_names,
@@ -677,6 +708,7 @@ pub(crate) async fn chain_detail_on(
         ownership_events,
         approvals,
         outreaches,
+        collaboration: None,
         truncated,
     }))
 }

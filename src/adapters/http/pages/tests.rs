@@ -1,4 +1,7 @@
 use super::*;
+use crate::entities::collaboration::{
+    CollaborationOwner, CollaborationOwnerKind, CollaborationProgress, CollaborationTarget,
+};
 use crate::entities::correlation::CorrelationId;
 use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
 use crate::entities::internal_note::{InternalNoteProvenance, InternalNoteView};
@@ -589,6 +592,7 @@ fn a_detail_column_with_nothing_open_says_so() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
     assert!(!occupied.contains("data-pane-empty"));
 }
@@ -2385,6 +2389,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains("chat chat-start"));
@@ -2541,6 +2546,7 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     // The connection lives on the pane, so every existing pane swap tears it down and rebuilds it
@@ -2581,6 +2587,7 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains(&format!(
@@ -2883,6 +2890,7 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
@@ -2940,6 +2948,7 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains(
@@ -3288,6 +3297,7 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains(&format!(
@@ -3473,6 +3483,7 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
+        collaboration: None,
     });
 
     // Rendered with the scope the pane itself uses, so the comparison is of the markup rather
@@ -3830,6 +3841,7 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains("id=\"task-pane\""));
@@ -3867,6 +3879,7 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
     assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
     assert!(!stopped_html.contains("/stop?"));
@@ -3955,6 +3968,7 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
 
     assert!(html.contains("Latest execution"));
@@ -4084,6 +4098,7 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
 
     // Verify token stats
@@ -5025,6 +5040,7 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
 
     // The task reads as completed, so the delivery section is the only thing that can tell an
@@ -5053,6 +5069,7 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
+        collaboration: None,
     });
     assert!(!quiet.contains("Delivery"));
 }
@@ -6202,7 +6219,7 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
         channel_names: vec!["Inbox".into()],
         agent_names: vec!["Triage".into()],
         tasks: vec![TaskChainTaskDetail {
-            task,
+            task: task.clone(),
             attempts: vec![attempt],
             deliveries: Vec::new(),
         }],
@@ -6210,6 +6227,41 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
         ownership_events: Vec::new(),
         approvals: Vec::new(),
         outreaches: Vec::new(),
+        collaboration: Some(CollaborationSummary {
+            task_id: task.id,
+            correlation_id: task.correlation_id,
+            owner: CollaborationOwner {
+                kind: CollaborationOwnerKind::Agent,
+                principal_id: Some(PrincipalId::random()),
+                label: "Triage <lead>".into(),
+                available: true,
+            },
+            status: OutreachBusinessStatus::Waiting,
+            progress: Some(CollaborationProgress {
+                responded: 1,
+                required: 2,
+                total: 3,
+            }),
+            expires_at: Some(at),
+            next_action: Some(CollaborationNextAction {
+                actor: NextActionActor::ExternalTarget,
+                action: NextActionKind::ProvideResponse,
+                due_at: Some(at),
+                href: None,
+            }),
+            children: vec![CollaborationTargetSummary {
+                id: Uuid::new_v4(),
+                target: CollaborationTarget::RestrictedInternal,
+                label: "Internal specialist".into(),
+                status: TargetBusinessStatus::Waiting,
+                responded_at: None,
+                next_action: None,
+                child: None,
+            }],
+            as_of: at,
+            truncated: false,
+            detail_href: None,
+        }),
         truncated: false,
     };
 
@@ -6220,6 +6272,11 @@ fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() 
         transition < attempt_started,
         "the status event must precede the attempt it caused, whatever its sequence number"
     );
+    assert!(html.contains("Collaboration status"));
+    assert!(html.contains("1 / 3 replies · 2 needed"));
+    assert!(html.contains("Internal specialist"));
+    assert!(html.contains("Triage &lt;lead&gt;"));
+    assert!(!html.contains("Triage <lead>"));
 }
 
 #[test]
@@ -6238,6 +6295,7 @@ fn a_truncated_chain_pane_says_so_and_a_complete_one_does_not() {
         ownership_events: Vec::new(),
         approvals: Vec::new(),
         outreaches: Vec::new(),
+        collaboration: None,
         truncated: true,
     };
 

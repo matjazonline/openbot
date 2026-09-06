@@ -463,7 +463,18 @@ impl OutreachAndAwaitQuorumTool {
         }
 
         Ok(OutreachTargetRequest {
-            email,
+            target: match &target.destination {
+                OutreachDestination::Channel { channel_id, .. } => {
+                    crate::task_queue::OutreachTargetIdentity::InternalChannel {
+                        channel_id: *channel_id,
+                    }
+                }
+                OutreachDestination::External(_) => {
+                    crate::task_queue::OutreachTargetIdentity::External {
+                        identity: qualified_email_identity(email.as_str())?,
+                    }
+                }
+            },
             request: message,
             delivery: composed.delivery,
         })

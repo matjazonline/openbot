@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        collaboration::CollaborationSummary,
         correlation::CorrelationId,
         internal_note::{AgentInstructionNote, AskOwnerOutcome, AskOwnerToAct, StartAgentTask},
         message::CanonicalMessageId,
@@ -29,7 +30,7 @@ use crate::{
             TaskOwnershipCommand, TaskOwnershipEvent, TaskStatus, TaskStatusEvent,
             TaskStatusEventCursor, ThreadWorkSummary,
         },
-        transport::DeliveryId,
+        transport::{DeliveryId, QualifiedIdentity},
         value_objects::{EmailAddress, MessageId},
     },
     transport::{DeliveryCreation, NewDelivery, NewStandaloneDelivery},
@@ -145,12 +146,22 @@ pub async fn while_leased<F: Future>(
 /// `NewDelivery` are application vocabulary, and the domain may not reach upward for them.
 #[derive(Debug, Clone)]
 pub struct OutreachTargetRequest {
-    pub email: EmailAddress,
+    /// Stable business destination. The delivery below still carries the current protocol address,
+    /// but that adapter detail is not the identity exposed by collaboration reads.
+    pub target: OutreachTargetIdentity,
     /// The question, as a canonical message in the task's thread. `request_message_id` on the
     /// target row points at it, which is how the reply guard tells the agent asking a third party
     /// something from the agent answering this turn.
     pub request: MessageWrite,
     pub delivery: NewDelivery,
+}
+
+/// A writable outreach destination. Redaction is intentionally absent: callers cannot persist the
+/// read model's `RestrictedInternal` placeholder as if it were a real target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutreachTargetIdentity {
+    InternalChannel { channel_id: Uuid },
+    External { identity: QualifiedIdentity },
 }
 
 /// One outreach to create, with every target already composed.
@@ -170,6 +181,16 @@ pub struct CreateOutreachRequest {
     pub subject: String,
     pub body: String,
     pub targets: Vec<OutreachTargetRequest>,
+}
+
+/// Authorization already resolved by the application for one collaboration read.
+///
+/// Persistence still proves the task belongs to `company_id`; the channel set controls which
+/// nested identities and links may cross back through the port.
+#[derive(Debug, Clone, Copy)]
+pub struct CollaborationReadScope<'a> {
+    pub company_id: Uuid,
+    pub visible_channel_ids: &'a [Uuid],
 }
 
 /// Everything one agent dispatch makes durable, so it can land as a single transaction.
@@ -232,6 +253,16 @@ pub enum DispatchCommit {
 }
 #[async_trait]
 pub trait TaskPersistence: Send + Sync {
+    /// One bounded, current snapshot. Implementations must return at most five nested task levels
+    /// and one hundred combined task/target nodes, with `truncated` set when either limit is hit.
+    async fn get_collaboration_summary(
+        &self,
+        _scope: CollaborationReadScope<'_>,
+        _task_id: Uuid,
+    ) -> AppResult<Option<CollaborationSummary>> {
+        Ok(None)
+    }
+
     /// What each of these threads is currently doing, for the mailbox's activity indicators.
     ///
     /// Batched deliberately: the thread column renders up to a full page of rows at once, and one
@@ -569,6 +600,7 @@ pub trait TaskPersistence: Send + Sync {
         &self,
         _company_id: Uuid,
         filter: TaskBoardFilter,
+        _visible_channel_ids: &[Uuid],
     ) -> AppResult<TaskChainBoard> {
         Ok(TaskChainBoard {
             cards: HashMap::new(),
@@ -579,7 +611,7 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn get_task_chain_detail(
         &self,
-        _company_id: Uuid,
+        _scope: CollaborationReadScope<'_>,
         _correlation_id: CorrelationId,
     ) -> AppResult<Option<TaskChainDetail>> {
         Ok(None)
@@ -626,6 +658,7 @@ pub trait TaskPersistence: Send + Sync {
         &self,
         company_id: Uuid,
         filter: &TaskFilter,
+        visible_channel_ids: &[Uuid],
         offset: i64,
         limit: i64,
     ) -> AppResult<Vec<BackgroundTask>> {
@@ -634,14 +667,19 @@ pub trait TaskPersistence: Send + Sync {
                 "Task-owner filtering is not configured".into(),
             ));
         }
-        self.list_company_tasks_page(
-            company_id,
-            filter.channel_id,
-            filter.status,
-            filter.sort_asc,
-            offset,
-            limit,
-        )
-        .await
+        let tasks = self
+            .list_company_tasks(
+                company_id,
+                filter.channel_id,
+                filter.status,
+                filter.sort_asc,
+            )
+            .await?;
+        Ok(tasks
+            .into_iter()
+            .filter(|task| visible_channel_ids.contains(&task.channel_id))
+            .skip(offset.max(0) as usize)
+            .take(limit.max(0) as usize)
+            .collect())
     }
 }

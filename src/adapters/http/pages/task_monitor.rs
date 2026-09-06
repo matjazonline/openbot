@@ -53,6 +53,7 @@ pub struct TaskDetailPane<'a> {
     pub ownership_controls_enabled: bool,
     pub ownership_events: &'a [TaskOwnershipEvent],
     pub owner_candidates: &'a [TaskOwnerCandidate],
+    pub collaboration: Option<&'a CollaborationSummary>,
 }
 
 /// The `/ui/tasks` URL for a given selection, i.e. what a click on it should leave in the address
@@ -403,6 +404,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
             <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {ownership_controls}
+                {collaboration}
                 {ownership_history}
                 {token_stats}
                 {latest_execution}
@@ -427,6 +429,10 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         action_button = task_action_button(company_id, task),
         error_html = form_error_banner(pane.error),
         ownership_controls = task_ownership_controls(pane),
+        collaboration = pane
+            .collaboration
+            .map(super::task_board::collaboration_status)
+            .unwrap_or_default(),
         ownership_history = task_ownership_history(pane.ownership_events),
         token_stats = task_token_stats(task, pane.attempts),
         latest_execution = task_latest_execution(task),

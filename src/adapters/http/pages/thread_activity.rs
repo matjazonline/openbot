@@ -47,6 +47,15 @@ pub fn thread_activity_event(thread_id: Uuid) -> String {
 
 /// The full-width activity strip shown below an open thread.
 pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
+    thread_collaboration_strip(activity, None)
+}
+
+/// The mailbox-sized collaboration snapshot. The task workspace owns the nested detail; this
+/// strip answers the five questions needed while reading the conversation.
+pub fn thread_collaboration_strip(
+    activity: Option<ThreadActivity>,
+    summary: Option<&CollaborationSummary>,
+) -> String {
     let Some(activity) = activity else {
         return String::new();
     };
@@ -57,8 +66,40 @@ pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
         ""
     };
 
+    let collaboration = summary.map(|summary| {
+        let progress = summary.progress.map(|progress| {
+            format!(" · {}/{} replies", progress.responded, progress.total)
+        }).unwrap_or_default();
+        let due = summary.expires_at.map(|at| {
+            let overdue = if at <= summary.as_of { " overdue" } else { "" };
+            format!(" · due {}{overdue}", format_time(at))
+        }).unwrap_or_default();
+        let next = summary
+            .next_action
+            .as_ref()
+            .map(|action| match action.actor {
+                NextActionActor::CurrentOwner => "owner",
+                NextActionActor::InternalTarget => "internal specialist",
+                NextActionActor::ExternalTarget => "external recipient",
+                NextActionActor::TaskQueue => "task queue",
+                NextActionActor::DeliveryQueue => "delivery queue",
+                NextActionActor::CompanyManager => "manager",
+            })
+            .map(|actor| format!(" · next: {actor}"))
+            .unwrap_or_default();
+        let unavailable = if summary.owner.available {
+            ""
+        } else {
+            " (unavailable)"
+        };
+        format!(
+            r##"<span class="truncate">Owner: <strong>{}</strong>{unavailable}{progress}{due}{next}</span>"##,
+            escape_html_text(&summary.owner.label),
+        )
+    }).unwrap_or_default();
+
     format!(
-        r##"<div class="flex items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span></div>"##,
+        r##"<div class="flex flex-wrap items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span>{collaboration}</div>"##,
         style = task_status_style(activity.task_status()),
         label = escape_html_text(activity.label()),
     )

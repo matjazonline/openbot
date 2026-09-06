@@ -13,7 +13,7 @@ use crate::app_error::AppError;
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskFailureOutcome;
 use crate::entities::transport::{DeliveryPurpose, DeliveryStatus};
-use crate::task_queue::HumanTaskCompletion;
+use crate::task_queue::{CollaborationReadScope, HumanTaskCompletion};
 use crate::transport::{DeliveryCreation, NewDelivery};
 use crate::{
     adapters::persistence::PostgresPersistence,
@@ -36,7 +36,7 @@ use crate::{
         transport::PrincipalId,
         value_objects::MessageId,
     },
-    use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite},
+    use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite, qualified_email_identity},
 };
 
 #[tokio::test]
@@ -841,21 +841,24 @@ async fn task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_c
 
     let filter = TaskBoardFilter::new(Some(second_channel.id), Utc::now());
     let board = persistence
-        .list_task_chain_board(company.id, filter)
+        .list_task_chain_board(company.id, filter, &[second_channel.id])
         .await
         .unwrap();
     assert_eq!(board.total(ChainStage::Queued), 1);
     let card = &board.cards(ChainStage::Queued)[0];
     assert_eq!(card.correlation_id, root.correlation_id);
     assert_eq!(card.counts.total_tasks, 2);
-    assert_eq!(card.title, "Root chain subject");
-    assert_eq!(
-        card.channel_names,
-        vec!["First Channel".to_string(), "Second Channel".to_string()]
-    );
+    assert_eq!(card.title, "nested_task");
+    assert_eq!(card.channel_names, vec!["Second Channel".to_string()]);
 
     let detail = persistence
-        .get_task_chain_detail(company.id, root.correlation_id)
+        .get_task_chain_detail(
+            CollaborationReadScope {
+                company_id: company.id,
+                visible_channel_ids: &[first_channel.id, second_channel.id],
+            },
+            root.correlation_id,
+        )
         .await
         .unwrap()
         .unwrap();
@@ -874,9 +877,31 @@ async fn task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_c
             .iter()
             .all(|event| event.reason == TaskTransitionReason::Enqueued)
     );
+    let scoped = persistence
+        .get_task_chain_detail(
+            CollaborationReadScope {
+                company_id: company.id,
+                visible_channel_ids: &[second_channel.id],
+            },
+            root.correlation_id,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(scoped.title, "nested_task");
+    assert_eq!(scoped.channel_names, vec!["Second Channel"]);
+    assert_eq!(scoped.tasks.len(), 1);
+    assert_eq!(scoped.tasks[0].task.id, nested.id);
+    assert!(scoped.events.iter().all(|event| event.task_id == nested.id));
     assert!(
         persistence
-            .get_task_chain_detail(Uuid::new_v4(), root.correlation_id)
+            .get_task_chain_detail(
+                CollaborationReadScope {
+                    company_id: Uuid::new_v4(),
+                    visible_channel_ids: &[first_channel.id, second_channel.id],
+                },
+                root.correlation_id,
+            )
             .await
             .unwrap()
             .is_none()
@@ -1467,7 +1492,6 @@ async fn an_operator_stop_after_an_outreach_drops_the_outreach_source() {
         .await
         .unwrap();
     assert!(progress.suspended);
-
     persistence
         .stop_task(task.id, StopActor::Operator(operator))
         .await
@@ -2829,7 +2853,9 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             subject: "Question".into(),
             body: "Please respond".into(),
             targets: vec![crate::task_queue::OutreachTargetRequest {
-                email: target_email.into(),
+                target: crate::task_queue::OutreachTargetIdentity::External {
+                    identity: qualified_email_identity(target_email).unwrap(),
+                },
                 request: email_write(EmailMessageDraft {
                     id: Uuid::new_v4(),
                     thread_id: thread.id,
@@ -2848,6 +2874,47 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .await
         .unwrap();
     assert!(progress.suspended);
+    let summary = persistence
+        .get_collaboration_summary(
+            CollaborationReadScope {
+                company_id: company.id,
+                visible_channel_ids: &[channel.id],
+            },
+            task.id,
+        )
+        .await
+        .unwrap()
+        .expect("the viewer can read the owning task");
+    assert_eq!(
+        summary.status,
+        crate::entities::collaboration::OutreachBusinessStatus::Waiting
+    );
+    assert_eq!(summary.progress.unwrap().total, 1);
+    assert_eq!(summary.children.len(), 1);
+    assert_eq!(
+        summary.children[0].target,
+        crate::entities::collaboration::CollaborationTarget::External {
+            identity: qualified_email_identity(target_email).unwrap(),
+        }
+    );
+    assert_eq!(
+        summary.children[0].status,
+        crate::entities::collaboration::TargetBusinessStatus::Sending
+    );
+    assert!(
+        persistence
+            .get_collaboration_summary(
+                CollaborationReadScope {
+                    company_id: Uuid::new_v4(),
+                    visible_channel_ids: &[channel.id],
+                },
+                task.id,
+            )
+            .await
+            .unwrap()
+            .is_none(),
+        "a task id cannot escape its company scope"
+    );
     assert_eq!(
         persistence
             .get_task_by_id(task.id)
@@ -2919,6 +2986,25 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .unwrap();
     assert_eq!(progress.status, OutreachStatus::ThresholdMet);
     assert_eq!(progress.response_count, 1);
+    let summary = persistence
+        .get_collaboration_summary(
+            CollaborationReadScope {
+                company_id: company.id,
+                visible_channel_ids: &[channel.id],
+            },
+            task.id,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        summary.status,
+        crate::entities::collaboration::OutreachBusinessStatus::ReadyToResume
+    );
+    assert_eq!(
+        summary.children[0].status,
+        crate::entities::collaboration::TargetBusinessStatus::Responded
+    );
     assert_eq!(
         persistence
             .get_task_by_id(task.id)
@@ -2938,6 +3024,60 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
     assert_eq!(replied.related_outreach_id, Some(outreach_id));
 
     CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn collaboration_targets_reject_cross_company_internal_channels() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (first_company, first_channel) = seed_company_and_channel(&persistence).await;
+    let (second_company, second_channel) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(
+        &persistence,
+        first_company.id,
+        first_channel.id,
+        "cross-company-collaboration-target",
+    )
+    .await;
+    let outreach_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO task_outreaches
+               (id, task_id, company_id, status, required_threshold_percent, expires_at,
+                outreach_key, subject, body)
+           VALUES ($1, $2, $3, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
+                   'cross-company-target', 'Question', 'Body')"#,
+    )
+    .bind(outreach_id)
+    .bind(task.id)
+    .bind(first_company.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let error = sqlx::query(
+        r#"INSERT INTO task_outreach_targets
+               (outreach_id, company_id, email, target_kind, internal_channel_id)
+           VALUES ($1, $2, 'other@example.test', 'internal_channel', $3)"#,
+    )
+    .bind(outreach_id)
+    .bind(first_company.id)
+    .bind(second_channel.id)
+    .execute(&pool)
+    .await
+    .expect_err("another company's valid channel id must be rejected");
+    assert_eq!(
+        error.as_database_error().and_then(|error| error.code()),
+        Some(std::borrow::Cow::Borrowed("23503"))
+    );
+
+    CompanyPersistence::delete(&persistence, first_company.id)
+        .await
+        .unwrap();
+    CompanyPersistence::delete(&persistence, second_company.id)
         .await
         .unwrap();
 }
@@ -3014,7 +3154,9 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
         .await;
         deliveries.push(queued.delivery.id);
         targets.push(crate::task_queue::OutreachTargetRequest {
-            email: address.into(),
+            target: crate::task_queue::OutreachTargetIdentity::External {
+                identity: qualified_email_identity(address).unwrap(),
+            },
             request: email_write(EmailMessageDraft {
                 id: Uuid::new_v4(),
                 thread_id: thread.id,
@@ -3209,7 +3351,9 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
             subject: "Question".into(),
             body: "Please respond".into(),
             targets: vec![crate::task_queue::OutreachTargetRequest {
-                email: "vendor@supplier.example".into(),
+                target: crate::task_queue::OutreachTargetIdentity::External {
+                    identity: qualified_email_identity("vendor@supplier.example").unwrap(),
+                },
                 request: question,
                 delivery: queued.delivery.clone(),
             }],
@@ -3359,12 +3503,14 @@ async fn board_cards(
     sql: &str,
     company_id: Uuid,
     filter: TaskBoardFilter,
+    visible_channel_ids: &[Uuid],
 ) -> Vec<TaskChainCard> {
     let mut cards = sqlx::query_as::<_, TaskChainCardDb>(sql)
         .bind(company_id)
         .bind(filter.channel_id)
         .bind(filter.terminal_since)
         .bind(filter.per_column_limit as i64)
+        .bind(visible_channel_ids)
         .fetch_all(pool)
         .await
         .unwrap()
@@ -3585,12 +3731,13 @@ async fn board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter()
     age_chain_deliveries(&pool, delivery_old.correlation_id).await;
 
     let filter = TaskBoardFilter::new(None, Utc::now());
-    let pushdown = board_cards(&pool, &BOARD_QUERY, company.id, filter).await;
+    let pushdown = board_cards(&pool, &BOARD_QUERY, company.id, filter, &[channel.id]).await;
     let control = board_cards(
         &pool,
         &board_query_sql(BOARD_ELIGIBLE_EVERY_CHAIN),
         company.id,
         filter,
+        &[channel.id],
     )
     .await;
     assert_eq!(
@@ -3632,9 +3779,15 @@ async fn board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter()
     .unwrap();
     let filtered = TaskBoardFilter::new(Some(other_channel.id), Utc::now());
     assert!(
-        board_cards(&pool, &BOARD_QUERY, company.id, filtered)
-            .await
-            .is_empty()
+        board_cards(
+            &pool,
+            &BOARD_QUERY,
+            company.id,
+            filtered,
+            &[other_channel.id],
+        )
+        .await
+        .is_empty()
     );
 
     CompanyPersistence::delete(&persistence, company.id)
@@ -3990,7 +4143,13 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
     }
 
     let detail = persistence
-        .get_task_chain_detail(company.id, first.correlation_id)
+        .get_task_chain_detail(
+            CollaborationReadScope {
+                company_id: company.id,
+                visible_channel_ids: &[channel.id],
+            },
+            first.correlation_id,
+        )
         .await
         .unwrap()
         .unwrap();
@@ -4134,11 +4293,13 @@ async fn bulk_approvals(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) 
 async fn bulk_outreaches(pool: &sqlx::PgPool, task_id: Uuid, count: i32) {
     sqlx::query(
         "INSERT INTO task_outreaches
-                 (id, task_id, status, required_threshold_percent, expires_at, outreach_key,
-                  subject, body)
-             SELECT gen_random_uuid(), $1, 'waiting', 50,
+                 (id, task_id, company_id, status, required_threshold_percent, expires_at,
+                  outreach_key, subject, body)
+             SELECT gen_random_uuid(), task.id, task.company_id, 'waiting', 50,
                     CURRENT_TIMESTAMP + interval '1 day', $2 || '-' || series, 'Subject', 'Body'
-               FROM generate_series(1, $3::int) AS series",
+               FROM background_tasks AS task
+               CROSS JOIN generate_series(1, $3::int) AS series
+              WHERE task.id = $1",
     )
     .bind(task_id)
     .bind(Uuid::new_v4().to_string())
@@ -4157,7 +4318,13 @@ async fn chain_detail_bounds_every_collection_and_reports_the_truncation() {
     let (company, channel) = seed_company_and_channel(&persistence).await;
     let detail_of = async |correlation_id| {
         persistence
-            .get_task_chain_detail(company.id, correlation_id)
+            .get_task_chain_detail(
+                CollaborationReadScope {
+                    company_id: company.id,
+                    visible_channel_ids: &[channel.id],
+                },
+                correlation_id,
+            )
             .await
             .unwrap()
             .unwrap()

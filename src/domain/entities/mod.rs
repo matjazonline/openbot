@@ -2,6 +2,7 @@ pub mod agent;
 pub mod approval;
 pub mod auth;
 pub mod channel;
+pub mod collaboration;
 pub mod company;
 pub mod company_invite;
 pub mod company_member;

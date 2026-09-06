@@ -34,6 +34,7 @@ use crate::{
     domain::monitoring::{MonitoringService, record_pagination_observation},
     entities::{
         channel::Channel,
+        collaboration::CollaborationSummary,
         company::Company,
         correlation::CorrelationId,
         task::{
@@ -47,6 +48,7 @@ use crate::{
     },
     infra::{config::AppConfig, events::MailboxEvents},
     services::task_worker::TaskWorker,
+    task_queue::CollaborationReadScope,
     use_cases::{
         channel::ChannelUseCases, company::CompanyUseCases, delivery::DeliveryReader,
         thread::ThreadUseCases, user::UserUseCases,
@@ -719,21 +721,66 @@ struct TaskMonitorView<'a> {
     company: &'a Company,
 }
 
+fn authorize_collaboration_links(summary: &mut CollaborationSummary, company_id: Uuid) {
+    if summary.owner.kind == crate::entities::collaboration::CollaborationOwnerKind::Restricted {
+        return;
+    }
+    let href = format!(
+        "/ui/tasks?company_id={company_id}&view=board&correlation_id={}",
+        summary.correlation_id
+    );
+    summary.detail_href = Some(href.clone());
+    if let Some(action) = summary.next_action.as_mut() {
+        action.href = Some(href.clone());
+    }
+    for target in &mut summary.children {
+        if !matches!(
+            &target.target,
+            crate::entities::collaboration::CollaborationTarget::RestrictedInternal
+        ) && let Some(action) = target.next_action.as_mut()
+        {
+            action.href = Some(href.clone());
+        }
+        if let Some(child) = target.child.as_mut() {
+            authorize_collaboration_links(child, company_id);
+        }
+    }
+}
+
 impl TaskMonitorView<'_> {
     async fn channels(&self) -> AppResult<Vec<Channel>> {
-        self.channel_use_cases
+        let channels = self
+            .channel_use_cases
             .list_company_channels(self.user_id, self.company.id)
-            .await
+            .await?;
+        let access = self
+            .thread_use_cases
+            .principal_access_for_user(self.company.id, self.user_id)
+            .await?;
+        Ok(match access {
+            Some(access) => channels
+                .into_iter()
+                .filter(|channel| channel.viewer_access(access))
+                .collect(),
+            None => Vec::new(),
+        })
     }
 
     /// One filtered page of tasks, plus whether another follows it.
     async fn page(&self, filter: &TaskFilter) -> AppResult<(Vec<BackgroundTask>, bool)> {
         record_pagination_observation(self.monitoring, "tasks", filter.offset());
+        let visible_channel_ids = self
+            .channels()
+            .await?
+            .into_iter()
+            .map(|channel| channel.id)
+            .collect::<Vec<_>>();
         let probed = self
             .thread_use_cases
             .list_company_tasks_filtered_page(
                 self.company.id,
                 filter,
+                &visible_channel_ids,
                 filter.offset(),
                 filter.probe_limit(),
             )
@@ -763,19 +810,49 @@ impl TaskMonitorView<'_> {
     }
 
     async fn board(&self, filter: TaskBoardFilter) -> AppResult<TaskChainBoard> {
+        let visible_channel_ids = self
+            .channels()
+            .await?
+            .into_iter()
+            .map(|channel| channel.id)
+            .collect::<Vec<_>>();
         self.thread_use_cases
             .get_task_persistence()
             .await
-            .list_task_chain_board(self.company.id, filter)
+            .list_task_chain_board(self.company.id, filter, &visible_channel_ids)
             .await
     }
 
     async fn chain(&self, correlation_id: CorrelationId) -> AppResult<Option<TaskChainDetail>> {
-        self.thread_use_cases
-            .get_task_persistence()
-            .await
-            .get_task_chain_detail(self.company.id, correlation_id)
-            .await
+        let persistence = self.thread_use_cases.get_task_persistence().await;
+        let readable_channels = self.channels().await?;
+        let visible_channel_ids = readable_channels
+            .iter()
+            .map(|channel| channel.id)
+            .collect::<Vec<_>>();
+        let scope = CollaborationReadScope {
+            company_id: self.company.id,
+            visible_channel_ids: &visible_channel_ids,
+        };
+        let Some(mut detail) = persistence
+            .get_task_chain_detail(scope, correlation_id)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let root_task_id = detail.tasks.first().map(|item| item.task.id);
+        detail.collaboration = match root_task_id {
+            Some(task_id) => {
+                persistence
+                    .get_collaboration_summary(scope, task_id)
+                    .await?
+            }
+            None => None,
+        };
+        if let Some(summary) = detail.collaboration.as_mut() {
+            authorize_collaboration_links(summary, self.company.id);
+        }
+        Ok(Some(detail))
     }
 
     /// One task, but only when it really belongs to the company the request is scoped to — the id
@@ -788,7 +865,15 @@ impl TaskMonitorView<'_> {
             .get_task_by_id(task_id)
             .await?;
 
-        Ok(task.filter(|task| task.company_id == self.company.id))
+        let visible_channel_ids = self
+            .channels()
+            .await?
+            .into_iter()
+            .map(|channel| channel.id)
+            .collect::<std::collections::HashSet<_>>();
+        Ok(task.filter(|task| {
+            task.company_id == self.company.id && visible_channel_ids.contains(&task.channel_id)
+        }))
     }
 
     async fn require_task(&self, task_id: Uuid) -> AppResult<BackgroundTask> {
@@ -839,6 +924,24 @@ impl TaskMonitorView<'_> {
         // The transport is a separate process and never writes back into the task, so its state is
         // joined in here, at render time.
         let persistence = self.thread_use_cases.get_task_persistence().await;
+        let visible_channel_ids = self
+            .channels()
+            .await?
+            .into_iter()
+            .map(|channel| channel.id)
+            .collect::<Vec<_>>();
+        let mut collaboration = persistence
+            .get_collaboration_summary(
+                CollaborationReadScope {
+                    company_id: self.company.id,
+                    visible_channel_ids: &visible_channel_ids,
+                },
+                task.id,
+            )
+            .await?;
+        if let Some(summary) = collaboration.as_mut() {
+            authorize_collaboration_links(summary, self.company.id);
+        }
         let (deliveries, delivery_error) = match self
             .deliveries
             .list_task_deliveries(self.company.id, task.id)
@@ -885,6 +988,7 @@ impl TaskMonitorView<'_> {
             ownership_controls_enabled: self.config.task_ownership_controls_enabled(),
             ownership_events: &ownership_events,
             owner_candidates: &owner_candidates,
+            collaboration: collaboration.as_ref(),
         }))
     }
 

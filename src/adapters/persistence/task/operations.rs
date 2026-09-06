@@ -27,6 +27,7 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
+        collaboration::CollaborationSummary,
         correlation::CorrelationId,
         outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch, OutreachStatus},
         runtime_metrics::{MachineIdentity, MachineRegion},
@@ -42,7 +43,10 @@ use crate::{
         transport::{DeliveryId, PrincipalId},
         value_objects::MessageId,
     },
-    task_queue::{AssignmentNotificationRecipient, HumanTaskCompletion, HumanTaskCompletionResult},
+    task_queue::{
+        AssignmentNotificationRecipient, CollaborationReadScope, HumanTaskCompletion,
+        HumanTaskCompletionResult,
+    },
     transport::{DeliveryCreation, NewDelivery},
 };
 
@@ -57,6 +61,57 @@ struct ResponseDraftDb {
     subject: String,
     body: String,
     recipient_snapshot: serde_json::Value,
+}
+
+struct OutreachTargetColumns<'a> {
+    delivery_address: &'a str,
+    kind: &'static str,
+    internal_channel_id: Option<Uuid>,
+    external_transport: Option<&'a str>,
+    external_namespace: Option<&'a str>,
+    external_subject: Option<&'a str>,
+}
+
+fn outreach_target_columns(
+    target: &crate::task_queue::OutreachTargetRequest,
+) -> AppResult<OutreachTargetColumns<'_>> {
+    let delivery_address = target
+        .delivery
+        .external_destination
+        .as_ref()
+        .ok_or_else(|| {
+            AppError::Internal("An outreach target delivery has no external destination".into())
+        })?
+        .as_str();
+    match &target.target {
+        crate::task_queue::OutreachTargetIdentity::InternalChannel { channel_id } => {
+            Ok(OutreachTargetColumns {
+                delivery_address,
+                kind: "internal_channel",
+                internal_channel_id: Some(*channel_id),
+                external_transport: None,
+                external_namespace: None,
+                external_subject: None,
+            })
+        }
+        crate::task_queue::OutreachTargetIdentity::External { identity } => {
+            if identity.transport() != target.delivery.transport
+                || identity.subject().as_str() != delivery_address
+            {
+                return Err(AppError::Internal(
+                    "Outreach target identity and delivery destination disagree".into(),
+                ));
+            }
+            Ok(OutreachTargetColumns {
+                delivery_address,
+                kind: "external",
+                internal_channel_id: None,
+                external_transport: Some(identity.transport().as_str()),
+                external_namespace: Some(identity.namespace().as_str()),
+                external_subject: Some(identity.subject().as_str()),
+            })
+        }
+    }
 }
 
 /// Retire the questions an outreach has not sent yet.
@@ -223,6 +278,14 @@ pub(crate) async fn get_task_by_id_on(
 
 #[async_trait]
 impl TaskPersistence for PostgresPersistence {
+    async fn get_collaboration_summary(
+        &self,
+        scope: CollaborationReadScope<'_>,
+        task_id: Uuid,
+    ) -> AppResult<Option<CollaborationSummary>> {
+        collaboration_summary_on(&self.pool, scope, task_id).await
+    }
+
     async fn list_thread_work_summary(
         &self,
         thread_ids: &[Uuid],
@@ -309,10 +372,10 @@ impl TaskPersistence for PostgresPersistence {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let outreach = sqlx::query_as::<_, OutreachDb>(
             r#"INSERT INTO task_outreaches (
-                    id, task_id, outreach_key, status, required_threshold_percent,
+                    id, task_id, company_id, outreach_key, status, required_threshold_percent,
                     expires_at, subject, body
                )
-               SELECT $1, id, $2, 'waiting', $3, $4, $5, $6
+               SELECT $1, id, company_id, $2, 'waiting', $3, $4, $5, $6
                FROM background_tasks
                WHERE id = $7 AND company_id = $8
                  AND status = 'processing' AND worker_id = $9
@@ -361,13 +424,23 @@ impl TaskPersistence for PostgresPersistence {
                 insert_message_on(&mut tx, &target.request).await?;
                 insert_delivery_on(&mut tx, &target.delivery).await?;
 
+                let columns = outreach_target_columns(target)?;
+
                 sqlx::query(
                     r#"INSERT INTO task_outreach_targets
-                           (outreach_id, email, delivery_id, request_message_id)
-                       VALUES ($1, $2, $3, $4)"#,
+                           (outreach_id, company_id, email, target_kind, internal_channel_id,
+                            external_transport, external_namespace, external_subject,
+                            delivery_id, request_message_id)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
                 )
                 .bind(outreach.id)
-                .bind(target.email.as_str())
+                .bind(request.company_id)
+                .bind(columns.delivery_address)
+                .bind(columns.kind)
+                .bind(columns.internal_channel_id)
+                .bind(columns.external_transport)
+                .bind(columns.external_namespace)
+                .bind(columns.external_subject)
                 .bind(target.delivery.id.as_uuid())
                 .bind(target.request.id.as_uuid())
                 .execute(&mut *tx)
@@ -1171,8 +1244,9 @@ impl TaskPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
         filter: TaskBoardFilter,
+        visible_channel_ids: &[Uuid],
     ) -> AppResult<TaskChainBoard> {
-        chain_board_on(&self.pool, company_id, filter).await
+        chain_board_on(&self.pool, company_id, filter, visible_channel_ids).await
     }
 
     async fn list_task_status_events(
@@ -1187,10 +1261,10 @@ impl TaskPersistence for PostgresPersistence {
 
     async fn get_task_chain_detail(
         &self,
-        company_id: Uuid,
+        scope: CollaborationReadScope<'_>,
         correlation_id: CorrelationId,
     ) -> AppResult<Option<TaskChainDetail>> {
-        chain_detail_on(&self.pool, company_id, correlation_id).await
+        chain_detail_on(&self.pool, scope, correlation_id).await
     }
     async fn list_task_channel_targets(
         &self,
@@ -1807,6 +1881,7 @@ impl TaskPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
         filter: &TaskFilter,
+        visible_channel_ids: &[Uuid],
         offset: i64,
         limit: i64,
     ) -> AppResult<Vec<BackgroundTask>> {
@@ -1818,6 +1893,10 @@ impl TaskPersistence for PostgresPersistence {
                FROM background_tasks WHERE company_id = "#,
         );
         query.push_bind(company_id);
+        query
+            .push(" AND channel_id = ANY(")
+            .push_bind(visible_channel_ids)
+            .push(")");
         if let Some(channel_id) = filter.channel_id {
             query.push(" AND channel_id = ").push_bind(channel_id);
         }

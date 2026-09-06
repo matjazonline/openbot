@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod board;
+mod collaboration;
 mod instructions;
 mod operations;
 mod outreach;
@@ -19,6 +20,7 @@ mod queue;
 mod rows;
 
 pub(crate) use board::*;
+pub(crate) use collaboration::*;
 pub(crate) use operations::record_outreach_reply_on;
 pub(crate) use outreach::*;
 pub(crate) use ownership::*;

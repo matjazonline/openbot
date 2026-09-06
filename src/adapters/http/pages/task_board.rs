@@ -262,6 +262,11 @@ pub fn task_chain_empty_pane(message: &str) -> String {
 }
 
 pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> String {
+    let collaboration = detail
+        .collaboration
+        .as_ref()
+        .map(collaboration_status)
+        .unwrap_or_default();
     let timeline = chain_timeline(detail);
     let tasks = detail
         .tasks
@@ -287,6 +292,7 @@ pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> 
             <div class="flex-1 space-y-5 overflow-y-auto p-4">
                 {error}
                 {truncation}
+                {collaboration}
                 <section><h3 class="mb-2 text-xs font-bold uppercase opacity-60">Chronological timeline</h3>{timeline}</section>
                 <section><h3 class="mb-2 text-xs font-bold uppercase opacity-60">Tasks in chain</h3><div class="space-y-2">{tasks}</div></section>
             </div>
@@ -298,6 +304,193 @@ pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> 
         error = form_error_banner(error),
         truncation = chain_truncation_notice(detail.truncated),
     )
+}
+
+pub(super) fn collaboration_status(summary: &CollaborationSummary) -> String {
+    let owner_availability = if summary.owner.available {
+        ""
+    } else {
+        " (unavailable)"
+    };
+    let progress = summary
+        .progress
+        .map(|progress| {
+            format!(
+                r##"<span class="badge badge-sm">{} / {} replies · {} needed</span>"##,
+                progress.responded, progress.total, progress.required
+            )
+        })
+        .unwrap_or_default();
+    let deadline = summary
+        .expires_at
+        .map(|expires_at| {
+            let overdue = if expires_at <= summary.as_of {
+                " · overdue"
+            } else {
+                ""
+            };
+            format!(
+                r##"<span class="badge badge-sm badge-outline">Due {}{overdue}</span>"##,
+                format_time(expires_at)
+            )
+        })
+        .unwrap_or_default();
+    let next = summary
+        .next_action
+        .as_ref()
+        .map(collaboration_next_action)
+        .unwrap_or_else(|| "No action is currently due.".into());
+    let children = summary
+        .children
+        .iter()
+        .map(|target| collaboration_target(target, 1))
+        .collect::<String>();
+    let truncated = if summary.truncated {
+        match summary.detail_href.as_deref() {
+            Some(href) => format!(
+                r##"<div class="alert alert-warning mt-3 text-xs"><span>More nested work exists beyond this bounded view.</span><a class="link" href="{}">Open scoped detail</a></div>"##,
+                escape_html_attr(href)
+            ),
+            None => r#"<div class="alert alert-warning mt-3 text-xs"><span>More nested work exists beyond this bounded view.</span></div>"#.into(),
+        }
+    } else {
+        String::new()
+    };
+    format!(
+        r##"<section class="space-y-3 rounded-box border border-primary/30 bg-primary/5 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div><h3 class="text-xs font-bold uppercase opacity-60">Collaboration status</h3>
+                    <p class="text-sm"><strong>{owner}</strong>{owner_availability} owns this work</p>
+                    <p class="text-[11px] opacity-60">Snapshot {as_of}</p></div>
+                <span class="badge {status_style}">{status}</span>
+            </div>
+            <div class="flex flex-wrap gap-2">{progress}{deadline}</div>
+            <p class="text-xs"><strong>Next:</strong> {next}</p>
+            <div class="space-y-2">{children}</div>{truncated}
+        </section>"##,
+        owner = escape_html_text(&summary.owner.label),
+        owner_availability = owner_availability,
+        as_of = format_time(summary.as_of),
+        status = outreach_business_label(summary.status),
+        status_style = outreach_business_style(summary.status),
+    )
+}
+
+fn collaboration_target(target: &CollaborationTargetSummary, depth: usize) -> String {
+    let next = target
+        .next_action
+        .as_ref()
+        .map(collaboration_next_action)
+        .unwrap_or_default();
+    let responded = target
+        .responded_at
+        .map(|at| format!(" · received {}", format_time(at)))
+        .unwrap_or_default();
+    let child = target
+        .child
+        .as_ref()
+        .map(|summary| {
+            let nested = summary
+                .children
+                .iter()
+                .map(|target| collaboration_target(target, depth + 1))
+                .collect::<String>();
+            format!(
+                r##"<div class="mt-2 border-l-2 border-base-300 pl-3"><p class="text-[11px]"><strong>{}</strong> owns the child task · {}</p>{nested}</div>"##,
+                escape_html_text(&summary.owner.label),
+                outreach_business_label(summary.status),
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        r##"<div class="rounded-box border border-base-300 bg-base-100 px-3 py-2" data-collaboration-depth="{depth}">
+            <div class="flex flex-wrap items-center gap-2"><strong class="text-xs">{label}</strong>
+            <span class="badge badge-xs {style}">{status}</span><span class="text-[11px] opacity-60">{responded}</span></div>
+            <p class="mt-1 text-[11px] opacity-70">{next}</p>{child}
+        </div>"##,
+        label = escape_html_text(&target.label),
+        style = target_business_style(target.status),
+        status = target_business_label(target.status),
+    )
+}
+
+fn collaboration_next_action(action: &CollaborationNextAction) -> String {
+    let actor = match action.actor {
+        NextActionActor::CurrentOwner => "current owner",
+        NextActionActor::InternalTarget => "internal specialist",
+        NextActionActor::ExternalTarget => "external recipient",
+        NextActionActor::TaskQueue => "task queue",
+        NextActionActor::DeliveryQueue => "delivery queue",
+        NextActionActor::CompanyManager => "company manager",
+    };
+    let verb = match action.action {
+        NextActionKind::RunTask => "resume the task",
+        NextActionKind::DeliverRequest => "send the request",
+        NextActionKind::ProvideResponse => "provide a response",
+        NextActionKind::ReviewTimeout => "review the deadline",
+        NextActionKind::ResolveDeliveryOutcome => "resolve an unknown delivery outcome",
+        NextActionKind::RepairFailure => "repair the failed work",
+    };
+    let due = action
+        .due_at
+        .map(|at| format!(" by {}", format_time(at)))
+        .unwrap_or_default();
+    let label = format!("{actor} must {verb}{due}");
+    match action.href.as_deref() {
+        Some(href) => format!(
+            r#"<a class="link" href="{}">{}</a>"#,
+            escape_html_attr(href),
+            escape_html_text(&label)
+        ),
+        None => label,
+    }
+}
+
+fn outreach_business_label(status: OutreachBusinessStatus) -> &'static str {
+    match status {
+        OutreachBusinessStatus::Waiting => "Waiting",
+        OutreachBusinessStatus::ReadyToResume => "Ready to resume",
+        OutreachBusinessStatus::NeedsDecision => "Needs decision",
+        OutreachBusinessStatus::Completed => "Completed",
+        OutreachBusinessStatus::Cancelled => "Cancelled",
+        OutreachBusinessStatus::Failed => "Failed",
+    }
+}
+
+fn outreach_business_style(status: OutreachBusinessStatus) -> &'static str {
+    match status {
+        OutreachBusinessStatus::Waiting => "badge-info badge-outline",
+        OutreachBusinessStatus::ReadyToResume => "badge-info",
+        OutreachBusinessStatus::NeedsDecision => "badge-warning",
+        OutreachBusinessStatus::Completed => "badge-success",
+        OutreachBusinessStatus::Cancelled => "badge-ghost",
+        OutreachBusinessStatus::Failed => "badge-error",
+    }
+}
+
+fn target_business_label(status: TargetBusinessStatus) -> &'static str {
+    match status {
+        TargetBusinessStatus::Preparing => "Preparing",
+        TargetBusinessStatus::Sending => "Sending",
+        TargetBusinessStatus::Waiting => "Waiting",
+        TargetBusinessStatus::Responded => "Responded",
+        TargetBusinessStatus::NeedsDecision => "Needs decision",
+        TargetBusinessStatus::Failed => "Failed",
+        TargetBusinessStatus::Cancelled => "Cancelled",
+        TargetBusinessStatus::Superseded => "Superseded",
+        TargetBusinessStatus::Expired => "Expired",
+    }
+}
+
+fn target_business_style(status: TargetBusinessStatus) -> &'static str {
+    match status {
+        TargetBusinessStatus::Preparing | TargetBusinessStatus::Sending => "badge-info",
+        TargetBusinessStatus::Waiting => "badge-info badge-outline",
+        TargetBusinessStatus::Responded => "badge-success",
+        TargetBusinessStatus::NeedsDecision | TargetBusinessStatus::Expired => "badge-warning",
+        TargetBusinessStatus::Failed => "badge-error",
+        TargetBusinessStatus::Cancelled | TargetBusinessStatus::Superseded => "badge-ghost",
+    }
 }
 
 /// Say plainly that the pane is showing part of a chain.

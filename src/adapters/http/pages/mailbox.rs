@@ -223,6 +223,7 @@ pub struct MessagePane<'a> {
     pub private_handoff: Option<&'a str>,
     pub ownership_error: Option<&'a str>,
     pub owner_candidates: &'a [TaskOwnerCandidate],
+    pub collaboration: Option<&'a CollaborationSummary>,
 }
 
 /// The detail pane showing the new-message form for a thread that is already open.
@@ -2239,7 +2240,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 r#"<div class="alert alert-error mx-4 mt-3 py-2 text-sm sm:mx-6">{}</div>"#,
                 escape_html_text(message)
             )),
-        activity_strip = thread_activity_strip(pane.activity),
+        activity_strip = thread_collaboration_strip(pane.activity, pane.collaboration),
         owner_panel = task_owner_panel(pane),
         human_completion = human_completion_composer(pane),
         note_actions = internal_note_actions(pane),

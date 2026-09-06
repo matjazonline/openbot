@@ -33,6 +33,7 @@ use crate::{
     entities::{
         agent::Agent,
         channel::Channel,
+        collaboration::CollaborationSummary,
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
         message::CanonicalMessageId,
@@ -48,6 +49,7 @@ use crate::{
         config::AppConfig,
         events::{MailboxEvent, MailboxEvents},
     },
+    task_queue::CollaborationReadScope,
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
@@ -324,15 +326,36 @@ async fn first_page_thread_ids(
 }
 
 /// What one thread is doing, for the strip under its messages.
-async fn thread_activity(
+async fn thread_collaboration(
     thread_use_cases: &ThreadUseCases,
+    company_id: Uuid,
+    channel_id: Uuid,
     thread_id: Uuid,
-) -> AppResult<Option<ThreadActivity>> {
-    Ok(thread_use_cases
+) -> AppResult<(Option<ThreadActivity>, Option<CollaborationSummary>)> {
+    let work = thread_use_cases
         .thread_work_summary(&[thread_id])
         .await?
-        .get(&thread_id)
-        .and_then(|summary| summary.activity))
+        .remove(&thread_id);
+    let collaboration = match work.as_ref() {
+        Some(work) => {
+            thread_use_cases
+                .get_task_persistence()
+                .await
+                .get_collaboration_summary(
+                    CollaborationReadScope {
+                        company_id,
+                        visible_channel_ids: &[channel_id],
+                    },
+                    work.task_id,
+                )
+                .await?
+        }
+        None => None,
+    };
+    Ok((
+        work.as_ref().and_then(|summary| summary.activity),
+        collaboration,
+    ))
 }
 
 /// The face and name the agent side of a thread is drawn with.
@@ -374,6 +397,28 @@ pub(super) async fn render_message_pane(
         .thread_work_summary(&[thread.id])
         .await?
         .remove(&thread.id);
+    let mut collaboration = match work.as_ref() {
+        Some(work) => {
+            thread_use_cases
+                .get_task_persistence()
+                .await
+                .get_collaboration_summary(
+                    CollaborationReadScope {
+                        company_id,
+                        visible_channel_ids: &[channel.id],
+                    },
+                    work.task_id,
+                )
+                .await?
+        }
+        None => None,
+    };
+    if viewer_manages_tasks && let Some(summary) = collaboration.as_mut() {
+        summary.detail_href = Some(format!(
+            "/ui/tasks?company_id={company_id}&view=board&correlation_id={}",
+            summary.correlation_id
+        ));
+    }
     let may_read_handoff = work.as_ref().is_some_and(|summary| {
         summary.ownership.owner.principal_id() == viewer_principal_id
             || access.is_some_and(|context| context.membership.manages_company_operations())
@@ -418,6 +463,7 @@ pub(super) async fn render_message_pane(
         private_handoff,
         ownership_error,
         owner_candidates: &owner_candidates,
+        collaboration: collaboration.as_ref(),
     }))
 }
 
@@ -701,14 +747,24 @@ async fn thread_message_stream(
         loop {
             if pending_activity {
                 pending_activity = false;
-                match thread_activity(&thread_use_cases, thread_id).await {
+                match thread_collaboration(
+                    &thread_use_cases,
+                    query.company_id,
+                    channel.id,
+                    thread_id,
+                )
+                .await
+                {
                     // Activity is state, not an append: it carries no cursor and is re-read whole
                     // every time, which is also what makes it correct after a reconnect. An idle
                     // thread renders as an empty strip, clearing whatever was there.
-                    Ok(activity) => {
+                    Ok((activity, collaboration)) => {
                         yield Ok(Event::default()
                             .event("activity")
-                            .data(pages::thread_activity_strip(activity)));
+                            .data(pages::thread_collaboration_strip(
+                                activity,
+                                collaboration.as_ref(),
+                            )));
                     }
                     Err(error) => {
                         warn!(%error, %thread_id, "Thread activity query failed");

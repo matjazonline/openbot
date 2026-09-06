@@ -12,6 +12,10 @@ use crate::entities::{
     agent::Agent,
     approval::{ApprovalStatus, HumanApproval},
     channel::Channel,
+    collaboration::{
+        CollaborationNextAction, CollaborationSummary, CollaborationTargetSummary, NextActionActor,
+        NextActionKind, OutreachBusinessStatus, TargetBusinessStatus,
+    },
     company::{Company, CompanyModelConnection},
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},

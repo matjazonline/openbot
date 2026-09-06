@@ -1003,22 +1003,29 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
     let outreach_id = Uuid::new_v4();
     sqlx::query(
         r#"INSERT INTO task_outreaches (
-                id, task_id, status, required_threshold_percent, expires_at,
+                id, company_id, task_id, status, required_threshold_percent, expires_at,
                 outreach_key, subject, body
-           ) VALUES ($1, $2, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
+           ) VALUES ($1, $2, $3, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
                      'atomic-reply', 'Question', 'Please reply')"#,
     )
     .bind(outreach_id)
+    .bind(fixture.company_id)
     .bind(task.id)
     .execute(&fixture.pool)
     .await
     .unwrap();
-    sqlx::query("INSERT INTO task_outreach_targets (outreach_id, email) VALUES ($1, $2)")
-        .bind(outreach_id)
-        .bind("vendor@example.com")
-        .execute(&fixture.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        r#"INSERT INTO task_outreach_targets (
+               outreach_id, company_id, email, target_kind,
+               external_transport, external_namespace, external_subject
+           ) VALUES ($1, $2, $3, 'external', 'email', 'email', $3)"#,
+    )
+    .bind(outreach_id)
+    .bind(fixture.company_id)
+    .bind("vendor@example.com")
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
 
     let key = format!("<outreach-response-{}@example.com>", fixture.suffix);
     let binding = fixture.email_binding_of(fixture.channel_id).await;

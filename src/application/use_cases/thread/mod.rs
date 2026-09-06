@@ -1455,11 +1455,18 @@ impl ThreadUseCases {
         &self,
         company_id: Uuid,
         filter: &crate::entities::task::TaskFilter,
+        visible_channel_ids: &[Uuid],
         offset: i64,
         limit: i64,
     ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
         self.task_persistence
-            .list_company_tasks_filtered_page(company_id, filter, offset, limit)
+            .list_company_tasks_filtered_page(
+                company_id,
+                filter,
+                visible_channel_ids,
+                offset,
+                limit,
+            )
             .await
     }
 

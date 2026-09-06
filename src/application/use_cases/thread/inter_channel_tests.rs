@@ -28,7 +28,7 @@ use crate::infra::config::ResendApiConfig;
 use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url, scripted_llm,
 };
-use crate::task_queue::{CreateOutreachRequest, OutreachTargetRequest};
+use crate::task_queue::{CollaborationReadScope, CreateOutreachRequest, OutreachTargetRequest};
 use crate::transport::EmailThreading;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
@@ -568,7 +568,9 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
             subject: "Acquire supplier capacity data".into(),
             body: "Return the earliest delivery date.".into(),
             targets: vec![OutreachTargetRequest {
-                email: address_b.clone().into(),
+                target: crate::task_queue::OutreachTargetIdentity::InternalChannel {
+                    channel_id: fx.channel_b.id,
+                },
                 request: question_to_b,
                 delivery: request_to_b.clone(),
             }],
@@ -597,6 +599,50 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     let b_tasks = fx.tasks_for(fx.channel_b.id).await;
     assert_eq!(b_tasks.len(), 1, "M1 enqueues exactly one task for B");
     assert_eq!(b_tasks[0].status, TaskStatus::Pending);
+    let redacted = TaskPersistence::get_collaboration_summary(
+        fx.persistence.as_ref(),
+        CollaborationReadScope {
+            company_id: fx.company.id,
+            visible_channel_ids: &[fx.channel_a.id],
+        },
+        task_a,
+    )
+    .await
+    .expect("the collaboration snapshot is readable")
+    .expect("A is visible");
+    assert_eq!(
+        redacted.children[0].target,
+        crate::entities::collaboration::CollaborationTarget::RestrictedInternal
+    );
+    assert_eq!(redacted.children[0].label, "Internal specialist");
+    assert!(
+        redacted.children[0].child.is_none(),
+        "a restricted nested channel must not expose its child task"
+    );
+
+    let visible = TaskPersistence::get_collaboration_summary(
+        fx.persistence.as_ref(),
+        CollaborationReadScope {
+            company_id: fx.company.id,
+            visible_channel_ids: &[fx.channel_a.id, fx.channel_b.id],
+        },
+        task_a,
+    )
+    .await
+    .expect("the collaboration snapshot is readable")
+    .expect("A is visible");
+    assert_eq!(
+        visible.children[0]
+            .child
+            .as_ref()
+            .expect("the exact request message links B's child task")
+            .task_id,
+        b_tasks[0].id
+    );
+    assert_eq!(
+        visible.task_id, task_a,
+        "a nested delegate never replaces the originating task identity"
+    );
     assert_eq!(
         fx.status_of(task_a).await,
         TaskStatus::WaitingForThirdPartyReply,
