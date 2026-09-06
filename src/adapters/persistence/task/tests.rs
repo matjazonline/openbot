@@ -11,10 +11,15 @@ use crate::adapters::persistence::test_support::{
 };
 use crate::app_error::AppError;
 use crate::entities::message::{MessageDirection, MessageRole};
+use crate::entities::response_draft::ExternalResponseReview;
 use crate::entities::task::TaskFailureOutcome;
 use crate::entities::transport::{DeliveryPurpose, DeliveryStatus};
-use crate::task_queue::{CollaborationReadScope, HumanTaskCompletion};
+use crate::task_queue::{AgentReviewCandidate, CollaborationReadScope, HumanTaskCompletion};
 use crate::transport::{DeliveryCreation, NewDelivery};
+use crate::use_cases::response_review::{
+    DraftPublicationSnapshot, PreparedReviewDraft, ResponseReviewPersistence, ReviewAction,
+    ReviewCommand,
+};
 use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
@@ -699,6 +704,7 @@ async fn human_completion_commits_one_reply_delivery_and_terminal_transition() {
             crate::entities::value_objects::EmailAddress::from("customer@example.com"),
             Vec::new(),
         ),
+        evidence: Vec::new(),
         message: &message,
         deliveries: vec![delivery.clone()],
     };
@@ -747,6 +753,821 @@ async fn human_completion_commits_one_reply_delivery_and_terminal_transition() {
     .unwrap();
     assert_eq!(delivery_count, 1);
 
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+struct PendingResponseReview {
+    company_id: Uuid,
+    channel_id: Uuid,
+    task_id: Uuid,
+    thread_id: Uuid,
+    owner: PrincipalId,
+    draft_id: crate::entities::response_draft::ResponseDraftId,
+    message: MessageWrite,
+    evidence_hash: String,
+}
+
+async fn pending_response_review(
+    persistence: &PostgresPersistence,
+    pool: &sqlx::PgPool,
+) -> PendingResponseReview {
+    let (company, channel) = seed_company_and_channel(persistence).await;
+    ResponseReviewPersistence::set_company_review_policy(
+        persistence,
+        company.id,
+        ExternalResponseReview::ReviewAllExternal,
+    )
+    .await
+    .unwrap();
+    let task = enqueue_chain(persistence, company.id, channel.id, "response-review").await;
+    let owner = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(pool)
+        .await
+        .unwrap(),
+    );
+    let transferred = persistence
+        .change_task_ownership(ownership_command(
+            &task,
+            owner,
+            TaskOwnershipAuthority::Manager,
+            TaskOwnershipOperation::Transfer,
+            TaskOwner::Human(owner),
+        ))
+        .await
+        .unwrap();
+    let owned = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+    let thread_id = owned.thread_id.unwrap();
+    let removed_attachment_hash = format!("removed-{}", Uuid::new_v4());
+    let mut evidence_message = MessageWrite::internal(
+        thread_id,
+        MessageAuthorWrite::Principal(owner),
+        "Private source",
+        "The attachment bytes are no longer available.",
+        MessageDirection::Inbound,
+        MessageRole::Human,
+        owned.correlation_id,
+    );
+    evidence_message
+        .attachments
+        .push(crate::entities::message::AttachmentMetadata {
+            filename: "private-source.txt".into(),
+            content_type: "text/plain".into(),
+            sha256_hash: removed_attachment_hash.clone(),
+            size_bytes: 32,
+            storage_key: None,
+            source: None,
+        });
+    ThreadPersistence::create_message(persistence, &evidence_message)
+        .await
+        .unwrap();
+    let message = MessageWrite::internal(
+        thread_id,
+        MessageAuthorWrite::Principal(owner),
+        "Re: review",
+        "Exact reviewed answer.",
+        MessageDirection::Outbound,
+        MessageRole::Human,
+        owned.correlation_id,
+    )
+    .external_conversation();
+    let mut delivery = delivery_fixture(
+        persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(task.id),
+            body: "Exact reviewed answer.",
+            ..DeliveryFixtureRequest::new(company.id, channel.id, thread_id, "response-review")
+        },
+    )
+    .await
+    .delivery;
+    delivery.message_id = message.id;
+    delivery.correlation_id = owned.correlation_id;
+    let draft_id = crate::entities::response_draft::ResponseDraftId::random();
+    let result = persistence
+        .complete_human_task(HumanTaskCompletion {
+            task_id: task.id,
+            company_id: company.id,
+            owner_principal_id: owner,
+            expected_ownership_version: transferred.to_version,
+            command_id: Uuid::new_v4(),
+            command_fingerprint: "review-fixture".into(),
+            draft_id,
+            draft_version: 1,
+            recipient_snapshot: crate::entities::response_draft::DraftRecipientSnapshot::email(
+                "customer@example.com".into(),
+                Vec::new(),
+            ),
+            evidence: vec![crate::entities::response_draft::ResponseEvidence {
+                id: Uuid::new_v4(),
+                source: crate::entities::response_draft::EvidenceSource::Attachment {
+                    message_id: evidence_message.id,
+                    sha256_hash: removed_attachment_hash.clone(),
+                },
+                source_version: "attachment-v1".into(),
+                content_digest: "missing-object-digest".into(),
+                audience: crate::entities::response_draft::EvidenceAudience::InternalOnly,
+                support: crate::entities::response_draft::EvidenceSupport::DirectEvidence,
+            }],
+            message: &message,
+            deliveries: vec![delivery],
+        })
+        .await
+        .unwrap();
+    assert!(result.pending_review);
+    assert!(result.deliveries.is_empty());
+    PendingResponseReview {
+        company_id: company.id,
+        channel_id: channel.id,
+        task_id: task.id,
+        thread_id,
+        owner,
+        draft_id,
+        message,
+        evidence_hash: removed_attachment_hash,
+    }
+}
+
+#[tokio::test]
+async fn response_review_approval_is_exact_idempotent_and_serialized() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::PendingApproval
+    );
+    let message_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE id = $1")
+        .bind(fixture.message.id.as_uuid())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        message_count, 0,
+        "review must not expose a canonical message"
+    );
+    let detail = persistence
+        .get_for_reviewer(fixture.company_id, fixture.draft_id, fixture.owner)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!detail.evidence[0].openable);
+    let unavailable_reason = detail.evidence[0].unavailable_reason.as_deref().unwrap();
+    assert!(!unavailable_reason.contains(&fixture.evidence_hash));
+    assert!(!unavailable_reason.contains("attachment"));
+    assert!(
+        sqlx::query(
+            "UPDATE response_draft_evidence SET content_digest = 'tampered' WHERE draft_id = $1"
+        )
+        .bind(fixture.draft_id.as_uuid())
+        .execute(&pool)
+        .await
+        .is_err(),
+        "a retained evidence set is immutable once its review row exists"
+    );
+    assert!(
+        detail.draft.source_handoff_generation.is_some(),
+        "a draft created after manual transfer retains the handoff event identity"
+    );
+    let publication = persistence
+        .publication_for_reviewer(fixture.company_id, fixture.draft_id, 1, fixture.owner)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        !serde_json::to_string(&publication)
+            .unwrap()
+            .contains("Continue from the existing thread"),
+        "private handoff content must never enter the publication snapshot"
+    );
+
+    let command = |command_id| ReviewCommand {
+        company_id: fixture.company_id,
+        draft_id: fixture.draft_id,
+        expected_draft_version: 1,
+        command_id,
+        actor_principal_id: fixture.owner,
+        action: ReviewAction::Approve {
+            rationale: Some("Verified against the request.".into()),
+        },
+    };
+    assert!(matches!(
+        persistence
+            .execute_review_command(ReviewCommand {
+                company_id: Uuid::new_v4(),
+                ..command(Uuid::new_v4())
+            })
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+    let first_id = Uuid::new_v4();
+    let second_id = Uuid::new_v4();
+    let (first, second) = tokio::join!(
+        persistence.execute_review_command(command(first_id)),
+        persistence.execute_review_command(command(second_id)),
+    );
+    let (winner_id, published) = match (first, second) {
+        (Ok(result), Err(AppError::Conflict(_))) => (first_id, result),
+        (Err(AppError::Conflict(_)), Ok(result)) => (second_id, result),
+        other => panic!("exactly one reviewer command must publish: {other:?}"),
+    };
+    let replay = persistence
+        .execute_review_command(command(winner_id))
+        .await
+        .unwrap();
+    assert_eq!(
+        replay, published,
+        "a command retry returns its original result"
+    );
+    assert_eq!(published.published_message_id, Some(fixture.message.id));
+    let counts: (i64, i64, i64) = sqlx::query_as(
+        r#"SELECT
+             (SELECT COUNT(*) FROM messages WHERE id = $1),
+             (SELECT COUNT(*) FROM message_deliveries WHERE task_id = $2),
+             (SELECT COUNT(*) FROM response_draft_publications WHERE draft_id = $3)"#,
+    )
+    .bind(fixture.message.id.as_uuid())
+    .bind(fixture.task_id)
+    .bind(fixture.draft_id.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (1, 1, 1));
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Completed
+    );
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn concurrent_retries_of_one_review_command_return_one_original_result() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+    let command = ReviewCommand {
+        company_id: fixture.company_id,
+        draft_id: fixture.draft_id,
+        expected_draft_version: 1,
+        command_id: Uuid::new_v4(),
+        actor_principal_id: fixture.owner,
+        action: ReviewAction::Approve { rationale: None },
+    };
+    let (first, retry) = tokio::join!(
+        persistence.execute_review_command(command.clone()),
+        persistence.execute_review_command(command),
+    );
+    assert_eq!(first.unwrap(), retry.unwrap());
+    let publication_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM response_draft_publications WHERE draft_id = $1")
+            .bind(fixture.draft_id.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(publication_count, 1);
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn editing_recipients_creates_a_new_version_and_stales_the_old_approval() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+    let current = persistence
+        .publication_for_reviewer(fixture.company_id, fixture.draft_id, 1, fixture.owner)
+        .await
+        .unwrap()
+        .unwrap();
+    let queued = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(fixture.task_id),
+            recipient: "corrected@example.com",
+            subject: "Re: corrected",
+            body: "Edited exact answer.",
+            ..DeliveryFixtureRequest::new(
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.thread_id,
+                "response-review-edit",
+            )
+        },
+    )
+    .await;
+    sqlx::query("DELETE FROM messages WHERE id = $1")
+        .bind(queued.message_id.as_uuid())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut edited_message = current.message().clone();
+    edited_message.id = queued.delivery.message_id;
+    edited_message.subject = "Re: corrected".into();
+    edited_message.clean_text_body = "Edited exact answer.".into();
+    let publication =
+        DraftPublicationSnapshot::new(edited_message.clone(), queued.delivery).unwrap();
+    let replacement = PreparedReviewDraft::new(
+        fixture.draft_id,
+        2,
+        fixture.company_id,
+        fixture.channel_id,
+        fixture.thread_id,
+        Some(fixture.task_id),
+        fixture.owner,
+        fixture.owner,
+        crate::entities::response_draft::DraftRecipientSnapshot::email(
+            "corrected@example.com".into(),
+            Vec::new(),
+        ),
+        Vec::new(),
+        publication,
+    )
+    .unwrap();
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fixture.company_id,
+            draft_id: fixture.draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fixture.owner,
+            action: ReviewAction::Edit {
+                replacement: Box::new(replacement),
+            },
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        persistence
+            .execute_review_command(ReviewCommand {
+                company_id: fixture.company_id,
+                draft_id: fixture.draft_id,
+                expected_draft_version: 1,
+                command_id: Uuid::new_v4(),
+                actor_principal_id: fixture.owner,
+                action: ReviewAction::Approve { rationale: None },
+            })
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+    let detail = persistence
+        .get_for_reviewer(fixture.company_id, fixture.draft_id, fixture.owner)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(detail.draft.version, 2);
+    assert_eq!(detail.history[0].status.as_str(), "superseded");
+    assert_eq!(
+        detail.draft.recipients,
+        crate::entities::response_draft::DraftRecipientSnapshot::email(
+            "corrected@example.com".into(),
+            Vec::new()
+        )
+    );
+    let published = persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fixture.company_id,
+            draft_id: fixture.draft_id,
+            expected_draft_version: 2,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fixture.owner,
+            action: ReviewAction::Approve { rationale: None },
+        })
+        .await
+        .unwrap();
+    assert_eq!(published.published_message_id, Some(edited_message.id));
+    let old_message_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE id = $1")
+        .bind(fixture.message.id.as_uuid())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(old_message_count, 0);
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn review_policy_parks_agent_dispatch_and_private_rejection_feedback_reaches_retry() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    ResponseReviewPersistence::set_company_review_policy(
+        &persistence,
+        company.id,
+        ExternalResponseReview::ReviewAllExternal,
+    )
+    .await
+    .unwrap();
+    let task = enqueue_chain(&persistence, company.id, channel.id, "review-agent").await;
+    let lease = claim(&persistence, task.id).await;
+    let agent_principal = lease.claimed_owner.agent_principal_id().unwrap();
+    let agent_id: Uuid =
+        sqlx::query_scalar("SELECT agent_id FROM principals WHERE company_id = $1 AND id = $2")
+            .bind(company.id)
+            .bind(agent_principal.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let thread_id = task.thread_id.unwrap();
+    let reply = AgentReply {
+        message: MessageWrite::internal(
+            thread_id,
+            MessageAuthorWrite::Agent(crate::use_cases::thread::AgentAuthor {
+                agent_id,
+                display_label: "Chain Agent".into(),
+            }),
+            "Re: review agent",
+            "Agent answer awaiting review.",
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            task.correlation_id,
+        )
+        .external_conversation(),
+        also_in_threads: Vec::new(),
+    };
+    let mut delivery = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(task.id),
+            body: "Agent answer awaiting review.",
+            ..DeliveryFixtureRequest::new(company.id, channel.id, thread_id, "review-agent")
+        },
+    )
+    .await
+    .delivery;
+    delivery.message_id = reply.message.id;
+    delivery.correlation_id = task.correlation_id;
+    let outcome = persistence
+        .commit_agent_dispatch(AgentDispatchCommit {
+            lease,
+            reply: &reply,
+            deliveries: vec![delivery],
+            review_candidate: Some(AgentReviewCandidate {
+                recipients: crate::entities::response_draft::DraftRecipientSnapshot::email(
+                    "customer@example.com".into(),
+                    Vec::new(),
+                ),
+                evidence: Vec::new(),
+            }),
+            payload: serde_json::json!({"answer": "retained"}),
+            complete_outreach: false,
+        })
+        .await
+        .unwrap();
+    let DispatchCommit::PendingReview {
+        draft_id,
+        draft_version,
+    } = outcome
+    else {
+        panic!("agent response was not parked for review")
+    };
+    assert_eq!(draft_version, 1);
+    assert_eq!(
+        persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::PendingApproval
+    );
+    let counts: (i64, i64) = sqlx::query_as(
+        r#"SELECT
+             (SELECT COUNT(*) FROM messages WHERE id = $1),
+             (SELECT COUNT(*) FROM message_deliveries WHERE task_id = $2)"#,
+    )
+    .bind(reply.message.id.as_uuid())
+    .bind(task.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (0, 0));
+    let owner = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: company.id,
+            draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: owner,
+            action: ReviewAction::Reject {
+                feedback: "Remove the unsupported delivery promise.".into(),
+            },
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Pending
+    );
+    let retry_lease = claim(&persistence, task.id).await;
+    let retry = persistence
+        .owned_agent_execution(company.id, channel.id, retry_lease)
+        .await
+        .unwrap()
+        .expect("rejected agent task remains executable by its owner");
+    assert_eq!(
+        retry.review_feedback.as_deref(),
+        Some("Remove the unsupported delivery promise.")
+    );
+    assert!(persistence.mark_task_completed(retry_lease).await.unwrap());
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn review_reassignment_changes_responsibility_not_task_ownership_and_rejection_requeues() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+    let suffix = Uuid::new_v4().simple().to_string();
+    let username = format!("reviewer_{suffix}");
+    let email = format!("{username}@example.com");
+    persistence
+        .create_user(&username, &email, "hash")
+        .await
+        .unwrap();
+    let reviewer_user = UserPersistence::get_by_email(&persistence, &email)
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.company_id)
+    .bind(reviewer_user.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let reviewer = PrincipalId::random();
+    sqlx::query(
+        r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
+           VALUES ($1, $2, 'person', $3, 'Response Reviewer')"#,
+    )
+    .bind(reviewer.as_uuid())
+    .bind(fixture.company_id)
+    .bind(reviewer_user.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fixture.company_id,
+            draft_id: fixture.draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fixture.owner,
+            action: ReviewAction::Reassign {
+                reviewer_principal_id: reviewer,
+            },
+        })
+        .await
+        .unwrap();
+    assert!(
+        persistence
+            .get_for_reviewer(fixture.company_id, fixture.draft_id, fixture.owner)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        persistence
+            .get_for_reviewer(fixture.company_id, fixture.draft_id, reviewer)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .ownership
+            .owner,
+        TaskOwner::Human(fixture.owner)
+    );
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fixture.company_id,
+            draft_id: fixture.draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: reviewer,
+            action: ReviewAction::Reject {
+                feedback: "Correct the recipient before sending.".into(),
+            },
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Pending
+    );
+    let decision: (String, String) = sqlx::query_as(
+        "SELECT status, feedback FROM response_reviews WHERE draft_id = $1 AND draft_version = 1",
+    )
+    .bind(fixture.draft_id.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        decision,
+        (
+            "rejected".into(),
+            "Correct the recipient before sending.".into()
+        )
+    );
+    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE company_id = $1 AND id = $2")
+        .bind(fixture.company_id)
+        .bind(fixture.channel_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        persistence
+            .get_for_reviewer(fixture.company_id, fixture.draft_id, reviewer)
+            .await
+            .unwrap()
+            .is_none(),
+        "an assigned reviewer who loses channel access must lose draft access too"
+    );
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn expired_review_cannot_publish_and_releases_the_task_for_regeneration() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+    sqlx::query(
+        r#"UPDATE response_reviews
+           SET created_at = CURRENT_TIMESTAMP - INTERVAL '2 seconds',
+               expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'
+           WHERE draft_id = $1"#,
+    )
+    .bind(fixture.draft_id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    let detail = persistence
+        .get_for_reviewer(fixture.company_id, fixture.draft_id, fixture.owner)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(detail.review.status.as_str(), "expired");
+    assert!(matches!(
+        persistence
+            .execute_review_command(ReviewCommand {
+                company_id: fixture.company_id,
+                draft_id: fixture.draft_id,
+                expected_draft_version: 1,
+                command_id: Uuid::new_v4(),
+                actor_principal_id: fixture.owner,
+                action: ReviewAction::Approve { rationale: None },
+            })
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+    assert_eq!(
+        persistence
+            .get_task_by_id(fixture.task_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Pending
+    );
+    let message_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE id = $1")
+        .bind(fixture.message.id.as_uuid())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(message_count, 0);
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn response_review_policy_round_trips_company_override_and_preferred_reviewer() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let owner = PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(company.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+    );
+    let initial = persistence
+        .review_policy(company.id, channel.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(initial.effective, ExternalResponseReview::Autonomous);
+    persistence
+        .set_company_review_policy(company.id, ExternalResponseReview::ReviewAllExternal)
+        .await
+        .unwrap();
+    persistence
+        .set_channel_review_policy(
+            company.id,
+            channel.id,
+            Some(ExternalResponseReview::Autonomous),
+            Some(owner),
+        )
+        .await
+        .unwrap();
+    let overridden = persistence
+        .review_policy(company.id, channel.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        overridden.company_default,
+        ExternalResponseReview::ReviewAllExternal
+    );
+    assert_eq!(
+        overridden.channel_override,
+        Some(ExternalResponseReview::Autonomous)
+    );
+    assert_eq!(overridden.preferred_reviewer_principal_id, Some(owner));
+    persistence
+        .set_channel_review_policy(company.id, channel.id, None, None)
+        .await
+        .unwrap();
+    let inherited = persistence
+        .review_policy(company.id, channel.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(inherited.channel_override, None);
+    assert_eq!(
+        inherited.effective,
+        ExternalResponseReview::ReviewAllExternal
+    );
+    assert_eq!(inherited.preferred_reviewer_principal_id, None);
     CompanyPersistence::delete(&persistence, company.id)
         .await
         .unwrap();
@@ -2469,6 +3290,7 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
             lease: stale,
             reply: &stale_reply,
             deliveries: vec![delivery("stale-key", stale_reply.message.id).await],
+            review_candidate: None,
             payload: serde_json::json!({"stale": true}),
             complete_outreach: false,
         })
@@ -2493,6 +3315,7 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
             lease,
             reply: &live_reply,
             deliveries: vec![live_delivery.clone()],
+            review_candidate: None,
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
         })
@@ -2522,6 +3345,7 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
             lease,
             reply: &rerun_reply,
             deliveries: vec![rerun_delivery],
+            review_candidate: None,
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
         })
@@ -2550,6 +3374,7 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
             lease,
             reply: &orphan,
             deliveries: vec![orphan_delivery],
+            review_candidate: None,
             payload: serde_json::json!({"rolled_back": true}),
             complete_outreach: false,
         })
@@ -5939,6 +6764,7 @@ async fn stop_task_serializes_with_final_dispatch_without_duplicate_customer_rep
             lease,
             reply: &reply,
             deliveries: vec![delivery],
+            review_candidate: None,
             payload: serde_json::json!({"final": true}),
             complete_outreach: true,
         }),

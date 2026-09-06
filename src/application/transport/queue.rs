@@ -102,7 +102,7 @@ impl Default for DeliveryBackoff {
 /// delivery answers for. That ordering is the point: a retry sends the bytes that were frozen
 /// rather than re-rendering against a display name, a participant list or a policy that has
 /// changed since, and a resumed multi-part send addresses the parts it already has.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NewDelivery {
     pub id: DeliveryId,
     pub company_id: Uuid,

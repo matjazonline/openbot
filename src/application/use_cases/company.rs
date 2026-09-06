@@ -107,6 +107,8 @@ pub struct CompanyWrite {
     pub name: String,
     pub slug: String,
     pub enable_llm_spam_guardrail: Option<bool>,
+    /// `None` preserves the current value on update and chooses autonomous on create.
+    pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     pub memory_provider: Option<MemoryProviderKind>,
     pub channel_defaults: CompanyChannelDefaults,
     /// The company's picture, already parsed as a URL a page may render.
@@ -786,6 +788,9 @@ mod tests {
                     name: "Acme Corp".to_string(),
                     slug: "acme-corp".to_string(),
                     enable_llm_spam_guardrail: Some(true),
+                    external_response_review: Some(
+                        crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
+                    ),
                     memory_provider: None,
                     channel_defaults: crate::entities::company::CompanyChannelDefaults::default(),
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),

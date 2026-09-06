@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 
+use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -27,6 +28,10 @@ use crate::{
         email_message::EmailMessageMetadata,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{CanonicalMessageId, MessageDirection, MessageRole},
+        response_draft::{
+            DraftRecipientSnapshot, EvidenceAudience, EvidenceSource, EvidenceSupport,
+            ResponseEvidence,
+        },
         schedule::ScheduledRunPayload,
         task::{BackgroundTask, TokenUsage},
         transport::{PrincipalId, TransportKind},
@@ -39,12 +44,13 @@ use crate::{
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outreach_tool::OutreachToolContext,
     },
-    task_queue::{AgentDispatchCommit, DispatchCommit, TASK_LEASE_SECONDS},
+    task_queue::{AgentDispatchCommit, AgentReviewCandidate, DispatchCommit, TASK_LEASE_SECONDS},
     transport::{
         CanonicalContent, ComposedDelivery, ConversationAnchor, DeliveryContext, DeliveryPurpose,
         DeliveryRequest, EmailDeliveryContext, EmailRelayTrace, EmailThreading, InboundEnvelope,
         NewDelivery,
     },
+    use_cases::response_review::{AgentReviewSubmission, DraftPublicationSnapshot},
 };
 
 use super::{
@@ -65,6 +71,22 @@ fn append_private_handoff(prompt: &mut String, handoff: Option<&str>) -> AppResu
     })?;
     prompt.push_str(
         "\n\nPrivate task handoff (ownership metadata; do not quote or expose it unless the task requires it):\n",
+    );
+    prompt.push_str(&encoded);
+    Ok(())
+}
+
+fn append_private_review_feedback(prompt: &mut String, feedback: Option<&str>) -> AppResult<()> {
+    let Some(feedback) = feedback else {
+        return Ok(());
+    };
+    let encoded = serde_json::to_string(feedback).map_err(|error| {
+        AppError::Internal(format!(
+            "Could not encode the private review feedback: {error}"
+        ))
+    })?;
+    prompt.push_str(
+        "\n\nReviewer feedback for the rejected response (private; revise the answer and do not quote or expose this instruction):\n",
     );
     prompt.push_str(&encoded);
     Ok(())
@@ -266,6 +288,7 @@ pub enum DispatchOutcome {
 /// reply path is the producer that did not.
 struct PlannedReply {
     deliveries: Vec<NewDelivery>,
+    review_candidate: Option<AgentReviewCandidate>,
     /// `None` when nothing was sent -- a simulated run -- and so nothing named a key.
     correlation: Option<EmailMessageMetadata>,
 }
@@ -275,6 +298,7 @@ struct PreparedDispatch {
     /// Empty for a simulated run, which answers in the thread and sends nothing.
     deliveries: Vec<NewDelivery>,
     reply: AgentReply,
+    review_candidate: Option<AgentReviewCandidate>,
 }
 
 /// The agent's answer: one canonical message, and every other thread it also answered.
@@ -417,7 +441,7 @@ impl ThreadUseCases {
                 "Idempotency Guard: schedule '{}' already answered in thread {}, skipping the agent",
                 payload.schedule_name, payload.thread_id
             );
-            if let Some(delivery) = self
+            if let Some((delivery, _)) = self
                 .scheduled_delivery(
                     task,
                     &payload,
@@ -467,6 +491,7 @@ impl ThreadUseCases {
 
         let mut prompt = payload.prompt.clone();
         append_private_handoff(&mut prompt, ownership.handoff_instruction.as_deref())?;
+        append_private_review_feedback(&mut prompt, ownership.review_feedback.as_deref())?;
         if let Some(memory) = self.memory.as_ref()
             && let Some(recalled) = memory
                 .recall(MemoryRecallInput {
@@ -569,7 +594,7 @@ impl ThreadUseCases {
             also_in_threads: Vec::new(),
         };
 
-        let deliveries = self
+        let planned_delivery = self
             .scheduled_delivery(
                 task,
                 &payload,
@@ -578,9 +603,17 @@ impl ThreadUseCases {
                 reply.message.id,
                 &output.content,
             )
-            .await?
-            .into_iter()
-            .collect::<Vec<_>>();
+            .await?;
+        let (deliveries, review_candidate) = match planned_delivery {
+            Some((delivery, recipients)) => (
+                vec![delivery],
+                Some(AgentReviewCandidate {
+                    recipients,
+                    evidence: scheduled_evidence(&payload),
+                }),
+            ),
+            None => (Vec::new(), None),
+        };
         let email_sent = !deliveries.is_empty();
         if email_sent {
             reply.message = reply.message.external_conversation();
@@ -609,12 +642,14 @@ impl ThreadUseCases {
                 lease,
                 reply: &reply,
                 deliveries,
+                review_candidate,
                 payload: new_payload,
                 complete_outreach: true,
             })
             .await?
         {
             DispatchCommit::Committed { .. } => {}
+            DispatchCommit::PendingReview { .. } => return Ok(DispatchOutcome::Suspended),
             DispatchCommit::LeaseLost => {
                 return Err(AppError::Internal(
                     "Task lease was lost before the dispatch could be committed".into(),
@@ -653,7 +688,7 @@ impl ThreadUseCases {
         channel: &Channel,
         message_id: CanonicalMessageId,
         answer: &str,
-    ) -> AppResult<Option<NewDelivery>> {
+    ) -> AppResult<Option<(NewDelivery, DraftRecipientSnapshot)>> {
         if !payload.wants_email() {
             return Ok(None);
         }
@@ -667,6 +702,7 @@ impl ThreadUseCases {
             return Ok(None);
         };
 
+        let recipients = DraftRecipientSnapshot::email(primary_to.clone(), cc_list.to_vec());
         let context = EmailDeliveryContext {
             from: Channel::address_for(&channel.slug, &company.slug, &self.config.app_domain_name),
             from_name: Some(channel.name.clone()),
@@ -699,7 +735,7 @@ impl ThreadUseCases {
             })
             .await?;
 
-        Ok(Some(composed.delivery))
+        Ok(Some((composed.delivery, recipients)))
     }
 
     async fn scheduled_recipients(
@@ -792,6 +828,7 @@ impl ThreadUseCases {
         let PlannedReply {
             deliveries,
             correlation,
+            review_candidate,
         } = planned;
         if !deliveries.is_empty() {
             reply.message = reply.message.external_conversation();
@@ -810,20 +847,26 @@ impl ThreadUseCases {
 
         let reply_message_id = reply.message.id;
         let email_sent = delivery.email_sent;
-        self.commit_dispatch(DispatchCommitInput {
-            ingest,
-            envelope,
-            lease,
-            run: &run,
-            commit: PreparedDispatch {
-                delivery,
-                deliveries,
-                reply,
-            },
-            response: &response,
-            metadata: &metadata,
-        })
-        .await?;
+        let pending_review = self
+            .commit_dispatch(DispatchCommitInput {
+                ingest,
+                envelope,
+                lease,
+                run: &run,
+                commit: PreparedDispatch {
+                    delivery,
+                    deliveries,
+                    reply,
+                    review_candidate,
+                },
+                response: &response,
+                metadata: &metadata,
+            })
+            .await?;
+        if pending_review {
+            self.persist_memories(ingest, &run).await;
+            return Ok(DispatchOutcome::Suspended);
+        }
         self.persist_memories(ingest, &run).await;
 
         Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
@@ -924,6 +967,10 @@ impl ThreadUseCases {
                 append_private_handoff(
                     &mut agent_prompt,
                     ownership.handoff_instruction.as_deref(),
+                )?;
+                append_private_review_feedback(
+                    &mut agent_prompt,
+                    ownership.review_feedback.as_deref(),
                 )?;
             }
             if let Some(memory) = self.memory.as_ref() {
@@ -1335,6 +1382,7 @@ impl ThreadUseCases {
             return Ok(PlannedReply {
                 deliveries: Vec::new(),
                 correlation: None,
+                review_candidate: None,
             });
         };
 
@@ -1359,6 +1407,12 @@ impl ThreadUseCases {
         // Bound before the context takes it: the same headers that go on the wire are what the
         // canonical message has to record, or the two disagree about what this answer replies to.
         let threading = answering(envelope);
+        let recipients_cc = recipients_cc
+            .into_iter()
+            .map(EmailAddress::from)
+            .collect::<Vec<_>>();
+        let recipient_to = sender_address(envelope);
+        let recipients = DraftRecipientSnapshot::email(recipient_to.clone(), recipients_cc.clone());
         let context = EmailDeliveryContext {
             from: crate::entities::channel::Channel::address_for(
                 &primary.reply_slug(),
@@ -1366,8 +1420,8 @@ impl ThreadUseCases {
                 &self.config.app_domain_name,
             ),
             from_name: Some(primary.channel.name.clone()),
-            recipient_to: sender_address(envelope),
-            recipients_cc: recipients_cc.into_iter().map(EmailAddress::from).collect(),
+            recipient_to,
+            recipients_cc,
             threading: threading.clone(),
             // An agent's answer continues the chain, so it carries the hop budget: the receiving
             // side needs it to stop two channels answering each other for ever.
@@ -1398,6 +1452,10 @@ impl ThreadUseCases {
         Ok(PlannedReply {
             correlation: email_correlation(&composed, &threading, body),
             deliveries: vec![composed.delivery],
+            review_candidate: Some(AgentReviewCandidate {
+                recipients,
+                evidence: response_evidence(primary),
+            }),
         })
     }
 
@@ -1524,7 +1582,7 @@ impl ThreadUseCases {
     ///
     /// A failed run never reaches here -- it is rejected before delivery -- so this only ever
     /// commits a run that produced a real reply.
-    async fn commit_dispatch(&self, input: DispatchCommitInput<'_, '_>) -> AppResult<()> {
+    async fn commit_dispatch(&self, input: DispatchCommitInput<'_, '_>) -> AppResult<bool> {
         let DispatchCommitInput {
             ingest,
             envelope,
@@ -1538,12 +1596,48 @@ impl ThreadUseCases {
             delivery,
             deliveries,
             reply,
+            review_candidate,
         } = commit;
 
         // A task-less caller (direct ingest) has no lease to fence on and no payload to write, but
         // its reply and its delivery still have to land together -- the shape this replaces sent
         // inline here, so a crash after the provider call left an answer nobody could see.
         let Some(task_id) = ingest.task_id else {
+            if let (Some(reviews), Some(candidate), [delivery]) = (
+                self.response_review_use_cases.as_ref(),
+                review_candidate,
+                deliveries.as_slice(),
+            ) {
+                let agent_id = match &reply.message.author {
+                    MessageAuthorWrite::Agent(author) => author.agent_id,
+                    _ => {
+                        return Err(AppError::Conflict(
+                            "A reviewable direct response must have an agent author.".into(),
+                        ));
+                    }
+                };
+                let publication =
+                    DraftPublicationSnapshot::new(reply.message.clone(), delivery.clone())?
+                        .with_also_in_threads(reply.also_in_threads.clone())?;
+                let draft_id = crate::entities::response_draft::ResponseDraftId::new(
+                    reply.message.id.as_uuid(),
+                );
+                if reviews
+                    .submit_agent_if_required(AgentReviewSubmission {
+                        id: draft_id,
+                        company_id: delivery.company_id,
+                        channel_id: delivery.channel_id,
+                        thread_id: reply.message.thread_id,
+                        agent_id,
+                        recipients: candidate.recipients,
+                        evidence: candidate.evidence,
+                        publication,
+                    })
+                    .await?
+                {
+                    return Ok(true);
+                }
+            }
             let (stored, _) = self
                 .thread_persistence
                 .create_message_with_deliveries(&reply.message, &deliveries)
@@ -1553,7 +1647,7 @@ impl ThreadUseCases {
                     .associate_message(*thread_id, stored.canonical_id, reply.message.entry_kind)
                     .await?;
             }
-            return Ok(());
+            return Ok(false);
         };
 
         let payload = self.dispatch_audit_payload(DispatchAudit {
@@ -1572,6 +1666,7 @@ impl ThreadUseCases {
                 lease,
                 reply: &reply,
                 deliveries,
+                review_candidate,
                 payload,
                 complete_outreach: true,
             })
@@ -1593,8 +1688,9 @@ impl ThreadUseCases {
                         );
                     }
                 }
-                Ok(())
+                Ok(false)
             }
+            DispatchCommit::PendingReview { .. } => Ok(true),
             // Nothing was written. Reporting this as an error is what makes the task retryable:
             // the run that now owns the lease will produce the reply.
             DispatchCommit::LeaseLost => Err(AppError::Internal(
@@ -1635,6 +1731,64 @@ impl ThreadUseCases {
         }
         payload
     }
+}
+
+fn scheduled_evidence(payload: &ScheduledRunPayload) -> Vec<ResponseEvidence> {
+    vec![ResponseEvidence {
+        id: Uuid::new_v4(),
+        source: EvidenceSource::Message {
+            message_id: payload.prompt_message_id,
+            thread_id: payload.thread_id,
+        },
+        source_version: payload.prompt_message_id.to_string(),
+        content_digest: format!("{:x}", Sha256::digest(payload.prompt.as_bytes())),
+        audience: EvidenceAudience::ExternalConversation,
+        support: EvidenceSupport::DirectEvidence,
+    }]
+}
+
+fn response_evidence(primary: &ChannelMatch) -> Vec<ResponseEvidence> {
+    let message = &primary.inbound_message;
+    let mut evidence = vec![ResponseEvidence {
+        id: Uuid::new_v4(),
+        source: EvidenceSource::Message {
+            message_id: message.canonical_id,
+            thread_id: message.thread_id,
+        },
+        source_version: message.created_at.to_rfc3339(),
+        content_digest: format!(
+            "{:x}",
+            Sha256::digest(format!("{}\0{}", message.subject, message.clean_text_body).as_bytes())
+        ),
+        audience: if message.audience.is_externally_deliverable() {
+            EvidenceAudience::ExternalConversation
+        } else {
+            EvidenceAudience::CompanyRestricted
+        },
+        support: EvidenceSupport::DirectEvidence,
+    }];
+    evidence.extend(
+        message
+            .attachments
+            .iter()
+            .flatten()
+            .map(|attachment| ResponseEvidence {
+                id: Uuid::new_v4(),
+                source: EvidenceSource::Attachment {
+                    message_id: message.canonical_id,
+                    sha256_hash: attachment.sha256_hash.clone(),
+                },
+                source_version: attachment.sha256_hash.clone(),
+                content_digest: attachment.sha256_hash.clone(),
+                audience: if message.audience.is_externally_deliverable() {
+                    EvidenceAudience::ExternalConversation
+                } else {
+                    EvidenceAudience::CompanyRestricted
+                },
+                support: EvidenceSupport::DirectEvidence,
+            }),
+    );
+    evidence
 }
 
 fn build_execution_parameters(

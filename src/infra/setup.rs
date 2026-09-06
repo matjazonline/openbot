@@ -43,6 +43,7 @@ use crate::{
         company_invite::CompanyInviteUseCases,
         company_resend_api::CompanyResendApiUseCases,
         memory::MemoryUseCases,
+        response_review::ResponseReviewUseCases,
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
@@ -209,6 +210,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         delivery_composer.clone(),
         config.clone(),
     ));
+    let response_review_use_cases = Arc::new(ResponseReviewUseCases::new(postgres_arc.clone()));
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
@@ -233,6 +235,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_agent_capability_reader(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
+        .with_response_review_use_cases(response_review_use_cases.clone())
         .with_monitoring(monitoring.clone())
         .with_memory(memory_coordinator)
         .with_harnesses(harnesses, text_classifier),
@@ -310,6 +313,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         skill_use_cases,
         thread_use_cases,
         approval_use_cases,
+        response_review_use_cases,
         memory_use_cases,
         memory_worker,
         inbound_event_worker,

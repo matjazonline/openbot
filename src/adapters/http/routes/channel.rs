@@ -108,6 +108,8 @@ pub struct ChannelForm {
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
+    pub external_response_review_override: Option<String>,
+    pub preferred_reviewer_principal_id: Option<Uuid>,
     pub retrieve_company_memory: Option<String>,
     pub retrieve_agent_memory: Option<String>,
     pub retrieve_user_memory: Option<String>,
@@ -161,6 +163,20 @@ pub(super) fn checkbox_ticked(value: Option<&str>) -> bool {
     matches!(value, Some("true") | Some("on"))
 }
 
+pub(super) fn parse_review_override(
+    value: Option<&str>,
+) -> Option<crate::entities::response_draft::ExternalResponseReview> {
+    match value {
+        Some("autonomous") => {
+            Some(crate::entities::response_draft::ExternalResponseReview::Autonomous)
+        }
+        Some("review_all_external") => {
+            Some(crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal)
+        }
+        _ => None,
+    }
+}
+
 pub fn slugify(input: &str) -> String {
     let clean: String = input
         .trim()
@@ -212,6 +228,9 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
+    pub external_response_review_override:
+        Option<crate::entities::response_draft::ExternalResponseReview>,
+    pub preferred_reviewer_principal_id: Option<Uuid>,
     #[serde(default)]
     pub retrieve_company_memory: bool,
     #[serde(default)]
@@ -424,6 +443,12 @@ async fn create_channel_handler(
     let write = ChannelWrite {
         enabled,
         add_3rd_party,
+        external_response_review_override: parse_review_override(
+            form.external_response_review_override.as_deref(),
+        ),
+        preferred_reviewer_principal_id: form
+            .preferred_reviewer_principal_id
+            .map(crate::entities::transport::PrincipalId::new),
         name: form.name,
         description: parse_text_form(form.description),
         slug,
@@ -662,6 +687,12 @@ async fn update_channel_handler(
         agent_ids,
         enabled,
         add_3rd_party,
+        external_response_review_override: parse_review_override(
+            form.external_response_review_override.as_deref(),
+        ),
+        preferred_reviewer_principal_id: form
+            .preferred_reviewer_principal_id
+            .map(crate::entities::transport::PrincipalId::new),
         retrieve_company_memory: memory.retrieve_company,
         retrieve_agent_memory: memory.retrieve_agent,
         retrieve_user_memory: memory.retrieve_user,
@@ -1457,6 +1488,10 @@ async fn create_channel_json(
         agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        external_response_review_override: payload.external_response_review_override,
+        preferred_reviewer_principal_id: payload
+            .preferred_reviewer_principal_id
+            .map(crate::entities::transport::PrincipalId::new),
         retrieve_company_memory: payload.retrieve_company_memory,
         retrieve_agent_memory: payload.retrieve_agent_memory,
         retrieve_user_memory: payload.retrieve_user_memory,
@@ -1527,6 +1562,10 @@ async fn update_channel_json(
         agent_ids: payload.agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        external_response_review_override: payload.external_response_review_override,
+        preferred_reviewer_principal_id: payload
+            .preferred_reviewer_principal_id
+            .map(crate::entities::transport::PrincipalId::new),
         retrieve_company_memory: payload.retrieve_company_memory,
         retrieve_agent_memory: payload.retrieve_agent_memory,
         retrieve_user_memory: payload.retrieve_user_memory,

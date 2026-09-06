@@ -7,6 +7,7 @@
 //! keys happens inside the one transaction that writes the message.
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
 };
 
 /// Who a message is attributed to, as its producer states it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageAuthorWrite {
     /// A transport handle. Resolved to the principal it names -- creating an external principal
     /// for a handle seen for the first time -- in the same transaction as the message, so a
@@ -47,7 +48,7 @@ pub enum MessageAuthorWrite {
 ///
 /// The label travels with the id because the writer upserts the agent's principal and a renamed
 /// agent should not leave its old name on every later message.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentAuthor {
     pub agent_id: Uuid,
     pub display_label: String,
@@ -55,7 +56,7 @@ pub struct AgentAuthor {
 
 /// One handle's part in a message. Position is assigned from the order these are given, per kind,
 /// so a rendered `To:` header reproduces what the producer stated.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageParticipantWrite {
     pub kind: MessageParticipantKind,
     pub identity: QualifiedIdentity,
@@ -72,7 +73,7 @@ impl MessageParticipantWrite {
 /// The provider key is what makes redelivery idempotent, so this is stated rather than guessed:
 /// a message with no transport behind it says so, instead of being given a synthetic key that a
 /// later delivery could collide with.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageCorrelation {
     /// Mail carried it. The RFC `Message-ID` is the provider key, on the channel's canonical email
     /// binding, and the rest of the headers become the message's email extension.
@@ -83,7 +84,7 @@ pub enum MessageCorrelation {
 }
 
 /// One canonical message, and its association with one thread, as its producer states it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageWrite {
     /// The identity this message is written under.
     ///

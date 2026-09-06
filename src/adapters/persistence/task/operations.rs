@@ -23,7 +23,10 @@ use uuid::Uuid;
 use super::*;
 use crate::{
     adapters::persistence::{
-        PostgresPersistence, delivery::enqueue::insert_delivery_on, thread::insert_message_on,
+        PostgresPersistence,
+        delivery::enqueue::insert_delivery_on,
+        response_review::{create_review_draft_on, effective_review_required_on},
+        thread::insert_message_on,
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -49,6 +52,7 @@ use crate::{
         HumanTaskCompletion, HumanTaskCompletionResult, OutreachReassignmentContext,
     },
     transport::{DeliveryCreation, NewDelivery},
+    use_cases::response_review::{DraftPublicationSnapshot, PreparedReviewDraft},
 };
 
 #[derive(sqlx::FromRow)]
@@ -1146,14 +1150,23 @@ impl TaskPersistence for PostgresPersistence {
         };
         let ownership_version = i64::try_from(lease.ownership_version)
             .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?;
-        let row = sqlx::query_as::<_, (Uuid, Option<String>)>(
+        let row = sqlx::query_as::<_, (Uuid, Option<String>, Option<String>)>(
             r#"SELECT principal.agent_id,
                       (SELECT event.handoff_instruction
                        FROM task_ownership_events AS event
                        WHERE event.task_id = task.id
                          AND event.new_owner_principal_id = task.owner_principal_id
                          AND event.operation = 'transfer'
-                       ORDER BY event.sequence DESC LIMIT 1) AS handoff_instruction
+                       ORDER BY event.sequence DESC LIMIT 1) AS handoff_instruction,
+                      (SELECT review.feedback
+                       FROM response_drafts AS draft
+                       JOIN response_reviews AS review
+                         ON (review.company_id, review.draft_id, review.draft_version) =
+                            (draft.company_id, draft.id, draft.version)
+                       WHERE draft.company_id = task.company_id AND draft.task_id = task.id
+                         AND review.status = 'rejected'
+                       ORDER BY review.updated_at DESC, draft.version DESC LIMIT 1)
+                         AS review_feedback
                FROM background_tasks AS task
                JOIN principals AS principal
                  ON principal.company_id = task.company_id
@@ -1179,12 +1192,13 @@ impl TaskPersistence for PostgresPersistence {
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(
-            row.map(|(agent_id, handoff_instruction)| OwnedAgentExecution {
+        Ok(row.map(
+            |(agent_id, handoff_instruction, review_feedback)| OwnedAgentExecution {
                 agent_id,
                 handoff_instruction,
-            }),
-        )
+                review_feedback,
+            },
+        ))
     }
 
     async fn change_task_ownership(
@@ -1467,6 +1481,107 @@ impl TaskPersistence for PostgresPersistence {
             return Ok(DispatchCommit::LeaseLost);
         }
 
+        if !commit.deliveries.is_empty()
+            && effective_review_required_on(
+                &mut tx,
+                commit.deliveries[0].company_id,
+                commit.deliveries[0].channel_id,
+            )
+            .await?
+        {
+            if commit.deliveries.len() != 1 {
+                return Err(AppError::BadRequest(
+                    "A reviewed response requires exactly one logical delivery.".into(),
+                ));
+            }
+            let candidate = commit.review_candidate.as_ref().ok_or_else(|| {
+                AppError::Internal("An external agent response has no review snapshot.".into())
+            })?;
+            let author = commit
+                .lease
+                .claimed_owner
+                .agent_principal_id()
+                .ok_or_else(|| AppError::Conflict("The task is no longer agent-owned.".into()))?;
+            let delivery = &commit.deliveries[0];
+            let publication =
+                DraftPublicationSnapshot::new(commit.reply.message.clone(), delivery.clone())?
+                    .with_also_in_threads(commit.reply.also_in_threads.clone())?;
+            let handoff_generation: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT id FROM task_ownership_events
+                   WHERE company_id = $1 AND task_id = $2 AND operation = 'transfer'
+                     AND new_owner_principal_id = $3
+                   ORDER BY sequence DESC LIMIT 1"#,
+            )
+            .bind(delivery.company_id)
+            .bind(commit.lease.task_id)
+            .bind(author.as_uuid())
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            let mut draft = PreparedReviewDraft::new(
+                crate::entities::response_draft::ResponseDraftId::new(
+                    commit.reply.message.id.as_uuid(),
+                ),
+                1,
+                delivery.company_id,
+                delivery.channel_id,
+                commit.reply.message.thread_id,
+                Some(commit.lease.task_id),
+                author,
+                author,
+                candidate.recipients.clone(),
+                candidate.evidence.clone(),
+                publication,
+            )?;
+            draft.source_handoff_generation = handoff_generation;
+            create_review_draft_on(&mut tx, &draft, None).await?;
+
+            if commit.complete_outreach {
+                let outreach_ids: Vec<Uuid> = sqlx::query_scalar(
+                    r#"UPDATE task_outreaches
+                       SET status = 'completed', version = version + 1,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                       RETURNING id"#,
+                )
+                .bind(commit.lease.task_id)
+                .fetch_all(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                for outreach_id in outreach_ids {
+                    cancel_unsent_outreach_questions(&mut tx, outreach_id).await?;
+                    sqlx::query(
+                        "UPDATE task_outreach_targets SET status = 'expired' WHERE outreach_id = $1 AND status = 'active'",
+                    )
+                    .bind(outreach_id)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(AppError::from)?;
+                }
+            }
+
+            sqlx::query(
+                r#"UPDATE background_tasks
+                   SET status = 'pending_approval', transition_reason = 'approval_requested',
+                       transition_actor_kind = 'agent', transition_actor_id = $3,
+                       worker_id = NULL, execution_generation = NULL, locked_at = NULL,
+                       lock_expires_at = NULL, wait_expires_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND id = $2"#,
+            )
+            .bind(delivery.company_id)
+            .bind(commit.lease.task_id)
+            .bind(author.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            tx.commit().await.map_err(AppError::from)?;
+            return Ok(DispatchCommit::PendingReview {
+                draft_id: draft.id,
+                draft_version: draft.version,
+            });
+        }
+
         // One canonical row, then one association per further thread the reply answered. Writing
         // the message again per thread is what used to make "the answer" several different rows
         // that had to be kept identical to still read as one.
@@ -1548,6 +1663,29 @@ impl TaskPersistence for PostgresPersistence {
             serde_json::to_value(&completion.recipient_snapshot).map_err(|error| {
                 AppError::Internal(format!("Failed to serialize draft recipients: {error}"))
             })?;
+        let publication =
+            DraftPublicationSnapshot::new(completion.message.clone(), publish_delivery.clone())?;
+        let publication_snapshot = serde_json::to_value(&publication).map_err(|error| {
+            AppError::Internal(format!("Failed to serialize draft publication: {error}"))
+        })?;
+        let attachment_snapshot =
+            serde_json::to_value(crate::entities::message::MessageAttachments::new(
+                completion.message.attachments.clone(),
+            ))
+            .map_err(|error| {
+                AppError::Internal(format!("Failed to serialize draft attachments: {error}"))
+            })?;
+        let transport_snapshot = serde_json::to_value(
+            crate::entities::response_draft::DraftTransportSnapshot::V1 {
+                transport: publish_delivery.transport,
+                source_binding_id: publish_delivery.source_binding_id,
+                destination_binding_id: publish_delivery.destination_binding_id,
+                external_destination: publish_delivery.external_destination.clone(),
+            },
+        )
+        .map_err(|error| {
+            AppError::Internal(format!("Failed to serialize draft transport: {error}"))
+        })?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let task: Option<(String, Option<Uuid>, Option<String>, i64, Option<Uuid>)> =
             sqlx::query_as(
@@ -1564,6 +1702,34 @@ impl TaskPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
         let (status, owner_id, owner_kind, version, thread_id) =
             task.ok_or_else(|| AppError::NotFound("Task not found.".into()))?;
+
+        let pending_draft: Option<(i32, String, String, serde_json::Value)> = sqlx::query_as(
+            r#"SELECT version, subject, body, recipient_snapshot
+               FROM response_drafts
+               WHERE company_id = $1 AND id = $2 AND status = 'pending_review'
+               ORDER BY version DESC LIMIT 1"#,
+        )
+        .bind(completion.company_id)
+        .bind(completion.draft_id.as_uuid())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if let Some((version, subject, body, recipients)) = pending_draft {
+            if version != draft_version
+                || subject != completion.message.subject
+                || body != completion.message.clean_text_body
+                || recipients != recipient_snapshot
+            {
+                return Err(AppError::Conflict(
+                    "This completion command already created a different draft.".into(),
+                ));
+            }
+            return Ok(HumanTaskCompletionResult {
+                message_id: completion.message.id,
+                deliveries: Vec::new(),
+                pending_review: true,
+            });
+        }
 
         let prior: Option<(Uuid, Uuid, String)> = sqlx::query_as(
             r#"SELECT message_id, command_id, command_fingerprint
@@ -1583,6 +1749,7 @@ impl TaskPersistence for PostgresPersistence {
             return Ok(HumanTaskCompletionResult {
                 message_id: CanonicalMessageId::new(message_id),
                 deliveries: Vec::new(),
+                pending_review: false,
             });
         }
 
@@ -1614,6 +1781,58 @@ impl TaskPersistence for PostgresPersistence {
             ));
         }
 
+        if effective_review_required_on(&mut tx, completion.company_id, publish_delivery.channel_id)
+            .await?
+        {
+            let handoff_generation: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT id FROM task_ownership_events
+                   WHERE company_id = $1 AND task_id = $2 AND operation = 'transfer'
+                     AND new_owner_principal_id = $3
+                   ORDER BY sequence DESC LIMIT 1"#,
+            )
+            .bind(completion.company_id)
+            .bind(completion.task_id)
+            .bind(completion.owner_principal_id.as_uuid())
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            let mut draft = PreparedReviewDraft::new(
+                completion.draft_id,
+                completion.draft_version,
+                completion.company_id,
+                publish_delivery.channel_id,
+                completion.message.thread_id,
+                Some(completion.task_id),
+                completion.owner_principal_id,
+                completion.owner_principal_id,
+                completion.recipient_snapshot.clone(),
+                completion.evidence.clone(),
+                publication,
+            )?;
+            draft.source_handoff_generation = handoff_generation;
+            create_review_draft_on(&mut tx, &draft, None).await?;
+            sqlx::query(
+                r#"UPDATE background_tasks
+                   SET status = 'pending_approval', transition_reason = 'approval_requested',
+                       transition_actor_kind = 'human', transition_actor_id = $3,
+                       worker_id = NULL, execution_generation = NULL, locked_at = NULL,
+                       lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND id = $2"#,
+            )
+            .bind(completion.company_id)
+            .bind(completion.task_id)
+            .bind(completion.owner_principal_id.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            tx.commit().await.map_err(AppError::from)?;
+            return Ok(HumanTaskCompletionResult {
+                message_id: completion.message.id,
+                deliveries: Vec::new(),
+                pending_review: true,
+            });
+        }
+
         let latest = sqlx::query_as::<_, ResponseDraftDb>(
             r#"SELECT version, status, channel_id, thread_id, task_id, author_principal_id,
                       subject, body, recipient_snapshot
@@ -1631,7 +1850,7 @@ impl TaskPersistence for PostgresPersistence {
         match latest {
             Some(draft)
                 if draft.version == draft_version
-                    && draft.status == "active"
+                    && draft.status == "pending_review"
                     && draft.channel_id == publish_delivery.channel_id
                     && draft.thread_id == completion.message.thread_id
                     && draft.task_id == Some(completion.task_id)
@@ -1649,8 +1868,12 @@ impl TaskPersistence for PostgresPersistence {
                 sqlx::query(
                     r#"INSERT INTO response_drafts (
                            id, version, company_id, channel_id, thread_id, task_id,
-                           author_principal_id, subject, body, recipient_snapshot, status
-                       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')"#,
+                           author_principal_id, reviewer_principal_id, proposed_message_id,
+                           subject, body, attachment_snapshot, recipient_snapshot,
+                           transport_snapshot, publication_snapshot, status,
+                           created_by_principal_id, updated_by_principal_id
+                       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12,
+                                 $13, $14, 'pending_review', $7, $7)"#,
                 )
                 .bind(completion.draft_id.as_uuid())
                 .bind(draft_version)
@@ -1659,9 +1882,13 @@ impl TaskPersistence for PostgresPersistence {
                 .bind(completion.message.thread_id)
                 .bind(completion.task_id)
                 .bind(completion.owner_principal_id.as_uuid())
+                .bind(completion.message.id.as_uuid())
                 .bind(&completion.message.subject)
                 .bind(&completion.message.clean_text_body)
+                .bind(&attachment_snapshot)
                 .bind(&recipient_snapshot)
+                .bind(&transport_snapshot)
+                .bind(&publication_snapshot)
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
@@ -1685,7 +1912,7 @@ impl TaskPersistence for PostgresPersistence {
         let advanced = sqlx::query(
             r#"UPDATE response_drafts
                   SET status = 'published', updated_at = CURRENT_TIMESTAMP
-                WHERE company_id = $1 AND id = $2 AND version = $3 AND status = 'active'"#,
+                WHERE company_id = $1 AND id = $2 AND version = $3 AND status = 'pending_review'"#,
         )
         .bind(completion.company_id)
         .bind(completion.draft_id.as_uuid())
@@ -1749,6 +1976,7 @@ impl TaskPersistence for PostgresPersistence {
         Ok(HumanTaskCompletionResult {
             message_id: stored.canonical_id,
             deliveries,
+            pending_review: false,
         })
     }
 

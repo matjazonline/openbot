@@ -1628,6 +1628,7 @@ mod tests {
             Ok(Some(OwnedAgentExecution {
                 agent_id,
                 handoff_instruction: None,
+                review_feedback: None,
             }))
         }
 

@@ -208,14 +208,15 @@ impl CompanyPersistence for PostgresPersistence {
                                       default_add_3rd_party, default_participant_emails,
                                       default_retrieve_company_memory, default_retrieve_agent_memory,
                                       default_retrieve_user_memory, default_persist_company_memory,
-                                      default_persist_agent_memory, default_persist_user_memory)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                                      default_persist_agent_memory, default_persist_user_memory,
+                                      external_response_review)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
                       default_add_3rd_party, default_participant_emails,
                       default_retrieve_company_memory, default_retrieve_agent_memory,
                       default_retrieve_user_memory, default_persist_company_memory,
                       default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at"#,
+                      avatar_url, created_at, external_response_review"#,
         )
         .bind(uuid)
         .bind(user_id)
@@ -232,6 +233,12 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.channel_defaults.persist_company_memory)
         .bind(write.channel_defaults.persist_agent_memory)
         .bind(write.channel_defaults.persist_user_memory)
+        .bind(
+            write
+                .external_response_review
+                .unwrap_or_default()
+                .as_str(),
+        )
         .fetch_one(&mut *transaction)
         .await
         .map_err(AppError::from)?;
@@ -260,7 +267,7 @@ impl CompanyPersistence for PostgresPersistence {
                       default_retrieve_company_memory, default_retrieve_agent_memory,
                       default_retrieve_user_memory, default_persist_company_memory,
                       default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at
+                      avatar_url, created_at, external_response_review
                FROM companies WHERE id = $1"#,
         )
         .bind(id)
@@ -279,7 +286,7 @@ impl CompanyPersistence for PostgresPersistence {
                       default_retrieve_company_memory, default_retrieve_agent_memory,
                       default_retrieve_user_memory, default_persist_company_memory,
                       default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at
+                      avatar_url, created_at, external_response_review
                FROM companies WHERE slug = $1"#,
         )
         .bind(slug)
@@ -298,7 +305,7 @@ impl CompanyPersistence for PostgresPersistence {
                       default_retrieve_company_memory, default_retrieve_agent_memory,
                       default_retrieve_user_memory, default_persist_company_memory,
                       default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at
+                      avatar_url, created_at, external_response_review
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -321,7 +328,7 @@ impl CompanyPersistence for PostgresPersistence {
                       company.default_retrieve_company_memory, company.default_retrieve_agent_memory,
                       company.default_retrieve_user_memory, company.default_persist_company_memory,
                       company.default_persist_agent_memory, company.default_persist_user_memory,
-                      company.avatar_url, company.created_at,
+                      company.avatar_url, company.created_at, company.external_response_review,
                       (company.user_id = $1) AS is_owner,
                       COALESCE((
                           SELECT member.role = 'admin'
@@ -352,14 +359,15 @@ impl CompanyPersistence for PostgresPersistence {
                       default_add_3rd_party = $6, default_participant_emails = $7,
                       default_retrieve_company_memory = $8, default_retrieve_agent_memory = $9,
                       default_retrieve_user_memory = $10, default_persist_company_memory = $11,
-                      default_persist_agent_memory = $12, default_persist_user_memory = $13
-               WHERE id = $14
+                      default_persist_agent_memory = $12, default_persist_user_memory = $13,
+                      external_response_review = COALESCE($14, external_response_review)
+               WHERE id = $15
                RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
                       default_add_3rd_party, default_participant_emails,
                       default_retrieve_company_memory, default_retrieve_agent_memory,
                       default_retrieve_user_memory, default_persist_company_memory,
                       default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at"#,
+                      avatar_url, created_at, external_response_review"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -385,6 +393,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.channel_defaults.persist_company_memory)
         .bind(write.channel_defaults.persist_agent_memory)
         .bind(write.channel_defaults.persist_user_memory)
+        .bind(write.external_response_review.map(|policy| policy.as_str()))
         .bind(id)
         .fetch_one(&self.pool)
         .await
@@ -411,15 +420,16 @@ impl CompanyPersistence for PostgresPersistence {
                    default_add_3rd_party = $6, default_participant_emails = $7,
                    default_retrieve_company_memory = $8, default_retrieve_agent_memory = $9,
                    default_retrieve_user_memory = $10, default_persist_company_memory = $11,
-                   default_persist_agent_memory = $12, default_persist_user_memory = $13
-               WHERE id = $14 AND user_id = $15
+                   default_persist_agent_memory = $12, default_persist_user_memory = $13,
+                   external_response_review = COALESCE($14, external_response_review)
+               WHERE id = $15 AND user_id = $16
                RETURNING id, user_id, name, slug,
                          enable_llm_spam_guardrail, memory_provider,
                          default_add_3rd_party, default_participant_emails,
                          default_retrieve_company_memory, default_retrieve_agent_memory,
                          default_retrieve_user_memory, default_persist_company_memory,
                          default_persist_agent_memory, default_persist_user_memory,
-                         avatar_url, created_at"#,
+                         avatar_url, created_at, external_response_review"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -445,6 +455,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.channel_defaults.persist_company_memory)
         .bind(write.channel_defaults.persist_agent_memory)
         .bind(write.channel_defaults.persist_user_memory)
+        .bind(write.external_response_review.map(|policy| policy.as_str()))
         .bind(id)
         .bind(user_id)
         .fetch_optional(&self.pool)

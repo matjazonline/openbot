@@ -65,7 +65,7 @@ use crate::{
 mod dispatch;
 pub use dispatch::{AgentReply, DispatchOutcome};
 mod human_completion;
-pub use human_completion::HumanCompletionDraft;
+pub use human_completion::{HumanCompletionDraft, ResponseReviewEditDraft};
 mod ingest;
 pub use ingest::{
     CanonicalMessageIngress, InboundMessage, InboundPreflight, IngestRejection, IngressOrigin,
@@ -418,6 +418,8 @@ pub struct ThreadUseCases {
     agent_capability_reader: Option<Arc<dyn crate::use_cases::skill::AgentCapabilityReader>>,
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
+    response_review_use_cases:
+        Option<Arc<crate::use_cases::response_review::ResponseReviewUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     memory: Option<Arc<MemoryCoordinator>>,
     /// Which runtimes this deployment can execute an agent on, and what answers the spam
@@ -470,6 +472,7 @@ impl ThreadUseCases {
             agent_capability_reader: None,
             agent_channel_provisioning: None,
             approval_use_cases: None,
+            response_review_use_cases: None,
             monitoring: None,
             memory: None,
             harnesses: None,
@@ -546,6 +549,14 @@ impl ThreadUseCases {
 
     pub fn with_approval_use_cases(mut self, approval_use_cases: Arc<ApprovalUseCases>) -> Self {
         self.approval_use_cases = Some(approval_use_cases);
+        self
+    }
+
+    pub fn with_response_review_use_cases(
+        mut self,
+        use_cases: Arc<crate::use_cases::response_review::ResponseReviewUseCases>,
+    ) -> Self {
+        self.response_review_use_cases = Some(use_cases);
         self
     }
 

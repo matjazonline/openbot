@@ -24,6 +24,7 @@ mod ui_internal_notes;
 pub mod ui_invites;
 pub mod ui_message_diagnostics;
 pub mod ui_profile;
+mod ui_response_reviews;
 pub mod ui_schedules;
 pub mod ui_tasks;
 pub mod ui_team;
@@ -89,6 +90,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_invites::router())
         .merge(ui_deliveries::router())
         .merge(ui_profile::router())
+        .merge(ui_response_reviews::router())
         .merge(ui_tasks::router())
         .merge(ui_team::router())
         .merge(ui_uploads::router())

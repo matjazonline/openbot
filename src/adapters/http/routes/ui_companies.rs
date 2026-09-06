@@ -106,6 +106,7 @@ pub struct CompanyForm {
     pub name: String,
     pub slug: Option<String>,
     pub enable_llm_spam_guardrail: Option<String>,
+    pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
     pub avatar_url: Option<String>,
     pub memory_provider: Option<String>,
@@ -943,6 +944,7 @@ impl SubmittedCompany {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
             enable_llm_spam_guardrail: self.spam_guardrail.stored(),
+            external_response_review: self.form.external_response_review,
             memory_provider: None,
             channel_defaults: crate::entities::company::CompanyChannelDefaults {
                 add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),

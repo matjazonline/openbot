@@ -321,9 +321,10 @@ impl ChannelPersistence for PostgresPersistence {
             r#"INSERT INTO channels (
                     id, company_id, name, description, access_mode, enabled, add_3rd_party, created_by,
                     retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
-                    persist_company_memory, persist_agent_memory, persist_user_memory
+                    persist_company_memory, persist_agent_memory, persist_user_memory,
+                    external_response_review_override, preferred_reviewer_principal_id
                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                         $9, $10, $11, $12, $13, $14)"#,
+                         $9, $10, $11, $12, $13, $14, $15, $16)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -339,6 +340,16 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
+        .bind(
+            write
+                .external_response_review_override
+                .map(|policy| policy.as_str()),
+        )
+        .bind(
+            write
+                .preferred_reviewer_principal_id
+                .map(crate::entities::transport::PrincipalId::as_uuid),
+        )
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -396,8 +407,10 @@ impl ChannelPersistence for PostgresPersistence {
                     id, company_id, name, description, access_mode, enabled, add_3rd_party,
                     created_by, retrieve_company_memory, retrieve_agent_memory,
                     retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                    persist_user_memory)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
+                    persist_user_memory, external_response_review_override,
+                    preferred_reviewer_principal_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                       $15, $16)"#,
         )
         .bind(channel_id)
         .bind(company_id)
@@ -413,6 +426,16 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(channel.persist_company_memory)
         .bind(channel.persist_agent_memory)
         .bind(channel.persist_user_memory)
+        .bind(
+            channel
+                .external_response_review_override
+                .map(|policy| policy.as_str()),
+        )
+        .bind(
+            channel
+                .preferred_reviewer_principal_id
+                .map(crate::entities::transport::PrincipalId::as_uuid),
+        )
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -504,8 +527,10 @@ impl ChannelPersistence for PostgresPersistence {
                    add_3rd_party = $5, retrieve_company_memory = $6,
                    retrieve_agent_memory = $7, retrieve_user_memory = $8,
                    persist_company_memory = $9, persist_agent_memory = $10,
-                   persist_user_memory = $11
-               WHERE id = $12"#,
+                   persist_user_memory = $11,
+                   external_response_review_override = COALESCE($12, external_response_review_override),
+                   preferred_reviewer_principal_id = COALESCE($13, preferred_reviewer_principal_id)
+               WHERE id = $14"#,
         )
         .bind(&write.name)
         .bind(&write.description)
@@ -518,6 +543,16 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
+        .bind(
+            write
+                .external_response_review_override
+                .map(|policy| policy.as_str()),
+        )
+        .bind(
+            write
+                .preferred_reviewer_principal_id
+                .map(crate::entities::transport::PrincipalId::as_uuid),
+        )
         .bind(id)
         .execute(&mut *tx)
         .await
@@ -715,8 +750,10 @@ async fn create_owned_agent_channel(
                     id, company_id, owner_agent_id, name, description, access_mode, enabled,
                     add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
                     retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                    persist_user_memory)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
+                    persist_user_memory, external_response_review_override,
+                    preferred_reviewer_principal_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                       $16, $17)"#,
     )
     .bind(channel_id)
     .bind(company_id)
@@ -733,6 +770,16 @@ async fn create_owned_agent_channel(
     .bind(channel.persist_company_memory)
     .bind(channel.persist_agent_memory)
     .bind(channel.persist_user_memory)
+    .bind(
+        channel
+            .external_response_review_override
+            .map(|policy| policy.as_str()),
+    )
+    .bind(
+        channel
+            .preferred_reviewer_principal_id
+            .map(crate::entities::transport::PrincipalId::as_uuid),
+    )
     .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
@@ -857,6 +904,10 @@ mod tests {
                 // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
                 // cannot pass this test.
                 add_3rd_party: false,
+                external_response_review_override: Some(
+                    crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
+                ),
+                preferred_reviewer_principal_id: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
                 retrieve_user_memory: false,

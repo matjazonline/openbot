@@ -51,6 +51,7 @@ pub struct CompanyForm {
     pub name: String,
     pub slug: String,
     pub enable_llm_spam_guardrail: Option<bool>,
+    pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     /// The company's picture. A save carries what it was sent, so the edit form keeps the stored
     /// URL in a hidden field rather than dropping the picture on every rename.
     pub avatar_url: Option<String>,
@@ -90,6 +91,7 @@ impl CompanyForm {
             name: self.name.clone(),
             slug: self.slug.clone(),
             enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
+            external_response_review: self.external_response_review,
             memory_provider: None,
             channel_defaults: crate::entities::company::CompanyChannelDefaults {
                 add_3rd_party: self.default_add_3rd_party.unwrap_or(false),

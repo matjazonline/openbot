@@ -700,6 +700,13 @@ impl SubmittedChannel {
             agent_ids,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
+            external_response_review_override: super::channel::parse_review_override(
+                self.form.external_response_review_override.as_deref(),
+            ),
+            preferred_reviewer_principal_id: self
+                .form
+                .preferred_reviewer_principal_id
+                .map(crate::entities::transport::PrincipalId::new),
             retrieve_company_memory: memory.retrieve_company,
             retrieve_agent_memory: memory.retrieve_agent,
             retrieve_user_memory: memory.retrieve_user,

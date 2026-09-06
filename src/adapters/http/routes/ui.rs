@@ -1329,17 +1329,27 @@ async fn complete_human_task(
             text_body: &form.text_body,
         })
         .await;
-    if let Err(error) = outcome {
-        return render_mailbox_ownership_error(
-            &thread_use_cases,
-            &agent_use_cases,
-            &viewer,
-            &company,
-            &channel,
-            &thread,
-            &error.to_string(),
-        )
-        .await;
+    let outcome = match outcome {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            return render_mailbox_ownership_error(
+                &thread_use_cases,
+                &agent_use_cases,
+                &viewer,
+                &company,
+                &channel,
+                &thread,
+                &error.to_string(),
+            )
+            .await;
+        }
+    };
+    if outcome.pending_review {
+        return Ok(Html(pages::response_review_action_result(
+            "The response is frozen and waiting for human review; nothing has been sent.",
+            company.id,
+        ))
+        .into_response());
     }
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
     sent_message_response(

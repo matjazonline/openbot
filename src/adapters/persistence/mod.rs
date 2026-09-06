@@ -19,6 +19,7 @@ pub mod inbound_event;
 pub mod integration;
 pub mod memory;
 pub mod participant;
+pub mod response_review;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod skill;

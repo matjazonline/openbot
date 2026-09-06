@@ -43,6 +43,9 @@ pub struct ChannelWrite {
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
+    pub external_response_review_override:
+        Option<crate::entities::response_draft::ExternalResponseReview>,
+    pub preferred_reviewer_principal_id: Option<crate::entities::transport::PrincipalId>,
     pub retrieve_company_memory: bool,
     pub retrieve_agent_memory: bool,
     pub retrieve_user_memory: bool,

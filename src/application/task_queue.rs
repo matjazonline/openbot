@@ -64,12 +64,13 @@ pub struct TaskLease {
     ttl: chrono::Duration,
 }
 
-/// Execution-only projection for an agent-owned task. The handoff is private ownership metadata,
-/// never a canonical thread message.
+/// Execution-only projection for an agent-owned task. Handoffs and rejected-review feedback are
+/// private execution metadata, never canonical thread messages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedAgentExecution {
     pub agent_id: Uuid,
     pub handoff_instruction: Option<String>,
+    pub review_feedback: Option<String>,
 }
 
 impl TaskLease {
@@ -227,10 +228,19 @@ pub struct AgentDispatchCommit<'a> {
     /// The deliveries the reply is owed, already rendered. Empty for a simulated run, which
     /// stores its answer and sends nothing.
     pub deliveries: Vec<NewDelivery>,
+    /// Review-only facts that cannot be recovered faithfully from a provider payload. Present
+    /// whenever a real external delivery is proposed; ignored for autonomous publication.
+    pub review_candidate: Option<AgentReviewCandidate>,
     /// The run's audit payload, written back onto the task.
     pub payload: Value,
     /// Whether this dispatch also closes the task's outreach.
     pub complete_outreach: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct AgentReviewCandidate {
+    pub recipients: crate::entities::response_draft::DraftRecipientSnapshot,
+    pub evidence: Vec<crate::entities::response_draft::ResponseEvidence>,
 }
 
 /// A human owner's externally published final answer. The task fence, canonical message,
@@ -245,6 +255,7 @@ pub struct HumanTaskCompletion<'a> {
     pub draft_id: crate::entities::response_draft::ResponseDraftId,
     pub draft_version: u32,
     pub recipient_snapshot: crate::entities::response_draft::DraftRecipientSnapshot,
+    pub evidence: Vec<crate::entities::response_draft::ResponseEvidence>,
     pub message: &'a MessageWrite,
     pub deliveries: Vec<NewDelivery>,
 }
@@ -253,6 +264,7 @@ pub struct HumanTaskCompletion<'a> {
 pub struct HumanTaskCompletionResult {
     pub message_id: CanonicalMessageId,
     pub deliveries: Vec<DeliveryCreation>,
+    pub pending_review: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -268,6 +280,11 @@ pub enum DispatchCommit {
     /// any that were absorbed onto a delivery an earlier run of this task had already queued,
     /// which is the idempotency key doing its job rather than a failure.
     Committed { deliveries: Vec<DeliveryCreation> },
+    /// The exact reply was retained as a draft and no canonical message or delivery was created.
+    PendingReview {
+        draft_id: crate::entities::response_draft::ResponseDraftId,
+        draft_version: u32,
+    },
     /// This run no longer owns the task, so nothing was written at all.
     LeaseLost,
 }
@@ -458,8 +475,8 @@ pub trait TaskPersistence: Send + Sync {
         lease: TaskLeaseRef,
     ) -> AppResult<Vec<AgentInstructionNote>>;
 
-    /// Resolve the agent behind the owner captured by this lease and its latest handoff. A stale
-    /// lease or an ineligible owner returns `None`, so execution fails closed.
+    /// Resolve the agent behind the owner captured by this lease and its latest private context. A
+    /// stale lease or an ineligible owner returns `None`, so execution fails closed.
     async fn owned_agent_execution(
         &self,
         _company_id: Uuid,

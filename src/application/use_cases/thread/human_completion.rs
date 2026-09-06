@@ -11,7 +11,7 @@ use crate::{
         company::Company,
         email_message::EmailMessageMetadata,
         message::{CanonicalMessageId, MessageDirection, MessageRole},
-        response_draft::{DraftRecipientSnapshot, ResponseDraftId},
+        response_draft::{DraftRecipientSnapshot, ResponseDraftId, ResponseEvidence},
         task::BackgroundTask,
         thread::Thread,
         transport::{DeliveryPurpose, PrincipalId, TransportKind},
@@ -21,6 +21,7 @@ use crate::{
     transport::{
         CanonicalContent, DeliveryContext, DeliveryRequest, EmailDeliveryContext, EmailThreading,
     },
+    use_cases::response_review::{DraftPublicationSnapshot, PreparedReviewDraft},
 };
 
 use super::{MessageAuthorWrite, MessageCorrelation, MessageWrite, ThreadUseCases};
@@ -34,6 +35,23 @@ pub struct HumanCompletionDraft<'a> {
     pub expected_ownership_version: u64,
     pub command_id: Uuid,
     pub text_body: &'a str,
+}
+
+pub struct ResponseReviewEditDraft<'a> {
+    pub draft_id: ResponseDraftId,
+    pub current_version: u32,
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub task_id: Option<Uuid>,
+    pub source_handoff_generation: Option<Uuid>,
+    pub actor_principal_id: PrincipalId,
+    pub subject: &'a str,
+    pub text_body: &'a str,
+    pub recipient_to: crate::entities::value_objects::EmailAddress,
+    pub recipients_cc: Vec<crate::entities::value_objects::EmailAddress>,
+    pub evidence: Vec<ResponseEvidence>,
+    pub current_publication: &'a DraftPublicationSnapshot,
 }
 
 impl ThreadUseCases {
@@ -135,10 +153,106 @@ impl ThreadUseCases {
                 draft_id: ResponseDraftId::new(draft.command_id),
                 draft_version: 1,
                 recipient_snapshot,
+                evidence: Vec::new(),
                 message: &message,
                 deliveries: vec![composed.delivery],
             })
             .await
+    }
+
+    /// Freeze a reviewer's edit as the next immutable version. Nothing is published here.
+    pub async fn prepare_response_review_edit(
+        &self,
+        edit: ResponseReviewEditDraft<'_>,
+    ) -> AppResult<PreparedReviewDraft> {
+        let subject = edit.subject.trim();
+        let body = edit.text_body.trim();
+        if subject.is_empty() || body.is_empty() || edit.recipient_to.is_empty() {
+            return Err(AppError::BadRequest(
+                "Subject, response, and primary recipient are required.".into(),
+            ));
+        }
+        let company = self
+            .company_persistence
+            .get_by_id(edit.company_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Company not found.".into()))?;
+        let channel = self
+            .channel_persistence
+            .get_by_id(edit.channel_id)
+            .await?
+            .filter(|channel| channel.company_id == edit.company_id)
+            .ok_or_else(|| AppError::NotFound("Channel not found.".into()))?;
+        let reply_to = self
+            .latest_replyable_email_context(edit.thread_id)
+            .await?
+            .ok_or_else(|| AppError::Conflict("This thread has no message to answer.".into()))?;
+        let threading = EmailThreading::received(reply_to.rfc_message_id, reply_to.references);
+        let message_id = CanonicalMessageId::random();
+        let content = CanonicalContent::parse(subject.to_string(), body.to_string())?;
+        let next_version = edit
+            .current_version
+            .checked_add(1)
+            .ok_or_else(|| AppError::Conflict("Draft version is exhausted.".into()))?;
+        let composed = self
+            .compose_delivery(DeliveryRequest {
+                company_id: edit.company_id,
+                channel_id: edit.channel_id,
+                message_id,
+                task_id: edit.task_id,
+                correlation_id: edit.current_publication.message().correlation_id,
+                purpose: edit.current_publication.delivery().purpose,
+                source_key: format!("review:{}:v{}", edit.draft_id, next_version),
+                content: &content,
+                context: DeliveryContext::Email(EmailDeliveryContext {
+                    from: Channel::address_for(
+                        &channel.slug,
+                        &company.slug,
+                        &self.config.app_domain_name,
+                    ),
+                    from_name: Some(channel.name.clone()),
+                    recipient_to: edit.recipient_to.clone(),
+                    recipients_cc: edit.recipients_cc.clone(),
+                    threading: threading.clone(),
+                    relay: None,
+                }),
+            })
+            .await?;
+        let current_message = edit.current_publication.message();
+        let message = MessageWrite {
+            id: message_id,
+            thread_id: edit.thread_id,
+            author: MessageAuthorWrite::Principal(edit.actor_principal_id),
+            subject: subject.to_string(),
+            clean_text_body: body.to_string(),
+            attachments: current_message.attachments.clone(),
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Human,
+            correlation_id: current_message.correlation_id,
+            participants: Vec::new(),
+            correlation: outbound_email_correlation(&composed, &threading, body.to_string()),
+            created_at: chrono::Utc::now(),
+            audience: crate::entities::message::MessageAudience::ExternalConversation,
+            entry_kind: current_message.entry_kind,
+        };
+        let publication = DraftPublicationSnapshot::new(message, composed.delivery)?
+            .with_also_in_threads(edit.current_publication.also_in_threads().to_vec())?;
+        let recipients = DraftRecipientSnapshot::email(edit.recipient_to, edit.recipients_cc);
+        let mut prepared = PreparedReviewDraft::new(
+            edit.draft_id,
+            next_version,
+            edit.company_id,
+            edit.channel_id,
+            edit.thread_id,
+            edit.task_id,
+            edit.actor_principal_id,
+            edit.actor_principal_id,
+            recipients,
+            edit.evidence,
+            publication,
+        )?;
+        prepared.source_handoff_generation = edit.source_handoff_generation;
+        Ok(prepared)
     }
 }
 

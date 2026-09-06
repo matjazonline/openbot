@@ -8,6 +8,7 @@
 pub mod test_support;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -23,7 +24,7 @@ use crate::{
 
 /// One sighting of a transport handle. Observing confers no grant; it only fixes which principal
 /// every later decision about that handle will name.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityObservation {
     pub identity: QualifiedIdentity,
     pub display_label: Option<String>,

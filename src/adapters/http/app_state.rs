@@ -30,6 +30,7 @@ use crate::{
         company_resend_api::{CompanyResendApiAccounts, CompanyResendApiUseCases},
         delivery::DeliveryReader,
         memory::MemoryUseCases,
+        response_review::ResponseReviewUseCases,
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::ThreadUseCases,
@@ -56,6 +57,7 @@ pub struct AppState {
     pub skill_use_cases: Arc<SkillUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+    pub response_review_use_cases: Arc<ResponseReviewUseCases>,
     pub memory_use_cases: Arc<MemoryUseCases>,
     pub memory_worker: Arc<MemoryWorker>,
     /// Owns claims on authenticated provider events. Routes only store and wake it.
@@ -176,6 +178,12 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
 impl FromRef<AppState> for Arc<ApprovalUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.approval_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<ResponseReviewUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.response_review_use_cases.clone()
     }
 }
 
