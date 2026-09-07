@@ -19,6 +19,7 @@ pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
 pub mod memory;
+pub mod notification;
 pub mod participant;
 pub mod response_review;
 pub mod runtime_metrics;

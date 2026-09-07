@@ -210,7 +210,7 @@ impl DeliveryWorker {
         }
 
         let outcome = sender.send(record, &part.rendered).await;
-        self.record_outcome_metric(record.transport, &outcome);
+        self.record_outcome_metric(record.transport, record.purpose, &outcome);
 
         match self
             .queue
@@ -326,7 +326,12 @@ impl DeliveryWorker {
         }
     }
 
-    fn record_outcome_metric(&self, transport: TransportKind, outcome: &ProviderSendOutcome) {
+    fn record_outcome_metric(
+        &self,
+        transport: TransportKind,
+        purpose: crate::entities::transport::DeliveryPurpose,
+        outcome: &ProviderSendOutcome,
+    ) {
         let Some(monitoring) = self.monitoring.as_ref() else {
             return;
         };
@@ -344,6 +349,13 @@ impl DeliveryWorker {
             1,
             &[("transport", transport.as_str()), ("outcome", kind)],
         );
+        if purpose == crate::entities::transport::DeliveryPurpose::Notification {
+            monitoring.increment_counter(
+                "notification_delivery_results_total",
+                1,
+                &[("transport", transport.as_str()), ("outcome", kind)],
+            );
+        }
     }
 }
 

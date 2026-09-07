@@ -48,8 +48,8 @@ use crate::{
         value_objects::MessageId,
     },
     task_queue::{
-        AssignmentNotificationRecipient, CollaborationReadScope, DelegationCommandRequest,
-        HumanTaskCompletion, HumanTaskCompletionResult, OutreachReassignmentContext,
+        CollaborationReadScope, DelegationCommandRequest, HumanTaskCompletion,
+        HumanTaskCompletionResult, OutreachReassignmentContext,
     },
     transport::{DeliveryCreation, NewDelivery},
     use_cases::response_review::{DraftPublicationSnapshot, PreparedReviewDraft},
@@ -1206,43 +1206,7 @@ impl TaskPersistence for PostgresPersistence {
         &self,
         command: TaskOwnershipCommand,
     ) -> AppResult<TaskOwnershipEvent> {
-        change_task_ownership_on(&self.pool, command, None).await
-    }
-
-    async fn change_task_ownership_with_notification(
-        &self,
-        command: TaskOwnershipCommand,
-        notification: Option<crate::transport::NewStandaloneDelivery>,
-    ) -> AppResult<TaskOwnershipEvent> {
-        change_task_ownership_on(&self.pool, command, notification).await
-    }
-
-    async fn assignment_notification_recipient(
-        &self,
-        company_id: Uuid,
-        principal_id: PrincipalId,
-    ) -> AppResult<Option<AssignmentNotificationRecipient>> {
-        let recipient: Option<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT users.id, users.email
-               FROM principals AS principal
-               JOIN users ON users.id = principal.user_id
-               LEFT JOIN user_notification_preferences AS preference
-                 ON preference.user_id = users.id
-               WHERE principal.company_id = $1 AND principal.id = $2
-                 AND principal.kind = 'person'
-                 AND COALESCE(preference.task_assignment_email_enabled, TRUE)"#,
-        )
-        .bind(company_id)
-        .bind(principal_id.as_uuid())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-        Ok(
-            recipient.map(|(user_id, email)| AssignmentNotificationRecipient {
-                user_id,
-                email: email.into(),
-            }),
-        )
+        change_task_ownership_on(&self.pool, command).await
     }
 
     async fn list_task_ownership_events(

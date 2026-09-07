@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::transport::NewStandaloneDelivery;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
@@ -259,7 +258,6 @@ fn authorize(
 pub(crate) async fn change_task_ownership_on(
     pool: &sqlx::PgPool,
     command: TaskOwnershipCommand,
-    assignment_notification: Option<NewStandaloneDelivery>,
 ) -> AppResult<TaskOwnershipEvent> {
     command.validate().map_err(AppError::BadRequest)?;
     let fingerprint = command_fingerprint(&command)?;
@@ -452,14 +450,6 @@ pub(crate) async fn change_task_ownership_on(
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
-
-    if let Some(notification) = assignment_notification {
-        crate::adapters::persistence::delivery::enqueue::insert_standalone_delivery_on(
-            &mut tx,
-            &notification,
-        )
-        .await?;
-    }
 
     tx.commit().await.map_err(AppError::from)?;
     event.try_into()

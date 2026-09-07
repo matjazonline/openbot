@@ -1518,23 +1518,9 @@ impl ThreadUseCases {
 
     pub async fn change_task_ownership(
         &self,
-        company: &Company,
-        task: &BackgroundTask,
         command: TaskOwnershipCommand,
     ) -> AppResult<TaskOwnershipEvent> {
-        crate::services::task_assignment_notification::change_ownership_with_assignment_notification(
-            self.task_persistence.as_ref(),
-            &self.deliveries,
-            &self.config,
-            crate::services::task_assignment_notification::AssignmentNotificationContext {
-                company_name: &company.name,
-                channel_id: task.channel_id,
-                thread_id: task.thread_id,
-                correlation_id: task.correlation_id,
-            },
-            command,
-        )
-        .await
+        self.task_persistence.change_task_ownership(command).await
     }
 
     /// Execute a recovery command, composing a replacement internal request first when the

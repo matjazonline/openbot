@@ -86,13 +86,13 @@ impl ListQuery {
     }
 }
 
-struct ReadContext {
-    access: CompanyAccess,
-    principal_id: PrincipalId,
-    visible_channel_ids: Vec<Uuid>,
+pub(super) struct ReadContext {
+    pub(super) access: CompanyAccess,
+    pub(super) principal_id: PrincipalId,
+    pub(super) visible_channel_ids: Vec<Uuid>,
 }
 
-async fn read_context(
+pub(super) async fn read_context(
     companies: &CompanyUseCases,
     channels: &ChannelUseCases,
     threads: &ThreadUseCases,

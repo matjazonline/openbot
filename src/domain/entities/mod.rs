@@ -20,6 +20,7 @@ pub mod internal_note;
 pub mod memory;
 pub mod message;
 pub mod message_view;
+pub mod notification;
 pub mod outreach;
 pub mod participant;
 pub mod quoted_text;

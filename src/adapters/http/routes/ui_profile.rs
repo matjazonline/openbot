@@ -26,6 +26,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         company_member::CompanyMembership,
+        notification::NotificationPreferences,
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
@@ -94,7 +95,11 @@ pub struct CodeForm {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct NotificationPreferencesForm {
-    pub task_assignment_email_enabled: Option<String>,
+    pub assignment_email_enabled: Option<String>,
+    pub response_review_email_enabled: Option<String>,
+    pub delegation_timeout_email_enabled: Option<String>,
+    pub task_failure_email_enabled: Option<String>,
+    pub delivery_failure_email_enabled: Option<String>,
 }
 
 /// The account and everything waiting on a code for it, which is what any pane render needs.
@@ -105,7 +110,7 @@ struct Account {
     user: User,
     pending: Vec<PendingChange>,
     methods: LoginMethods,
-    task_assignment_email_enabled: bool,
+    notification_preferences: NotificationPreferences,
 }
 
 impl Account {
@@ -114,9 +119,7 @@ impl Account {
             user: load_account(user_use_cases, user_id).await?,
             pending: user_use_cases.pending_account_changes(user_id).await?,
             methods: user_use_cases.login_methods(user_id).await?,
-            task_assignment_email_enabled: user_use_cases
-                .task_assignment_email_enabled(user_id)
-                .await?,
+            notification_preferences: user_use_cases.notification_preferences(user_id).await?,
         })
     }
 
@@ -132,7 +135,7 @@ impl Account {
             methods: &self.methods,
             google_enabled: GoogleOAuthConfig::from_env().is_some(),
             apple_enabled: AppleOAuthConfig::from_env().is_some(),
-            task_assignment_email_enabled: self.task_assignment_email_enabled,
+            notification_preferences: self.notification_preferences,
             outcome,
         })
     }
@@ -163,12 +166,24 @@ async fn update_notification_preferences(
     user: AuthenticatedUser,
     Form(form): Form<NotificationPreferencesForm>,
 ) -> AppResult<Html<String>> {
-    let enabled = matches!(
-        form.task_assignment_email_enabled.as_deref(),
-        Some("true" | "on")
-    );
+    let enabled = |value: Option<&str>| matches!(value, Some("true" | "on"));
     user_use_cases
-        .set_task_assignment_email_enabled(user.id, enabled)
+        .set_notification_preferences(
+            user.id,
+            NotificationPreferences {
+                assignment_email_enabled: enabled(form.assignment_email_enabled.as_deref()),
+                response_review_email_enabled: enabled(
+                    form.response_review_email_enabled.as_deref(),
+                ),
+                delegation_timeout_email_enabled: enabled(
+                    form.delegation_timeout_email_enabled.as_deref(),
+                ),
+                task_failure_email_enabled: enabled(form.task_failure_email_enabled.as_deref()),
+                delivery_failure_email_enabled: enabled(
+                    form.delivery_failure_email_enabled.as_deref(),
+                ),
+            },
+        )
         .await?;
     let account = Account::load(&user_use_cases, user.id).await?;
     Ok(Html(account.pane(

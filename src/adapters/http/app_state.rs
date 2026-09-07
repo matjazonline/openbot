@@ -8,7 +8,7 @@ use crate::{
         http::session::SessionAuthority, persistence::dashboard::DashboardPersistence,
         storage::FileStorage,
     },
-    application::attention::AttentionPersistence,
+    application::{attention::AttentionPersistence, notification::NotificationPersistence},
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
     infra::{
@@ -19,6 +19,7 @@ use crate::{
         database_query_health::DatabaseQueryHealthService,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_worker::MemoryWorker,
+        notification_worker::NotificationWorker,
         runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
     },
     transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
@@ -72,6 +73,10 @@ pub struct AppState {
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
     /// Derived human work and durable business summaries; source commands remain authoritative.
     pub attention: Arc<dyn AttentionPersistence>,
+    /// Recipient-facing projection over the same operational sources as `attention`.
+    pub notifications: Arc<dyn NotificationPersistence>,
+    /// Owns durable notification-event claims and enqueues optional email through deliveries.
+    pub notification_worker: Arc<NotificationWorker>,
     /// Shared across tabs so the operator query-statistics cache is process-wide.
     pub database_query_health: Arc<DatabaseQueryHealthService>,
     /// Current dashboard streams on this process; the stream guard updates it on disconnect too.
@@ -205,6 +210,12 @@ impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
 impl FromRef<AppState> for Arc<dyn AttentionPersistence> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.attention.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn NotificationPersistence> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.notifications.clone()
     }
 }
 

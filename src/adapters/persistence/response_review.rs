@@ -299,14 +299,16 @@ pub(crate) async fn create_review_draft_on(
     // this point, so every reviewer sees the same response-level provenance for this version.
     sqlx::query(
         r#"INSERT INTO response_reviews (
-               company_id, draft_id, draft_version, reviewer_principal_id, expires_at
-           ) VALUES ($1, $2, $3, $4, $5)"#,
+               company_id, draft_id, draft_version, reviewer_principal_id, expires_at,
+               notification_actor_principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6)"#,
     )
     .bind(draft.company_id)
     .bind(draft.id.as_uuid())
     .bind(i32::try_from(draft.version).unwrap_or(i32::MAX))
     .bind(reviewer.as_uuid())
     .bind(draft.expires_at)
+    .bind(draft.created_by_principal_id.as_uuid())
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;

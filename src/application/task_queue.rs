@@ -32,9 +32,9 @@ use crate::{
             TaskStatusEventCursor, ThreadWorkSummary,
         },
         transport::{DeliveryId, QualifiedIdentity},
-        value_objects::{EmailAddress, MessageId},
+        value_objects::MessageId,
     },
-    transport::{DeliveryCreation, NewDelivery, NewStandaloneDelivery},
+    transport::{DeliveryCreation, NewDelivery},
     use_cases::thread::{AgentReply, MessageWrite, TaskChannelTarget},
 };
 
@@ -267,12 +267,6 @@ pub struct HumanTaskCompletionResult {
     pub pending_review: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AssignmentNotificationRecipient {
-    pub user_id: Uuid,
-    pub email: EmailAddress,
-}
-
 /// What [`TaskPersistence::commit_agent_dispatch`] did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchCommit {
@@ -495,27 +489,6 @@ pub trait TaskPersistence: Send + Sync {
         Err(AppError::Internal(
             "Task ownership persistence is not configured".into(),
         ))
-    }
-
-    async fn change_task_ownership_with_notification(
-        &self,
-        command: TaskOwnershipCommand,
-        notification: Option<NewStandaloneDelivery>,
-    ) -> AppResult<TaskOwnershipEvent> {
-        if notification.is_some() {
-            return Err(AppError::Internal(
-                "Atomic assignment notification persistence is not configured".into(),
-            ));
-        }
-        self.change_task_ownership(command).await
-    }
-
-    async fn assignment_notification_recipient(
-        &self,
-        _company_id: Uuid,
-        _principal_id: crate::entities::transport::PrincipalId,
-    ) -> AppResult<Option<AssignmentNotificationRecipient>> {
-        Ok(None)
     }
 
     async fn list_task_ownership_events(

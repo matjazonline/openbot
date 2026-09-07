@@ -41,6 +41,7 @@ const INBOUND_EVENT_CHANNEL: &str = "inbound_event_ready";
 const TASK_READY_CHANNEL: &str = "task_ready";
 const TASK_OWNERSHIP_CHANNEL: &str = "task_ownership_changed";
 const ATTENTION_CHANNEL: &str = "attention_changed";
+const ACTIONABLE_NOTIFICATION_CHANNEL: &str = "actionable_notification_changed";
 
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
 /// loss here — a lagged subscriber re-queries from its cursor and catches up in one round trip —
@@ -72,6 +73,13 @@ pub struct AttentionScope {
     pub channel_id: Uuid,
     pub source_kind: AttentionWakeSource,
     pub source_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub struct NotificationScope {
+    pub company_id: Uuid,
+    pub recipient_user_id: Uuid,
+    pub notification_id: Uuid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -140,6 +148,7 @@ pub enum MailboxEvent {
     ActivityChanged(ThreadScope),
     TaskChainChanged(TaskChainScope),
     AttentionChanged(AttentionScope),
+    NotificationChanged(NotificationScope),
 }
 
 impl MailboxEvent {
@@ -148,7 +157,9 @@ impl MailboxEvent {
             MailboxEvent::MessageCommitted(scope) | MailboxEvent::ActivityChanged(scope) => {
                 Some(*scope)
             }
-            MailboxEvent::TaskChainChanged(_) | MailboxEvent::AttentionChanged(_) => None,
+            MailboxEvent::TaskChainChanged(_)
+            | MailboxEvent::AttentionChanged(_)
+            | MailboxEvent::NotificationChanged(_) => None,
         }
     }
 
@@ -183,6 +194,13 @@ impl MailboxEvent {
     pub fn attention_scope(&self, company_id: Uuid) -> Option<AttentionScope> {
         match self {
             Self::AttentionChanged(scope) if scope.company_id == company_id => Some(*scope),
+            _ => None,
+        }
+    }
+
+    pub fn notification_scope(&self, user_id: Uuid) -> Option<NotificationScope> {
+        match self {
+            Self::NotificationChanged(scope) if scope.recipient_user_id == user_id => Some(*scope),
             _ => None,
         }
     }
@@ -268,6 +286,7 @@ async fn listen_until_error(
             TASK_READY_CHANNEL,
             TASK_OWNERSHIP_CHANNEL,
             ATTENTION_CHANNEL,
+            ACTIONABLE_NOTIFICATION_CHANNEL,
         ])
         .await?;
     info!("Listening for mailbox notifications");
@@ -300,6 +319,10 @@ async fn listen_until_error(
                 .map(MailboxEvent::TaskChainChanged),
             ATTENTION_CHANNEL => serde_json::from_str::<AttentionScope>(notification.payload())
                 .map(MailboxEvent::AttentionChanged),
+            ACTIONABLE_NOTIFICATION_CHANNEL => {
+                serde_json::from_str::<NotificationScope>(notification.payload())
+                    .map(MailboxEvent::NotificationChanged)
+            }
             other => {
                 warn!(
                     channel = other,
@@ -383,6 +406,20 @@ mod tests {
                 channel_id: id(2),
                 source_kind: AttentionWakeSource::Handoff,
                 source_id: id(6),
+            }
+        );
+
+        let notification_payload = r#"{
+            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
+            "recipient_user_id": "0a8f5f5e-0000-4000-8000-000000000004",
+            "notification_id": "0a8f5f5e-0000-4000-8000-000000000005"
+        }"#;
+        assert_eq!(
+            serde_json::from_str::<NotificationScope>(notification_payload).unwrap(),
+            NotificationScope {
+                company_id: id(3),
+                recipient_user_id: id(4),
+                notification_id: id(5),
             }
         );
     }

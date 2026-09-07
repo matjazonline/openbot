@@ -7,6 +7,7 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        notification::NotificationPreferences,
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
@@ -26,6 +27,15 @@ pub struct UserDb {
     pub password_hash: String,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct NotificationPreferencesDb {
+    assignment_email_enabled: bool,
+    response_review_email_enabled: bool,
+    delegation_timeout_email_enabled: bool,
+    task_failure_email_enabled: bool,
+    delivery_failure_email_enabled: bool,
 }
 
 #[async_trait]
@@ -141,37 +151,79 @@ impl UserPersistence for PostgresPersistence {
         Ok(db.into())
     }
 
-    async fn task_assignment_email_enabled(&self, id: Uuid) -> AppResult<bool> {
-        sqlx::query_scalar(
-            r#"SELECT COALESCE((
-                   SELECT task_assignment_email_enabled
-                   FROM user_notification_preferences
-                   WHERE user_id = $1
-               ), TRUE)"#,
+    async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences> {
+        let row = sqlx::query_as::<_, NotificationPreferencesDb>(
+            r#"SELECT
+                   COALESCE(preference.assignment_email_enabled, TRUE)
+                       AS assignment_email_enabled,
+                   COALESCE(preference.response_review_email_enabled, TRUE)
+                       AS response_review_email_enabled,
+                   COALESCE(preference.delegation_timeout_email_enabled, TRUE)
+                       AS delegation_timeout_email_enabled,
+                   COALESCE(preference.task_failure_email_enabled, TRUE)
+                       AS task_failure_email_enabled,
+                   COALESCE(preference.delivery_failure_email_enabled, TRUE)
+                       AS delivery_failure_email_enabled
+               FROM users AS account
+               LEFT JOIN user_notification_preferences AS preference
+                 ON preference.user_id = account.id
+               WHERE account.id = $1"#,
         )
         .bind(id)
         .fetch_one(&self.pool)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+        Ok(NotificationPreferences {
+            assignment_email_enabled: row.assignment_email_enabled,
+            response_review_email_enabled: row.response_review_email_enabled,
+            delegation_timeout_email_enabled: row.delegation_timeout_email_enabled,
+            task_failure_email_enabled: row.task_failure_email_enabled,
+            delivery_failure_email_enabled: row.delivery_failure_email_enabled,
+        })
     }
 
-    async fn set_task_assignment_email_enabled(&self, id: Uuid, enabled: bool) -> AppResult<()> {
+    async fn set_notification_preferences(
+        &self,
+        id: Uuid,
+        preferences: NotificationPreferences,
+    ) -> AppResult<()> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let account: Option<Uuid> =
+            sqlx::query_scalar("SELECT id FROM users AS account WHERE account.id = $1 FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(AppError::from)?;
+        if account.is_none() {
+            return Err(AppError::NotFound("User not found".into()));
+        }
         let result = sqlx::query(
             r#"INSERT INTO user_notification_preferences (
-                   user_id, task_assignment_email_enabled, updated_at
-               ) SELECT id, $2, CURRENT_TIMESTAMP FROM users WHERE id = $1
+                   user_id, assignment_email_enabled, response_review_email_enabled,
+                   delegation_timeout_email_enabled, task_failure_email_enabled,
+                   delivery_failure_email_enabled, updated_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
                ON CONFLICT (user_id) DO UPDATE
-               SET task_assignment_email_enabled = EXCLUDED.task_assignment_email_enabled,
+               SET assignment_email_enabled = EXCLUDED.assignment_email_enabled,
+                   response_review_email_enabled = EXCLUDED.response_review_email_enabled,
+                   delegation_timeout_email_enabled = EXCLUDED.delegation_timeout_email_enabled,
+                   task_failure_email_enabled = EXCLUDED.task_failure_email_enabled,
+                   delivery_failure_email_enabled = EXCLUDED.delivery_failure_email_enabled,
                    updated_at = CURRENT_TIMESTAMP"#,
         )
         .bind(id)
-        .bind(enabled)
-        .execute(&self.pool)
+        .bind(preferences.assignment_email_enabled)
+        .bind(preferences.response_review_email_enabled)
+        .bind(preferences.delegation_timeout_email_enabled)
+        .bind(preferences.task_failure_email_enabled)
+        .bind(preferences.delivery_failure_email_enabled)
+        .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
         if result.rows_affected() == 0 {
             return Err(AppError::NotFound("User not found".into()));
         }
+        transaction.commit().await.map_err(AppError::from)?;
         Ok(())
     }
 
@@ -883,6 +935,41 @@ mod tests {
                 .expect("the account")
                 .email,
             mover.email
+        );
+    }
+
+    #[tokio::test]
+    async fn notification_preferences_default_and_round_trip_every_email_family() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let user = account(&persistence).await;
+        assert_eq!(
+            persistence
+                .notification_preferences(user.id)
+                .await
+                .expect("default preferences"),
+            NotificationPreferences::default()
+        );
+
+        let expected = NotificationPreferences {
+            assignment_email_enabled: false,
+            response_review_email_enabled: true,
+            delegation_timeout_email_enabled: false,
+            task_failure_email_enabled: true,
+            delivery_failure_email_enabled: false,
+        };
+        persistence
+            .set_notification_preferences(user.id, expected)
+            .await
+            .expect("stored preferences");
+        assert_eq!(
+            persistence
+                .notification_preferences(user.id)
+                .await
+                .expect("updated preferences"),
+            expected
         );
     }
 

@@ -85,7 +85,7 @@ pub struct ProfilePane<'a> {
     pub methods: &'a LoginMethods,
     pub google_enabled: bool,
     pub apple_enabled: bool,
-    pub task_assignment_email_enabled: bool,
+    pub notification_preferences: crate::entities::notification::NotificationPreferences,
     pub outcome: ProfileOutcome<'a>,
 }
 
@@ -150,23 +150,56 @@ fn notification_preferences_section(pane: &ProfilePane<'_>) -> String {
     format!(
         r##"<section class="mb-6 rounded-box border border-base-300 p-5">
             <h2 class="text-lg font-semibold">Notifications</h2>
-            <p class="mb-4 text-sm opacity-70">Choose which direct task assignments are emailed to you.</p>
+            <p class="mb-4 text-sm opacity-70">In-app alerts always remain available. Choose which urgent responsibility changes are also emailed.</p>
             {banner}
             <form hx-put="/ui/profile/notifications" hx-target="#profile-pane" hx-swap="outerHTML">
-                <label class="label cursor-pointer justify-start gap-3">
-                    <input type="checkbox" name="task_assignment_email_enabled" value="true"
-                        class="toggle toggle-primary"{checked}>
-                    <span>Email me when someone else assigns a task to me</span>
-                </label>
+                {assignment}
+                {review}
+                {delegation}
+                {task_failure}
+                {delivery_failure}
                 <button type="submit" class="btn btn-primary btn-sm mt-3">Save notifications</button>
             </form>
         </section>"##,
         banner = pane.outcome.banner(ProfileForm::Notifications),
-        checked = if pane.task_assignment_email_enabled {
-            " checked"
-        } else {
-            ""
-        },
+        assignment = notification_toggle(
+            "assignment_email_enabled",
+            "Assignments and transfers to me",
+            pane.notification_preferences.assignment_email_enabled
+        ),
+        review = notification_toggle(
+            "response_review_email_enabled",
+            "Response reviews assigned to me",
+            pane.notification_preferences.response_review_email_enabled
+        ),
+        delegation = notification_toggle(
+            "delegation_timeout_email_enabled",
+            "Delegation timeouts that need my decision",
+            pane.notification_preferences
+                .delegation_timeout_email_enabled
+        ),
+        task_failure = notification_toggle(
+            "task_failure_email_enabled",
+            "Permanent task failures assigned to me",
+            pane.notification_preferences.task_failure_email_enabled
+        ),
+        delivery_failure = notification_toggle(
+            "delivery_failure_email_enabled",
+            "Permanent delivery failures assigned to me",
+            pane.notification_preferences.delivery_failure_email_enabled
+        ),
+    )
+}
+
+fn notification_toggle(name: &str, label: &str, checked: bool) -> String {
+    format!(
+        r#"<label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" name="{}" value="true" class="toggle toggle-primary"{}>
+            <span>{}</span>
+        </label>"#,
+        escape_html_attr(name),
+        if checked { " checked" } else { "" },
+        escape_html_text(label),
     )
 }
 

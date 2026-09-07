@@ -28,6 +28,7 @@ use crate::{
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
         memory_worker::MemoryWorker,
+        notification_worker::NotificationWorker,
         runtime_metrics::MemoryProviderActivity,
     },
     transport::{
@@ -202,6 +203,12 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
     );
     let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
+    let notification_worker = Arc::new(NotificationWorker::new(
+        postgres_arc.clone(),
+        delivery_composer.clone(),
+        config.clone(),
+        monitoring.clone(),
+    ));
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
         postgres_arc.clone(),
@@ -322,6 +329,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         task_wakeups,
         dashboard_persistence: postgres_arc.clone(),
         attention: postgres_arc.clone(),
+        notifications: postgres_arc.clone(),
+        notification_worker,
         database_query_health,
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         runtime_metrics: postgres_arc.clone(),

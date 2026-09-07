@@ -43,6 +43,7 @@ pub enum UiSection {
     Deliveries,
     Companies,
     Invites,
+    Notifications,
     /// The signed-in account's own details. Reached from the account menu rather than the rail --
     /// it is the one `/ui` page that is about the reader instead of about a company.
     Profile,
@@ -1436,6 +1437,7 @@ fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
                     <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
                         <li class="menu-title truncate">{email}</li>
                         <li><a href="/ui/profile">Profile</a></li>
+                        <li><a href="/ui/notifications">Notifications</a></li>
                         <li><a href="/ui/invites">My Invites</a></li>
 {agent_library}
                         <li>
@@ -1595,7 +1597,7 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
         }
         // Company settings are readable by the team, while their edit controls remain owner-only.
         UiSection::Companies => user.company_membership.is_team(),
-        UiSection::Invites | UiSection::Profile => false,
+        UiSection::Invites | UiSection::Notifications | UiSection::Profile => false,
     }
 }
 

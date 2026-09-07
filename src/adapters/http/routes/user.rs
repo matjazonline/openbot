@@ -759,6 +759,21 @@ mod tests {
             Ok(None)
         }
 
+        async fn notification_preferences(
+            &self,
+            _: uuid::Uuid,
+        ) -> AppResult<crate::entities::notification::NotificationPreferences> {
+            Ok(crate::entities::notification::NotificationPreferences::default())
+        }
+
+        async fn set_notification_preferences(
+            &self,
+            _: uuid::Uuid,
+            _: crate::entities::notification::NotificationPreferences,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+
         async fn update_avatar_url(
             &self,
             _: uuid::Uuid,

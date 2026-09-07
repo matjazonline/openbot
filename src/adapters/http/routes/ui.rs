@@ -817,6 +817,8 @@ async fn thread_message_stream(
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
                 // Thread-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
+                // Thread-scoped wake_ups filters these out before they reach this stream.
+                Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
                 // Something was missed and there is no telling what, so redo both.
                 Some(Wake::Lagged) => {
                     pending_messages = true;
@@ -972,6 +974,8 @@ async fn thread_column_stream(
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
                 // Channel-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
+                // Channel-scoped wake_ups filters these out before they reach this stream.
+                Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
                 // What was missed is unknown, so redraw the rows and every badge the column is
                 // likely to be showing rather than leave a stale spinner behind.
                 Some(Wake::Lagged) => {
@@ -1398,7 +1402,7 @@ async fn change_visible_task_ownership(
     let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
-    let task = thread_use_cases
+    thread_use_cases
         .get_task_persistence()
         .await
         .get_task_by_id(task_id)
@@ -1462,25 +1466,21 @@ async fn change_visible_task_ownership(
         _ => return Err(AppError::NotFound("Ownership action not found.".into())),
     };
     let outcome = thread_use_cases
-        .change_task_ownership(
-            &company,
-            &task,
-            TaskOwnershipCommand {
-                task_id,
-                company_id: company.id,
-                command_id: form.command_id,
-                expected_version: form.expected_ownership_version,
-                actor: TaskOwnershipActor {
-                    principal_id: actor,
-                    authority,
-                },
-                operation,
-                new_owner,
-                reason,
-                reason_detail: form.reason_detail,
-                handoff_instruction: form.handoff_instruction,
+        .change_task_ownership(TaskOwnershipCommand {
+            task_id,
+            company_id: company.id,
+            command_id: form.command_id,
+            expected_version: form.expected_ownership_version,
+            actor: TaskOwnershipActor {
+                principal_id: actor,
+                authority,
             },
-        )
+            operation,
+            new_owner,
+            reason,
+            reason_detail: form.reason_detail,
+            handoff_instruction: form.handoff_instruction,
+        })
         .await;
     if let Err(error) = outcome {
         return render_mailbox_ownership_error(

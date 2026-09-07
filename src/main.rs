@@ -32,6 +32,7 @@ use mail_agents::{
     services::{
         delivery_worker::DeliveryWorker,
         inbound_event_worker::InboundEventWorker,
+        notification_worker::NotificationWorker,
         runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
         task_worker::TaskWorker,
     },
@@ -153,6 +154,7 @@ async fn serve() -> anyhow::Result<()> {
     let app_state = init_app_state().await?;
     let memory_worker = app_state.memory_worker.clone();
     let inbound_event_worker: Arc<InboundEventWorker> = app_state.inbound_event_worker.clone();
+    let notification_worker: Arc<NotificationWorker> = app_state.notification_worker.clone();
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
@@ -187,6 +189,8 @@ async fn serve() -> anyhow::Result<()> {
     let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
     let mut inbound_event_worker_handle =
         tokio::spawn(inbound_event_worker.run(shutdown_rx.resubscribe()));
+    let mut notification_worker_handle =
+        tokio::spawn(notification_worker.run(shutdown_rx.resubscribe()));
 
     // The delivery queue is drained by its own worker rather than by the task loop. A delivery
     // outlives the task that produced it, plenty of deliveries have no task behind them at all,
@@ -262,6 +266,7 @@ async fn serve() -> anyhow::Result<()> {
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("memory worker", &mut memory_worker_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
+        join_background("notification projector", &mut notification_worker_handle),
         join_background("task worker", &mut task_worker_handle),
         join_background("delivery worker", &mut delivery_worker_handle),
         join_background("SMTP listener", &mut smtp_handle),

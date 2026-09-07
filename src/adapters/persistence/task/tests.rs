@@ -449,31 +449,6 @@ async fn competing_ownership_claims_are_versioned_and_idempotent() {
     .await
     .unwrap();
 
-    assert!(
-        persistence
-            .assignment_notification_recipient(company.id, member_principal)
-            .await
-            .unwrap()
-            .is_some(),
-        "assignment email defaults on"
-    );
-    sqlx::query(
-        "INSERT INTO user_notification_preferences (user_id, task_assignment_email_enabled) \
-         VALUES ($1, FALSE)",
-    )
-    .bind(member_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-    assert!(
-        persistence
-            .assignment_notification_recipient(company.id, member_principal)
-            .await
-            .unwrap()
-            .is_none(),
-        "the recipient's disabled preference suppresses assignment email"
-    );
-
     let unassigned = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     let first = ownership_command(
         &unassigned,

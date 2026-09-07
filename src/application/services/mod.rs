@@ -13,11 +13,11 @@ mod memory_job_schedule;
 pub mod memory_provider;
 pub mod memory_worker;
 pub mod native_tools;
+pub mod notification_worker;
 pub mod outreach_tool;
 pub mod prompt_fence;
 pub mod runtime_metrics;
 pub mod spam_scanner;
-pub mod task_assignment_notification;
 pub mod task_ownership_tool;
 pub mod task_worker;
 

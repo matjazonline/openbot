@@ -15,10 +15,8 @@ use crate::{
         },
         value_objects::ToolId,
     },
-    infra::config::AppConfig,
     services::harness::{NativeToolDeclaration, NativeToolSafety, ToolInvocation},
     task_queue::TaskPersistence,
-    transport::DeliveryComposer,
 };
 
 pub use crate::entities::tool_catalogue::TASK_OWNERSHIP_TOOL_ID;
@@ -28,9 +26,6 @@ pub struct TaskOwnershipToolContext {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub lease: crate::entities::task::TaskLeaseRef,
-    pub company_name: String,
-    pub thread_id: Option<Uuid>,
-    pub correlation_id: crate::entities::correlation::CorrelationId,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
@@ -81,22 +76,13 @@ struct OwnershipToolInput {
 
 pub struct TaskOwnershipTool {
     persistence: Arc<dyn TaskPersistence>,
-    deliveries: DeliveryComposer,
-    config: Arc<AppConfig>,
     context: TaskOwnershipToolContext,
 }
 
 impl TaskOwnershipTool {
-    pub fn new(
-        persistence: Arc<dyn TaskPersistence>,
-        deliveries: DeliveryComposer,
-        config: Arc<AppConfig>,
-        context: TaskOwnershipToolContext,
-    ) -> Self {
+    pub fn new(persistence: Arc<dyn TaskPersistence>, context: TaskOwnershipToolContext) -> Self {
         Self {
             persistence,
-            deliveries,
-            config,
             context,
         }
     }
@@ -203,20 +189,7 @@ impl TaskOwnershipTool {
             reason_detail: input.reason_detail,
             handoff_instruction: input.handoff_instruction,
         };
-        match crate::services::task_assignment_notification::change_ownership_with_assignment_notification(
-            self.persistence.as_ref(),
-            &self.deliveries,
-            &self.config,
-            crate::services::task_assignment_notification::AssignmentNotificationContext {
-                company_name: &self.context.company_name,
-                channel_id: self.context.channel_id,
-                thread_id: self.context.thread_id,
-                correlation_id: self.context.correlation_id,
-            },
-            command,
-        )
-        .await
-        {
+        match self.persistence.change_task_ownership(command).await {
             Ok(event) => ToolInvocation::suspended(serde_json::json!({
                 "task_id": event.task_id,
                 "operation": event.operation.as_str(),

@@ -5720,7 +5720,7 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5760,7 +5760,7 @@ fn an_oauth_only_profile_can_add_password_and_connect_available_providers() {
         },
         google_enabled: true,
         apple_enabled: true,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5790,7 +5790,7 @@ fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Identity,
             "An account already uses the address 'taken@example.com'.",
@@ -5820,7 +5820,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Saved(ProfileForm::Password, "Your password has been changed."),
     });
     let (details, password) = saved
@@ -5840,7 +5840,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Password,
             "That is not your current password.",
@@ -5887,7 +5887,7 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -5974,7 +5974,7 @@ fn a_section_waiting_on_a_code_asks_for_it_instead_of_offering_its_form_again() 
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -6009,7 +6009,7 @@ fn a_pending_password_change_leaves_the_account_details_form_alone() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -6039,7 +6039,7 @@ fn a_pending_address_is_never_shown_as_the_account_s_own() {
         },
         google_enabled: false,
         apple_enabled: false,
-        task_assignment_email_enabled: true,
+        notification_preferences: Default::default(),
         outcome: ProfileOutcome::Saved(
             ProfileForm::Identity,
             "Your name and picture are saved. Check the new address for the code.",

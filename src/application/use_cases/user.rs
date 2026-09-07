@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        notification::NotificationPreferences,
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
@@ -117,13 +118,13 @@ pub trait UserPersistence: Send + Sync {
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;
 
-    async fn task_assignment_email_enabled(&self, _id: Uuid) -> AppResult<bool> {
-        Ok(true)
-    }
+    async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences>;
 
-    async fn set_task_assignment_email_enabled(&self, _id: Uuid, _enabled: bool) -> AppResult<()> {
-        Ok(())
-    }
+    async fn set_notification_preferences(
+        &self,
+        id: Uuid,
+        preferences: NotificationPreferences,
+    ) -> AppResult<()>;
 
     /// Stores the account's profile picture, or clears it with `None`. `Ok(None)` means no such
     /// user, so a stale session cannot silently write nothing.
@@ -653,17 +654,17 @@ impl UserUseCases {
         self.persistence.get_by_id(id).await
     }
 
-    pub async fn task_assignment_email_enabled(&self, id: Uuid) -> AppResult<bool> {
-        self.persistence.task_assignment_email_enabled(id).await
+    pub async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences> {
+        self.persistence.notification_preferences(id).await
     }
 
-    pub async fn set_task_assignment_email_enabled(
+    pub async fn set_notification_preferences(
         &self,
         id: Uuid,
-        enabled: bool,
+        preferences: NotificationPreferences,
     ) -> AppResult<()> {
         self.persistence
-            .set_task_assignment_email_enabled(id, enabled)
+            .set_notification_preferences(id, preferences)
             .await
     }
 
@@ -1083,6 +1084,18 @@ mod test {
 
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<User>> {
             Ok(Some(self.stored.lock().unwrap().clone()))
+        }
+
+        async fn notification_preferences(&self, _id: Uuid) -> AppResult<NotificationPreferences> {
+            Ok(NotificationPreferences::default())
+        }
+
+        async fn set_notification_preferences(
+            &self,
+            _id: Uuid,
+            _preferences: NotificationPreferences,
+        ) -> AppResult<()> {
+            Ok(())
         }
 
         async fn update_avatar_url(

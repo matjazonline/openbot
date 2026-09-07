@@ -435,26 +435,17 @@ impl<'a> AgentRunner<'a> {
 
             let mut context = context;
             context.sub_agent_scope = self.params.spec().sub_agents.clone();
-            if let Some(config) = self
+            if self
                 .app_config
                 .as_ref()
-                .filter(|config| config.task_ownership_controls_enabled())
+                .is_some_and(|config| config.task_ownership_controls_enabled())
             {
                 host = host.with_task_ownership(TaskOwnershipTool::new(
                     task_persistence.clone(),
-                    deliveries.clone(),
-                    config.clone(),
                     TaskOwnershipToolContext {
                         company_id: context.company_id,
                         channel_id: context.channel_id,
                         lease: context.lease,
-                        company_name: self
-                            .company
-                            .as_ref()
-                            .map(|company| company.name.clone())
-                            .unwrap_or_else(|| context.company_slug.as_str().to_string()),
-                        thread_id: Some(context.thread_id),
-                        correlation_id: context.correlation_id,
                     },
                 ));
             }

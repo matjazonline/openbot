@@ -354,6 +354,7 @@ async fn reassign_on(
     let version = i32::try_from(command.expected_draft_version).unwrap_or(i32::MAX);
     sqlx::query(
         r#"UPDATE response_reviews SET reviewer_principal_id = $4,
+                  notification_actor_principal_id = $5,
                   updated_at = CURRENT_TIMESTAMP
            WHERE company_id = $1 AND draft_id = $2 AND draft_version = $3"#,
     )
@@ -361,6 +362,7 @@ async fn reassign_on(
     .bind(command.draft_id.as_uuid())
     .bind(version)
     .bind(reviewer.as_uuid())
+    .bind(command.actor_principal_id.as_uuid())
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;

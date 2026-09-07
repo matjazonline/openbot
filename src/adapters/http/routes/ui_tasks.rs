@@ -796,25 +796,21 @@ async fn mutate_task_ownership(
     });
     let outcome = workspace
         .thread_use_cases
-        .change_task_ownership(
-            &company,
-            &task,
-            TaskOwnershipCommand {
-                task_id,
-                company_id: company.id,
-                command_id: form.command_id,
-                expected_version: form.expected_ownership_version,
-                actor: TaskOwnershipActor {
-                    principal_id: actor,
-                    authority: TaskOwnershipAuthority::Manager,
-                },
-                operation,
-                new_owner,
-                reason,
-                reason_detail: form.reason_detail,
-                handoff_instruction: form.handoff_instruction,
+        .change_task_ownership(TaskOwnershipCommand {
+            task_id,
+            company_id: company.id,
+            command_id: form.command_id,
+            expected_version: form.expected_ownership_version,
+            actor: TaskOwnershipActor {
+                principal_id: actor,
+                authority: TaskOwnershipAuthority::Manager,
             },
-        )
+            operation,
+            new_owner,
+            reason,
+            reason_detail: form.reason_detail,
+            handoff_instruction: form.handoff_instruction,
+        })
         .await;
 
     view.after_write(
