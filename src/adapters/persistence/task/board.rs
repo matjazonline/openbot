@@ -516,7 +516,8 @@ pub(crate) async fn chain_detail_on(
 
     let mut task_rows = sqlx::query_as::<_, BackgroundTaskDb>(
         r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                  payload, retry_count, max_retries, last_error, owner_principal_id,
+                  payload, retry_count, max_retries, last_error, business_priority,
+                  business_due_at, attention_version, owner_principal_id,
                   owner_principal_kind, ownership_version, worker_id,
                   execution_generation, locked_at, lock_expires_at, run_at, created_at,
                   updated_at

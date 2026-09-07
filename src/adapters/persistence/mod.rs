@@ -6,6 +6,7 @@ use crate::app_error::AppError;
 pub mod agent;
 pub mod agent_channel;
 pub mod approval;
+pub mod attention;
 pub mod channel;
 pub mod company;
 pub mod company_invite;

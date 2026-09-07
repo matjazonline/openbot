@@ -3,6 +3,7 @@ pub mod agent_library;
 pub mod apple_auth;
 pub mod approval;
 pub mod assets;
+pub mod attention;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
@@ -77,6 +78,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(agent::router())
         .merge(agent_library::router())
         .merge(approval::router())
+        .merge(attention::router())
         .merge(monitoring::router())
         .merge(onboarding::router())
         .merge(ui::router())

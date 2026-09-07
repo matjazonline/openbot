@@ -208,7 +208,8 @@ pub(crate) async fn stop_task_on(
            WHERE id = $1
              AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                     payload, retry_count, max_retries, last_error, owner_principal_id,
+                     payload, retry_count, max_retries, last_error, business_priority,
+                     business_due_at, attention_version, owner_principal_id,
                      owner_principal_kind, ownership_version, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
@@ -313,7 +314,8 @@ pub(crate) async fn resume_task_on(
            WHERE id = $1
              AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                     payload, retry_count, max_retries, last_error, owner_principal_id,
+                     payload, retry_count, max_retries, last_error, business_priority,
+                     business_due_at, attention_version, owner_principal_id,
                      owner_principal_kind, ownership_version, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
@@ -353,7 +355,8 @@ pub(crate) async fn insert_task(
     // Neither branch touches `correlation_id`: a redelivered cause joins the chain its first
     // delivery started rather than overwriting it with a fresher one.
     const RETURNING: &str = "RETURNING id, company_id, channel_id, thread_id, correlation_id, \
-         task_type, status, payload, retry_count, max_retries, last_error, owner_principal_id, \
+         task_type, status, payload, retry_count, max_retries, last_error, business_priority, \
+         business_due_at, attention_version, owner_principal_id, \
          owner_principal_kind, ownership_version, worker_id, \
          execution_generation, locked_at, lock_expires_at, run_at, created_at, updated_at";
     let conflict = match source {

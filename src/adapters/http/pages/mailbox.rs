@@ -38,6 +38,7 @@ pub enum UiSection {
     Channels,
     Agents,
     Schedules,
+    Work,
     Tasks,
     Deliveries,
     Companies,
@@ -1526,6 +1527,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
             Icon::Stopwatch,
             "Schedules",
         ),
+        (UiSection::Work, "/ui/work", Icon::Alert, "Work"),
         (UiSection::Tasks, "/ui/tasks", Icon::Gear, "Tasks"),
         (
             UiSection::Deliveries,
@@ -1582,7 +1584,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
 /// The rail mirrors route authorization instead of advertising workspaces the caller cannot open.
 fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
     match section {
-        UiSection::Mailbox => user.company_membership.is_team(),
+        UiSection::Mailbox | UiSection::Work => user.company_membership.is_team(),
         UiSection::Channels
         | UiSection::Agents
         | UiSection::Schedules

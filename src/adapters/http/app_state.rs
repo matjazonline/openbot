@@ -8,6 +8,7 @@ use crate::{
         http::session::SessionAuthority, persistence::dashboard::DashboardPersistence,
         storage::FileStorage,
     },
+    application::attention::AttentionPersistence,
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
     infra::{
@@ -69,6 +70,8 @@ pub struct AppState {
     pub task_wakeups: TaskWakeups,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Derived human work and durable business summaries; source commands remain authoritative.
+    pub attention: Arc<dyn AttentionPersistence>,
     /// Shared across tabs so the operator query-statistics cache is process-wide.
     pub database_query_health: Arc<DatabaseQueryHealthService>,
     /// Current dashboard streams on this process; the stream guard updates it on disconnect too.
@@ -196,6 +199,12 @@ impl FromRef<AppState> for Arc<MemoryUseCases> {
 impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.dashboard_persistence.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn AttentionPersistence> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.attention.clone()
     }
 }
 

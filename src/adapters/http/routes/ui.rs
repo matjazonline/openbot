@@ -815,6 +815,8 @@ async fn thread_message_stream(
                 Some(Wake::Event(MailboxEvent::ActivityChanged(_))) => pending_activity = true,
                 // Thread-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
+                // Thread-scoped wake_ups filters these out before they reach this stream.
+                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
                 // Something was missed and there is no telling what, so redo both.
                 Some(Wake::Lagged) => {
                     pending_messages = true;
@@ -968,6 +970,8 @@ async fn thread_column_stream(
                 }
                 // Channel-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
+                // Channel-scoped wake_ups filters these out before they reach this stream.
+                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
                 // What was missed is unknown, so redraw the rows and every badge the column is
                 // likely to be showing rather than leave a stale spinner behind.
                 Some(Wake::Lagged) => {

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
 
+use crate::entities::attention::BusinessPriority;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::runtime_metrics::MachineIdentity;
@@ -684,6 +685,11 @@ pub struct BackgroundTask {
     pub retry_count: i32,
     pub max_retries: i32,
     pub last_error: Option<String>,
+    /// Human-facing urgency. It never affects `run_at` or worker claims.
+    pub business_priority: BusinessPriority,
+    pub business_due_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Fence for priority/due changes; ownership has its own independent fence.
+    pub attention_version: u64,
     pub ownership: TaskOwnership,
     pub worker_id: Option<Uuid>,
     /// Set only while the row is `processing`. Minted at claim time, it is what a write from a

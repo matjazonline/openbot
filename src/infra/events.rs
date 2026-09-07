@@ -14,7 +14,7 @@
 //! [`crate::use_cases::thread::ThreadUseCases::get_thread_messages_after`].
 
 use crate::services::inbound_event_worker::InboundEventWakeups;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
 use tokio::sync::Notify;
@@ -40,6 +40,7 @@ const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
 const INBOUND_EVENT_CHANNEL: &str = "inbound_event_ready";
 const TASK_READY_CHANNEL: &str = "task_ready";
 const TASK_OWNERSHIP_CHANNEL: &str = "task_ownership_changed";
+const ATTENTION_CHANNEL: &str = "attention_changed";
 
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
 /// loss here — a lagged subscriber re-queries from its cursor and catches up in one round trip —
@@ -63,6 +64,24 @@ pub struct ThreadScope {
 pub struct TaskChainScope {
     pub company_id: Uuid,
     pub correlation_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub struct AttentionScope {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub source_kind: AttentionWakeSource,
+    pub source_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttentionWakeSource {
+    Task,
+    Handoff,
+    ResponseReview,
+    Delegation,
+    Delivery,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -120,6 +139,7 @@ pub enum MailboxEvent {
     MessageCommitted(ThreadScope),
     ActivityChanged(ThreadScope),
     TaskChainChanged(TaskChainScope),
+    AttentionChanged(AttentionScope),
 }
 
 impl MailboxEvent {
@@ -128,7 +148,7 @@ impl MailboxEvent {
             MailboxEvent::MessageCommitted(scope) | MailboxEvent::ActivityChanged(scope) => {
                 Some(*scope)
             }
-            MailboxEvent::TaskChainChanged(_) => None,
+            MailboxEvent::TaskChainChanged(_) | MailboxEvent::AttentionChanged(_) => None,
         }
     }
 
@@ -158,6 +178,13 @@ impl MailboxEvent {
 
     pub fn is_task_chain(&self, correlation_id: Uuid) -> bool {
         matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.correlation_id == correlation_id)
+    }
+
+    pub fn attention_scope(&self, company_id: Uuid) -> Option<AttentionScope> {
+        match self {
+            Self::AttentionChanged(scope) if scope.company_id == company_id => Some(*scope),
+            _ => None,
+        }
     }
 }
 
@@ -240,6 +267,7 @@ async fn listen_until_error(
             INBOUND_EVENT_CHANNEL,
             TASK_READY_CHANNEL,
             TASK_OWNERSHIP_CHANNEL,
+            ATTENTION_CHANNEL,
         ])
         .await?;
     info!("Listening for mailbox notifications");
@@ -270,6 +298,8 @@ async fn listen_until_error(
                 .map(MailboxEvent::ActivityChanged),
             TASK_CHAIN_CHANNEL => serde_json::from_str::<TaskChainScope>(notification.payload())
                 .map(MailboxEvent::TaskChainChanged),
+            ATTENTION_CHANNEL => serde_json::from_str::<AttentionScope>(notification.payload())
+                .map(MailboxEvent::AttentionChanged),
             other => {
                 warn!(
                     channel = other,
@@ -338,6 +368,22 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<TaskOwnershipScope>(ownership_payload).unwrap(),
             TaskOwnershipScope { task_id: id(5) }
+        );
+
+        let attention_payload = r#"{
+            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
+            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
+            "source_kind": "handoff",
+            "source_id": "0a8f5f5e-0000-4000-8000-000000000006"
+        }"#;
+        assert_eq!(
+            serde_json::from_str::<AttentionScope>(attention_payload).unwrap(),
+            AttentionScope {
+                company_id: id(3),
+                channel_id: id(2),
+                source_kind: AttentionWakeSource::Handoff,
+                source_id: id(6),
+            }
         );
     }
 

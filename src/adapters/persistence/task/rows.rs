@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
+    entities::attention::BusinessPriority,
     entities::runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
     entities::task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskChainCard,
@@ -33,6 +34,9 @@ pub struct BackgroundTaskDb {
     pub retry_count: i32,
     pub max_retries: i32,
     pub last_error: Option<String>,
+    pub business_priority: String,
+    pub business_due_at: Option<DateTime<Utc>>,
+    pub attention_version: i64,
     pub owner_principal_id: Option<Uuid>,
     pub owner_principal_kind: Option<String>,
     pub ownership_version: i64,
@@ -244,6 +248,12 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
                 db.id, db.ownership_version
             ))
         })?;
+        let attention_version = u64::try_from(db.attention_version).map_err(|_| {
+            AppError::Internal(format!(
+                "Invalid attention version for background task {}: {}",
+                db.id, db.attention_version
+            ))
+        })?;
 
         Ok(BackgroundTask {
             id: db.id,
@@ -257,6 +267,10 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
             retry_count: db.retry_count,
             max_retries: db.max_retries,
             last_error: db.last_error,
+            business_priority: BusinessPriority::from_str(&db.business_priority)
+                .map_err(AppError::Internal)?,
+            business_due_at: db.business_due_at,
+            attention_version,
             ownership: TaskOwnership {
                 owner,
                 version: ownership_version,

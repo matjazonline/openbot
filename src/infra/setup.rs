@@ -321,6 +321,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         inbound_event_wakeups,
         task_wakeups,
         dashboard_persistence: postgres_arc.clone(),
+        attention: postgres_arc.clone(),
         database_query_health,
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         runtime_metrics: postgres_arc.clone(),

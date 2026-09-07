@@ -317,7 +317,8 @@ pub(crate) async fn get_task_by_id_on(
 ) -> AppResult<Option<BackgroundTask>> {
     let db = sqlx::query_as::<_, BackgroundTaskDb>(
         r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                  retry_count, max_retries, last_error, owner_principal_id,
+                  retry_count, max_retries, last_error, business_priority, business_due_at,
+                  attention_version, owner_principal_id,
                   owner_principal_kind, ownership_version, worker_id, execution_generation,
                   locked_at, lock_expires_at, run_at, created_at, updated_at
            FROM background_tasks WHERE id = $1"#,
@@ -2115,7 +2116,8 @@ impl TaskPersistence for PostgresPersistence {
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
                          task.correlation_id, task.task_type, task.status, task.payload,
                          task.retry_count,
-                         task.max_retries, task.last_error, task.owner_principal_id,
+                         task.max_retries, task.last_error, task.business_priority,
+                         task.business_due_at, task.attention_version, task.owner_principal_id,
                          task.owner_principal_kind, task.ownership_version, task.worker_id, task.execution_generation, task.locked_at,
                          task.lock_expires_at, task.run_at, task.created_at, task.updated_at"#,
         )
@@ -2216,7 +2218,8 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
             r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, owner_principal_id,
+                      retry_count, max_retries, last_error, business_priority, business_due_at,
+                      attention_version, owner_principal_id,
                       owner_principal_kind, ownership_version, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks WHERE company_id = "#,
@@ -2262,7 +2265,8 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
             r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, owner_principal_id,
+                      retry_count, max_retries, last_error, business_priority, business_due_at,
+                      attention_version, owner_principal_id,
                       owner_principal_kind, ownership_version, worker_id, execution_generation,
                       locked_at, lock_expires_at, run_at, created_at, updated_at
                FROM background_tasks WHERE company_id = "#,
