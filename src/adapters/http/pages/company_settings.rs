@@ -676,7 +676,7 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
                     </div>
                 </fieldset>"##,
                 unused_option = unused_option,
-                provider_options = ["google", "openai", "anthropic", "groq"]
+                provider_options = crate::model_providers::SUPPORTED_MODEL_PROVIDERS
                     .into_iter()
                     .map(|provider| format!(
                         r#"<option value="{provider}"{}>{provider}</option>"#,

@@ -346,8 +346,9 @@ impl NotificationPersistence for PostgresPersistence {
 
     async fn notification_census(&self) -> AppResult<NotificationCensus> {
         let row: (Option<f64>, i64, i64) = sqlx::query_as(
-            r#"SELECT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - MIN(created_at))
-                       FILTER (WHERE state = 'active'),
+            r#"SELECT EXTRACT(EPOCH FROM (
+                          CURRENT_TIMESTAMP - MIN(created_at) FILTER (WHERE state = 'active')
+                      )),
                       (SELECT COUNT(*) FROM notification_events WHERE status = 'pending'),
                       (SELECT COUNT(*) FROM notification_events WHERE status = 'dead_letter')
                  FROM notifications"#,

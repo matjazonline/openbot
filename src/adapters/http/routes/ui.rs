@@ -459,7 +459,6 @@ pub(super) async fn render_message_pane(
         work,
         viewer_principal_id,
         viewer_manages_tasks,
-        ownership_controls_enabled: thread_use_cases.task_ownership_controls_enabled(),
         private_handoff,
         ownership_error,
         owner_candidates: &owner_candidates,
@@ -1292,11 +1291,6 @@ async fn complete_human_task(
     viewer: Viewer,
     Form(form): Form<HumanCompletionForm>,
 ) -> AppResult<Response> {
-    if !config.task_ownership_controls_enabled() {
-        return Err(AppError::NotFound(
-            "Task ownership controls are disabled.".into(),
-        ));
-    }
     let (company, channel) = load_viewable_channel(
         &company_use_cases,
         &channel_use_cases,
@@ -1386,11 +1380,6 @@ async fn change_visible_task_ownership(
     Path((task_id, operation)): Path<(Uuid, String)>,
     Form(form): Form<VisibleOwnershipForm>,
 ) -> AppResult<Response> {
-    if !config.task_ownership_controls_enabled() {
-        return Err(AppError::NotFound(
-            "Task ownership controls are disabled.".into(),
-        ));
-    }
     let (company, channel) = load_viewable_channel(
         &company_use_cases,
         &channel_use_cases,

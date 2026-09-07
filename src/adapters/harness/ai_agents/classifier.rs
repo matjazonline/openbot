@@ -79,14 +79,13 @@ fn build_classifier(request: &ClassificationRequest<'_>) -> AppResult<ai_agents:
         AppError::Internal(format!("Could not read the classifier config: {error}"))
     })?;
 
-    let provider_type = std::str::FromStr::from_str(request.provider.as_str()).map_err(|_| {
-        AppError::BadRequest(format!("Unsupported LLM provider '{}'.", request.provider))
-    })?;
-    let provider = ai_agents::UnifiedLLMProvider::new(
-        provider_type,
-        request.model.as_str().to_string(),
+    let transport = super::provider_transport(request.provider, None)?;
+    let provider = ai_agents::UnifiedLLMProvider::from_spec_config(
+        transport.provider_type,
+        request.model.as_str(),
         Some(request.api_key.to_string()),
-        None,
+        transport.base_url,
+        Default::default(),
     )
     .map_err(|error| {
         AppError::Internal(format!(
@@ -161,6 +160,22 @@ mod tests {
             api_key: "sk-test-123",
         })
         .expect("a classifier is wired");
+    }
+
+    #[test]
+    fn an_xai_classifier_uses_the_supported_compatible_transport() {
+        let provider = ModelProvider::canonical("xai");
+        let model = ModelName::canonical("grok-4.6");
+
+        build_classifier(&ClassificationRequest {
+            purpose: "spam_guardrail",
+            system_prompt: "Classify.",
+            user_prompt: "irrelevant",
+            provider: &provider,
+            model: &model,
+            api_key: "xai-test-123",
+        })
+        .expect("an xAI classifier is wired");
     }
 
     /// A provider this platform cannot build is the caller's problem, not an internal fault.

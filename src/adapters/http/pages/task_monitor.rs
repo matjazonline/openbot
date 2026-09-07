@@ -50,7 +50,6 @@ pub struct TaskDetailPane<'a> {
     pub attempts_error: Option<&'a str>,
     /// Why a stop or resume did not happen, when one was asked for and refused.
     pub error: Option<&'a str>,
-    pub ownership_controls_enabled: bool,
     pub ownership_events: &'a [TaskOwnershipEvent],
     pub owner_candidates: &'a [TaskOwnerCandidate],
     pub collaboration: Option<&'a CollaborationSummary>,
@@ -587,7 +586,7 @@ fn ownership_form_fields(task: &BackgroundTask) -> String {
 }
 
 fn task_ownership_controls(pane: &TaskDetailPane<'_>) -> String {
-    if !pane.ownership_controls_enabled || pane.task.status == TaskStatus::Completed {
+    if pane.task.status == TaskStatus::Completed {
         return String::new();
     }
     let task = pane.task;

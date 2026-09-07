@@ -1,682 +1,191 @@
--- Initial schema. This migration intentionally targets a newly created database.
+-- Squashed baseline for a newly created database.
+-- Incremental upgrades and data backfills are intentionally unsupported.
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
 --
--- Squashed from the incremental migrations that preceded it; it describes the schema's current
--- state, not the order it was arrived at.
-
-CREATE EXTENSION citext;
-
-CREATE TABLE users (
-    id UUID PRIMARY KEY,
-    username CITEXT NOT NULL UNIQUE,
-    email CITEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- Written from a form field and read straight into an `<img src>`, so the one scheme rule the
-    -- renderer relies on is enforced where it cannot be bypassed.
-    avatar_url TEXT,
-    CONSTRAINT users_username_not_blank CHECK (btrim(username::text) <> ''),
-    CONSTRAINT users_email_not_blank CHECK (btrim(email::text) <> ''),
-    CONSTRAINT users_avatar_url_scheme_check
-        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://')
-);
-
--- A registration waiting on a code mailed to the address it claims. An account only exists in
--- `users` once that code comes back, so an unconfirmed address is never one anyone can sign in as.
-CREATE TABLE pending_user_registrations (
-    email CITEXT PRIMARY KEY,
-    username CITEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    confirmation_code_hash TEXT NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pending_user_registrations_username_not_blank CHECK (btrim(username::text) <> ''),
-    CONSTRAINT pending_user_registrations_email_not_blank CHECK (btrim(email::text) <> '')
-);
-
-CREATE UNIQUE INDEX pending_user_registrations_username_key
-    ON pending_user_registrations (username);
-
--- A change to an account that is waiting on a code mailed out to prove it was really asked for.
+-- Name: citext; Type: EXTENSION; Schema: -; Owner: -
 --
--- The two kinds prove different things and so mail the code to different places: an email change
--- sends it to the *new* address (proving the account owner can read it), a password change sends
--- it to the address the account already has. That is why the new address lives here rather than
--- being written to `users` and confirmed in place -- an unconfirmed address must never be one the
--- account can sign in or receive mail as.
-CREATE TABLE pending_account_changes (
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL,
-    -- Set for a 'email' change and null for a 'password' one, and vice versa: the CHECK below is
-    -- what keeps a row from claiming to be one kind while carrying the other's payload.
-    new_email CITEXT,
-    new_password_hash TEXT,
-    confirmation_code_hash TEXT NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- One pending change of each kind per account. Asking again replaces the earlier request, so
-    -- an abandoned code cannot still be confirmed after a second one was sent.
-    PRIMARY KEY (user_id, kind),
-    CONSTRAINT pending_account_changes_kind_check CHECK (kind IN ('email', 'password')),
-    CONSTRAINT pending_account_changes_payload_matches_kind CHECK (
-        (kind = 'email' AND new_email IS NOT NULL AND new_password_hash IS NULL)
-        OR (kind = 'password' AND new_password_hash IS NOT NULL AND new_email IS NULL)
-    ),
-    CONSTRAINT pending_account_changes_email_not_blank
-        CHECK (new_email IS NULL OR btrim(new_email::text) <> '')
-);
 
--- Authentication methods are explicit: finding the same email through another provider must not
--- silently turn that provider into a way into the account.
-CREATE TABLE user_login_methods (
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL,
-    provider_subject TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, provider),
-    CONSTRAINT user_login_methods_provider_check
-        CHECK (provider IN ('password', 'google', 'apple')),
-    CONSTRAINT user_login_methods_subject_check CHECK (
-        (provider = 'password' AND provider_subject IS NULL)
-        OR (provider IN ('google', 'apple')
-            AND provider_subject IS NOT NULL
-            AND btrim(provider_subject) <> '')
-    )
-);
+CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
-CREATE UNIQUE INDEX user_login_methods_provider_subject_key
-    ON user_login_methods (provider, provider_subject)
-    WHERE provider_subject IS NOT NULL;
 
--- The shape every `created_by` column carries. Written once as a function rather than repeated as
--- a CHECK body per table, so "what provenance looks like" has one definition: an actor kind, the
--- id that kind implies (a system actor has none, an agent additionally carries the channel and
--- task it acted from), a non-blank name, and no keys beyond those.
-CREATE FUNCTION valid_creation_provenance(provenance JSONB) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN
-    jsonb_typeof(provenance) = 'object'
-    AND (provenance - ARRAY[
-        'actor_type', 'actor_id', 'actor_name', 'source_channel_id', 'source_task_id'
-    ]::TEXT[]) = '{}'::JSONB
-    AND jsonb_typeof(provenance->'actor_type') = 'string'
-    AND provenance->>'actor_type' IN ('user', 'agent', 'system')
-    AND jsonb_typeof(provenance->'actor_name') = 'string'
-    AND btrim(provenance->>'actor_name') <> ''
-    AND CASE provenance->>'actor_type'
-        WHEN 'system' THEN
-            provenance ? 'actor_id'
-            AND provenance->'actor_id' = 'null'::JSONB
-            AND COALESCE(provenance->'source_channel_id' = 'null'::JSONB, true)
-            AND COALESCE(provenance->'source_task_id' = 'null'::JSONB, true)
-        WHEN 'user' THEN
-            jsonb_typeof(provenance->'actor_id') = 'string'
-            AND provenance->>'actor_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-            AND COALESCE(provenance->'source_channel_id' = 'null'::JSONB, true)
-            AND COALESCE(provenance->'source_task_id' = 'null'::JSONB, true)
-        WHEN 'agent' THEN
-            jsonb_typeof(provenance->'actor_id') = 'string'
-            AND provenance->>'actor_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-            AND jsonb_typeof(provenance->'source_channel_id') = 'string'
-            AND provenance->>'source_channel_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-            AND jsonb_typeof(provenance->'source_task_id') = 'string'
-            AND provenance->>'source_task_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        ELSE false
-    END;
-
-CREATE TABLE companies (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    name TEXT NOT NULL,
-    slug CITEXT NOT NULL UNIQUE,
-    enable_llm_spam_guardrail BOOLEAN,
-    default_add_3rd_party BOOLEAN NOT NULL DEFAULT TRUE,
-    default_participant_emails CITEXT[],
-    default_retrieve_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    default_retrieve_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    default_retrieve_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    default_persist_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    default_persist_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    default_persist_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- A company gets a picture of its own, on the same terms as a user's or an agent's: an
-    -- http(s) URL or nothing, so what a page renders into an `<img src>` can never be an active
-    -- scheme.
-    avatar_url TEXT,
-    -- NULL means the company keeps no memory at all. There is no 'none' sentinel: two ways to
-    -- write "off" is one way for a query to miss half the companies that have it off.
-    memory_provider TEXT,
-    CONSTRAINT companies_name_not_blank CHECK (btrim(name) <> ''),
-    CONSTRAINT companies_slug_format CHECK (
-        slug::text = lower(slug::text)
-        AND slug::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'
-    ),
-    CONSTRAINT companies_avatar_url_scheme_check
-        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
-    CONSTRAINT companies_memory_provider_check
-        CHECK (memory_provider IS NULL OR memory_provider IN ('hydradb', 'hindsight')),
-    CONSTRAINT companies_default_participants_bounded CHECK (
-        default_participant_emails IS NULL
-        OR (
-            cardinality(default_participant_emails) <= 64
-            AND array_position(default_participant_emails, NULL) IS NULL
-            AND array_position(default_participant_emails, ''::citext) IS NULL
-        )
-    )
-);
-
-CREATE INDEX companies_user_created_idx
-    ON companies (user_id, created_at DESC, id DESC);
-
--- One credential per provider per company, plus the exact models that company's agents may
--- select. Credentials live here and nowhere else: an agent picks a provider and a model, never a
--- key, so a leaked agent or channel row carries nothing usable.
-CREATE TABLE company_model_connections (
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL,
-    -- Stored in the envelope form `enc:v1:<key version>:<ciphertext>`; the key version travels
-    -- inside the envelope, so there is no separate column to keep in step with it.
-    api_key TEXT NOT NULL,
-    models TEXT[] NOT NULL,
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (company_id, provider),
-    CONSTRAINT company_model_connections_provider_check CHECK (
-        provider IN ('google', 'openai', 'anthropic', 'groq')
-        AND length(provider) <= 64
-    ),
-    CONSTRAINT company_model_connections_api_key_check CHECK (
-        btrim(api_key) <> '' AND octet_length(api_key) <= 16384
-    ),
-    CONSTRAINT company_model_connections_models_count_check CHECK (
-        cardinality(models) BETWEEN 1 AND 32
-    ),
-    CONSTRAINT company_model_connections_models_have_no_nulls CHECK (
-        array_position(models, NULL) IS NULL AND array_position(models, '') IS NULL
-    )
-);
-
--- At most one default per company, so "which provider does an agent inherit" has one answer.
-CREATE UNIQUE INDEX company_model_connections_one_default_idx
-    ON company_model_connections (company_id)
-    WHERE is_default;
-
--- The Resend account one company sends through and receives into.
 --
--- Resend is a per-tenant integration rather than a deployment one: the key that posts a company's
--- mail is the same key that fetches the mail its webhook announces, so both directions are one
--- row and a company with no row here simply has no Resend. There is deliberately no deployment
--- fallback -- a shared key would let one tenant's mail be read with another's credential.
-CREATE TABLE company_resend_api_integrations (
-    company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
-    -- The last path segment of this company's webhook URL, and the only thing that names the
-    -- tenant an unauthenticated request belongs to. Opaque and rotatable on purpose: the slug
-    -- would leak the tenant to anyone who sees the URL in a Resend dashboard, and would break the
-    -- registered endpoint on a rename. Finding the row is not authenticating it -- the signature
-    -- is still checked against this row's secret.
-    webhook_token TEXT NOT NULL UNIQUE,
-    -- Both `enc:v2` envelopes, each bound to (company, credential kind) as associated data, so a
-    -- ciphertext moved between companies or between these two columns fails to open rather than
-    -- yielding the original secret.
-    api_key TEXT NOT NULL,
-    signing_secret TEXT NOT NULL,
-    -- The `authserv-id` this company's Resend account stamps into Authentication-Results. Per
-    -- company because it is a property of the receiving account, and reading a verdict written by
-    -- anyone else is how a forged header becomes a pass.
-    authserv_id TEXT NOT NULL,
-    -- Off refuses the webhook and the send while keeping the credentials, so an operator can stop
-    -- a misbehaving integration without re-entering two secrets to start it again.
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- Exactly what `ResendApiWebhookToken::generate` produces. A token shorter than this is not one
-    -- this application wrote, and the check is what keeps a hand-edited row from weakening the
-    -- only identifier the webhook route has.
-    CONSTRAINT company_resend_api_integrations_webhook_token_check CHECK (
-        webhook_token ~ '^[a-z0-9]{32}$'
-    ),
-    -- enc:v2:<kek version>:<dek nonce>:<wrapped dek>:<data nonce>:<ciphertext+tag>
-    CONSTRAINT company_resend_api_integrations_api_key_check CHECK (
-        api_key ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
-        AND octet_length(api_key) <= 8192
-    ),
-    CONSTRAINT company_resend_api_integrations_signing_secret_check CHECK (
-        signing_secret ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
-        AND octet_length(signing_secret) <= 8192
-    ),
-    -- One `authserv-id` token, such as `resend.com`: no whitespace, because the parser reads the
-    -- first token of the header and a value with a space in it could never match one.
-    CONSTRAINT company_resend_api_integrations_authserv_id_check CHECK (
-        btrim(authserv_id) <> ''
-        AND authserv_id !~ '[[:space:]]'
-        AND octet_length(authserv_id) <= 255
-    )
-);
+-- Name: EXTENSION citext; Type: COMMENT; Schema: -; Owner: -
+--
 
-CREATE TABLE company_invites (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    email CITEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- The role the invite grants on acceptance, so an admin invite does not have to be re-granted
-    -- as a second step after the member row exists.
-    role TEXT NOT NULL DEFAULT 'member',
-    CONSTRAINT company_invites_company_email_key UNIQUE (company_id, email),
-    CONSTRAINT company_invites_status_check
-        CHECK (status IN ('pending', 'accepted', 'declined')),
-    CONSTRAINT company_invites_role_check CHECK (role IN ('member', 'admin'))
-);
+COMMENT ON EXTENSION citext IS 'data type for case-insensitive character strings';
 
-CREATE INDEX company_invites_company_created_idx
-    ON company_invites (company_id, created_at DESC, id DESC);
-CREATE INDEX company_invites_email_created_idx
-    ON company_invites (email, created_at DESC, id DESC);
 
-CREATE TABLE company_members (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL DEFAULT 'member',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT company_members_company_user_key UNIQUE (company_id, user_id),
-    CONSTRAINT company_members_role_check CHECK (role IN ('owner', 'member', 'admin'))
-);
+--
+-- Name: pg_stat_statements; Type: EXTENSION; Schema: -; Owner: -
+--
 
--- The owner is also a member row, so a person principal can prove company membership with one
--- foreign key instead of a union against `companies.user_id`.
-CREATE UNIQUE INDEX company_members_one_owner_idx
-    ON company_members (company_id) WHERE role = 'owner';
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA public;
 
-CREATE INDEX company_members_user_company_idx ON company_members (user_id, company_id);
-CREATE INDEX company_members_company_created_idx
-    ON company_members (company_id, created_at, id);
 
--- A NULL `company_id` is an operator-managed global library agent: visible to every company,
--- owned by none.
-CREATE TABLE agents (
-    id UUID PRIMARY KEY,
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    slug CITEXT NOT NULL,
-    provider TEXT,
-    model TEXT,
-    system_prompt TEXT,
-    -- What this agent is for, in one line. Read by the `list_company_agents` tool so a sibling
-    -- agent can pick the right colleague without its address book living in a system prompt.
-    description TEXT,
-    config_json JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    avatar_url TEXT,
-    created_by JSONB NOT NULL,
-    -- Wall-clock budget for a single agent run. NULL leaves the runner's own default in place.
-    run_timeout_secs INTEGER,
-    memory_recall_mode TEXT NOT NULL DEFAULT 'fast'
-        CHECK (memory_recall_mode IN ('fast', 'thinking')),
-    memory_max_results SMALLINT NOT NULL DEFAULT 5
-        CHECK (memory_max_results BETWEEN 1 AND 20),
-    memory_persistence_mode TEXT NOT NULL DEFAULT 'audience_only'
-        CHECK (memory_persistence_mode IN ('audience_only', 'scope_specific_facts')),
-    memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug),
-    CONSTRAINT agents_name_not_blank CHECK (btrim(name) <> ''),
-    CONSTRAINT agents_slug_format CHECK (
-        slug::text = lower(slug::text)
-        AND slug::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
-    ),
-    CONSTRAINT agents_config_object_check CHECK (
-        config_json IS NULL OR jsonb_typeof(config_json) = 'object'
-    ),
-    CONSTRAINT agents_avatar_url_scheme_check
-        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
-    CONSTRAINT agents_created_by_shape_check CHECK (valid_creation_provenance(created_by)),
-    CONSTRAINT agents_run_timeout_secs_check
-        CHECK (run_timeout_secs BETWEEN 1 AND 3600)
-);
+--
+-- Name: EXTENSION pg_stat_statements; Type: COMMENT; Schema: -; Owner: -
+--
 
-CREATE INDEX agents_company_created_idx
-    ON agents (company_id, created_at DESC, id DESC);
+COMMENT ON EXTENSION pg_stat_statements IS 'track planning and execution statistics of all SQL statements executed';
 
--- `agents_company_slug_key` does not constrain library agents: UNIQUE treats every NULL
--- `company_id` as distinct, so the library needs its own uniqueness over slug alone.
-CREATE UNIQUE INDEX agents_library_slug_key
-    ON agents (slug) WHERE company_id IS NULL;
 
--- Deleting a company still cascades through its channels and its own agents. Only global library
--- definitions need an in-use deletion guard, since nothing cascades them away.
-CREATE FUNCTION prevent_assigned_library_agent_delete() RETURNS trigger
-LANGUAGE plpgsql AS $$
+--
+-- Name: attention_source_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.attention_source_events_are_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
-    IF OLD.company_id IS NULL
-       AND EXISTS (SELECT 1 FROM channel_agents WHERE agent_id = OLD.id) THEN
-        RAISE EXCEPTION 'library agent is assigned to one or more channels'
-            USING ERRCODE = '23503';
+    IF TG_OP = 'DELETE'
+       AND NOT EXISTS (SELECT 1 FROM companies WHERE id = OLD.company_id) THEN
+        RETURN OLD;
     END IF;
+    RAISE EXCEPTION 'attention source events are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: bump_handoff_version_for_responsibility_cleanup(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.bump_handoff_version_for_responsibility_cleanup() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.responsible_principal_id IS DISTINCT FROM OLD.responsible_principal_id
+       AND NEW.version = OLD.version THEN
+        NEW.version := OLD.version + 1;
+        NEW.updated_at := CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: bump_task_attention_version_for_owner_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.bump_task_attention_version_for_owner_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF (NEW.owner_principal_id, NEW.owner_principal_kind)
+       IS DISTINCT FROM (OLD.owner_principal_id, OLD.owner_principal_kind) THEN
+        NEW.attention_version := OLD.attention_version + 1;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: create_memory_lifecycle_for_legacy_connection(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.create_memory_lifecycle_for_legacy_connection() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    INSERT INTO memory_remote_resource_lifecycles
+        (provider, remote_database_id, company_id, desired_state)
+    VALUES (NEW.provider, NEW.remote_database_id, NEW.company_id, 'present')
+    ON CONFLICT (provider, remote_database_id) DO UPDATE
+    SET company_id = EXCLUDED.company_id,
+        desired_state = 'present',
+        quiesce_until = CURRENT_TIMESTAMP,
+        last_error = NULL,
+        updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: delete_channel_target_tasks(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.delete_channel_target_tasks() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    DELETE FROM background_tasks task
+    WHERE EXISTS (
+        SELECT 1 FROM task_channel_targets target
+        WHERE target.task_id = task.id AND target.channel_id = OLD.id
+    );
     RETURN OLD;
 END;
 $$;
 
-CREATE TRIGGER library_agent_delete_guard
-BEFORE DELETE ON agents
-FOR EACH ROW EXECUTE FUNCTION prevent_assigned_library_agent_delete();
 
--- A principal is one company-scoped actor: a teammate, an agent, an outsider we have seen, or the
--- platform itself.  Every authorization and thread-participation decision names a principal, so
--- that none of them is keyed by a mutable address string.
-CREATE TABLE principals (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL,
-    user_id UUID,
-    agent_id UUID,
-    display_label TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT principals_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT principals_kind_check CHECK (kind IN ('person', 'agent', 'external', 'system')),
-    CONSTRAINT principals_display_label_check CHECK (
-        btrim(display_label) <> '' AND octet_length(display_label) <= 255
-    ),
-    -- Exactly the reference its kind allows: an external or system principal cannot smuggle in a
-    -- user or agent id and inherit that actor's access.
-    CONSTRAINT principals_shape_check CHECK (
-        (kind = 'person' AND user_id IS NOT NULL AND agent_id IS NULL)
-        OR (kind = 'agent' AND user_id IS NULL AND agent_id IS NOT NULL)
-        OR (kind IN ('external', 'system') AND user_id IS NULL AND agent_id IS NULL)
-    ),
-    -- Composite references prove the referenced user or agent belongs to the *same* company, so a
-    -- cross-tenant principal cannot be written at all.
-    CONSTRAINT principals_company_user_fk
-        FOREIGN KEY (company_id, user_id)
-        REFERENCES company_members(company_id, user_id) ON DELETE CASCADE,
-    CONSTRAINT principals_company_agent_fk
-        FOREIGN KEY (company_id, agent_id)
-        REFERENCES agents(company_id, id) ON DELETE CASCADE
-);
-
-CREATE UNIQUE INDEX principals_company_user_key
-    ON principals (company_id, user_id) WHERE user_id IS NOT NULL;
-CREATE UNIQUE INDEX principals_company_agent_key
-    ON principals (company_id, agent_id) WHERE agent_id IS NOT NULL;
--- The platform itself is one actor per company, so a schedule prompt and an approval note written
--- months apart are attributed to the same principal rather than to a growing pile of look-alikes.
-CREATE UNIQUE INDEX principals_company_system_key
-    ON principals (company_id) WHERE kind = 'system';
-
--- One transport-qualified handle for a principal.  `(transport, namespace, subject)` is the whole
--- key: an email mailbox and a Slack user id in two workspaces are three distinct rows that never
--- collide, and nothing here is compared case-insensitively -- the email writer stores the
--- normalized lower-case mailbox instead, so the generic column keeps provider-exact bytes.
-CREATE TABLE participant_identities (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    principal_id UUID NOT NULL,
-    transport TEXT NOT NULL,
-    namespace TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    display_label TEXT,
-    status TEXT NOT NULL,
-    claim_metadata JSONB NOT NULL,
-    provenance TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT participant_identities_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT participant_identities_company_principal_id_key
-        UNIQUE (company_id, principal_id, id),
-    CONSTRAINT participant_identities_qualified_key
-        UNIQUE (company_id, transport, namespace, subject),
-    CONSTRAINT participant_identities_principal_fk
-        FOREIGN KEY (company_id, principal_id)
-        REFERENCES principals(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT participant_identities_transport_check CHECK (transport IN ('email', 'slack')),
-    CONSTRAINT participant_identities_namespace_check CHECK (
-        btrim(namespace) <> '' AND octet_length(namespace) <= 255
-    ),
-    CONSTRAINT participant_identities_subject_check CHECK (
-        btrim(subject) <> '' AND octet_length(subject) <= 320
-    ),
-    CONSTRAINT participant_identities_display_label_check CHECK (
-        display_label IS NULL OR octet_length(display_label) <= 255
-    ),
-    CONSTRAINT participant_identities_status_check
-        CHECK (status IN ('observed', 'verified', 'disabled')),
-    CONSTRAINT participant_identities_provenance_check CHECK (
-        provenance IN ('account', 'agent', 'channel_allowlist', 'transport_ingress',
-                       'provider_profile_claim', 'system')
-    ),
-    -- A claim is enrichment, never a key: a Slack profile email lives in here and merges nothing.
-    -- The payload is versioned, discriminated and bounded; Rust still decodes it fallibly because
-    -- a structurally valid object can carry a discriminator a rolling deploy has not learned yet.
-    CONSTRAINT participant_identities_claim_metadata_check CHECK (
-        jsonb_typeof(claim_metadata) = 'object'
-        AND claim_metadata->'version' = '1'::JSONB
-        AND jsonb_typeof(claim_metadata->'kind') = 'string'
-        AND claim_metadata->>'kind' IN ('observation', 'account', 'provider_profile')
-        AND octet_length(claim_metadata::text) <= 8192
-    )
-);
-
-CREATE INDEX participant_identities_principal_idx
-    ON participant_identities (company_id, principal_id, created_at, id);
-
--- Which transports need a company-scoped provider account before anything can be read or sent.
--- Email is a *deployment* transport: this server owns its own mail namespace, so a channel is
--- reachable as soon as it has an address. Slack is an *installed* transport, and a binding onto it
--- is meaningless without the workspace grant behind it.
 --
--- Written once as a function because three constraints need the same answer, and mirrored in Rust
--- by `TransportKind::requires_installation`. The equivalence is a test, not a comment: see
--- `rust_and_sql_agree_on_which_transports_require_an_installation`.
-CREATE FUNCTION transport_requires_installation(transport TEXT) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN transport = 'slack';
-
--- Why a binding changed state, for the `disabled_reason` column and the audit log alike. One list
--- so an operator reading an audit row and an operator reading a disabled binding see the same
--- vocabulary, and so a reason can never be recovered by parsing a free-text error.
-CREATE FUNCTION valid_binding_change_reason(reason TEXT) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN reason IN (
-    'manager_request', 'installation_revoked', 'endpoint_removed',
-    'access_revoked', 'channel_disabled', 'provider_drift'
-);
-
--- Why a delivery attempt did not succeed. One list, because both `message_deliveries` and
--- `message_delivery_parts` classify the same failures and an operator alert reads across both.
--- Mirrored in Rust by `FailureClass`; the equivalence is a test rather than a comment.
-CREATE FUNCTION valid_delivery_failure_class(class TEXT) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN class IN (
-    'authentication', 'rate_limited', 'invalid_payload', 'destination_unavailable',
-    'network', 'timeout', 'provider_fault', 'internal',
-    'dependency_failed', 'superseded', 'lease_expired'
-);
-
--- One provider account a company has installed. No token is stored here: the broad entity is
--- listed in the UI, logged, and serialized, so the secret lives one table over in
--- `integration_credentials` and is only ever read through an exact-scope query.
-CREATE TABLE integration_installations (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    transport TEXT NOT NULL,
-    -- The provider's own identifier for the account -- a Slack team id.
-    external_tenant_key TEXT NOT NULL,
-    display_name TEXT NOT NULL,
-    status TEXT NOT NULL,
-    -- What the provider says it granted, as the provider spells it. Diagnostic only; it never
-    -- substitutes for handling the provider's own authorization errors.
-    granted_scopes TEXT[] NOT NULL DEFAULT '{}',
-    installed_by JSONB NOT NULL,
-    installed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by JSONB NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    revoked_by JSONB,
-    revoked_at TIMESTAMPTZ,
-    -- Composite keys the tenant-scoped children below point at. The three-column form additionally
-    -- proves a binding's `transport` matches the installation it names, so a Slack binding cannot
-    -- hang off some future provider's account.
-    CONSTRAINT integration_installations_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT integration_installations_company_transport_key UNIQUE (company_id, id, transport),
-    -- v1 refuses to let one external workspace install into two app companies: either company's
-    -- managers could then link the other's conversations. Revisit only with a written
-    -- multi-tenant-workspace threat model, not because a customer asks.
-    CONSTRAINT integration_installations_tenant_key UNIQUE (transport, external_tenant_key),
-    CONSTRAINT integration_installations_transport_check
-        CHECK (transport_requires_installation(transport)),
-    CONSTRAINT integration_installations_tenant_key_check CHECK (
-        btrim(external_tenant_key) <> '' AND octet_length(external_tenant_key) <= 255
-    ),
-    CONSTRAINT integration_installations_display_name_check CHECK (
-        btrim(display_name) <> '' AND octet_length(display_name) <= 255
-    ),
-    CONSTRAINT integration_installations_status_check CHECK (
-        status IN ('active', 'reauthorization_required', 'revoked', 'disabled')
-    ),
-    -- A provider can hand back an arbitrary scope list; this is the bound on it.
-    CONSTRAINT integration_installations_scopes_check CHECK (
-        array_position(granted_scopes, NULL) IS NULL
-        AND NOT ('' = ANY (granted_scopes))
-        AND COALESCE(array_length(granted_scopes, 1), 0) <= 64
-        AND octet_length(array_to_string(granted_scopes, ',')) <= 4096
-    ),
-    CONSTRAINT integration_installations_installed_by_check
-        CHECK (valid_creation_provenance(installed_by)),
-    CONSTRAINT integration_installations_updated_by_check
-        CHECK (valid_creation_provenance(updated_by)),
-    -- Revocation is the one terminal transition, so it is the one that has to name an actor and a
-    -- time -- and it cannot be recorded without the status that means it.
-    CONSTRAINT integration_installations_revocation_check CHECK (
-        (status = 'revoked') = (revoked_at IS NOT NULL)
-        AND (revoked_at IS NULL) = (revoked_by IS NULL)
-        AND (revoked_by IS NULL OR valid_creation_provenance(revoked_by))
-    )
-);
-
-CREATE INDEX integration_installations_company_idx
-    ON integration_installations (company_id, transport, installed_at DESC, id DESC);
-
--- One secret, in its own table, keyed by exactly the scope a reader must state.
+-- Name: delete_orphan_message(); Type: FUNCTION; Schema: public; Owner: -
 --
--- `envelope` is the output of the per-credential DEK format in
--- `src/adapters/persistence/credentials/envelope.rs`: a random data key encrypts the token, the
--- key-encryption key wraps the data key, and both layers authenticate the row's own
--- (company, installation, transport, kind) context. Moving a row's ciphertext to another company,
--- installation or credential kind therefore fails to open rather than silently decrypting.
+
+CREATE FUNCTION public.delete_orphan_message() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    DELETE FROM messages message
+    WHERE message.id = OLD.message_id
+      AND NOT EXISTS (
+          SELECT 1 FROM thread_messages association
+          WHERE association.message_id = OLD.message_id
+      );
+    RETURN NULL;
+END;
+$$;
+
+
 --
--- The CHECK is defence in depth. It recognizes the envelope's *structure* so a plaintext token
--- cannot be written by hand; it proves nothing about authenticity, which is the application's job.
-CREATE TABLE integration_credentials (
-    company_id UUID NOT NULL,
-    installation_id UUID NOT NULL,
-    credential_kind TEXT NOT NULL,
-    envelope TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (company_id, installation_id, credential_kind),
-    CONSTRAINT integration_credentials_installation_fk
-        FOREIGN KEY (company_id, installation_id)
-        REFERENCES integration_installations(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT integration_credentials_kind_check CHECK (
-        credential_kind IN ('bot_access_token', 'bot_refresh_token', 'user_access_token')
-    ),
-    -- enc:v2:<kek version>:<dek nonce>:<wrapped dek>:<data nonce>:<ciphertext+tag>
-    CONSTRAINT integration_credentials_envelope_check CHECK (
-        envelope ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
-        AND octet_length(envelope) <= 8192
-    )
-);
+-- Name: enforce_agent_skill_scope(); Type: FUNCTION; Schema: public; Owner: -
+--
 
--- A channel's addresses live in `channel_slugs`, not here; see that table.
-CREATE TABLE channels (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    access_mode TEXT NOT NULL DEFAULT 'team',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- A reversible off switch: disabling stops the channel taking traffic without deleting its
-    -- threads, tasks and approvals the way DELETE FROM channels does.
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    -- Whether a trusted sender may pull CC'd outsiders onto this channel's threads. Off means the
-    -- channel is internal: outsiders never join a thread and never appear on an agent reply's Cc.
-    add_3rd_party BOOLEAN NOT NULL DEFAULT TRUE,
-    created_by JSONB NOT NULL,
-    -- Memory is opt-in per scope and per direction: reading someone's memory into a prompt and
-    -- writing a turn back out to it are separate grants, so a channel can recall without
-    -- recording.
-    retrieve_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    retrieve_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    retrieve_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    persist_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    persist_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    persist_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    -- What this channel is for, in one line. Read back to a teammate who mails an address that
-    -- does not exist, so they can find the channel they meant without asking anyone.
-    description TEXT,
-    owner_agent_id UUID,
-    CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT channels_owner_agent_key UNIQUE (owner_agent_id),
-    CONSTRAINT channels_owner_agent_fk
-        FOREIGN KEY (company_id, owner_agent_id)
-        REFERENCES agents(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
-    CONSTRAINT channels_access_mode_check
-        CHECK (access_mode IN ('team', 'allowlist', 'public')),
-    CONSTRAINT channels_created_by_shape_check CHECK (valid_creation_provenance(created_by))
-);
+CREATE FUNCTION public.enforce_agent_skill_scope() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM agents AS agent
+        WHERE agent.id = NEW.agent_id
+          AND agent.company_id IS NOT DISTINCT FROM NEW.company_id
+    ) THEN
+        RAISE EXCEPTION 'agent must match the relationship company scope'
+            USING ERRCODE = '23514', CONSTRAINT = 'agent_skills_agent_scope_check';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM skills AS skill
+        WHERE skill.id = NEW.skill_id
+          AND skill.company_id IS NOT DISTINCT FROM NEW.company_id
+    ) THEN
+        RAISE EXCEPTION 'skill must match the relationship company scope'
+            USING ERRCODE = '23514', CONSTRAINT = 'agent_skills_skill_scope_check';
+    END IF;
+    RETURN NEW;
+END;
+$$;
 
-CREATE INDEX channels_company_created_idx
-    ON channels (company_id, created_at DESC, id DESC);
 
--- The whole per-company channel address namespace in one table, so a channel can answer on more
--- than one local part. Canonical slug and aliases share a single UNIQUE (company_id, slug), which
--- is what makes canonical-vs-alias collisions impossible without a trigger or a racy app check.
-CREATE TABLE channel_slugs (
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    slug CITEXT NOT NULL,
-    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (channel_id, slug),
-    CONSTRAINT channel_slugs_company_slug_key UNIQUE (company_id, slug),
-    CONSTRAINT channel_slugs_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channel_slugs_format CHECK (
-        slug::text = lower(slug::text)
-        AND slug::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
-    )
-);
+--
+-- Name: enforce_channel_agent_scope(); Type: FUNCTION; Schema: public; Owner: -
+--
 
--- Exactly one canonical slug per channel; aliases are unlimited.
-CREATE UNIQUE INDEX channel_slugs_primary_idx ON channel_slugs (channel_id) WHERE is_primary;
-
--- The agent FK is on `agent_id` alone, not the compound (company_id, agent_id), because a library
--- agent has no company to match. `channel_agents_scope_check` below is what replaces the tenancy
--- the compound key used to carry.
-CREATE TABLE channel_agents (
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    agent_id UUID NOT NULL,
-    position INTEGER NOT NULL,
-    PRIMARY KEY (channel_id, agent_id),
-    CONSTRAINT channel_agents_channel_position_key UNIQUE (channel_id, position),
-    CONSTRAINT channel_agents_position_check CHECK (position >= 0),
-    CONSTRAINT channel_agents_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channel_agents_agent_fk
-        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
-);
-
-CREATE INDEX channel_agents_agent_idx ON channel_agents (agent_id, channel_id);
-
-CREATE FUNCTION enforce_channel_agent_scope() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.enforce_channel_agent_scope() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM agents AS agent
@@ -690,12 +199,97 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER channel_agents_scope_check
-BEFORE INSERT OR UPDATE ON channel_agents
-FOR EACH ROW EXECUTE FUNCTION enforce_channel_agent_scope();
 
-CREATE FUNCTION enforce_owned_channel_position_zero() RETURNS trigger
-LANGUAGE plpgsql AS $$
+--
+-- Name: enforce_enabled_channel_has_active_agent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_enabled_channel_has_active_agent() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    checked_channel_id UUID;
+BEGIN
+    IF TG_TABLE_NAME = 'channels' THEN
+        checked_channel_id := COALESCE(NEW.id, OLD.id);
+    ELSE
+        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM channels AS channel
+        WHERE channel.id = checked_channel_id AND channel.enabled
+    ) AND NOT EXISTS (
+        SELECT 1 FROM channel_agents AS assignment
+        WHERE assignment.channel_id = checked_channel_id AND assignment.position = 0
+    ) THEN
+        RAISE EXCEPTION 'enabled channel must have an active agent at position 0'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: enforce_outreach_status_transition(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_outreach_status_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.status = NEW.status THEN
+        RETURN NEW;
+    END IF;
+    IF NOT (CASE OLD.status
+        WHEN 'waiting' THEN NEW.status IN (
+            'threshold_met', 'timeout_pending_approval', 'proceed_partial', 'cancelled'
+        )
+        WHEN 'timeout_pending_approval' THEN NEW.status IN (
+            'waiting', 'threshold_met', 'proceed_partial', 'cancelled'
+        )
+        WHEN 'threshold_met' THEN NEW.status IN ('completed', 'cancelled')
+        WHEN 'proceed_partial' THEN NEW.status IN ('completed', 'cancelled')
+        WHEN 'cancelled' THEN FALSE
+        WHEN 'completed' THEN FALSE
+        ELSE FALSE
+    END) THEN
+        RAISE EXCEPTION 'invalid outreach status transition: % -> %', OLD.status, NEW.status
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_outreach_target_status_transition(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_outreach_target_status_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.status = NEW.status THEN
+        RETURN NEW;
+    END IF;
+    IF OLD.status <> 'active'
+       OR NEW.status NOT IN ('responded', 'cancelled', 'superseded', 'expired') THEN
+        RAISE EXCEPTION 'invalid outreach target status transition: % -> %', OLD.status, NEW.status
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_owned_channel_position_zero(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_owned_channel_position_zero() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 DECLARE
     checked_channel_id UUID;
 BEGIN
@@ -725,403 +319,672 @@ BEGIN
 END;
 $$;
 
-CREATE CONSTRAINT TRIGGER owned_channel_position_zero_check
-AFTER INSERT OR UPDATE OF owner_agent_id ON channels
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION enforce_owned_channel_position_zero();
 
-CREATE CONSTRAINT TRIGGER owned_channel_assignment_position_zero_check
-AFTER INSERT OR UPDATE OR DELETE ON channel_agents
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION enforce_owned_channel_position_zero();
+--
+-- Name: enforce_response_draft_evidence_immutability(); Type: FUNCTION; Schema: public; Owner: -
+--
 
-CREATE FUNCTION prevent_owned_channel_delete() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.enforce_response_draft_evidence_immutability() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
-    IF OLD.owner_agent_id IS NOT NULL
-       AND EXISTS (SELECT 1 FROM agents WHERE id = OLD.owner_agent_id) THEN
-        RAISE EXCEPTION 'owned channel must be deleted through its owner agent'
-            USING ERRCODE = '23503';
+    IF TG_OP = 'INSERT' THEN
+        IF EXISTS (
+            SELECT 1 FROM response_reviews
+            WHERE company_id = NEW.company_id AND draft_id = NEW.draft_id
+              AND draft_version = NEW.draft_version
+        ) THEN
+            RAISE EXCEPTION 'response draft evidence is already sealed' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
     END IF;
+    IF TG_OP = 'DELETE' AND NOT EXISTS (
+        SELECT 1 FROM response_drafts
+        WHERE company_id = OLD.company_id AND id = OLD.draft_id AND version = OLD.draft_version
+    ) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'response draft evidence is immutable' USING ERRCODE = '23514';
+END;
+$$;
+
+
+--
+-- Name: enforce_response_draft_update(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_response_draft_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF (OLD.id, OLD.version, OLD.company_id, OLD.channel_id, OLD.thread_id,
+        OLD.author_principal_id, OLD.proposed_message_id,
+        OLD.subject, OLD.body, OLD.attachment_snapshot, OLD.recipient_snapshot,
+        OLD.transport_snapshot, OLD.publication_snapshot, OLD.created_by_principal_id,
+        OLD.created_at, OLD.source_handoff_generation) IS DISTINCT FROM
+       (NEW.id, NEW.version, NEW.company_id, NEW.channel_id, NEW.thread_id,
+        NEW.author_principal_id, NEW.proposed_message_id,
+        NEW.subject, NEW.body, NEW.attachment_snapshot, NEW.recipient_snapshot,
+        NEW.transport_snapshot, NEW.publication_snapshot, NEW.created_by_principal_id,
+        NEW.created_at, NEW.source_handoff_generation) THEN
+        RAISE EXCEPTION 'response draft versions are immutable' USING ERRCODE = '23514';
+    END IF;
+    IF OLD.task_id IS DISTINCT FROM NEW.task_id
+       AND NOT (OLD.task_id IS NOT NULL AND NEW.task_id IS NULL) THEN
+        RAISE EXCEPTION 'a response draft task source cannot be replaced' USING ERRCODE = '23514';
+    END IF;
+    IF OLD.status <> NEW.status AND NOT (
+        OLD.status = 'pending_review'
+        AND NEW.status IN ('rejected', 'expired', 'superseded', 'published')
+    ) THEN
+        RAISE EXCEPTION 'invalid response draft status transition' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enqueue_actionable_notification_event(uuid, text, uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_actionable_notification_event(event_company uuid, event_source_kind text, event_source_id uuid, event_action_kind text, event_actor uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    next_generation BIGINT;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM companies AS company WHERE company.id = event_company
+    ) THEN
+        RETURN;
+    END IF;
+    IF event_actor IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM principals AS principal
+         WHERE principal.company_id = event_company AND principal.id = event_actor
+    ) THEN
+        event_actor := NULL;
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended(
+        event_company::TEXT || ':' || event_source_kind || ':' || event_source_id::TEXT
+            || ':' || event_action_kind,
+        0
+    ));
+    SELECT COALESCE(MAX(source_generation), 0) + 1
+      INTO next_generation
+      FROM notification_events AS event
+     WHERE event.company_id = event_company
+       AND event.source_kind = event_source_kind
+       AND event.source_id = event_source_id
+       AND event.action_kind = event_action_kind;
+
+    INSERT INTO notification_events (
+        company_id, source_kind, source_id, action_kind, source_generation, actor_principal_id
+    ) VALUES (
+        event_company, event_source_kind, event_source_id, event_action_kind,
+        next_generation, event_actor
+    );
+END;
+$$;
+
+
+--
+-- Name: initialize_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.initialize_task_ownership() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    resolved RECORD;
+BEGIN
+    IF NEW.owner_principal_id IS NULL THEN
+        SELECT principal.id, principal.display_label
+          INTO resolved
+          FROM channel_agents AS assignment
+          JOIN agents AS agent
+            ON agent.id = assignment.agent_id AND agent.company_id = NEW.company_id
+          JOIN principals AS principal
+            ON principal.company_id = NEW.company_id
+           AND principal.agent_id = agent.id
+           AND principal.kind = 'agent'
+         WHERE assignment.company_id = NEW.company_id
+           AND assignment.channel_id = NEW.channel_id
+           AND assignment.position = 0
+         LIMIT 1;
+        NEW.owner_principal_id := resolved.id;
+        NEW.owner_principal_kind := CASE WHEN resolved.id IS NULL THEN NULL ELSE 'agent' END;
+    END IF;
+    NEW.ownership_version := 1;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: internal_note_tombstones_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.internal_note_tombstones_are_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' AND NOT EXISTS (
+        SELECT 1 FROM internal_notes WHERE company_id = OLD.company_id AND id = OLD.note_id
+    ) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'internal note tombstones are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: internal_notes_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.internal_notes_are_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' AND NOT EXISTS (
+        SELECT 1 FROM threads
+         WHERE company_id = OLD.company_id AND channel_id = OLD.channel_id AND id = OLD.thread_id
+    ) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'internal note audit rows are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: notification_from_attention_source(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_attention_source() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.source_kind = 'handoff'
+       AND NEW.operation IN ('created', 'reassigned', 'resolved', 'withdrawn') THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'handoff', NEW.source_id, 'assignment', NEW.actor_principal_id
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: notification_from_delivery(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_delivery() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    event_company UUID := COALESCE(NEW.company_id, OLD.company_id);
+BEGIN
+    IF event_company IS NULL THEN
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        UPDATE notifications
+           SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE company_id = event_company AND source_kind = 'delivery'
+           AND source_id = OLD.id AND state = 'active';
+    ELSIF OLD.status IS DISTINCT FROM NEW.status
+          AND (OLD.status IN ('dead_letter', 'outcome_unknown')
+               OR NEW.status IN ('dead_letter', 'outcome_unknown')) THEN
+        PERFORM enqueue_actionable_notification_event(
+            event_company, 'delivery', NEW.id, 'delivery_failure', NULL
+        );
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+--
+-- Name: notification_from_outreach(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_outreach() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    event_company UUID;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        UPDATE notifications
+           SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE source_kind = 'delegation' AND source_id = OLD.id AND state = 'active';
+    ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
+        SELECT company_id INTO event_company FROM background_tasks WHERE id = NEW.task_id;
+        IF event_company IS NOT NULL AND (
+            OLD.status = 'timeout_pending_approval' OR NEW.status = 'timeout_pending_approval'
+        ) THEN
+            PERFORM enqueue_actionable_notification_event(
+                event_company, 'delegation', NEW.id, 'delegation_timeout', NULL
+            );
+        END IF;
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+--
+-- Name: notification_from_review(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_review() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'response_review', NEW.draft_id, 'response_review',
+            NEW.notification_actor_principal_id
+        );
+    ELSIF OLD.status IS DISTINCT FROM NEW.status
+          OR OLD.reviewer_principal_id IS DISTINCT FROM NEW.reviewer_principal_id THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'response_review', NEW.draft_id, 'response_review',
+            NEW.notification_actor_principal_id
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: notification_from_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_task_ownership() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    related_source UUID;
+BEGIN
+    IF NEW.new_owner_kind = 'human'
+       AND (NEW.previous_owner_principal_id, NEW.previous_owner_kind)
+           IS DISTINCT FROM (NEW.new_owner_principal_id, NEW.new_owner_kind) THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'task', NEW.task_id, 'assignment', NEW.actor_principal_id
+        );
+    ELSIF NEW.previous_owner_kind = 'human' AND NEW.new_owner_kind <> 'human' THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'task', NEW.task_id, 'assignment', NEW.actor_principal_id
+        );
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM background_tasks AS task
+         WHERE task.company_id = NEW.company_id AND task.id = NEW.task_id
+           AND task.status = 'dead_letter'
+    ) THEN
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'task', NEW.task_id, 'task_failure', NEW.actor_principal_id
+        );
+    END IF;
+
+    FOR related_source IN
+        SELECT outreach.id FROM task_outreaches AS outreach
+         WHERE outreach.task_id = NEW.task_id AND outreach.status = 'timeout_pending_approval'
+    LOOP
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'delegation', related_source, 'delegation_timeout',
+            NEW.actor_principal_id
+        );
+    END LOOP;
+
+    FOR related_source IN
+        SELECT delivery.id FROM message_deliveries AS delivery
+         WHERE delivery.company_id = NEW.company_id AND delivery.task_id = NEW.task_id
+           AND delivery.status IN ('dead_letter', 'outcome_unknown')
+    LOOP
+        PERFORM enqueue_actionable_notification_event(
+            NEW.company_id, 'delivery', related_source, 'delivery_failure',
+            NEW.actor_principal_id
+        );
+    END LOOP;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: notification_from_task_status(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_from_task_status() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        UPDATE notifications
+           SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE company_id = OLD.company_id AND source_kind = 'task'
+           AND source_id = OLD.id AND state = 'active';
+    ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
+        IF OLD.status = 'dead_letter' OR NEW.status = 'dead_letter' THEN
+            PERFORM enqueue_actionable_notification_event(
+                NEW.company_id, 'task', NEW.id, 'task_failure', NULL
+            );
+        END IF;
+        IF NEW.status IN ('completed', 'stopped', 'dead_letter')
+           OR OLD.status IN ('completed', 'stopped', 'dead_letter') THEN
+            PERFORM enqueue_actionable_notification_event(
+                NEW.company_id, 'task', NEW.id, 'assignment', NULL
+            );
+        END IF;
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+--
+-- Name: valid_creation_provenance(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_creation_provenance(provenance jsonb) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN ((jsonb_typeof(provenance) = 'object'::text) AND ((provenance - ARRAY['actor_type'::text, 'actor_id'::text, 'actor_name'::text, 'source_channel_id'::text, 'source_task_id'::text]) = '{}'::jsonb) AND (jsonb_typeof((provenance -> 'actor_type'::text)) = 'string'::text) AND ((provenance ->> 'actor_type'::text) = ANY (ARRAY['user'::text, 'agent'::text, 'system'::text])) AND (jsonb_typeof((provenance -> 'actor_name'::text)) = 'string'::text) AND (btrim((provenance ->> 'actor_name'::text)) <> ''::text) AND CASE (provenance ->> 'actor_type'::text) WHEN 'system'::text THEN ((provenance ? 'actor_id'::text) AND ((provenance -> 'actor_id'::text) = 'null'::jsonb) AND COALESCE(((provenance -> 'source_channel_id'::text) = 'null'::jsonb), true) AND COALESCE(((provenance -> 'source_task_id'::text) = 'null'::jsonb), true)) WHEN 'user'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND COALESCE(((provenance -> 'source_channel_id'::text) = 'null'::jsonb), true) AND COALESCE(((provenance -> 'source_task_id'::text) = 'null'::jsonb), true)) WHEN 'agent'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND (jsonb_typeof((provenance -> 'source_channel_id'::text)) = 'string'::text) AND ((provenance ->> 'source_channel_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND (jsonb_typeof((provenance -> 'source_task_id'::text)) = 'string'::text) AND ((provenance ->> 'source_task_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)) ELSE false END);
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: channel_principal_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channel_principal_grants (
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    capability text NOT NULL,
+    provenance text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT channel_principal_grants_capability_check CHECK ((capability = ANY (ARRAY['participate'::text, 'view'::text]))),
+    CONSTRAINT channel_principal_grants_provenance_check CHECK ((provenance = ANY (ARRAY['configured_allowlist'::text, 'manager'::text, 'conversation_membership'::text, 'system'::text])))
+);
+
+
+--
+-- Name: channels; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channels (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    name text NOT NULL,
+    access_mode text DEFAULT 'team'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    add_3rd_party boolean DEFAULT true NOT NULL,
+    created_by jsonb NOT NULL,
+    retrieve_company_memory boolean DEFAULT false NOT NULL,
+    retrieve_agent_memory boolean DEFAULT false NOT NULL,
+    retrieve_user_memory boolean DEFAULT false NOT NULL,
+    persist_company_memory boolean DEFAULT false NOT NULL,
+    persist_agent_memory boolean DEFAULT false NOT NULL,
+    persist_user_memory boolean DEFAULT false NOT NULL,
+    description text,
+    owner_agent_id uuid,
+    external_response_review_override text,
+    preferred_reviewer_principal_id uuid,
+    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
+    CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT channels_external_response_review_override_check CHECK (((external_response_review_override IS NULL) OR (external_response_review_override = ANY (ARRAY['autonomous'::text, 'review_all_external'::text])))),
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
+);
+
+
+--
+-- Name: company_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_members (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text DEFAULT 'member'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT company_members_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'member'::text, 'admin'::text])))
+);
+
+
+--
+-- Name: principals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.principals (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    kind text NOT NULL,
+    user_id uuid,
+    agent_id uuid,
+    display_label text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT principals_display_label_check CHECK (((btrim(display_label) <> ''::text) AND (octet_length(display_label) <= 255))),
+    CONSTRAINT principals_kind_check CHECK ((kind = ANY (ARRAY['person'::text, 'agent'::text, 'external'::text, 'system'::text]))),
+    CONSTRAINT principals_shape_check CHECK ((((kind = 'person'::text) AND (user_id IS NOT NULL) AND (agent_id IS NULL)) OR ((kind = 'agent'::text) AND (user_id IS NULL) AND (agent_id IS NOT NULL)) OR ((kind = ANY (ARRAY['external'::text, 'system'::text])) AND (user_id IS NULL) AND (agent_id IS NULL))))
+);
+
+
+--
+-- Name: notification_principal_can_view(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_principal_can_view(checked_company uuid, checked_channel uuid, checked_principal uuid) RETURNS boolean
+    LANGUAGE sql STABLE
+    RETURN (EXISTS (SELECT 1 FROM ((public.principals principal JOIN public.company_members member ON (((member.company_id = principal.company_id) AND (member.user_id = principal.user_id)))) JOIN public.channels channel ON (((channel.company_id = principal.company_id) AND (channel.id = notification_principal_can_view.checked_channel)))) WHERE ((principal.company_id = notification_principal_can_view.checked_company) AND (principal.id = notification_principal_can_view.checked_principal) AND (principal.kind = 'person'::text) AND ((member.role = 'owner'::text) OR (channel.access_mode = ANY (ARRAY['team'::text, 'public'::text])) OR (EXISTS (SELECT 1 FROM public.channel_principal_grants permission WHERE ((permission.company_id = notification_principal_can_view.checked_company) AND (permission.channel_id = notification_principal_can_view.checked_channel) AND (permission.principal_id = notification_principal_can_view.checked_principal) AND (permission.capability = 'view'::text))))))));
+
+
+--
+-- Name: notification_recheck_channel_access(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_recheck_channel_access() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    row_data JSONB := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+    changed_company UUID := (row_data->>'company_id')::UUID;
+    changed_channel UUID := COALESCE(
+        (row_data->>'channel_id')::UUID,
+        (row_data->>'id')::UUID
+    );
+BEGIN
+    PERFORM 1 FROM channels AS channel
+     WHERE channel.company_id = changed_company AND channel.id = changed_channel
+     FOR UPDATE;
+    PERFORM withdraw_unauthorized_notifications(changed_company, changed_channel);
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+--
+-- Name: notification_recheck_membership(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_recheck_membership() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    changed_company UUID := COALESCE(NEW.company_id, OLD.company_id);
+    changed_user UUID := COALESCE(NEW.user_id, OLD.user_id);
+BEGIN
+    UPDATE notifications AS notification
+       SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE notification.company_id = changed_company
+       AND notification.recipient_user_id = changed_user
+       AND notification.state = 'active'
+       AND (
+           notification.recipient_principal_id IS NULL
+           OR NOT notification_principal_can_view(
+               notification.company_id,
+               notification.channel_id,
+               notification.recipient_principal_id
+           )
+       );
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+--
+-- Name: notification_withdraw_deleted_principal(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_withdraw_deleted_principal() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE notifications
+       SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE company_id = OLD.company_id AND recipient_principal_id = OLD.id
+       AND state = 'active';
     RETURN OLD;
 END;
 $$;
 
-CREATE TRIGGER owned_channel_delete_guard
-BEFORE DELETE ON channels
-FOR EACH ROW EXECUTE FUNCTION prevent_owned_channel_delete();
 
-CREATE FUNCTION enforce_enabled_channel_has_active_agent() RETURNS trigger
-LANGUAGE plpgsql AS $$
+--
+-- Name: notification_withdraw_deleted_source(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notification_withdraw_deleted_source() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 DECLARE
-    checked_channel_id UUID;
+    row_data JSONB := to_jsonb(OLD);
+    deleted_source_id UUID := COALESCE(
+        (row_data->>'id')::UUID, (row_data->>'draft_id')::UUID
+    );
 BEGIN
-    IF TG_TABLE_NAME = 'channels' THEN
-        checked_channel_id := COALESCE(NEW.id, OLD.id);
-    ELSE
-        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
-    END IF;
+    UPDATE notifications
+       SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE source_kind = TG_ARGV[0] AND source_id = deleted_source_id
+       AND state = 'active';
+    RETURN OLD;
+END;
+$$;
+
+
+--
+-- Name: notify_actionable_notification_changed(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notify_actionable_notification_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM pg_notify(
+        'actionable_notification_changed',
+        json_build_object(
+            'company_id', NEW.company_id,
+            'recipient_user_id', NEW.recipient_user_id,
+            'notification_id', NEW.id
+        )::TEXT
+    );
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: notify_agent_instruction(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notify_agent_instruction() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
     IF EXISTS (
-        SELECT 1 FROM channels AS channel
-        WHERE channel.id = checked_channel_id AND channel.enabled
-    ) AND NOT EXISTS (
-        SELECT 1 FROM channel_agents AS assignment
-        WHERE assignment.channel_id = checked_channel_id AND assignment.position = 0
+        SELECT 1 FROM background_tasks
+         WHERE id = NEW.task_id AND status = 'pending' AND owner_principal_kind = 'agent'
     ) THEN
-        RAISE EXCEPTION 'enabled channel must have an active agent at position 0'
-            USING ERRCODE = '23514';
+        PERFORM pg_notify('task_ready', json_build_object('task_id', NEW.task_id)::text);
     END IF;
+    PERFORM pg_notify('thread_activity', json_build_object(
+        'thread_id', NEW.thread_id, 'channel_id', NEW.channel_id, 'company_id', NEW.company_id
+    )::text);
     RETURN NULL;
 END;
 $$;
 
-CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check
-AFTER INSERT OR UPDATE OF enabled ON channels
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION enforce_enabled_channel_has_active_agent();
 
-CREATE CONSTRAINT TRIGGER channel_assignment_active_agent_check
-AFTER INSERT OR UPDATE OR DELETE ON channel_agents
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION enforce_enabled_channel_has_active_agent();
-
--- What one principal may do on one channel.  `participate` is permission to send into the channel;
--- `view` is permission to read it in the UI.  The email allowlist form writes both; `@public` is
--- an access *mode* on the channel rather than a grant, so it never confers UI read access, and the
--- owner and team rules stay in `Channel`'s domain policy rather than being denormalized here.
-CREATE TABLE channel_principal_grants (
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    principal_id UUID NOT NULL,
-    capability TEXT NOT NULL,
-    provenance TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (company_id, channel_id, principal_id, capability),
-    CONSTRAINT channel_principal_grants_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channel_principal_grants_principal_fk
-        FOREIGN KEY (company_id, principal_id)
-        REFERENCES principals(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channel_principal_grants_capability_check
-        CHECK (capability IN ('participate', 'view')),
-    CONSTRAINT channel_principal_grants_provenance_check
-        CHECK (provenance IN (
-            'configured_allowlist', 'manager', 'conversation_membership', 'system'
-        ))
-);
-
-CREATE INDEX channel_principal_grants_principal_idx
-    ON channel_principal_grants (company_id, principal_id, channel_id, capability);
-
--- One protocol-facing interface onto a business channel.
 --
--- A channel is not an inbox and not a Slack conversation: it owns agents, policy and threads, and
--- exposes zero or more bindings. That is what lets a channel gain a second transport without a
--- nullable column per provider, and lets one interface be paused while the rest keeps working.
+-- Name: notify_attention_changed(); Type: FUNCTION; Schema: public; Owner: -
 --
--- `installation_id` is NULL exactly for the deployment transports, which is `transport_requires_
--- installation` stated as a CHECK. The composite foreign key carries the tenancy *and* the
--- transport, so a binding can neither borrow another company's provider account nor point a Slack
--- binding at a non-Slack installation. NULL `installation_id` makes that MATCH SIMPLE key
--- unenforced, which is exactly the wanted behaviour for email -- the CHECK is what keeps the two
--- cases from blurring.
-CREATE TABLE channel_bindings (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    installation_id UUID,
-    transport TEXT NOT NULL,
-    -- The scope in which `external_endpoint_key` is unique, and always an immutable identifier:
-    -- the provider workspace for an installed transport, the company id for email. Nothing here is
-    -- a slug -- `companies.slug` and `channel_slugs.slug` are both editable, and a key built from
-    -- an editable value goes stale the moment someone edits it.
-    namespace TEXT NOT NULL,
-    external_endpoint_key TEXT NOT NULL,
-    display_label TEXT NOT NULL,
-    access_policy TEXT NOT NULL,
-    delivery_policy TEXT NOT NULL,
-    status TEXT NOT NULL,
-    disabled_reason TEXT,
-    created_by JSONB NOT NULL,
-    -- What a human confirmed about the endpoint at link time. Confirmations only: no member lists,
-    -- no provider responses, no message content.
-    access_snapshot JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT channel_bindings_company_id_id_key UNIQUE (company_id, id),
-    -- Carries the transport into the referencing key, so `message_deliveries` proves its stored
-    -- `transport` is the one its destination interface actually speaks rather than re-asserting a
-    -- literal. Same shape, same reason as `integration_installations_company_transport_key`.
-    CONSTRAINT channel_bindings_company_transport_key UNIQUE (company_id, id, transport),
-    CONSTRAINT channel_bindings_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT channel_bindings_installation_fk
-        FOREIGN KEY (company_id, installation_id, transport)
-        REFERENCES integration_installations(company_id, id, transport) ON DELETE CASCADE,
-    CONSTRAINT channel_bindings_transport_check CHECK (transport IN ('email', 'slack')),
-    CONSTRAINT channel_bindings_installation_coherence_check CHECK (
-        transport_requires_installation(transport) = (installation_id IS NOT NULL)
-    ),
-    CONSTRAINT channel_bindings_namespace_check CHECK (
-        btrim(namespace) <> '' AND octet_length(namespace) <= 255
-    ),
-    CONSTRAINT channel_bindings_endpoint_key_check CHECK (
-        btrim(external_endpoint_key) <> '' AND octet_length(external_endpoint_key) <= 512
-    ),
-    CONSTRAINT channel_bindings_display_label_check CHECK (
-        btrim(display_label) <> '' AND octet_length(display_label) <= 255
-    ),
-    CONSTRAINT channel_bindings_access_policy_check
-        CHECK (access_policy IN ('channel_acl', 'conversation_members_read_and_participate')),
-    CONSTRAINT channel_bindings_delivery_policy_check
-        CHECK (delivery_policy IN ('reply_only', 'reply_and_initiate')),
-    CONSTRAINT channel_bindings_status_check
-        CHECK (status IN ('active', 'paused', 'disabled', 'orphaned')),
-    -- A binding that stopped carrying traffic says why, and one that is carrying traffic cannot
-    -- claim it was disabled for a reason.
-    CONSTRAINT channel_bindings_disabled_reason_check CHECK (
-        (status IN ('disabled', 'orphaned')) = (disabled_reason IS NOT NULL)
-        AND (disabled_reason IS NULL OR valid_binding_change_reason(disabled_reason))
-    ),
-    CONSTRAINT channel_bindings_created_by_check CHECK (valid_creation_provenance(created_by)),
-    CONSTRAINT channel_bindings_access_snapshot_check CHECK (
-        jsonb_typeof(access_snapshot) = 'object'
-        AND access_snapshot->'version' = '1'::JSONB
-        AND jsonb_typeof(access_snapshot->'kind') = 'string'
-        AND access_snapshot->>'kind' IN ('deployment_endpoint', 'provider_conversation')
-        AND octet_length(access_snapshot::text) <= 4096
-    )
-);
 
--- `active` and `paused` are the statuses that still *claim* an endpoint; `disabled` and `orphaned`
--- release it so the same conversation can be linked to a different channel. The three partial
--- unique indexes below are all defined over that same set, and `BindingStatus::
--- holds_endpoint_claim` states it in Rust.
-
--- Two channels in one workspace cannot consume the same conversation. Scoped by installation
--- rather than by company because the installation is what the provider's ids are unique within.
-CREATE UNIQUE INDEX channel_bindings_installed_endpoint_idx
-    ON channel_bindings (installation_id, transport, namespace, external_endpoint_key)
-    WHERE installation_id IS NOT NULL AND status IN ('active', 'paused');
-
--- The same rule for the deployment transports, written separately rather than folded into the
--- index above: a NULL `installation_id` makes a composite unique index match nothing, so one
--- combined index would let every email binding collide silently. For email this reads as one live
--- binding per (company, local part), which is the guarantee `channel_slugs` already makes.
-CREATE UNIQUE INDEX channel_bindings_deployment_endpoint_idx
-    ON channel_bindings (transport, namespace, external_endpoint_key)
-    WHERE installation_id IS NULL AND status IN ('active', 'paused');
-
--- One canonical deployment interface per channel per transport, so a retried or concurrent
--- channel creation cannot leave a channel with two email bindings.
-CREATE UNIQUE INDEX channel_bindings_canonical_deployment_idx
-    ON channel_bindings (company_id, channel_id, transport)
-    WHERE installation_id IS NULL AND status IN ('active', 'paused');
-
-CREATE INDEX channel_bindings_channel_idx
-    ON channel_bindings (company_id, channel_id, transport, status);
-
-CREATE INDEX channel_bindings_installation_idx
-    ON channel_bindings (installation_id, status)
-    WHERE installation_id IS NOT NULL;
-
--- Append-only lifecycle history. Linking a private provider conversation is a read grant to
--- everyone in it, so who did it, when, and what they were shown has to survive the binding being
--- paused, re-enabled and disabled again.
-CREATE TABLE binding_audit_events (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    binding_id UUID NOT NULL,
-    action TEXT NOT NULL,
-    reason TEXT,
-    actor JSONB NOT NULL,
-    -- Safe identifiers plus the confirmed access-policy snapshot. Never a credential, never a full
-    -- provider response; `ChannelBinding::audit_metadata` is the only thing that builds it.
-    metadata JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT binding_audit_events_binding_fk
-        FOREIGN KEY (company_id, binding_id)
-        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT binding_audit_events_action_check CHECK (
-        action IN ('linked', 'endpoint_changed', 'enabled', 'paused', 'disabled',
-                   'drift_detected', 'unlinked')
-    ),
-    CONSTRAINT binding_audit_events_reason_check
-        CHECK (reason IS NULL OR valid_binding_change_reason(reason)),
-    CONSTRAINT binding_audit_events_actor_check CHECK (valid_creation_provenance(actor)),
-    CONSTRAINT binding_audit_events_metadata_check CHECK (
-        jsonb_typeof(metadata) = 'object'
-        AND metadata->'version' = '1'::JSONB
-        AND jsonb_typeof(metadata->'transport') = 'string'
-        AND octet_length(metadata::text) <= 4096
-    )
-);
-
-CREATE INDEX binding_audit_events_binding_idx
-    ON binding_audit_events (company_id, binding_id, created_at DESC, id DESC);
-
--- Append-only means append-only. Deleting a company or a channel still cascades the history away
--- with the rows it describes, but nothing may rewrite what an audit row said it saw.
-CREATE FUNCTION reject_binding_audit_rewrite() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.notify_attention_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    row_data JSONB := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+    source_id UUID;
+    company UUID := NULLIF(row_data->>'company_id', '')::UUID;
+    channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
 BEGIN
-    IF TG_OP = 'UPDATE' OR pg_trigger_depth() <= 1 THEN
-        RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+    source_id := COALESCE(
+        NULLIF(row_data->>'id', '')::UUID,
+        NULLIF(row_data->>'draft_id', '')::UUID
+    );
+
+    IF TG_ARGV[0] = 'response_review' THEN
+        SELECT draft.company_id, draft.channel_id
+          INTO company, channel
+          FROM response_drafts AS draft
+         WHERE draft.id = NULLIF(row_data->>'draft_id', '')::UUID
+           AND draft.version = NULLIF(row_data->>'draft_version', '')::INTEGER;
+    ELSIF TG_ARGV[0] = 'delegation' THEN
+        SELECT task.company_id, task.channel_id
+          INTO company, channel
+          FROM background_tasks AS task
+         WHERE task.id = NULLIF(row_data->>'task_id', '')::UUID;
     END IF;
-    RETURN OLD;
+
+    IF company IS NOT NULL AND channel IS NOT NULL AND source_id IS NOT NULL THEN
+        PERFORM pg_notify(
+            'attention_changed',
+            json_build_object(
+                'company_id', company,
+                'channel_id', channel,
+                'source_kind', TG_ARGV[0],
+                'source_id', source_id
+            )::TEXT
+        );
+    END IF;
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
-CREATE TRIGGER binding_audit_events_append_only
-BEFORE UPDATE OR DELETE ON binding_audit_events
-FOR EACH ROW EXECUTE FUNCTION reject_binding_audit_rewrite();
 
--- The durable boundary between a fast authenticated webhook acknowledgement and canonical
--- ingestion. Exact provider bytes live here only for the short incident/retry window; tasks and
--- canonical messages carry identifiers and bounded normalized content instead.
+--
+-- Name: notify_inbound_event_ready(); Type: FUNCTION; Schema: public; Owner: -
+--
 
-CREATE FUNCTION valid_inbound_event_error_class(class TEXT) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN class IN (
-    'decode', 'invalid_payload', 'routing', 'dependency', 'rate_limited', 'provider_fault',
-    'deadline', 'internal', 'unsupported_transport', 'lease_expired'
-);
-
-CREATE FUNCTION valid_inbound_event_ignore_reason(reason TEXT) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN reason IN (
-    'not_message', 'unsupported_event', 'unsupported_subtype', 'automated_sender',
-    'empty_content', 'inactive_binding', 'delivery_confirmation'
-);
-
--- Header selection is the authenticating adapter's responsibility. This function only guarantees
--- that the selected diagnostic facts stay small, printable, and structurally predictable.
-CREATE FUNCTION valid_inbound_safe_header_facts(facts JSONB) RETURNS BOOLEAN
-LANGUAGE SQL
-IMMUTABLE
-RETURN jsonb_typeof(facts) = 'object'
-   AND (SELECT COUNT(*) <= 16 FROM jsonb_object_keys(facts))
-   AND octet_length(facts::TEXT) <= 4096
-   AND NOT EXISTS (
-       SELECT 1
-         FROM jsonb_each(facts) AS fact(name, value)
-        WHERE fact.name !~ '^[a-z0-9_]{1,64}$'
-           OR jsonb_typeof(fact.value) <> 'string'
-           OR octet_length(fact.value #>> '{}') NOT BETWEEN 1 AND 256
-           OR fact.value #>> '{}' ~ '[[:cntrl:]]'
-   );
-
-CREATE TABLE inbound_events (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    installation_id UUID,
-    transport TEXT NOT NULL,
-    external_event_key TEXT NOT NULL,
-    correlation_id UUID NOT NULL,
-    raw_payload BYTEA NOT NULL,
-    content_type TEXT,
-    content_hash BYTEA NOT NULL,
-    safe_header_facts JSONB NOT NULL DEFAULT '{}'::JSONB,
-    status TEXT NOT NULL DEFAULT 'pending',
-    attempt_count INTEGER NOT NULL DEFAULT 0,
-    max_attempts INTEGER NOT NULL DEFAULT 5,
-    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_error_class TEXT,
-    last_error_detail TEXT,
-    ignore_reason TEXT,
-    execution_id UUID,
-    owner_worker_id UUID,
-    locked_at TIMESTAMPTZ,
-    lock_expires_at TIMESTAMPTZ,
-    received_at TIMESTAMPTZ NOT NULL,
-    processed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT inbound_events_company_id_id_key UNIQUE (company_id, id),
-    -- Slack event_id is globally unique. A future provider with tenant-local delivery ids must
-    -- change this documented key to include installation_id before it can use this inbox.
-    CONSTRAINT inbound_events_transport_external_event_key
-        UNIQUE (transport, external_event_key),
-    -- The three-column reference proves installation, company and discriminator agree. Its NULL
-    -- behavior permits deployment transports; the check immediately below says exactly which
-    -- transports are allowed to use that arm.
-    CONSTRAINT inbound_events_installation_fk
-        FOREIGN KEY (company_id, installation_id, transport)
-        REFERENCES integration_installations(company_id, id, transport) ON DELETE CASCADE,
-    CONSTRAINT inbound_events_installation_check CHECK (
-        transport_requires_installation(transport) = (installation_id IS NOT NULL)
-    ),
-    CONSTRAINT inbound_events_transport_check CHECK (transport IN ('email', 'slack')),
-    CONSTRAINT inbound_events_external_event_key_check CHECK (
-        btrim(external_event_key) <> '' AND octet_length(external_event_key) <= 512
-    ),
-    -- This is the same 1 MiB boundary exported as MAX_INBOUND_EVENT_PAYLOAD_BYTES. The HTTP route
-    -- rejects before allocation; this check prevents a second writer bypassing that guard.
-    CONSTRAINT inbound_events_payload_check CHECK (
-        octet_length(raw_payload) BETWEEN 1 AND 1048576
-    ),
-    CONSTRAINT inbound_events_content_type_check CHECK (
-        content_type IS NULL
-        OR (btrim(content_type) <> '' AND octet_length(content_type) <= 255
-            AND content_type !~ '[[:cntrl:]]')
-    ),
-    CONSTRAINT inbound_events_content_hash_check CHECK (octet_length(content_hash) = 32),
-    CONSTRAINT inbound_events_safe_header_facts_check
-        CHECK (valid_inbound_safe_header_facts(safe_header_facts)),
-    CONSTRAINT inbound_events_status_check CHECK (status IN (
-        'pending', 'processing', 'retryable', 'completed', 'ignored', 'dead_letter'
-    )),
-    CONSTRAINT inbound_events_attempt_check CHECK (
-        attempt_count >= 0 AND max_attempts > 0 AND attempt_count <= max_attempts
-    ),
-    CONSTRAINT inbound_events_error_check CHECK (
-        (last_error_class IS NULL OR valid_inbound_event_error_class(last_error_class))
-        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
-        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
-        AND ((status IN ('retryable', 'dead_letter')) = (last_error_class IS NOT NULL))
-    ),
-    CONSTRAINT inbound_events_ignore_check CHECK (
-        (status = 'ignored') = (ignore_reason IS NOT NULL)
-        AND (ignore_reason IS NULL OR valid_inbound_event_ignore_reason(ignore_reason))
-    ),
-    CONSTRAINT inbound_events_lease_check CHECK (
-        (status = 'processing'
-         AND execution_id IS NOT NULL
-         AND owner_worker_id IS NOT NULL
-         AND locked_at IS NOT NULL
-         AND lock_expires_at IS NOT NULL
-         AND lock_expires_at > locked_at)
-        OR
-        (status <> 'processing'
-         AND execution_id IS NULL
-         AND owner_worker_id IS NULL
-         AND locked_at IS NULL
-         AND lock_expires_at IS NULL)
-    ),
-    CONSTRAINT inbound_events_processed_check CHECK (
-        (status IN ('completed', 'ignored', 'dead_letter')) = (processed_at IS NOT NULL)
-    )
-);
-
-CREATE INDEX inbound_events_claimable_idx
-    ON inbound_events (available_at, received_at, id)
-    WHERE status IN ('pending', 'retryable');
-CREATE INDEX inbound_events_processing_lease_idx
-    ON inbound_events (lock_expires_at, id) WHERE status = 'processing';
--- Retention walks terminal rows by status and processed time and deletes in bounded batches.
-CREATE INDEX inbound_events_processed_retention_idx
-    ON inbound_events (status, processed_at, id)
-    WHERE status IN ('completed', 'ignored', 'dead_letter');
-CREATE INDEX inbound_events_company_installation_created_idx
-    ON inbound_events (company_id, installation_id, created_at DESC, id DESC);
-
--- A hint only. Polling and startup reconciliation remain authoritative, so a dropped notification
--- cannot lose work and a process on another machine can recover without receiving this payload.
-CREATE FUNCTION notify_inbound_event_ready() RETURNS TRIGGER AS $$
+CREATE FUNCTION public.notify_inbound_event_ready() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
     IF NEW.status IN ('pending', 'retryable')
        AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status
@@ -1130,541 +993,160 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER inbound_events_notify_ready
-AFTER INSERT OR UPDATE OF status, available_at ON inbound_events
-FOR EACH ROW EXECUTE FUNCTION notify_inbound_event_ready();
 
--- One conversation inside one business channel.
 --
--- Deliberately carries no provider key of its own: a thread may be bound to email and to several
--- Slack conversations at once, so the mapping lives one-to-many in `external_threads`.
-CREATE TABLE threads (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    subject TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT threads_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT threads_company_channel_id_key UNIQUE (company_id, channel_id, id),
-    CONSTRAINT threads_channel_id_key UNIQUE (channel_id, id),
-    CONSTRAINT threads_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE
-);
-
-CREATE INDEX threads_channel_updated_idx
-    ON threads (channel_id, updated_at DESC, id DESC);
-
--- Who is a party to a thread, and in what capacity.  `role` carries the author/participant
--- distinction that an email array could only imply by position.
-CREATE TABLE thread_principals (
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    thread_id UUID NOT NULL,
-    principal_id UUID NOT NULL,
-    role TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (company_id, channel_id, thread_id, principal_id, role),
-    CONSTRAINT thread_principals_thread_fk
-        FOREIGN KEY (company_id, channel_id, thread_id)
-        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
-    CONSTRAINT thread_principals_principal_fk
-        FOREIGN KEY (company_id, principal_id)
-        REFERENCES principals(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT thread_principals_role_check CHECK (role IN ('author', 'participant'))
-);
-
-CREATE INDEX thread_principals_principal_idx
-    ON thread_principals (company_id, principal_id, thread_id, role);
-
--- The canonical payload of one message, whatever carried it: an email, a Slack post, a schedule's
--- prompt, an approval note, or an agent's answer.
+-- Name: notify_internal_note_change(); Type: FUNCTION; Schema: public; Owner: -
 --
--- Nothing here is email-shaped. The author is a principal, not an address; the subject is a plain
--- string; protocol headers and provider keys live in `email_message_metadata`, `external_messages`
--- and `external_threads`. A message stored once may be associated with several threads through
--- `thread_messages` and delivered through several bindings without a second copy of its body.
-CREATE TABLE messages (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    -- Who said it. Always a principal, so "the same person over two transports" is one actor.
-    author_principal_id UUID NOT NULL,
-    -- Which of that principal's handles said it, when a transport named one. A schedule prompt
-    -- and a system note have an author but no handle, which is why this is nullable.
-    authored_identity_id UUID,
-    subject TEXT NOT NULL,
-    clean_text_body TEXT NOT NULL,
-    attachments JSONB,
-    direction TEXT NOT NULL,
-    role TEXT NOT NULL,
-    -- The chain this message belongs to, minted at ingress and shared with the task it causes.
-    correlation_id UUID NOT NULL,
-    -- Over one canonical payload, so a provider redelivering the same key with different content
-    -- is a detectable collision rather than a silent rewrite. See `canonical_message_hash`.
-    content_hash BYTEA NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT messages_company_id_id_key UNIQUE (company_id, id),
-    -- Composite, so a message can never name an author or handle from another company.
-    CONSTRAINT messages_author_principal_fk
-        FOREIGN KEY (company_id, author_principal_id)
-        REFERENCES principals(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT messages_authored_identity_fk
-        FOREIGN KEY (company_id, authored_identity_id)
-        REFERENCES participant_identities(company_id, id)
-        ON DELETE SET NULL (authored_identity_id),
-    CONSTRAINT messages_authored_identity_author_fk
-        FOREIGN KEY (company_id, author_principal_id, authored_identity_id)
-        REFERENCES participant_identities(company_id, principal_id, id)
-        ON DELETE SET NULL (authored_identity_id),
-    CONSTRAINT messages_direction_check CHECK (direction IN ('inbound', 'outbound')),
-    CONSTRAINT messages_role_check CHECK (role IN ('human', 'agent', 'system')),
-    CONSTRAINT messages_content_hash_check CHECK (octet_length(content_hash) = 32),
-    CONSTRAINT messages_subject_check CHECK (octet_length(subject) <= 2048),
-    -- Attachment metadata arrives from outside and is decoded long after it was written, so it is
-    -- stored as a versioned, discriminated, bounded envelope and decoded fallibly in Rust -- a
-    -- structurally valid object may still carry a version a rolling deploy has not learned yet.
-    CONSTRAINT messages_attachments_check CHECK (
-        attachments IS NULL
-        OR (
-            jsonb_typeof(attachments) = 'object'
-            -- The discriminator is a JSON *string* because `MessageAttachments` is an
-            -- internally-tagged Rust enum, whose variant name is what serde writes here. A
-            -- number would decode as a different shape entirely.
-            AND attachments->'version' = '"1"'::JSONB
-            AND jsonb_typeof(attachments->'items') = 'array'
-            AND octet_length(attachments::text) <= 262144
-        )
-    )
-);
 
-CREATE INDEX messages_company_created_idx ON messages (company_id, created_at DESC, id DESC);
-CREATE INDEX messages_author_idx ON messages (company_id, author_principal_id);
-
--- The sender/to/cc projection of a message, for the transports that have one.
---
--- `position` is what makes a rendered `To:` header reproducible: the order a message was addressed
--- in is data, not an accident of how a query happened to sort. A transport without recipient
--- vocabulary -- Slack, a schedule prompt -- simply writes no rows here.
-CREATE TABLE message_participants (
-    company_id UUID NOT NULL,
-    message_id UUID NOT NULL,
-    participant_identity_id UUID NOT NULL,
-    kind TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    PRIMARY KEY (message_id, kind, position),
-    CONSTRAINT message_participants_message_fk
-        FOREIGN KEY (company_id, message_id)
-        REFERENCES messages(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT message_participants_identity_fk
-        FOREIGN KEY (company_id, participant_identity_id)
-        REFERENCES participant_identities(company_id, id) ON DELETE CASCADE,
-    -- One handle appears at most once per role, so a duplicated `Cc` cannot become two rows that
-    -- render the same address twice.
-    CONSTRAINT message_participants_identity_kind_key
-        UNIQUE (message_id, kind, participant_identity_id),
-    CONSTRAINT message_participants_kind_check CHECK (kind IN ('sender', 'to', 'cc')),
-    CONSTRAINT message_participants_position_check CHECK (position >= 0)
-);
-
-CREATE INDEX message_participants_identity_idx
-    ON message_participants (company_id, participant_identity_id, message_id);
-
--- The email protocol extension of a canonical message: the headers and raw representations that
--- only mail has, kept out of `messages` so a Slack post needs none of them.
---
--- `rfc_message_id` is deliberately *not* unique per company. A Message-ID identifies a mail on the
--- wire, not a message this company holds: when one channel's agent mails another, the same
--- Message-ID is one outbound message on the sending channel's binding and one inbound message on
--- the receiving channel's, with different bodies, different directions and different threads. The
--- pre-canonical schema forced those into one row keyed by Message-ID and then had to demand that
--- both writers produce byte-identical content -- a coupling that silently broke every
--- inter-channel delegation the moment one side stored a raw body the other did not. Dedup belongs
--- to `external_messages (binding_id, external_message_key)`, which is the provider key qualified
--- by the interface that carried it.
---
--- Email authentication (SPF/DKIM/DMARC) and spam scoring are deliberately absent. They are ingress
--- guards, consumed before a message exists at all -- see `check_inbound_guards` -- and nothing
--- downstream reads them back. A field is retained here only because something reads it.
-CREATE TABLE email_message_metadata (
-    company_id UUID NOT NULL,
-    message_id UUID NOT NULL,
-    rfc_message_id TEXT NOT NULL,
-    in_reply_to TEXT,
-    references_list TEXT[] NOT NULL DEFAULT '{}',
-    thread_index TEXT,
-    raw_text_body TEXT,
-    raw_html_body TEXT,
-    PRIMARY KEY (message_id),
-    CONSTRAINT email_message_metadata_message_fk
-        FOREIGN KEY (company_id, message_id)
-        REFERENCES messages(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT email_message_metadata_rfc_message_id_check CHECK (
-        btrim(rfc_message_id) <> '' AND octet_length(rfc_message_id) <= 998
-    ),
-    CONSTRAINT email_message_metadata_in_reply_to_check CHECK (
-        in_reply_to IS NULL OR octet_length(in_reply_to) <= 998
-    ),
-    CONSTRAINT email_message_metadata_thread_index_check CHECK (
-        thread_index IS NULL OR octet_length(thread_index) <= 998
-    ),
-    -- Bounded because the whole array is read into memory to build a threading lookup key.
-    CONSTRAINT email_message_metadata_references_check CHECK (
-        array_length(references_list, 1) IS NULL OR array_length(references_list, 1) <= 100
-    )
-);
-
--- Thread resolution and the ingress duplicate check both look a Message-ID up inside one company.
-CREATE INDEX email_message_metadata_company_rfc_idx
-    ON email_message_metadata (company_id, rfc_message_id);
-CREATE INDEX email_message_metadata_in_reply_to_idx
-    ON email_message_metadata (company_id, in_reply_to) WHERE in_reply_to IS NOT NULL;
-CREATE INDEX email_message_metadata_thread_index_idx
-    ON email_message_metadata (company_id, thread_index) WHERE thread_index IS NOT NULL;
-
--- Which provider conversation, on which binding, a canonical thread is reachable as.
---
--- One thread may have many rows: the same conversation can run over the channel's email binding
--- and over two Slack conversations at once. The key is opaque here -- the owning adapter decides
--- what a thread key is (`thread_ts.unwrap_or(ts)` for Slack, an RFC root for mail) -- so nothing
--- in the database or the application parses it.
-CREATE TABLE external_threads (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    binding_id UUID NOT NULL,
-    external_thread_key TEXT NOT NULL,
-    thread_id UUID NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT external_threads_company_id_id_key UNIQUE (company_id, id),
-    -- One provider conversation resolves to exactly one internal thread; the same key in another
-    -- binding is a different conversation and collides with nothing.
-    CONSTRAINT external_threads_binding_key_key UNIQUE (binding_id, external_thread_key),
-    CONSTRAINT external_threads_binding_fk
-        FOREIGN KEY (company_id, binding_id)
-        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT external_threads_thread_fk
-        FOREIGN KEY (company_id, thread_id)
-        REFERENCES threads(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT external_threads_key_check CHECK (
-        btrim(external_thread_key) <> '' AND octet_length(external_thread_key) <= 998
-    )
-);
-
-CREATE INDEX external_threads_thread_idx
-    ON external_threads (company_id, thread_id, binding_id);
-
--- Which provider message, on which binding, a canonical message was carried as.
---
--- This is the dedup key for redelivery: a provider replaying an event finds its own key here and
--- the existing canonical message is returned instead of a second one being written.
-CREATE TABLE external_messages (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    binding_id UUID NOT NULL,
-    external_message_key TEXT NOT NULL,
-    message_id UUID NOT NULL,
-    -- Which part of an outbound delivery produced this provider message. A long answer is sent as
-    -- several provider messages, so the mapping is per part rather than per message: several rows
-    -- here can point at one canonical message while each names the part that carried it.
-    --
-    -- `NULL` for an inbound mapping, which is every message that arrived from outside. The
-    -- reference is added at the end of the file, after `message_delivery_parts` exists.
-    delivery_part_id UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT external_messages_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT external_messages_binding_key_key UNIQUE (binding_id, external_message_key),
-    CONSTRAINT external_messages_binding_fk
-        FOREIGN KEY (company_id, binding_id)
-        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT external_messages_message_fk
-        FOREIGN KEY (company_id, message_id)
-        REFERENCES messages(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT external_messages_key_check CHECK (
-        btrim(external_message_key) <> '' AND octet_length(external_message_key) <= 998
-    )
-);
-
-CREATE INDEX external_messages_message_idx
-    ON external_messages (company_id, message_id, binding_id);
-
--- One canonical message's membership of one thread.
---
--- Carries no payload of its own: the body, role and direction belong to the message, and this row
--- says only that the message is part of this conversation. `id` is the association identity the
--- UI and `task_outreach_targets.response_association_id` name, so a message in two threads has two
--- addressable rows.
-CREATE TABLE thread_messages (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    thread_id UUID NOT NULL,
-    message_id UUID NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT thread_messages_thread_message_key UNIQUE (thread_id, message_id),
-    -- A message lands in at most one thread per channel: a second thread in the same channel would
-    -- split one conversation in two for the same audience.
-    CONSTRAINT thread_messages_channel_message_key UNIQUE (channel_id, message_id),
-    -- All three tenancy columns are in the key, so a message cannot name a thread that belongs to
-    -- another company or another channel than the one it recorded.
-    CONSTRAINT thread_messages_thread_fk
-        FOREIGN KEY (company_id, channel_id, thread_id)
-        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
-    CONSTRAINT thread_messages_message_fk
-        FOREIGN KEY (company_id, message_id)
-        REFERENCES messages(company_id, id) ON DELETE CASCADE
-);
-
-CREATE INDEX thread_messages_thread_created_idx
-    ON thread_messages (thread_id, created_at, id);
-CREATE INDEX thread_messages_message_thread_idx
-    ON thread_messages (message_id, thread_id);
-
-CREATE FUNCTION delete_orphan_message() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.notify_internal_note_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    note_thread UUID;
+    note_channel UUID;
+    note_company UUID;
 BEGIN
-    DELETE FROM messages message
-    WHERE message.id = OLD.message_id
-      AND NOT EXISTS (
-          SELECT 1 FROM thread_messages association
-          WHERE association.message_id = OLD.message_id
-      );
+    IF TG_TABLE_NAME = 'internal_notes' THEN
+        note_thread := NEW.thread_id;
+        note_channel := NEW.channel_id;
+        note_company := NEW.company_id;
+    ELSE
+        SELECT thread_id, channel_id, company_id
+          INTO note_thread, note_channel, note_company
+          FROM internal_notes WHERE id = NEW.note_id;
+    END IF;
+    PERFORM pg_notify('thread_messages', json_build_object(
+        'thread_id', note_thread, 'channel_id', note_channel, 'company_id', note_company
+    )::text);
     RETURN NULL;
 END;
 $$;
 
-CREATE TRIGGER thread_messages_delete_orphan_message
-AFTER DELETE ON thread_messages
-FOR EACH ROW EXECUTE FUNCTION delete_orphan_message();
 
--- Announce every persisted message so open `/ui` mailboxes can append it live.
 --
--- This lives in a trigger rather than in the Rust writer for three reasons: every writer is
--- covered, including ones added later; the notification is bound to the same transaction as the
--- row, so it is delivered only on commit and never announces a message a reader cannot yet see;
--- and `create_message` does not have `company_id` in hand -- it derives it in SQL from `threads`.
+-- Name: notify_task_chain_changed(); Type: FUNCTION; Schema: public; Owner: -
 --
--- The payload carries identifiers only. `pg_notify` caps payloads at 8000 bytes, and listeners
--- re-query for the message body anyway so that a reader resuming after a dropped connection takes
--- the same path as one receiving a live message.
-CREATE FUNCTION notify_thread_message() RETURNS TRIGGER AS $$
+
+CREATE FUNCTION public.notify_task_chain_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    notified_company_id UUID;
+    notified_correlation_id UUID;
 BEGIN
-    PERFORM pg_notify(
-        'thread_message',
-        json_build_object(
-            'thread_id', NEW.thread_id,
-            'channel_id', NEW.channel_id,
-            'company_id', NEW.company_id
-        )::text
-    );
+    -- `UPDATE OF status` fires whenever the column appears in a SET list, whether or not the value
+    -- moved. A write that leaves the status alone changes nothing the board draws, so it must not
+    -- wake every connected viewer of the company. This suppresses no real transition:
+    -- `pending -> sending -> delivered` is three material changes and still emits three
+    -- notifications,
+    -- which the stream coalesces on its own. The checks are per table because these are the only
+    -- notifying tables that have a `status` column at all.
+    IF TG_OP = 'UPDATE' THEN
+        IF TG_TABLE_NAME = 'message_deliveries' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'human_approvals' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        END IF;
+    END IF;
+
+    IF TG_TABLE_NAME = 'task_status_events' THEN
+        notified_company_id := NEW.company_id;
+        notified_correlation_id := NEW.correlation_id;
+    ELSIF TG_TABLE_NAME = 'message_deliveries' THEN
+        notified_company_id := NEW.company_id;
+        notified_correlation_id := NEW.correlation_id;
+    ELSIF TG_TABLE_NAME = 'human_approvals' THEN
+        SELECT task.company_id, task.correlation_id
+          INTO notified_company_id, notified_correlation_id
+          FROM background_tasks AS task WHERE task.id = NEW.task_id;
+    ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
+        SELECT task.company_id, task.correlation_id
+          INTO notified_company_id, notified_correlation_id
+          FROM background_tasks AS task WHERE task.id = NEW.task_id;
+    ELSE
+        SELECT task.company_id, task.correlation_id
+          INTO notified_company_id, notified_correlation_id
+          FROM task_outreaches AS outreach
+          JOIN background_tasks AS task ON task.id = outreach.task_id
+         WHERE outreach.id = NEW.outreach_id;
+    END IF;
+
+    IF notified_company_id IS NOT NULL AND notified_correlation_id IS NOT NULL THEN
+        PERFORM pg_notify(
+            'task_chain_changed',
+            json_build_object(
+                'company_id', notified_company_id,
+                'correlation_id', notified_correlation_id
+            )::text
+        );
+    END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
--- INSERT only, and the association insert is `ON CONFLICT DO NOTHING`: a redelivered provider
--- message writes no second row here and so announces nothing, which is what stops a duplicate
--- bubble appearing in an open mailbox. The body lives on `messages` and is never rewritten by the
--- association, so there is nothing else here worth announcing.
-CREATE TRIGGER thread_messages_notify
-    AFTER INSERT ON thread_messages
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_thread_message();
 
-CREATE TABLE background_tasks (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    channel_id UUID NOT NULL,
-    thread_id UUID,
-    -- The canonical message this task was queued for, when one caused it. Tenant-scoped and
-    -- unique, so a redelivered provider message finds the task its first delivery created instead
-    -- of starting a second run of the same work.
-    source_message_uuid UUID,
-    -- The same guarantee for the one source that is not a message: a schedule slot coming due.
-    -- No foreign key, because `schedule_runs` names `background_tasks` and Postgres cannot create
-    -- the pair in either order; `schedule_runs_schedule_slot_key` is what makes the slot unique in
-    -- the first place, and this makes the task it materializes unique too.
-    source_schedule_run_id UUID,
-    -- The inbound event this task descends from, minted once at ingress and inherited by every
-    -- task the run goes on to spawn (an outreach in another channel, an approval resume, a
-    -- schedule's next occurrence). Never re-minted here: the `ON CONFLICT` below returns the
-    -- task a redelivered message already has, correlation id and all, so a duplicate delivery
-    -- joins the original chain instead of starting a second one.
-    correlation_id UUID NOT NULL,
-    task_type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    payload JSONB NOT NULL DEFAULT '{}',
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    max_retries INTEGER NOT NULL DEFAULT 3,
-    last_error TEXT,
-    worker_id UUID,
-    -- Fences one execution against the next. `worker_id` alone cannot: a worker whose lease
-    -- lapsed and which then re-claims the same task would match its own stale guard. The
-    -- generation is minted afresh at every claim, so a write from a superseded run matches
-    -- nothing. `schedule_runs.materialization_generation` does the same job for that queue.
-    execution_generation UUID,
-    locked_at TIMESTAMPTZ,
-    lock_expires_at TIMESTAMPTZ,
-    wait_expires_at TIMESTAMPTZ,
-    run_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- Why the row's current status was written, and by whom. Carried on the row rather than in
-    -- transaction-local settings so that a status change and its attribution are the same write:
-    -- one statement, one round trip, and no pooled-session state for a later query to inherit.
-    -- Every status-changing UPDATE sets all five, binding NULL where a value is absent -- a column
-    -- left out of a SET list would keep the previous transition's value, which the trigger below
-    -- cannot tell from deliberate reuse. An INSERT leaves all five NULL: a new row has no prior
-    -- transition, and `enqueued` is derivable without being told.
-    --
-    -- These describe the latest intended transition, not history: `task_status_events` is the
-    -- ledger. They are deliberately unindexed -- nothing queries by them.
-    transition_reason TEXT,
-    transition_actor_kind TEXT,
-    transition_actor_id UUID,
-    transition_approval_id UUID,
-    transition_outreach_id UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT background_tasks_company_source_message_key
-        UNIQUE (company_id, source_message_uuid),
-    CONSTRAINT background_tasks_company_source_schedule_run_key
-        UNIQUE (company_id, source_schedule_run_id),
-    -- A task names at most one source. Both set would make "which redelivery does this dedup
-    -- against?" ambiguous, and the two unique keys above would each answer differently.
-    CONSTRAINT background_tasks_single_source_check CHECK (
-        source_message_uuid IS NULL OR source_schedule_run_id IS NULL
-    ),
-    CONSTRAINT background_tasks_source_message_fk
-        FOREIGN KEY (company_id, source_message_uuid)
-        REFERENCES messages(company_id, id) ON DELETE SET NULL (source_message_uuid),
-    CONSTRAINT background_tasks_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT background_tasks_thread_fk
-        FOREIGN KEY (company_id, channel_id, thread_id)
-        REFERENCES threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id),
-    CONSTRAINT background_tasks_status_check CHECK (status IN (
-        'pending', 'processing', 'pending_approval',
-        'waiting_for_third_party_reply', 'completed', 'failed',
-        'dead_letter', 'stopped'
-    )),
-    CONSTRAINT background_tasks_retry_count_check CHECK (retry_count >= 0),
-    CONSTRAINT background_tasks_max_retries_check CHECK (max_retries > 0),
-    CONSTRAINT background_tasks_payload_object_check CHECK (jsonb_typeof(payload) = 'object'),
-    -- Only a processing row may hold a lease, and it must hold all of it. Previously this said
-    -- merely "all four set or all four null", which let a completed or suspended row keep the
-    -- worker that last touched it and made "is this task claimed?" ambiguous. Clearing was left
-    -- to each UPDATE getting it right; now the database refuses the alternative.
-    CONSTRAINT background_tasks_lease_check CHECK (
-        (status = 'processing'
-         AND worker_id IS NOT NULL
-         AND execution_generation IS NOT NULL
-         AND locked_at IS NOT NULL
-         AND lock_expires_at IS NOT NULL
-         AND lock_expires_at > locked_at)
-        OR
-        (status <> 'processing'
-         AND worker_id IS NULL
-         AND execution_generation IS NULL
-         AND locked_at IS NULL
-         AND lock_expires_at IS NULL)
-    ),
-    CONSTRAINT background_tasks_transition_reason_check CHECK (
-        transition_reason IS NULL OR transition_reason IN (
-            'enqueued', 'claimed', 'completed',
-            'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
-            'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
-            'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
-            'outreach_extended', 'operator_stopped', 'operator_resumed', 'unknown'
-        )
-    ),
-    CONSTRAINT background_tasks_transition_actor_kind_check CHECK (
-        transition_actor_kind IS NULL OR transition_actor_kind IN (
-            'system', 'worker', 'operator', 'approval', 'outreach'
-        )
-    ),
-    -- An actor kind names exactly one shape, and the shape is what the ledger reads. `worker` and
-    -- `operator` are identified by `transition_actor_id`; `approval` and `outreach` are identified
-    -- by the row that caused the transition; `system` is identified by nothing. Stating a kind
-    -- without its id, or two sources at once, is the corruption this table refuses to store.
-    CONSTRAINT background_tasks_transition_shape_check CHECK (
-        (transition_reason IS NULL
-         AND transition_actor_kind IS NULL
-         AND transition_actor_id IS NULL
-         AND transition_approval_id IS NULL
-         AND transition_outreach_id IS NULL)
-        OR
-        (transition_reason IS NOT NULL
-         AND CASE transition_actor_kind
-             WHEN 'system' THEN transition_actor_id IS NULL
-                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
-             WHEN 'worker' THEN transition_actor_id IS NOT NULL
-                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
-             WHEN 'operator' THEN transition_actor_id IS NOT NULL
-                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
-             WHEN 'approval' THEN transition_actor_id IS NULL
-                 AND transition_approval_id IS NOT NULL AND transition_outreach_id IS NULL
-             WHEN 'outreach' THEN transition_actor_id IS NULL
-                 AND transition_approval_id IS NULL AND transition_outreach_id IS NOT NULL
-             ELSE FALSE
-         END)
-    )
-);
-
-CREATE INDEX background_tasks_pending_ready_idx
-    ON background_tasks (run_at, created_at, id)
-    WHERE status = 'pending';
-CREATE INDEX background_tasks_processing_lease_idx
-    ON background_tasks (lock_expires_at, id)
-    WHERE status = 'processing';
-CREATE INDEX background_tasks_company_created_idx
-    ON background_tasks (company_id, created_at DESC, id DESC);
-CREATE INDEX background_tasks_company_channel_created_idx
-    ON background_tasks (company_id, channel_id, created_at DESC, id DESC);
-CREATE INDEX background_tasks_company_status_created_idx
-    ON background_tasks (company_id, status, created_at DESC, id DESC);
--- The whole-chain lookup: every task one inbound event caused, in the order it caused them.
-CREATE INDEX background_tasks_correlation_idx
-    ON background_tasks (correlation_id, created_at);
-
-CREATE INDEX background_tasks_thread_idx
-    ON background_tasks (thread_id) WHERE thread_id IS NOT NULL;
-CREATE INDEX background_tasks_waiting_due_idx
-    ON background_tasks (wait_expires_at, id)
-    WHERE status = 'waiting_for_third_party_reply' AND wait_expires_at IS NOT NULL;
--- The Kanban board selects chains that are unfinished *or* touched recently. The unfinished arm is
--- served by background_tasks_company_status_created_idx; this is the recency arm, so the two
--- resolve as a BitmapOr instead of a full scan of every task the company has ever run.
-CREATE INDEX background_tasks_company_updated_idx
-    ON background_tasks (company_id, updated_at DESC);
-
-CREATE TABLE agent_channel_provisions (
-    task_id UUID NOT NULL REFERENCES background_tasks(id) ON DELETE CASCADE,
-    request_hash TEXT NOT NULL,
-    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-    warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (task_id, request_hash)
-);
-
--- The runs column filters background_tasks by the schedule id inside the payload. Without this the
--- lookup scans every task ever queued, scheduled or not.
-CREATE INDEX background_tasks_schedule_idx
-    ON background_tasks ((payload->>'schedule_id'))
-    WHERE task_type = 'scheduled_agent_run';
-
--- Announce task status changes so an open mailbox can show what an agent is doing.
 --
--- `UPDATE OF status` is load-bearing: the worker renews a task's lease every few seconds while it
--- runs (`renew_task_lease` touches only `lock_expires_at`), and a trigger on any UPDATE would turn
--- every heartbeat of every running task into a broadcast to every connected mailbox.
+-- Name: notify_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
 --
--- Tasks with no thread -- and there are some, `thread_id` is nullable and a deleted thread nulls it
--- -- have nothing to display against, so they are skipped rather than published and filtered later.
-CREATE FUNCTION notify_thread_activity() RETURNS TRIGGER AS $$
+
+CREATE FUNCTION public.notify_task_ownership() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    affected_thread UUID;
+    affected_channel UUID;
+    affected_correlation UUID;
+    affected_status TEXT;
+    affected_owner_kind TEXT;
+BEGIN
+    SELECT thread_id, channel_id, correlation_id, status, owner_principal_kind
+      INTO affected_thread, affected_channel, affected_correlation, affected_status,
+           affected_owner_kind
+      FROM background_tasks WHERE id = NEW.task_id;
+
+    IF affected_thread IS NOT NULL THEN
+        PERFORM pg_notify('thread_activity', json_build_object(
+            'thread_id', affected_thread,
+            'channel_id', affected_channel,
+            'company_id', NEW.company_id
+        )::text);
+    END IF;
+    IF affected_correlation IS NOT NULL THEN
+        PERFORM pg_notify('task_chain_changed', json_build_object(
+            'company_id', NEW.company_id,
+            'correlation_id', affected_correlation
+        )::text);
+    END IF;
+    PERFORM pg_notify('task_ownership_changed', json_build_object(
+        'task_id', NEW.task_id
+    )::text);
+    IF affected_status = 'pending' AND affected_owner_kind = 'agent' THEN
+        PERFORM pg_notify('task_ready', json_build_object(
+            'task_id', NEW.task_id
+        )::text);
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: notify_thread_activity(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notify_thread_activity() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
     PERFORM pg_notify(
         'thread_activity',
@@ -1676,595 +1158,138 @@ BEGIN
     );
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER background_tasks_notify_activity
-    AFTER INSERT OR UPDATE OF status ON background_tasks
-    FOR EACH ROW
-    WHEN (NEW.thread_id IS NOT NULL)
-    EXECUTE FUNCTION notify_thread_activity();
 
-CREATE TABLE task_channel_targets (
-    task_id UUID NOT NULL,
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    thread_id UUID NOT NULL,
-    recipient_role TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    PRIMARY KEY (task_id, position),
-    CONSTRAINT task_channel_targets_channel_key UNIQUE (task_id, channel_id),
-    CONSTRAINT task_channel_targets_position_check CHECK (position >= 0),
-    CONSTRAINT task_channel_targets_role_check CHECK (recipient_role IN ('to', 'cc')),
-    CONSTRAINT task_channel_targets_task_fk
-        FOREIGN KEY (company_id, task_id)
-        REFERENCES background_tasks(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT task_channel_targets_thread_fk
-        FOREIGN KEY (company_id, channel_id, thread_id)
-        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE
-);
+--
+-- Name: notify_thread_message(); Type: FUNCTION; Schema: public; Owner: -
+--
 
-CREATE INDEX task_channel_targets_channel_task_idx
-    ON task_channel_targets (company_id, channel_id, task_id);
-CREATE INDEX task_channel_targets_thread_idx
-    ON task_channel_targets (company_id, channel_id, thread_id);
-
-CREATE FUNCTION delete_channel_target_tasks() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.notify_thread_message() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
-    DELETE FROM background_tasks task
-    WHERE EXISTS (
-        SELECT 1 FROM task_channel_targets target
-        WHERE target.task_id = task.id AND target.channel_id = OLD.id
+    PERFORM pg_notify(
+        'thread_message',
+        json_build_object(
+            'thread_id', NEW.thread_id,
+            'channel_id', NEW.channel_id,
+            'company_id', NEW.company_id
+        )::text
     );
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: prevent_assigned_library_agent_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_assigned_library_agent_delete() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.company_id IS NULL
+       AND EXISTS (SELECT 1 FROM channel_agents WHERE agent_id = OLD.id) THEN
+        RAISE EXCEPTION 'library agent is assigned to one or more channels'
+            USING ERRCODE = '23503';
+    END IF;
     RETURN OLD;
 END;
 $$;
 
-CREATE TRIGGER channels_delete_target_tasks
-BEFORE DELETE ON channels
-FOR EACH ROW EXECUTE FUNCTION delete_channel_target_tasks();
 
-CREATE TABLE task_attempts (
-    id UUID PRIMARY KEY,
-    task_id UUID NOT NULL REFERENCES background_tasks(id) ON DELETE CASCADE,
-    attempt_number INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    error TEXT,
-    -- Why the attempt stopped running, beyond the coarse `status`. NULL for attempts still in
-    -- flight and for rows written before the worker started recording it.
-    stop_reason TEXT,
-    prompt_tokens INTEGER,
-    completion_tokens INTEGER,
-    result JSONB,
-    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at TIMESTAMPTZ,
-    -- Which run of the task this attempt belongs to. A task that is stopped and started again
-    -- keeps counting `attempt_number` from where it left off, so the generation is what separates
-    -- one execution's attempts from the next's.
-    execution_generation UUID NOT NULL,
-    -- Which worker run produced this attempt. `background_tasks.worker_id` is a lease and is
-    -- nulled the moment the run ends, so the ledger is the only durable answer to "who ran this".
-    worker_id UUID NOT NULL,
-    -- Where that run executed: FLY_MACHINE_ID, or a per-boot `local-<uuid>` off Fly. Denormalized
-    -- onto the attempt on purpose -- there is no worker registry to join to, and a ledger row is
-    -- the record of what was true at the time, not a pointer to what is true now.
-    machine_id TEXT NOT NULL,
-    machine_region TEXT,
-    CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number),
-    CONSTRAINT task_attempts_status_check CHECK (status IN ('processing', 'completed', 'failed')),
-    CONSTRAINT task_attempts_machine_id_check CHECK (length(trim(machine_id)) > 0),
-    CONSTRAINT task_attempts_token_check CHECK (
-        (prompt_tokens IS NULL OR prompt_tokens >= 0)
-        AND (completion_tokens IS NULL OR completion_tokens >= 0)
-    ),
-    CONSTRAINT task_attempts_stop_reason_check CHECK (stop_reason IN (
-        'completed', 'retryable_failure', 'terminal_failure',
-        'timed_out', 'shutdown', 'lease_lost'
-    ))
-);
-
-CREATE TABLE human_approvals (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    channel_id UUID NOT NULL,
-    -- The conversation the approval concerns. Not nullable: the request is written as a system
-    -- message in this thread and delivered from it, so an approval with no thread is one nobody
-    -- could be told about.
-    thread_id UUID NOT NULL,
-    task_id UUID,
-    step_key TEXT NOT NULL,
-    approver_email CITEXT NOT NULL,
-    action_type TEXT NOT NULL,
-    action_title TEXT NOT NULL,
-    action_summary TEXT NOT NULL,
-    payload JSONB NOT NULL DEFAULT '{}',
-    token UUID NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'pending',
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT human_approvals_thread_step_key UNIQUE
-        (company_id, channel_id, thread_id, step_key),
-    CONSTRAINT human_approvals_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT human_approvals_thread_fk
-        FOREIGN KEY (company_id, channel_id, thread_id)
-        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
-    CONSTRAINT human_approvals_task_fk
-        FOREIGN KEY (company_id, task_id)
-        REFERENCES background_tasks(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT human_approvals_status_check
-        CHECK (status IN ('pending', 'approved', 'rejected', 'expired')),
-    CONSTRAINT human_approvals_expiry_check CHECK (expires_at > created_at),
-    CONSTRAINT human_approvals_payload_object_check CHECK (jsonb_typeof(payload) = 'object')
-);
-
-CREATE INDEX human_approvals_channel_created_idx
-    ON human_approvals (company_id, channel_id, created_at DESC, id DESC);
-CREATE INDEX human_approvals_pending_expiry_idx
-    ON human_approvals (expires_at, id) WHERE status = 'pending';
-CREATE INDEX human_approvals_task_idx
-    ON human_approvals (task_id) WHERE task_id IS NOT NULL;
-
--- One durable attempt to expose one canonical message through one protocol interface.
 --
--- The generic queue avoids transport-shaped assumptions: one provider result per
--- row (`provider_message_id`), a single flat status vocabulary that could not tell "the provider
--- refused this" from "the connection dropped after the request went out", and a lease that lived
--- on the same row as the thing being sent. A chat provider splits one answer into several posts,
--- each with its own provider key, and its ambiguous outcomes must never be blind-retried.
+-- Name: prevent_assigned_library_skill_delete(); Type: FUNCTION; Schema: public; Owner: -
 --
--- So a delivery owns the lease and the retry budget; `message_delivery_parts` owns the provider
--- results. There is exactly one leased object per provider call chain, which is what keeps a
--- multi-part send from growing a second ownership state machine.
+
+CREATE FUNCTION public.prevent_assigned_library_skill_delete() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.company_id IS NULL
+       AND EXISTS (SELECT 1 FROM agent_skills WHERE skill_id = OLD.id) THEN
+        RAISE EXCEPTION 'library skill is assigned to one or more agents'
+            USING ERRCODE = '23503', CONSTRAINT = 'library_skill_delete_guard';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+
 --
--- `transport` is stored rather than derived at read time so a claim does not have to join the
--- binding to know which adapter to hand the row to; `message_deliveries_transport_matches_binding`
--- proves the copy agrees with the binding it came from.
-CREATE TABLE message_deliveries (
-    id UUID PRIMARY KEY,
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    -- The business channel whose interface carries this. Canonical deliveries require it; the
-    -- attribution check permits NULL only for a standalone rejection notification.
-    channel_id UUID,
-    -- The canonical message being exposed. Canonical deliveries require it. A pre-ingest
-    -- rejection has no accepted message to invent, so the standalone notification arm omits it.
-    message_id UUID,
-    -- The interface the message came from, or that its producing channel speaks through. Recorded
-    -- so fan-out can exclude it: delivering a message back to its own interface is an echo.
-    source_binding_id UUID,
-    -- The interface that actually carries this delivery. Deduplication is scoped to it.
-    destination_binding_id UUID,
-    -- The recipient named inside the destination interface's own namespace, when the destination
-    -- is an address rather than the interface itself: an outreach recipient, the customer a reply
-    -- answers. `NULL` means the interface *is* the destination, which is what a mirror is.
-    external_destination TEXT,
-    -- The task whose work produced this. Carries no lifecycle meaning -- it is the join the task
-    -- view uses to show delivery state, and nothing writes back through it.
-    task_id UUID,
-    -- The delivery that has to land first. A chat mirror cannot post a reply until the root post
-    -- it threads under exists, and the claim below refuses this row until that one is delivered.
-    depends_on_delivery_id UUID,
-    -- Inherited from whatever produced this. Unlike `task_id` it is never cleared, so a delivered
-    -- message stays attached to its trail even after the task row is gone.
-    correlation_id UUID NOT NULL,
-    transport TEXT NOT NULL,
-    purpose TEXT NOT NULL,
-    -- Stable across every attempt at the same logical delivery, and derived from the purpose, the
-    -- message and the destination rather than from the attempt. It is the lock that makes creation
-    -- idempotent, and what the delivered provider key is derived from.
-    idempotency_key TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    attempt_count INTEGER NOT NULL DEFAULT 0,
-    max_attempts INTEGER NOT NULL,
-    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- Why the last attempt ended, as a typed class plus a bounded detail. Typed because an
-    -- operator alert has to tell a revoked credential from a rate limit, and because recovering
-    -- that by matching substrings of a free-text error is not classification.
-    last_error_class TEXT,
-    last_error_detail TEXT,
-    -- The fence. Minted fresh by every claim, and named in the `WHERE` clause of every renewal,
-    -- part transition, completion and failure, so a superseded run cannot report a result over
-    -- the execution that replaced it.
-    execution_id UUID,
-    owner_worker_id UUID,
-    locked_at TIMESTAMPTZ,
-    lock_expires_at TIMESTAMPTZ,
-    delivered_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT message_deliveries_company_id_id_key UNIQUE (company_id, id),
-    -- One logical delivery per destination interface. The destination is already inside
-    -- `idempotency_key`, so this absorbs a retried planning step rather than enqueuing a second
-    -- send, while two outreach recipients on one message stay two rows.
-    CONSTRAINT message_deliveries_destination_key_key
-        UNIQUE (destination_binding_id, idempotency_key),
-    -- Every composite reference proves the referenced row belongs to the same company, so a
-    -- delivery cannot name another tenant's channel, message, interface or task.
-    CONSTRAINT message_deliveries_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT message_deliveries_message_fk
-        FOREIGN KEY (company_id, message_id)
-        REFERENCES messages(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT message_deliveries_source_binding_fk
-        FOREIGN KEY (company_id, source_binding_id)
-        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
-    -- Carried, not re-asserted: the pair proves the destination interface both belongs to this
-    -- company *and* speaks the transport this row says it does, so a claim can trust the stored
-    -- `transport` without joining.
-    CONSTRAINT message_deliveries_destination_binding_fk
-        FOREIGN KEY (company_id, destination_binding_id, transport)
-        REFERENCES channel_bindings(company_id, id, transport) ON DELETE CASCADE,
-    CONSTRAINT message_deliveries_task_fk
-        FOREIGN KEY (company_id, task_id)
-        REFERENCES background_tasks(company_id, id) ON DELETE SET NULL (task_id),
-    -- Self-referential and same-company. A dependency in another company would let one tenant's
-    -- stuck root hold another tenant's delivery closed for ever.
-    CONSTRAINT message_deliveries_dependency_fk
-        FOREIGN KEY (company_id, depends_on_delivery_id)
-        REFERENCES message_deliveries(company_id, id) ON DELETE SET NULL (depends_on_delivery_id),
-    CONSTRAINT message_deliveries_no_self_dependency_check
-        CHECK (depends_on_delivery_id IS NULL OR depends_on_delivery_id <> id),
-    CONSTRAINT message_deliveries_attribution_check CHECK (
-        (company_id IS NOT NULL
-         AND channel_id IS NOT NULL
-         AND message_id IS NOT NULL
-         AND source_binding_id IS NOT NULL
-         AND destination_binding_id IS NOT NULL)
-        OR
-        (company_id IS NULL
-         AND channel_id IS NULL
-         AND message_id IS NULL
-         AND source_binding_id IS NULL
-         AND destination_binding_id IS NULL
-         AND task_id IS NULL
-         AND depends_on_delivery_id IS NULL
-         AND external_destination IS NOT NULL
-         AND purpose = 'notification')
-    ),
-    CONSTRAINT message_deliveries_transport_check CHECK (transport IN ('email', 'slack')),
-    CONSTRAINT message_deliveries_purpose_check
-        CHECK (purpose IN ('reply', 'mirror', 'outreach', 'notification')),
-    CONSTRAINT message_deliveries_status_check CHECK (status IN (
-        'pending', 'sending', 'retryable', 'delivered', 'outcome_unknown', 'dead_letter'
-    )),
-    CONSTRAINT message_deliveries_attempt_check
-        CHECK (attempt_count >= 0 AND max_attempts > 0 AND attempt_count <= max_attempts),
-    CONSTRAINT message_deliveries_idempotency_key_check CHECK (
-        btrim(idempotency_key) <> '' AND octet_length(idempotency_key) <= 512
-    ),
-    CONSTRAINT message_deliveries_external_destination_check CHECK (
-        external_destination IS NULL
-        OR (btrim(external_destination) <> '' AND octet_length(external_destination) <= 998)
-    ),
-    CONSTRAINT message_deliveries_error_check CHECK (
-        (last_error_class IS NULL OR valid_delivery_failure_class(last_error_class))
-        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
-        -- A detail with no class is an unclassified failure wearing a sentence, which is the shape
-        -- `src/adapters/persistence/AGENTS.md` forbids for an audited transition.
-        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
-    ),
-    -- Lease metadata belongs to 'sending' and to nothing else. Without the second arm a terminal
-    -- row keeps the worker id that last touched it, and a stale lease on a finished row reads as
-    -- an in-flight delivery to anything sweeping for expired ones.
-    CONSTRAINT message_deliveries_lease_check CHECK (
-        (status = 'sending'
-         AND execution_id IS NOT NULL
-         AND owner_worker_id IS NOT NULL
-         AND locked_at IS NOT NULL
-         AND lock_expires_at IS NOT NULL
-         AND lock_expires_at > locked_at)
-        OR
-        (status <> 'sending'
-         AND execution_id IS NULL
-         AND owner_worker_id IS NULL
-         AND locked_at IS NULL
-         AND lock_expires_at IS NULL)
-    ),
-    -- Only a delivered row has a delivery time, and it must have one.
-    CONSTRAINT message_deliveries_delivered_at_check
-        CHECK ((status = 'delivered') = (delivered_at IS NOT NULL))
-);
-
--- The claim's own index: `status IN ('pending','retryable') AND available_at <= now`, ordered by
--- `(available_at, id)`. Both claimable statuses share one partial index because the claim takes
--- them together -- a row that failed and backed off is the same work as one that never ran.
-CREATE INDEX message_deliveries_claimable_idx
-    ON message_deliveries (available_at, id)
-    WHERE status IN ('pending', 'retryable');
-CREATE INDEX message_deliveries_sending_lease_idx
-    ON message_deliveries (lock_expires_at, id) WHERE status = 'sending';
-CREATE INDEX message_deliveries_company_created_idx
-    ON message_deliveries (company_id, created_at DESC, id DESC);
-CREATE INDEX message_deliveries_company_channel_created_idx
-    ON message_deliveries (company_id, channel_id, created_at DESC, id DESC);
-CREATE INDEX message_deliveries_correlation_idx
-    ON message_deliveries (correlation_id, created_at);
-CREATE INDEX message_deliveries_task_idx
-    ON message_deliveries (task_id) WHERE task_id IS NOT NULL;
--- The board's delivery-side recency arm and its unfinished arm; see
--- `background_tasks_company_updated_idx`. Both are needed for the board's
--- `status IN (...) OR updated_at >= cutoff` disjunction to come out as a BitmapOr of two index
--- scans rather than a sequential scan.
-CREATE INDEX message_deliveries_company_updated_idx
-    ON message_deliveries (company_id, updated_at DESC);
-CREATE INDEX message_deliveries_company_status_idx
-    ON message_deliveries (company_id, status);
-CREATE INDEX message_deliveries_message_idx
-    ON message_deliveries (company_id, message_id);
--- Read by the claim (per candidate row) and by the sweep that dead-letters descendants of a
--- dependency that can never be delivered.
-CREATE INDEX message_deliveries_dependency_idx
-    ON message_deliveries (depends_on_delivery_id)
-    WHERE depends_on_delivery_id IS NOT NULL;
-CREATE UNIQUE INDEX message_deliveries_standalone_key_key
-    ON message_deliveries (transport, idempotency_key)
-    WHERE destination_binding_id IS NULL;
-
--- One frozen piece of a delivery, and what its provider said about it.
+-- Name: prevent_message_audience_widening(); Type: FUNCTION; Schema: public; Owner: -
 --
--- Parts are rendered and written before the first provider call, so a retry sends the bytes that
--- were frozen rather than re-rendering against a display name or a policy that has since changed.
--- They own no lease: every transition here is fenced on the parent's live `execution_id`, which is
--- why `begin_part`/`complete_part` take the parent's execution rather than a claim of their own.
-CREATE TABLE message_delivery_parts (
-    id UUID PRIMARY KEY,
-    company_id UUID,
-    delivery_id UUID NOT NULL,
-    part_index INTEGER NOT NULL,
-    -- Stable across re-renders of the same delivery, and derived from the delivery's idempotency
-    -- key rather than from its id: whoever froze these parts computed the key before the row
-    -- existed, and an outbound RFC Message-ID is derived from it so a queuer can record the
-    -- message it will send under before it is sent.
-    part_key TEXT NOT NULL,
-    -- The rendered wire payload, in the owning adapter's own shape. Versioned and transport-tagged
-    -- inside the object and decoded fallibly, so a payload written by a newer renderer is an error
-    -- at the seam rather than a misread field halfway through a provider call. Never a credential
-    -- and never an authorization header.
-    payload JSONB NOT NULL,
-    status TEXT NOT NULL DEFAULT 'prepared',
-    -- The provider's own key for what it stored: an RFC Message-ID, a chat timestamp. One per
-    -- part, because a long answer is several provider messages.
-    provider_message_key TEXT,
-    -- What a reconciliation lookup compares against when a provider outcome was ambiguous. Derived
-    -- from the rendered body alone, so it is safe to carry in provider metadata.
-    content_digest TEXT NOT NULL,
-    attempt_count INTEGER NOT NULL DEFAULT 0,
-    last_error_class TEXT,
-    last_error_detail TEXT,
-    -- Committed immediately before the external call, and the whole reason a crash can be
-    -- classified. A part whose lease lapsed without this set never reached the provider and is
-    -- retryable; one with it set may have been accepted and becomes `outcome_unknown`.
-    request_started_at TIMESTAMPTZ,
-    delivered_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT message_delivery_parts_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT message_delivery_parts_delivery_index_key UNIQUE (delivery_id, part_index),
-    CONSTRAINT message_delivery_parts_delivery_key_key UNIQUE (delivery_id, part_key),
-    CONSTRAINT message_delivery_parts_delivery_fk
-        FOREIGN KEY (company_id, delivery_id)
-        REFERENCES message_deliveries(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT message_delivery_parts_delivery_id_fk
-        FOREIGN KEY (delivery_id) REFERENCES message_deliveries(id) ON DELETE CASCADE,
-    CONSTRAINT message_delivery_parts_index_check
-        CHECK (part_index >= 0 AND part_index < 50),
-    CONSTRAINT message_delivery_parts_status_check CHECK (status IN (
-        'prepared', 'sending', 'delivered', 'outcome_unknown', 'retryable', 'dead'
-    )),
-    CONSTRAINT message_delivery_parts_key_check CHECK (
-        btrim(part_key) <> '' AND octet_length(part_key) <= 200
-    ),
-    CONSTRAINT message_delivery_parts_digest_check CHECK (
-        btrim(content_digest) <> '' AND octet_length(content_digest) <= 128
-    ),
-    CONSTRAINT message_delivery_parts_provider_key_check CHECK (
-        provider_message_key IS NULL
-        OR (btrim(provider_message_key) <> '' AND octet_length(provider_message_key) <= 998)
-    ),
-    -- Bounded here as well as in Rust: the payload is read back into memory by whichever instance
-    -- claims the row, and a bound only the writer enforces is not a bound.
-    CONSTRAINT message_delivery_parts_payload_check CHECK (
-        jsonb_typeof(payload) = 'object'
-        AND jsonb_typeof(payload->'transport') = 'string'
-        AND jsonb_typeof(payload->'version') = 'number'
-        AND octet_length(payload::text) <= 262144
-    ),
-    CONSTRAINT message_delivery_parts_attempt_check CHECK (attempt_count >= 0),
-    CONSTRAINT message_delivery_parts_error_check CHECK (
-        (last_error_class IS NULL OR valid_delivery_failure_class(last_error_class))
-        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
-        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
-    ),
-    -- A delivered part has a delivery time and nothing else does; and a part cannot claim the
-    -- provider accepted it without having started the request that carried it.
-    CONSTRAINT message_delivery_parts_delivered_at_check
-        CHECK ((status = 'delivered') = (delivered_at IS NOT NULL)),
-    CONSTRAINT message_delivery_parts_started_check CHECK (
-        status <> 'delivered' OR request_started_at IS NOT NULL
-    )
-);
 
--- Delivery resumes at the first unfinished part, in order.
-CREATE INDEX message_delivery_parts_delivery_idx
-    ON message_delivery_parts (delivery_id, part_index);
-CREATE INDEX message_delivery_parts_unfinished_idx
-    ON message_delivery_parts (delivery_id, part_index)
-    WHERE status IN ('prepared', 'retryable');
--- The reply guard matches a third party's `References:` against the provider key an outreach went
--- out under, so this is read per candidate rather than scanned.
-CREATE UNIQUE INDEX message_delivery_parts_provider_key_idx
-    ON message_delivery_parts (company_id, provider_message_key)
-    WHERE provider_message_key IS NOT NULL;
+CREATE FUNCTION public.prevent_message_audience_widening() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.audience <> 'external_conversation'
+       AND NEW.audience = 'external_conversation' THEN
+        RAISE EXCEPTION 'message audience cannot be widened in place'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
 
--- Declared here rather than inside `external_messages`, which is created several hundred lines
--- earlier: the mapping table has to exist before the ingress path can write an inbound row, and
--- the part table has to exist before this reference can be made. Composite, so a provider mapping
--- cannot name another tenant's delivery part, and `SET NULL` so retiring a delivery leaves the
--- provider mapping that proves the message went out.
-ALTER TABLE external_messages
-    ADD CONSTRAINT external_messages_delivery_part_fk
-    FOREIGN KEY (company_id, delivery_part_id)
-    REFERENCES message_delivery_parts(company_id, id) ON DELETE SET NULL (delivery_part_id);
 
-CREATE INDEX external_messages_delivery_part_idx
-    ON external_messages (delivery_part_id) WHERE delivery_part_id IS NOT NULL;
-
-CREATE TABLE task_outreaches (
-    id UUID PRIMARY KEY,
-    task_id UUID NOT NULL REFERENCES background_tasks(id) ON DELETE CASCADE,
-    status TEXT NOT NULL,
-    required_threshold_percent NUMERIC(5,2) NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    outreach_key TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    body TEXT NOT NULL,
-    CONSTRAINT task_outreaches_task_key UNIQUE (task_id, outreach_key),
-    CONSTRAINT task_outreaches_status_check CHECK (
-        status IN (
-            'waiting', 'threshold_met', 'timeout_pending_approval',
-            'proceed_partial', 'cancelled', 'completed'
-        )
-    ),
-    CONSTRAINT task_outreaches_threshold_check CHECK (
-        required_threshold_percent > 0
-        AND required_threshold_percent <= 100
-    ),
-    CONSTRAINT task_outreaches_expiry_check CHECK (expires_at > created_at),
-    CONSTRAINT task_outreaches_subject_check CHECK (length(btrim(subject)) > 0),
-    CONSTRAINT task_outreaches_body_check CHECK (length(btrim(body)) > 0)
-);
-
-CREATE INDEX task_outreaches_due_idx
-    ON task_outreaches (expires_at, id)
-    WHERE status = 'waiting' AND expires_at IS NOT NULL;
-CREATE INDEX task_outreaches_task_idx ON task_outreaches (task_id);
-CREATE INDEX task_outreaches_task_status_idx
-    ON task_outreaches (task_id, status);
-
-CREATE TABLE task_outreach_targets (
-    outreach_id UUID NOT NULL REFERENCES task_outreaches(id) ON DELETE CASCADE,
-    email CITEXT NOT NULL,
-    responded_at TIMESTAMPTZ,
-    -- The *association* the reply landed on -- `thread_messages.id`, not `messages.id`. Named for
-    -- the table it points at, because its sibling `request_message_id` points at the canonical row
-    -- and two columns called `*_message_id` referencing different tables is a join waiting to be
-    -- written the wrong way round. A reply is a turn in one thread; the question is a canonical
-    -- message that may appear in several.
-    response_association_id UUID,
-    -- The delivery that carried this outreach's question. `SET NULL` so closing a company's
-    -- deliveries does not erase the record that this target was asked.
-    delivery_id UUID REFERENCES message_deliveries(id) ON DELETE SET NULL,
-    -- The canonical message this outreach *asked* with.
-    --
-    -- Recorded so that "is this outbound message the agent's answer, or the agent asking somebody
-    -- else a question?" is answered by a canonical relation. The reply guard used to answer it by
-    -- joining a delivery's provider key back to an RFC `Message-ID` on the message, which made a
-    -- purely internal decision depend on an SMTP header -- and gave the wrong answer for any
-    -- transport that has none.
-    request_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
-    PRIMARY KEY (outreach_id, email),
-    CONSTRAINT task_outreach_targets_response_association_fk
-        FOREIGN KEY (response_association_id) REFERENCES thread_messages(id) ON DELETE SET NULL,
-    CONSTRAINT task_outreach_targets_response_check CHECK (
-        response_association_id IS NULL OR responded_at IS NOT NULL
-    )
-);
-
-CREATE INDEX task_outreach_targets_email_waiting_idx
-    ON task_outreach_targets (email, outreach_id) WHERE responded_at IS NULL;
-CREATE INDEX task_outreach_targets_response_association_idx
-    ON task_outreach_targets (response_association_id)
-    WHERE response_association_id IS NOT NULL;
--- The reply guard's `NOT EXISTS` runs per candidate outbound message, so it reads this rather than
--- the table.
-CREATE INDEX task_outreach_targets_request_message_idx
-    ON task_outreach_targets (request_message_id)
-    WHERE request_message_id IS NOT NULL;
-CREATE UNIQUE INDEX task_outreach_targets_delivery_idx
-    ON task_outreach_targets (delivery_id) WHERE delivery_id IS NOT NULL;
-
--- Immutable, metadata-only history for every background-task status transition.
-CREATE TABLE task_status_events (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL,
-    task_id UUID NOT NULL,
-    correlation_id UUID NOT NULL,
-    sequence INTEGER NOT NULL,
-    from_status TEXT,
-    to_status TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    actor_kind TEXT NOT NULL,
-    actor_id UUID,
-    related_approval_id UUID REFERENCES human_approvals(id) ON DELETE SET NULL,
-    related_outreach_id UUID REFERENCES task_outreaches(id) ON DELETE SET NULL,
-    retry_count INTEGER NOT NULL,
-    run_at TIMESTAMPTZ NOT NULL,
-    execution_generation UUID,
-    transitioned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT task_status_events_task_fk
-        FOREIGN KEY (company_id, task_id)
-        REFERENCES background_tasks(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT task_status_events_task_sequence_key UNIQUE (task_id, sequence),
-    CONSTRAINT task_status_events_sequence_check CHECK (sequence > 0),
-    CONSTRAINT task_status_events_retry_count_check CHECK (retry_count >= 0),
-    CONSTRAINT task_status_events_from_status_check CHECK (
-        from_status IS NULL OR from_status IN (
-            'pending', 'processing', 'pending_approval',
-            'waiting_for_third_party_reply', 'completed', 'failed',
-            'dead_letter', 'stopped'
-        )
-    ),
-    CONSTRAINT task_status_events_to_status_check CHECK (to_status IN (
-        'pending', 'processing', 'pending_approval',
-        'waiting_for_third_party_reply', 'completed', 'failed',
-        'dead_letter', 'stopped'
-    )),
-    CONSTRAINT task_status_events_reason_check CHECK (reason IN (
-        'enqueued', 'claimed', 'completed',
-        'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
-        'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
-        'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
-        'outreach_extended', 'operator_stopped', 'operator_resumed', 'unknown'
-    )),
-    CONSTRAINT task_status_events_actor_kind_check CHECK (actor_kind IN (
-        'system', 'worker', 'operator', 'approval', 'outreach'
-    )),
-    CONSTRAINT task_status_events_related_source_check CHECK (
-        related_approval_id IS NULL OR related_outreach_id IS NULL
-    )
-);
-
-CREATE INDEX task_status_events_task_history_idx
-    ON task_status_events (task_id, transitioned_at, sequence, id);
-CREATE INDEX task_status_events_company_correlation_timeline_idx
-    ON task_status_events (company_id, correlation_id, transitioned_at, task_id, sequence, id);
-
--- The row-local attribution columns declared with `background_tasks` above, tied to the tables
--- they name now that those exist. No cascade action: the only way either row disappears is with
--- the task that owns it, and that deletion takes the referencing row with it.
-ALTER TABLE background_tasks
-    ADD CONSTRAINT background_tasks_transition_approval_fk
-        FOREIGN KEY (transition_approval_id) REFERENCES human_approvals(id),
-    ADD CONSTRAINT background_tasks_transition_outreach_fk
-        FOREIGN KEY (transition_outreach_id) REFERENCES task_outreaches(id);
-
--- The transition that produced this row wrote its own attribution into `NEW.transition_*`, so the
--- ledger row is assembled from the same tuple that changed the status. The deterministic mapping
--- below is the fallback for the writes that genuinely have nothing to add -- an INSERT, and status
--- changes whose cause is fully determined by the pair of statuses.
 --
--- Lease loss is deliberately absent from that mapping. It used to be recognised by matching
--- `NEW.last_error` against a copy of the Rust `LEASE_EXPIRED_ERROR` string, so editing the
--- constant would silently have reclassified every future lease loss as `retryable_failure`. The
--- sweep now names itself: it sets `transition_reason = 'lease_lost'` and copies each row's own
--- `worker_id` into `transition_actor_id`, so the event records the worker that actually lost that
--- lease and the duplicated string is gone rather than kept in sync.
-CREATE FUNCTION record_task_status_event() RETURNS TRIGGER AS $$
+-- Name: prevent_owned_channel_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_owned_channel_delete() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.owner_agent_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM agents WHERE id = OLD.owner_agent_id) THEN
+        RAISE EXCEPTION 'owned channel must be deleted through its owner agent'
+            USING ERRCODE = '23503';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+
+--
+-- Name: record_initial_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_initial_task_ownership() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    label TEXT;
+BEGIN
+    SELECT display_label INTO label
+      FROM principals
+     WHERE company_id = NEW.company_id AND id = NEW.owner_principal_id;
+    INSERT INTO task_ownership_events (
+        task_id, company_id, sequence, from_version, to_version, command_id,
+        command_fingerprint, operation, actor_kind, previous_owner_kind,
+        new_owner_principal_id, new_owner_kind, new_owner_label, reason
+    ) VALUES (
+        NEW.id, NEW.company_id, 1, 0, 1, gen_random_uuid(), 'enqueue:' || NEW.id::text,
+        'initial_assignment', 'system', 'unassigned', NEW.owner_principal_id,
+        CASE NEW.owner_principal_kind WHEN 'person' THEN 'human'
+             WHEN 'agent' THEN 'agent' ELSE 'unassigned' END,
+        label, 'initial_assignment'
+    );
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: record_task_status_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_task_status_event() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 DECLARE
     transition_reason TEXT;
     transition_actor_kind TEXT;
@@ -2344,400 +1369,100 @@ BEGIN
     );
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER background_tasks_record_status_event
-AFTER INSERT OR UPDATE OF status ON background_tasks
-FOR EACH ROW EXECUTE FUNCTION record_task_status_event();
 
--- One small, identifier-only notification wakes every Tasks board that may need to reconcile.
-CREATE FUNCTION notify_task_chain_changed() RETURNS TRIGGER AS $$
+--
+-- Name: reject_binding_audit_rewrite(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.reject_binding_audit_rewrite() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' OR pg_trigger_depth() <= 1 THEN
+        RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+
+--
+-- Name: release_tasks_for_removed_principal(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.release_tasks_for_removed_principal() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 DECLARE
-    notified_company_id UUID;
-    notified_correlation_id UUID;
+    owned RECORD;
 BEGIN
-    -- `UPDATE OF status` fires whenever the column appears in a SET list, whether or not the value
-    -- moved. A write that leaves the status alone changes nothing the board draws, so it must not
-    -- wake every connected viewer of the company. This suppresses no real transition:
-    -- `pending -> sending -> delivered` is three material changes and still emits three
-    -- notifications,
-    -- which the stream coalesces on its own. The checks are per table because these are the only
-    -- notifying tables that have a `status` column at all.
-    IF TG_OP = 'UPDATE' THEN
-        IF TG_TABLE_NAME = 'message_deliveries' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
-        ELSIF TG_TABLE_NAME = 'human_approvals' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
-        ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
+    FOR owned IN
+        SELECT task.*, OLD.display_label AS old_label
+          FROM background_tasks AS task
+         WHERE task.company_id = OLD.company_id AND task.owner_principal_id = OLD.id
+         FOR UPDATE
+    LOOP
+        UPDATE background_tasks
+           SET owner_principal_id = NULL,
+               owner_principal_kind = NULL,
+               ownership_version = ownership_version + 1,
+               status = CASE WHEN status = 'processing' THEN 'pending' ELSE status END,
+               worker_id = NULL,
+               execution_generation = NULL,
+               locked_at = NULL,
+               lock_expires_at = NULL,
+               run_at = CASE WHEN status = 'processing' THEN CURRENT_TIMESTAMP ELSE run_at END,
+               transition_reason = CASE
+                   WHEN status = 'processing' THEN 'ownership_transferred'
+                   ELSE transition_reason
+               END,
+               transition_actor_kind = CASE
+                   WHEN status = 'processing' THEN 'system'
+                   ELSE transition_actor_kind
+               END,
+               transition_actor_id = CASE
+                   WHEN status = 'processing' THEN NULL
+                   ELSE transition_actor_id
+               END,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = owned.id;
+
+        IF owned.status = 'processing' THEN
+            UPDATE task_attempts
+               SET status = 'failed', stop_reason = 'ownership_transferred',
+                   error = 'Task ownership was removed', finished_at = CURRENT_TIMESTAMP
+             WHERE task_id = owned.id
+               AND execution_generation = owned.execution_generation
+               AND status = 'processing';
         END IF;
-    END IF;
 
-    IF TG_TABLE_NAME = 'task_status_events' THEN
-        notified_company_id := NEW.company_id;
-        notified_correlation_id := NEW.correlation_id;
-    ELSIF TG_TABLE_NAME = 'message_deliveries' THEN
-        notified_company_id := NEW.company_id;
-        notified_correlation_id := NEW.correlation_id;
-    ELSIF TG_TABLE_NAME = 'human_approvals' THEN
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM background_tasks AS task WHERE task.id = NEW.task_id;
-    ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM background_tasks AS task WHERE task.id = NEW.task_id;
-    ELSE
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM task_outreaches AS outreach
-          JOIN background_tasks AS task ON task.id = outreach.task_id
-         WHERE outreach.id = NEW.outreach_id;
-    END IF;
-
-    IF notified_company_id IS NOT NULL AND notified_correlation_id IS NOT NULL THEN
-        PERFORM pg_notify(
-            'task_chain_changed',
-            json_build_object(
-                'company_id', notified_company_id,
-                'correlation_id', notified_correlation_id
-            )::text
+        INSERT INTO task_ownership_events (
+            task_id, company_id, sequence, from_version, to_version, command_id,
+            command_fingerprint, operation, actor_kind, previous_owner_principal_id,
+            previous_owner_kind, previous_owner_label, new_owner_kind, reason
+        ) VALUES (
+            owned.id, owned.company_id, owned.ownership_version + 1,
+            owned.ownership_version, owned.ownership_version + 1, gen_random_uuid(),
+            'owner-removed:' || OLD.id::text || ':' || owned.ownership_version::text,
+            'owner_removed', 'system', OLD.id,
+            CASE OLD.kind WHEN 'person' THEN 'human' ELSE 'agent' END,
+            owned.old_label, 'unassigned', 'owner_removed'
         );
-    END IF;
-    RETURN NULL;
+    END LOOP;
+    RETURN OLD;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER task_status_events_notify_chain
-AFTER INSERT ON task_status_events
-FOR EACH ROW EXECUTE FUNCTION notify_task_chain_changed();
 
-CREATE TRIGGER message_deliveries_notify_chain
-AFTER INSERT OR UPDATE OF status ON message_deliveries
-FOR EACH ROW EXECUTE FUNCTION notify_task_chain_changed();
-
-CREATE TRIGGER human_approvals_notify_chain
-AFTER INSERT OR UPDATE OF status ON human_approvals
-FOR EACH ROW WHEN (NEW.task_id IS NOT NULL)
-EXECUTE FUNCTION notify_task_chain_changed();
-
-CREATE TRIGGER task_outreaches_notify_chain
-AFTER INSERT OR UPDATE OF status ON task_outreaches
-FOR EACH ROW EXECUTE FUNCTION notify_task_chain_changed();
-
-CREATE TRIGGER task_outreach_targets_notify_chain
-AFTER UPDATE OF responded_at ON task_outreach_targets
-FOR EACH ROW WHEN (OLD.responded_at IS DISTINCT FROM NEW.responded_at)
-EXECUTE FUNCTION notify_task_chain_changed();
-
-CREATE TABLE channel_schedules (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    channel_id UUID NOT NULL,
-    name TEXT NOT NULL,
-    schedule_type TEXT NOT NULL,
-    interval_seconds BIGINT,
-    subject_template TEXT NOT NULL,
-    prompt_template TEXT NOT NULL,
-    delivery_mode TEXT NOT NULL DEFAULT 'mailbox_only',
-    recipient_emails CITEXT[] NOT NULL DEFAULT '{}',
-    timezone TEXT NOT NULL DEFAULT 'UTC',
-    -- The team member a run acts as: its prompt is attributed to their address and user-scoped
-    -- memory is recalled and written as theirs. NULL is a run that belongs to nobody, which is
-    -- what every schedule was before the attribution existed. Team membership itself is not
-    -- constrained here, because it can be revoked after the fact -- the run re-checks it and
-    -- refuses rather than acting as somebody who has left; a deleted account leaves the schedule
-    -- running unattributed rather than erroring forever.
-    run_as_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    last_run_at TIMESTAMPTZ,
-    next_run_at TIMESTAMPTZ,
-    last_error TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT channel_schedules_name_not_blank CHECK (btrim(name) <> ''),
-    CONSTRAINT channel_schedules_type_check CHECK (schedule_type IN ('interval', 'one_off')),
-    CONSTRAINT channel_schedules_interval_check CHECK (
-        (schedule_type = 'interval' AND interval_seconds IS NOT NULL AND interval_seconds >= 60)
-        OR (schedule_type = 'one_off' AND interval_seconds IS NULL)
-    ),
-    CONSTRAINT channel_schedules_delivery_mode_check CHECK (
-        delivery_mode IN ('mailbox_only', 'email_participants', 'email_custom')
-    ),
-    -- A schedule renders its templates and counts its days in this zone, so an unknown name has to
-    -- be refused at write time: the claim query would otherwise fail on every tick.
-    CONSTRAINT channel_schedules_timezone_check CHECK (now() AT TIME ZONE timezone IS NOT NULL),
-    -- Compound so the schedule's company and its channel's company cannot drift apart.
-    CONSTRAINT channel_schedules_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE CASCADE
-);
-
-CREATE INDEX channel_schedules_due_idx
-    ON channel_schedules (next_run_at, id)
-    WHERE enabled = true AND next_run_at IS NOT NULL;
-
-CREATE INDEX channel_schedules_company_idx
-    ON channel_schedules (company_id, created_at DESC, id DESC);
-
-CREATE INDEX channel_schedules_channel_idx
-    ON channel_schedules (channel_id, created_at DESC, id DESC);
-
--- One row per slot a schedule was due for, written before any work is attempted. The slot's UNIQUE
--- key is what makes a tick idempotent: a second scheduler that wakes for the same slot collides
--- rather than running the agent twice.
 --
--- `schedule_snapshot` freezes the templates and delivery settings as they were when the slot came
--- due, so editing a schedule does not retroactively change a run that is still materializing.
-CREATE TABLE schedule_runs (
-    id UUID PRIMARY KEY,
-    schedule_id UUID NOT NULL REFERENCES channel_schedules(id) ON DELETE CASCADE,
-    scheduled_for TIMESTAMPTZ NOT NULL,
-    schedule_snapshot JSONB NOT NULL,
-    thread_id UUID REFERENCES threads(id) ON DELETE SET NULL,
-    task_id UUID REFERENCES background_tasks(id) ON DELETE SET NULL,
-    last_error TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- Turning a due slot into a thread and a task is itself leased durable work: the run is the
-    -- queue row, and `materialization_status` is its state machine.
-    materialization_status TEXT NOT NULL DEFAULT 'pending',
-    materialization_attempts INTEGER NOT NULL DEFAULT 0,
-    materialization_available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    materialization_worker_id UUID,
-    materialization_generation UUID,
-    materialization_locked_at TIMESTAMPTZ,
-    materialization_lock_expires_at TIMESTAMPTZ,
-    CONSTRAINT schedule_runs_schedule_slot_key UNIQUE (schedule_id, scheduled_for),
-    CONSTRAINT schedule_runs_snapshot_object_check
-        CHECK (jsonb_typeof(schedule_snapshot) = 'object'),
-    CONSTRAINT schedule_runs_task_requires_thread_check
-        CHECK (task_id IS NULL OR thread_id IS NOT NULL),
-    CONSTRAINT schedule_runs_materialization_attempts_check
-        CHECK (materialization_attempts >= 0 AND materialization_attempts <= 5),
-    -- Each status names exactly which of the lease columns may be set, so a lost worker cannot
-    -- leave a row that looks both claimed and free, and 'failed' is reachable only once the
-    -- attempt budget is spent.
-    CONSTRAINT schedule_runs_materialization_state_check CHECK (
-        (materialization_status = 'pending'
-         AND task_id IS NULL
-         AND materialization_attempts < 5
-         AND materialization_worker_id IS NULL
-         AND materialization_generation IS NULL
-         AND materialization_locked_at IS NULL
-         AND materialization_lock_expires_at IS NULL)
-        OR
-        (materialization_status = 'materializing'
-         AND task_id IS NULL
-         AND materialization_attempts BETWEEN 1 AND 5
-         AND materialization_worker_id IS NOT NULL
-         AND materialization_generation IS NOT NULL
-         AND materialization_locked_at IS NOT NULL
-         AND materialization_lock_expires_at IS NOT NULL
-         AND materialization_lock_expires_at > materialization_locked_at)
-        OR
-        (materialization_status = 'materialized'
-         AND task_id IS NOT NULL
-         AND materialization_worker_id IS NULL
-         AND materialization_generation IS NULL
-         AND materialization_locked_at IS NULL
-         AND materialization_lock_expires_at IS NULL)
-        OR
-        (materialization_status = 'failed'
-         AND task_id IS NULL
-         AND materialization_attempts = 5
-         AND materialization_worker_id IS NULL
-         AND materialization_generation IS NULL
-         AND materialization_locked_at IS NULL
-         AND materialization_lock_expires_at IS NULL)
-    )
-);
-
-CREATE INDEX schedule_runs_schedule_created_idx
-    ON schedule_runs (schedule_id, created_at DESC, id DESC);
-CREATE INDEX schedule_runs_materialization_ready_idx
-    ON schedule_runs (materialization_available_at, created_at, id)
-    WHERE materialization_status = 'pending';
-CREATE INDEX schedule_runs_materialization_expired_idx
-    ON schedule_runs (materialization_lock_expires_at, created_at, id)
-    WHERE materialization_status = 'materializing';
-
--- Declared before `memory_remote_resource_lifecycles` on purpose, and the order is load-bearing.
--- Both tables carry a `company_id` FK to `companies`, and Postgres runs a delete's referential
--- actions in the order those constraints were created. This table's ON DELETE CASCADE has to run
--- first, because deleting the connection is what fires
--- `memory_connection_lifecycle_compatibility_delete` and flips the lifecycle row to 'absent'.
--- Declare the lifecycle table first and its ON DELETE SET NULL runs while `desired_state` is still
--- 'present', which its own CHECK rejects. Nothing in a schema dump records this; moving these two
--- definitions past each other breaks company deletion.
-CREATE TABLE memory_provider_connections (
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
-    remote_database_id TEXT NOT NULL,
-    readiness TEXT NOT NULL DEFAULT 'pending'
-        CHECK (readiness IN ('pending', 'provisioning', 'ready', 'failed')),
-    last_error TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (company_id, provider),
-    UNIQUE (provider, remote_database_id)
-);
-
--- What the provider is meant to be holding for a company, kept after the company row is gone.
+-- Name: retire_memory_lifecycle_for_legacy_connection(); Type: FUNCTION; Schema: public; Owner: -
 --
--- Deleting a company must not lose the fact that a remote database still exists and has to be torn
--- down, so `company_id` is nullable and the intent lives here rather than on the connection.
--- `operation_generation` fences the workers: an operation leased under an older generation cannot
--- apply its result over a newer decision.
-CREATE TABLE memory_remote_resource_lifecycles (
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
-    remote_database_id TEXT NOT NULL,
-    company_id UUID NULL REFERENCES companies(id) ON DELETE SET NULL,
-    desired_state TEXT NOT NULL CHECK (desired_state IN ('present', 'absent')),
-    operation_generation BIGINT NOT NULL DEFAULT 0 CHECK (operation_generation >= 0),
-    operation_lease_token UUID NULL,
-    operation_lease_expires_at TIMESTAMPTZ NULL,
-    quiesce_until TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_error TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (provider, remote_database_id),
-    UNIQUE (company_id, provider),
-    CHECK (
-        (operation_lease_token IS NULL AND operation_lease_expires_at IS NULL)
-        OR
-        (operation_lease_token IS NOT NULL AND operation_lease_expires_at IS NOT NULL)
-    ),
-    CHECK (desired_state = 'absent' OR company_id IS NOT NULL)
-);
 
--- Creating the remote database and waiting for it to come up are separate durable phases, hence
--- `phase` alongside `status`: `status` is the queue state a worker leases on, `phase` is where the
--- provisioning itself has got to. `attempts` counts leases, `failure_attempts` counts only
--- classified provider failures, so polling a slow-but-healthy database never exhausts the budget.
-CREATE TABLE memory_provisioning_jobs (
-    id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
-    remote_database_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
-    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lease_token UUID NULL,
-    lease_expires_at TIMESTAMPTZ NULL,
-    last_error TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    operation_generation BIGINT NULL,
-    phase TEXT NOT NULL DEFAULT 'create_pending',
-    failure_attempts INTEGER NOT NULL DEFAULT 0,
-    readiness_deadline TIMESTAMPTZ NULL,
-    next_poll_at TIMESTAMPTZ NULL,
-    UNIQUE (company_id, provider),
-    UNIQUE (provider, remote_database_id),
-    CHECK (
-        (status = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
-        OR
-        (status <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL)
-    ),
-    CONSTRAINT memory_provisioning_jobs_generation_state_check CHECK (
-        (status = 'leased' AND operation_generation IS NOT NULL)
-        OR
-        (status <> 'leased' AND operation_generation IS NULL)
-    ),
-    CONSTRAINT memory_provisioning_jobs_lifecycle_fkey
-        FOREIGN KEY (provider, remote_database_id)
-        REFERENCES memory_remote_resource_lifecycles(provider, remote_database_id),
-    CONSTRAINT memory_provisioning_jobs_phase_check
-        CHECK (phase IN ('create_pending', 'waiting_ready', 'ready', 'failed')),
-    CONSTRAINT memory_provisioning_jobs_failure_attempts_check
-        CHECK (failure_attempts >= 0),
-    CONSTRAINT memory_provisioning_jobs_phase_state_check CHECK (
-        (status IN ('pending', 'leased') AND phase IN ('create_pending', 'waiting_ready'))
-        OR (status = 'completed' AND phase = 'ready')
-        OR (status = 'failed' AND phase = 'failed')
-    ),
-    CONSTRAINT memory_provisioning_jobs_readiness_window_check CHECK (
-        (phase = 'create_pending' AND readiness_deadline IS NULL AND next_poll_at IS NULL)
-        OR
-        (phase = 'waiting_ready' AND readiness_deadline IS NOT NULL AND next_poll_at IS NOT NULL)
-        OR phase IN ('ready', 'failed')
-    )
-);
-
--- A waiting_ready job is due at its next poll, everything else at its backoff. One index over the
--- CASE keeps both phases on the same claim query.
-CREATE INDEX memory_provisioning_jobs_due_idx
-    ON memory_provisioning_jobs (
-        (CASE phase WHEN 'waiting_ready' THEN next_poll_at ELSE available_at END),
-        created_at,
-        id
-    )
-    WHERE status = 'pending';
-
-CREATE TABLE memory_cleanup_jobs (
-    id UUID PRIMARY KEY,
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
-    remote_database_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
-    attempts INTEGER NOT NULL DEFAULT 0,
-    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lease_expires_at TIMESTAMPTZ NULL,
-    last_error TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    lease_token UUID NULL,
-    operation_generation BIGINT NULL,
-    UNIQUE (provider, remote_database_id),
-    CONSTRAINT memory_cleanup_jobs_lease_state_check CHECK (
-        (status = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
-        OR
-        (status <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL)
-    ),
-    CONSTRAINT memory_cleanup_jobs_generation_state_check CHECK (
-        (status = 'leased' AND operation_generation IS NOT NULL)
-        OR
-        (status <> 'leased' AND operation_generation IS NULL)
-    ),
-    CONSTRAINT memory_cleanup_jobs_lifecycle_fkey
-        FOREIGN KEY (provider, remote_database_id)
-        REFERENCES memory_remote_resource_lifecycles(provider, remote_database_id)
-);
-
-CREATE INDEX memory_cleanup_jobs_due_idx
-    ON memory_cleanup_jobs (available_at, created_at, id)
-    WHERE status = 'pending';
-
--- Keep lifecycle intent coherent while an older application version is still serving traffic.
--- The explicit application writes remain authoritative; these triggers cover only legacy writes.
-CREATE FUNCTION create_memory_lifecycle_for_legacy_connection() RETURNS trigger AS $$
-BEGIN
-    INSERT INTO memory_remote_resource_lifecycles
-        (provider, remote_database_id, company_id, desired_state)
-    VALUES (NEW.provider, NEW.remote_database_id, NEW.company_id, 'present')
-    ON CONFLICT (provider, remote_database_id) DO UPDATE
-    SET company_id = EXCLUDED.company_id,
-        desired_state = 'present',
-        quiesce_until = CURRENT_TIMESTAMP,
-        last_error = NULL,
-        updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER memory_connection_lifecycle_compatibility_insert
-AFTER INSERT ON memory_provider_connections
-FOR EACH ROW EXECUTE FUNCTION create_memory_lifecycle_for_legacy_connection();
-
-CREATE FUNCTION retire_memory_lifecycle_for_legacy_connection() RETURNS trigger AS $$
+CREATE FUNCTION public.retire_memory_lifecycle_for_legacy_connection() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 DECLARE
     cleanup_available_at TIMESTAMPTZ;
 BEGIN
@@ -2777,16 +1502,16 @@ BEGIN
     END IF;
     RETURN OLD;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER memory_connection_lifecycle_compatibility_delete
-BEFORE DELETE ON memory_provider_connections
-FOR EACH ROW EXECUTE FUNCTION retire_memory_lifecycle_for_legacy_connection();
 
--- Keep the phase constraint compatible with workers from a preceding application release during a
--- rolling deploy. New workers write phase explicitly; this trigger fills only legacy status-only
--- transitions.
-CREATE FUNCTION synchronize_legacy_memory_provisioning_phase() RETURNS trigger AS $$
+--
+-- Name: synchronize_legacy_memory_provisioning_phase(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.synchronize_legacy_memory_provisioning_phase() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
     IF NEW.status = 'completed' AND NEW.phase NOT IN ('ready', 'failed') THEN
         NEW.phase = 'ready';
@@ -2801,70 +1526,5308 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER memory_provisioning_phase_compatibility_update
-BEFORE UPDATE ON memory_provisioning_jobs
-FOR EACH ROW EXECUTE FUNCTION synchronize_legacy_memory_provisioning_phase();
 
-CREATE TABLE runtime_metric_samples (
-    machine_id TEXT NOT NULL,
-    machine_region TEXT,
-    sampled_at TIMESTAMPTZ NOT NULL,
-    process_rss_bytes BIGINT,
-    memory_limit_bytes BIGINT,
-    cpu_utilization_percent DOUBLE PRECISION,
-    cpu_steal_percent DOUBLE PRECISION,
-    cpu_throttle_percent DOUBLE PRECISION,
-    database_acquire_duration_ms DOUBLE PRECISION NOT NULL,
-    database_acquire_succeeded BOOLEAN NOT NULL,
-    pool_size INTEGER NOT NULL,
-    pool_idle INTEGER NOT NULL,
-    pool_active INTEGER NOT NULL,
-    active_task_executions INTEGER NOT NULL DEFAULT 0,
-    task_worker_concurrency_limit INTEGER NOT NULL DEFAULT 1,
-    -- Memory provider calls counted per ten-second sample rather than probed, so the figures are
-    -- the latency and failures memory recall and ingestion actually paid, and an idle machine
-    -- polls nobody. The aggregate spans every configured provider; the `hydradb_` column names
-    -- predate the second one and are kept deliberately, because renaming them would mean a
-    -- migration on a table whose CHECK constraints are coupled to the column list.
-    hydradb_calls INTEGER NOT NULL DEFAULT 0,
-    hydradb_failures INTEGER NOT NULL DEFAULT 0,
-    hydradb_duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
-    PRIMARY KEY (machine_id, sampled_at),
-    CONSTRAINT runtime_metric_samples_rss_nonnegative
-        CHECK (process_rss_bytes IS NULL OR process_rss_bytes >= 0),
-    CONSTRAINT runtime_metric_samples_memory_limit_nonnegative
-        CHECK (memory_limit_bytes IS NULL OR memory_limit_bytes >= 0),
-    CONSTRAINT runtime_metric_samples_cpu_utilization_nonnegative
-        CHECK (cpu_utilization_percent IS NULL OR cpu_utilization_percent >= 0),
-    CONSTRAINT runtime_metric_samples_cpu_steal_nonnegative
-        CHECK (cpu_steal_percent IS NULL OR cpu_steal_percent >= 0),
-    CONSTRAINT runtime_metric_samples_cpu_throttle_nonnegative
-        CHECK (cpu_throttle_percent IS NULL OR cpu_throttle_percent >= 0),
-    CONSTRAINT runtime_metric_samples_acquire_duration_nonnegative
-        CHECK (database_acquire_duration_ms >= 0),
-    CONSTRAINT runtime_metric_samples_pool_size_nonnegative CHECK (pool_size >= 0),
-    CONSTRAINT runtime_metric_samples_pool_idle_nonnegative CHECK (pool_idle >= 0),
-    CONSTRAINT runtime_metric_samples_pool_active_nonnegative CHECK (pool_active >= 0),
-    CONSTRAINT runtime_metric_samples_pool_parts_fit
-        CHECK (pool_idle + pool_active = pool_size),
-    CONSTRAINT runtime_metric_samples_active_tasks_nonnegative
-        CHECK (active_task_executions >= 0),
-    CONSTRAINT runtime_metric_samples_worker_limit_positive
-        CHECK (task_worker_concurrency_limit > 0),
-    CONSTRAINT runtime_metric_samples_active_tasks_within_limit
-        CHECK (active_task_executions <= task_worker_concurrency_limit),
-    CONSTRAINT runtime_metric_samples_hydradb_calls_nonnegative
-        CHECK (hydradb_calls >= 0),
-    CONSTRAINT runtime_metric_samples_hydradb_failures_within_calls
-        CHECK (hydradb_failures >= 0 AND hydradb_failures <= hydradb_calls),
-    CONSTRAINT runtime_metric_samples_hydradb_duration_nonnegative
-        CHECK (hydradb_duration_ms >= 0),
-    CONSTRAINT runtime_metric_samples_hydradb_duration_needs_calls
-        CHECK (hydradb_calls > 0 OR hydradb_duration_ms = 0)
+--
+-- Name: task_ownership_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.task_ownership_events_are_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Tenant/task deletion may remove the ledger with its aggregate root. Direct mutation while
+    -- the task exists is forbidden. A principal deletion never changes snapshot rows.
+    IF TG_OP = 'DELETE' AND NOT EXISTS (
+        SELECT 1 FROM background_tasks WHERE id = OLD.task_id AND company_id = OLD.company_id
+    ) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'task ownership events are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: transport_requires_installation(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.transport_requires_installation(transport text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN (transport = 'slack'::text);
+
+
+--
+-- Name: valid_binding_change_reason(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_binding_change_reason(reason text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN (reason = ANY (ARRAY['manager_request'::text, 'installation_revoked'::text, 'endpoint_removed'::text, 'access_revoked'::text, 'channel_disabled'::text, 'provider_drift'::text]));
+
+
+--
+-- Name: valid_delivery_failure_class(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_delivery_failure_class(class text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN (class = ANY (ARRAY['authentication'::text, 'rate_limited'::text, 'invalid_payload'::text, 'destination_unavailable'::text, 'network'::text, 'timeout'::text, 'provider_fault'::text, 'internal'::text, 'dependency_failed'::text, 'superseded'::text, 'lease_expired'::text]));
+
+
+--
+-- Name: valid_inbound_event_error_class(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_inbound_event_error_class(class text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN (class = ANY (ARRAY['decode'::text, 'invalid_payload'::text, 'routing'::text, 'dependency'::text, 'rate_limited'::text, 'provider_fault'::text, 'deadline'::text, 'internal'::text, 'unsupported_transport'::text, 'lease_expired'::text]));
+
+
+--
+-- Name: valid_inbound_event_ignore_reason(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_inbound_event_ignore_reason(reason text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN (reason = ANY (ARRAY['not_message'::text, 'unsupported_event'::text, 'unsupported_subtype'::text, 'automated_sender'::text, 'empty_content'::text, 'inactive_binding'::text, 'delivery_confirmation'::text]));
+
+
+--
+-- Name: valid_inbound_safe_header_facts(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_inbound_safe_header_facts(facts jsonb) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    RETURN ((jsonb_typeof(facts) = 'object'::text) AND (SELECT (count(*) <= 16) FROM jsonb_object_keys(valid_inbound_safe_header_facts.facts) jsonb_object_keys(jsonb_object_keys)) AND (octet_length((facts)::text) <= 4096) AND (NOT (EXISTS (SELECT 1 FROM jsonb_each(valid_inbound_safe_header_facts.facts) fact(name, value) WHERE ((fact.name !~ '^[a-z0-9_]{1,64}$'::text) OR (jsonb_typeof(fact.value) <> 'string'::text) OR ((octet_length((fact.value #>> '{}'::text[])) < 1) OR (octet_length((fact.value #>> '{}'::text[])) > 256)) OR ((fact.value #>> '{}'::text[]) ~ '[[:cntrl:]]'::text))))));
+
+
+--
+-- Name: valid_tool_id_array(text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.valid_tool_id_array(ids text[]) RETURNS boolean
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+    SELECT cardinality(ids) <= 32
+       AND array_position(ids, NULL) IS NULL
+       AND COALESCE(bool_and(btrim(id) <> '' AND char_length(id) <= 120), TRUE)
+    FROM unnest(ids) AS id;
+$$;
+
+
+--
+-- Name: withdraw_unauthorized_notifications(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.withdraw_unauthorized_notifications(changed_company uuid, changed_channel uuid) RETURNS void
+    LANGUAGE sql
+    AS $$
+    UPDATE notifications AS notification
+       SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE notification.company_id = changed_company
+       AND notification.channel_id = changed_channel
+       AND notification.state = 'active'
+       AND (
+           notification.recipient_principal_id IS NULL
+           OR NOT notification_principal_can_view(
+               notification.company_id,
+               notification.channel_id,
+               notification.recipient_principal_id
+           )
+       );
+$$;
+
+
+--
+-- Name: agent_channel_provisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_channel_provisions (
+    task_id uuid NOT NULL,
+    request_hash text NOT NULL,
+    agent_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- The primary key is also the covering B-tree for reads and pruning by machine and sample time.
-COMMENT ON CONSTRAINT runtime_metric_samples_pkey ON runtime_metric_samples IS
-    'Supports runtime history reads on (machine_id, sampled_at)';
+
+--
+-- Name: agent_skills; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_skills (
+    company_id uuid,
+    agent_id uuid NOT NULL,
+    skill_id uuid NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT agent_skills_position_check CHECK ((("position" >= 0) AND ("position" <= 15)))
+);
+
+
+--
+-- Name: agent_sub_agents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_sub_agents (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    sub_agent_id uuid NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT agent_sub_agents_not_self CHECK ((agent_id <> sub_agent_id)),
+    CONSTRAINT agent_sub_agents_position_check CHECK ((("position" >= 0) AND ("position" <= 63)))
+);
+
+
+--
+-- Name: agents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agents (
+    id uuid NOT NULL,
+    company_id uuid,
+    name text NOT NULL,
+    slug public.citext NOT NULL,
+    provider text,
+    model text,
+    system_prompt text,
+    description text,
+    config_json jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    avatar_url text,
+    created_by jsonb NOT NULL,
+    run_timeout_secs integer,
+    memory_recall_mode text DEFAULT 'fast'::text NOT NULL,
+    memory_max_results smallint DEFAULT 5 NOT NULL,
+    memory_persistence_mode text DEFAULT 'audience_only'::text NOT NULL,
+    memory_enabled boolean DEFAULT false NOT NULL,
+    harness_kind text DEFAULT 'ai_agents'::text NOT NULL,
+    granted_tool_ids text[] DEFAULT '{}'::text[] NOT NULL,
+    native_tool_policy jsonb DEFAULT '{"version": 1}'::jsonb NOT NULL,
+    CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
+    CONSTRAINT agents_config_v1_shape_check CHECK (((config_json IS NULL) OR ((jsonb_typeof(config_json) = 'object'::text) AND ((config_json ->> 'version'::text) = '1'::text) AND (octet_length((config_json)::text) <= 65536)))),
+    CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT agents_granted_tool_ids_bounded CHECK (public.valid_tool_id_array(granted_tool_ids)),
+    CONSTRAINT agents_harness_kind_check CHECK ((harness_kind = 'ai_agents'::text)),
+    CONSTRAINT agents_memory_max_results_check CHECK (((memory_max_results >= 1) AND (memory_max_results <= 20))),
+    CONSTRAINT agents_memory_persistence_mode_check CHECK ((memory_persistence_mode = ANY (ARRAY['audience_only'::text, 'scope_specific_facts'::text]))),
+    CONSTRAINT agents_memory_recall_mode_check CHECK ((memory_recall_mode = ANY (ARRAY['fast'::text, 'thinking'::text]))),
+    CONSTRAINT agents_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    CONSTRAINT agents_native_tool_policy_shape CHECK (((jsonb_typeof(native_tool_policy) = 'object'::text) AND ((native_tool_policy ->> 'version'::text) = '1'::text) AND (octet_length((native_tool_policy)::text) <= 16384))),
+    CONSTRAINT agents_run_timeout_secs_check CHECK (((run_timeout_secs >= 1) AND (run_timeout_secs <= 3600))),
+    CONSTRAINT agents_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+);
+
+
+--
+-- Name: attention_source_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attention_source_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    source_kind text NOT NULL,
+    source_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    operation text NOT NULL,
+    actor_principal_id uuid NOT NULL,
+    from_version bigint NOT NULL,
+    to_version bigint NOT NULL,
+    previous_priority text,
+    new_priority text,
+    previous_due_at timestamp with time zone,
+    new_due_at timestamp with time zone,
+    previous_responsible_principal_id uuid,
+    new_responsible_principal_id uuid,
+    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT attention_source_events_operation_check CHECK ((operation = ANY (ARRAY['created'::text, 'attributes_changed'::text, 'reassigned'::text, 'resolved'::text, 'withdrawn'::text]))),
+    CONSTRAINT attention_source_events_priority_check CHECK ((((previous_priority IS NULL) OR (previous_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))) AND ((new_priority IS NULL) OR (new_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))))),
+    CONSTRAINT attention_source_events_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text]))),
+    CONSTRAINT attention_source_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1))))
+);
+
+
+--
+-- Name: background_tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.background_tasks (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid,
+    source_message_uuid uuid,
+    source_schedule_run_id uuid,
+    correlation_id uuid NOT NULL,
+    task_type text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    retry_count integer DEFAULT 0 NOT NULL,
+    max_retries integer DEFAULT 3 NOT NULL,
+    last_error text,
+    worker_id uuid,
+    execution_generation uuid,
+    locked_at timestamp with time zone,
+    lock_expires_at timestamp with time zone,
+    wait_expires_at timestamp with time zone,
+    run_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    transition_reason text,
+    transition_actor_kind text,
+    transition_actor_id uuid,
+    transition_approval_id uuid,
+    transition_outreach_id uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    owner_principal_id uuid,
+    owner_principal_kind text,
+    ownership_version bigint DEFAULT 1 NOT NULL,
+    business_priority text DEFAULT 'normal'::text NOT NULL,
+    business_due_at timestamp with time zone,
+    attention_version bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT background_tasks_attention_version_check CHECK ((attention_version > 0)),
+    CONSTRAINT background_tasks_business_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
+    CONSTRAINT background_tasks_lease_check CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+    CONSTRAINT background_tasks_max_retries_check CHECK ((max_retries > 0)),
+    CONSTRAINT background_tasks_owner_shape_check CHECK ((((owner_principal_id IS NULL) AND (owner_principal_kind IS NULL)) OR ((owner_principal_id IS NOT NULL) AND (owner_principal_kind = ANY (ARRAY['person'::text, 'agent'::text]))))),
+    CONSTRAINT background_tasks_ownership_version_check CHECK ((ownership_version > 0)),
+    CONSTRAINT background_tasks_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
+    CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
+    CONSTRAINT background_tasks_single_source_check CHECK (((source_message_uuid IS NULL) OR (source_schedule_run_id IS NULL))),
+    CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text]))),
+    CONSTRAINT background_tasks_transition_actor_kind_check CHECK (((transition_actor_kind IS NULL) OR (transition_actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text])))),
+    CONSTRAINT background_tasks_transition_reason_check CHECK (((transition_reason IS NULL) OR (transition_reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'unknown'::text])))),
+    CONSTRAINT background_tasks_transition_shape_check CHECK ((((transition_reason IS NULL) AND (transition_actor_kind IS NULL) AND (transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL)) OR ((transition_reason IS NOT NULL) AND
+CASE transition_actor_kind
+    WHEN 'system'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'worker'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'operator'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'human'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'agent'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'approval'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NOT NULL) AND (transition_outreach_id IS NULL))
+    WHEN 'outreach'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NOT NULL))
+    ELSE false
+END)))
+);
+
+
+--
+-- Name: binding_audit_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.binding_audit_events (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    action text NOT NULL,
+    reason text,
+    actor jsonb NOT NULL,
+    metadata jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT binding_audit_events_action_check CHECK ((action = ANY (ARRAY['linked'::text, 'endpoint_changed'::text, 'enabled'::text, 'paused'::text, 'disabled'::text, 'drift_detected'::text, 'unlinked'::text]))),
+    CONSTRAINT binding_audit_events_actor_check CHECK (public.valid_creation_provenance(actor)),
+    CONSTRAINT binding_audit_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND ((metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((metadata -> 'transport'::text)) = 'string'::text) AND (octet_length((metadata)::text) <= 4096))),
+    CONSTRAINT binding_audit_events_reason_check CHECK (((reason IS NULL) OR public.valid_binding_change_reason(reason)))
+);
+
+
+--
+-- Name: channel_agents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channel_agents (
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT channel_agents_position_check CHECK (("position" >= 0))
+);
+
+
+--
+-- Name: channel_bindings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channel_bindings (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    installation_id uuid,
+    transport text NOT NULL,
+    namespace text NOT NULL,
+    external_endpoint_key text NOT NULL,
+    display_label text NOT NULL,
+    access_policy text NOT NULL,
+    delivery_policy text NOT NULL,
+    status text NOT NULL,
+    disabled_reason text,
+    created_by jsonb NOT NULL,
+    access_snapshot jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT channel_bindings_access_policy_check CHECK ((access_policy = ANY (ARRAY['channel_acl'::text, 'conversation_members_read_and_participate'::text]))),
+    CONSTRAINT channel_bindings_access_snapshot_check CHECK (((jsonb_typeof(access_snapshot) = 'object'::text) AND ((access_snapshot -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((access_snapshot -> 'kind'::text)) = 'string'::text) AND ((access_snapshot ->> 'kind'::text) = ANY (ARRAY['deployment_endpoint'::text, 'provider_conversation'::text])) AND (octet_length((access_snapshot)::text) <= 4096))),
+    CONSTRAINT channel_bindings_created_by_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT channel_bindings_delivery_policy_check CHECK ((delivery_policy = ANY (ARRAY['reply_only'::text, 'reply_and_initiate'::text]))),
+    CONSTRAINT channel_bindings_disabled_reason_check CHECK ((((status = ANY (ARRAY['disabled'::text, 'orphaned'::text])) = (disabled_reason IS NOT NULL)) AND ((disabled_reason IS NULL) OR public.valid_binding_change_reason(disabled_reason)))),
+    CONSTRAINT channel_bindings_display_label_check CHECK (((btrim(display_label) <> ''::text) AND (octet_length(display_label) <= 255))),
+    CONSTRAINT channel_bindings_endpoint_key_check CHECK (((btrim(external_endpoint_key) <> ''::text) AND (octet_length(external_endpoint_key) <= 512))),
+    CONSTRAINT channel_bindings_installation_coherence_check CHECK ((public.transport_requires_installation(transport) = (installation_id IS NOT NULL))),
+    CONSTRAINT channel_bindings_namespace_check CHECK (((btrim(namespace) <> ''::text) AND (octet_length(namespace) <= 255))),
+    CONSTRAINT channel_bindings_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'disabled'::text, 'orphaned'::text]))),
+    CONSTRAINT channel_bindings_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+);
+
+
+--
+-- Name: channel_schedules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channel_schedules (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    name text NOT NULL,
+    schedule_type text NOT NULL,
+    interval_seconds bigint,
+    subject_template text NOT NULL,
+    prompt_template text NOT NULL,
+    delivery_mode text DEFAULT 'mailbox_only'::text NOT NULL,
+    recipient_emails public.citext[] DEFAULT '{}'::public.citext[] NOT NULL,
+    timezone text DEFAULT 'UTC'::text NOT NULL,
+    run_as_user_id uuid,
+    enabled boolean DEFAULT true NOT NULL,
+    last_run_at timestamp with time zone,
+    next_run_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT channel_schedules_delivery_mode_check CHECK ((delivery_mode = ANY (ARRAY['mailbox_only'::text, 'email_participants'::text, 'email_custom'::text]))),
+    CONSTRAINT channel_schedules_interval_check CHECK ((((schedule_type = 'interval'::text) AND (interval_seconds IS NOT NULL) AND (interval_seconds >= 60)) OR ((schedule_type = 'one_off'::text) AND (interval_seconds IS NULL)))),
+    CONSTRAINT channel_schedules_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    CONSTRAINT channel_schedules_timezone_check CHECK (((now() AT TIME ZONE timezone) IS NOT NULL)),
+    CONSTRAINT channel_schedules_type_check CHECK ((schedule_type = ANY (ARRAY['interval'::text, 'one_off'::text])))
+);
+
+
+--
+-- Name: channel_slugs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.channel_slugs (
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    slug public.citext NOT NULL,
+    is_primary boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT channel_slugs_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+);
+
+
+--
+-- Name: companies; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.companies (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    name text NOT NULL,
+    slug public.citext NOT NULL,
+    enable_llm_spam_guardrail boolean,
+    default_add_3rd_party boolean DEFAULT true NOT NULL,
+    default_participant_emails public.citext[],
+    default_retrieve_company_memory boolean DEFAULT false NOT NULL,
+    default_retrieve_agent_memory boolean DEFAULT false NOT NULL,
+    default_retrieve_user_memory boolean DEFAULT false NOT NULL,
+    default_persist_company_memory boolean DEFAULT false NOT NULL,
+    default_persist_agent_memory boolean DEFAULT false NOT NULL,
+    default_persist_user_memory boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    avatar_url text,
+    memory_provider text,
+    external_response_review text DEFAULT 'autonomous'::text NOT NULL,
+    CONSTRAINT companies_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
+    CONSTRAINT companies_default_participants_bounded CHECK (((default_participant_emails IS NULL) OR ((cardinality(default_participant_emails) <= 64) AND (array_position(default_participant_emails, NULL::public.citext) IS NULL) AND (array_position(default_participant_emails, ''::public.citext) IS NULL)))),
+    CONSTRAINT companies_external_response_review_check CHECK ((external_response_review = ANY (ARRAY['autonomous'::text, 'review_all_external'::text]))),
+    CONSTRAINT companies_memory_provider_check CHECK (((memory_provider IS NULL) OR (memory_provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text])))),
+    CONSTRAINT companies_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    CONSTRAINT companies_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'::text)))
+);
+
+
+--
+-- Name: company_invites; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_invites (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    email public.citext NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    role text DEFAULT 'member'::text NOT NULL,
+    CONSTRAINT company_invites_role_check CHECK ((role = ANY (ARRAY['member'::text, 'admin'::text]))),
+    CONSTRAINT company_invites_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text])))
+);
+
+
+--
+-- Name: company_model_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_model_connections (
+    company_id uuid NOT NULL,
+    provider text NOT NULL,
+    api_key text NOT NULL,
+    models text[] NOT NULL,
+    is_default boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT company_model_connections_api_key_check CHECK (((btrim(api_key) <> ''::text) AND (octet_length(api_key) <= 16384))),
+    CONSTRAINT company_model_connections_models_count_check CHECK (((cardinality(models) >= 1) AND (cardinality(models) <= 32))),
+    CONSTRAINT company_model_connections_models_have_no_nulls CHECK (((array_position(models, NULL::text) IS NULL) AND (array_position(models, ''::text) IS NULL))),
+    CONSTRAINT company_model_connections_provider_check CHECK (((provider = ANY (ARRAY['google'::text, 'openai'::text, 'anthropic'::text, 'groq'::text])) AND (length(provider) <= 64)))
+);
+
+
+--
+-- Name: company_resend_api_integrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_resend_api_integrations (
+    company_id uuid NOT NULL,
+    webhook_token text NOT NULL,
+    api_key text NOT NULL,
+    signing_secret text NOT NULL,
+    authserv_id text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT company_resend_api_integrations_api_key_check CHECK (((api_key ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'::text) AND (octet_length(api_key) <= 8192))),
+    CONSTRAINT company_resend_api_integrations_authserv_id_check CHECK (((btrim(authserv_id) <> ''::text) AND (authserv_id !~ '[[:space:]]'::text) AND (octet_length(authserv_id) <= 255))),
+    CONSTRAINT company_resend_api_integrations_signing_secret_check CHECK (((signing_secret ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'::text) AND (octet_length(signing_secret) <= 8192))),
+    CONSTRAINT company_resend_api_integrations_webhook_token_check CHECK ((webhook_token ~ '^[a-z0-9]{32}$'::text))
+);
+
+
+--
+-- Name: delegation_control_commands; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.delegation_control_commands (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    outreach_id uuid NOT NULL,
+    target_id uuid,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    operation text NOT NULL,
+    actor_principal_id uuid NOT NULL,
+    actor_kind text NOT NULL,
+    authority text NOT NULL,
+    reason text NOT NULL,
+    reason_detail text,
+    from_version bigint NOT NULL,
+    to_version bigint NOT NULL,
+    result jsonb NOT NULL,
+    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT delegation_control_commands_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['person'::text, 'agent'::text]))),
+    CONSTRAINT delegation_control_commands_authority_check CHECK ((authority = ANY (ARRAY['human_owner'::text, 'company_manager'::text, 'owning_agent'::text]))),
+    CONSTRAINT delegation_control_commands_operation_check CHECK ((operation = ANY (ARRAY['extend_outreach'::text, 'cancel_target'::text, 'cancel_outreach'::text, 'reassign_internal_target'::text, 'proceed_with_partial'::text, 'stop_task'::text]))),
+    CONSTRAINT delegation_control_commands_reason_check CHECK ((reason = ANY (ARRAY['deadline_changed'::text, 'no_longer_needed'::text, 'target_unavailable'::text, 'incorrect_target'::text, 'partial_results_accepted'::text, 'task_stopped'::text, 'other'::text]))),
+    CONSTRAINT delegation_control_commands_reason_detail_check CHECK (((reason_detail IS NULL) OR (octet_length(reason_detail) <= 512))),
+    CONSTRAINT delegation_control_commands_result_version_check CHECK (((result ->> 'version'::text) = '1'::text)),
+    CONSTRAINT delegation_control_commands_version_check CHECK (((from_version > 0) AND (to_version = (from_version + 1))))
+);
+
+
+--
+-- Name: email_message_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.email_message_metadata (
+    company_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    rfc_message_id text NOT NULL,
+    in_reply_to text,
+    references_list text[] DEFAULT '{}'::text[] NOT NULL,
+    thread_index text,
+    raw_text_body text,
+    raw_html_body text,
+    CONSTRAINT email_message_metadata_in_reply_to_check CHECK (((in_reply_to IS NULL) OR (octet_length(in_reply_to) <= 998))),
+    CONSTRAINT email_message_metadata_references_check CHECK (((array_length(references_list, 1) IS NULL) OR (array_length(references_list, 1) <= 100))),
+    CONSTRAINT email_message_metadata_rfc_message_id_check CHECK (((btrim(rfc_message_id) <> ''::text) AND (octet_length(rfc_message_id) <= 998))),
+    CONSTRAINT email_message_metadata_thread_index_check CHECK (((thread_index IS NULL) OR (octet_length(thread_index) <= 998)))
+);
+
+
+--
+-- Name: external_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.external_messages (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    external_message_key text NOT NULL,
+    message_id uuid NOT NULL,
+    delivery_part_id uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT external_messages_key_check CHECK (((btrim(external_message_key) <> ''::text) AND (octet_length(external_message_key) <= 998)))
+);
+
+
+--
+-- Name: external_threads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.external_threads (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    external_thread_key text NOT NULL,
+    thread_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT external_threads_key_check CHECK (((btrim(external_thread_key) <> ''::text) AND (octet_length(external_thread_key) <= 998)))
+);
+
+
+--
+-- Name: human_approvals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.human_approvals (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    task_id uuid,
+    step_key text NOT NULL,
+    approver_email public.citext NOT NULL,
+    action_type text NOT NULL,
+    action_title text NOT NULL,
+    action_summary text NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    token uuid NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT human_approvals_expiry_check CHECK ((expires_at > created_at)),
+    CONSTRAINT human_approvals_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
+    CONSTRAINT human_approvals_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
+);
+
+
+--
+-- Name: human_task_completions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.human_task_completions (
+    task_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    owner_principal_id uuid NOT NULL,
+    ownership_version bigint NOT NULL,
+    message_id uuid NOT NULL,
+    completed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT human_task_completions_ownership_version_check CHECK ((ownership_version > 0))
+);
+
+
+--
+-- Name: inbound_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.inbound_events (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    installation_id uuid,
+    transport text NOT NULL,
+    external_event_key text NOT NULL,
+    correlation_id uuid NOT NULL,
+    raw_payload bytea NOT NULL,
+    content_type text,
+    content_hash bytea NOT NULL,
+    safe_header_facts jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 5 NOT NULL,
+    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error_class text,
+    last_error_detail text,
+    ignore_reason text,
+    execution_id uuid,
+    owner_worker_id uuid,
+    locked_at timestamp with time zone,
+    lock_expires_at timestamp with time zone,
+    received_at timestamp with time zone NOT NULL,
+    processed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT inbound_events_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
+    CONSTRAINT inbound_events_content_hash_check CHECK ((octet_length(content_hash) = 32)),
+    CONSTRAINT inbound_events_content_type_check CHECK (((content_type IS NULL) OR ((btrim(content_type) <> ''::text) AND (octet_length(content_type) <= 255) AND (content_type !~ '[[:cntrl:]]'::text)))),
+    CONSTRAINT inbound_events_error_check CHECK ((((last_error_class IS NULL) OR public.valid_inbound_event_error_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)) AND ((status = ANY (ARRAY['retryable'::text, 'dead_letter'::text])) = (last_error_class IS NOT NULL)))),
+    CONSTRAINT inbound_events_external_event_key_check CHECK (((btrim(external_event_key) <> ''::text) AND (octet_length(external_event_key) <= 512))),
+    CONSTRAINT inbound_events_ignore_check CHECK ((((status = 'ignored'::text) = (ignore_reason IS NOT NULL)) AND ((ignore_reason IS NULL) OR public.valid_inbound_event_ignore_reason(ignore_reason)))),
+    CONSTRAINT inbound_events_installation_check CHECK ((public.transport_requires_installation(transport) = (installation_id IS NOT NULL))),
+    CONSTRAINT inbound_events_lease_check CHECK ((((status = 'processing'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+    CONSTRAINT inbound_events_payload_check CHECK (((octet_length(raw_payload) >= 1) AND (octet_length(raw_payload) <= 1048576))),
+    CONSTRAINT inbound_events_processed_check CHECK (((status = ANY (ARRAY['completed'::text, 'ignored'::text, 'dead_letter'::text])) = (processed_at IS NOT NULL))),
+    CONSTRAINT inbound_events_safe_header_facts_check CHECK (public.valid_inbound_safe_header_facts(safe_header_facts)),
+    CONSTRAINT inbound_events_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'retryable'::text, 'completed'::text, 'ignored'::text, 'dead_letter'::text]))),
+    CONSTRAINT inbound_events_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+);
+
+
+--
+-- Name: integration_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integration_credentials (
+    company_id uuid NOT NULL,
+    installation_id uuid NOT NULL,
+    credential_kind text NOT NULL,
+    envelope text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT integration_credentials_envelope_check CHECK (((envelope ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'::text) AND (octet_length(envelope) <= 8192))),
+    CONSTRAINT integration_credentials_kind_check CHECK ((credential_kind = ANY (ARRAY['bot_access_token'::text, 'bot_refresh_token'::text, 'user_access_token'::text])))
+);
+
+
+--
+-- Name: integration_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integration_installations (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    transport text NOT NULL,
+    external_tenant_key text NOT NULL,
+    display_name text NOT NULL,
+    status text NOT NULL,
+    granted_scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    installed_by jsonb NOT NULL,
+    installed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_by jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    revoked_by jsonb,
+    revoked_at timestamp with time zone,
+    CONSTRAINT integration_installations_display_name_check CHECK (((btrim(display_name) <> ''::text) AND (octet_length(display_name) <= 255))),
+    CONSTRAINT integration_installations_installed_by_check CHECK (public.valid_creation_provenance(installed_by)),
+    CONSTRAINT integration_installations_revocation_check CHECK ((((status = 'revoked'::text) = (revoked_at IS NOT NULL)) AND ((revoked_at IS NULL) = (revoked_by IS NULL)) AND ((revoked_by IS NULL) OR public.valid_creation_provenance(revoked_by)))),
+    CONSTRAINT integration_installations_scopes_check CHECK (((array_position(granted_scopes, NULL::text) IS NULL) AND (NOT (''::text = ANY (granted_scopes))) AND (COALESCE(array_length(granted_scopes, 1), 0) <= 64) AND (octet_length(array_to_string(granted_scopes, ','::text)) <= 4096))),
+    CONSTRAINT integration_installations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'reauthorization_required'::text, 'revoked'::text, 'disabled'::text]))),
+    CONSTRAINT integration_installations_tenant_key_check CHECK (((btrim(external_tenant_key) <> ''::text) AND (octet_length(external_tenant_key) <= 255))),
+    CONSTRAINT integration_installations_transport_check CHECK (public.transport_requires_installation(transport)),
+    CONSTRAINT integration_installations_updated_by_check CHECK (public.valid_creation_provenance(updated_by))
+);
+
+
+--
+-- Name: internal_note_tombstones; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.internal_note_tombstones (
+    note_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    actor_principal_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: internal_notes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.internal_notes (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    message_audience text DEFAULT 'internal_only'::text NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    author_principal_id uuid NOT NULL,
+    provenance text NOT NULL,
+    supersedes_note_id uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT internal_notes_message_audience_check CHECK ((message_audience = 'internal_only'::text)),
+    CONSTRAINT internal_notes_no_self_supersession CHECK ((id IS DISTINCT FROM supersedes_note_id)),
+    CONSTRAINT internal_notes_provenance_check CHECK ((provenance = ANY (ARRAY['human_ui'::text, 'api'::text, 'integration'::text, 'email_quiet_ingress'::text])))
+);
+
+
+--
+-- Name: manual_handoffs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.manual_handoffs (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid,
+    correlation_id uuid,
+    title text NOT NULL,
+    next_action text NOT NULL,
+    status text DEFAULT 'open'::text NOT NULL,
+    responsible_principal_id uuid,
+    business_priority text DEFAULT 'normal'::text NOT NULL,
+    business_due_at timestamp with time zone,
+    version bigint DEFAULT 1 NOT NULL,
+    created_by_principal_id uuid,
+    resolved_by_principal_id uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    resolved_at timestamp with time zone,
+    CONSTRAINT manual_handoffs_next_action_check CHECK (((btrim(next_action) <> ''::text) AND (octet_length(next_action) <= 2048))),
+    CONSTRAINT manual_handoffs_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
+    CONSTRAINT manual_handoffs_resolution_check CHECK ((((status = 'open'::text) AND (resolved_at IS NULL) AND (resolved_by_principal_id IS NULL)) OR ((status <> 'open'::text) AND (resolved_at IS NOT NULL)))),
+    CONSTRAINT manual_handoffs_status_check CHECK ((status = ANY (ARRAY['open'::text, 'resolved'::text, 'withdrawn'::text]))),
+    CONSTRAINT manual_handoffs_title_check CHECK (((btrim(title) <> ''::text) AND (octet_length(title) <= 512))),
+    CONSTRAINT manual_handoffs_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: memory_cleanup_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.memory_cleanup_jobs (
+    id uuid NOT NULL,
+    provider text NOT NULL,
+    remote_database_id text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    lease_expires_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    lease_token uuid,
+    operation_generation bigint,
+    CONSTRAINT memory_cleanup_jobs_generation_state_check CHECK ((((status = 'leased'::text) AND (operation_generation IS NOT NULL)) OR ((status <> 'leased'::text) AND (operation_generation IS NULL)))),
+    CONSTRAINT memory_cleanup_jobs_lease_state_check CHECK ((((status = 'leased'::text) AND (lease_token IS NOT NULL) AND (lease_expires_at IS NOT NULL)) OR ((status <> 'leased'::text) AND (lease_token IS NULL) AND (lease_expires_at IS NULL)))),
+    CONSTRAINT memory_cleanup_jobs_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
+    CONSTRAINT memory_cleanup_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'leased'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: memory_provider_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.memory_provider_connections (
+    company_id uuid NOT NULL,
+    provider text NOT NULL,
+    remote_database_id text NOT NULL,
+    readiness text DEFAULT 'pending'::text NOT NULL,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT memory_provider_connections_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
+    CONSTRAINT memory_provider_connections_readiness_check CHECK ((readiness = ANY (ARRAY['pending'::text, 'provisioning'::text, 'ready'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: memory_provisioning_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.memory_provisioning_jobs (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    provider text NOT NULL,
+    remote_database_id text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    lease_token uuid,
+    lease_expires_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    operation_generation bigint,
+    phase text DEFAULT 'create_pending'::text NOT NULL,
+    failure_attempts integer DEFAULT 0 NOT NULL,
+    readiness_deadline timestamp with time zone,
+    next_poll_at timestamp with time zone,
+    CONSTRAINT memory_provisioning_jobs_attempts_check CHECK ((attempts >= 0)),
+    CONSTRAINT memory_provisioning_jobs_check CHECK ((((status = 'leased'::text) AND (lease_token IS NOT NULL) AND (lease_expires_at IS NOT NULL)) OR ((status <> 'leased'::text) AND (lease_token IS NULL) AND (lease_expires_at IS NULL)))),
+    CONSTRAINT memory_provisioning_jobs_failure_attempts_check CHECK ((failure_attempts >= 0)),
+    CONSTRAINT memory_provisioning_jobs_generation_state_check CHECK ((((status = 'leased'::text) AND (operation_generation IS NOT NULL)) OR ((status <> 'leased'::text) AND (operation_generation IS NULL)))),
+    CONSTRAINT memory_provisioning_jobs_phase_check CHECK ((phase = ANY (ARRAY['create_pending'::text, 'waiting_ready'::text, 'ready'::text, 'failed'::text]))),
+    CONSTRAINT memory_provisioning_jobs_phase_state_check CHECK ((((status = ANY (ARRAY['pending'::text, 'leased'::text])) AND (phase = ANY (ARRAY['create_pending'::text, 'waiting_ready'::text]))) OR ((status = 'completed'::text) AND (phase = 'ready'::text)) OR ((status = 'failed'::text) AND (phase = 'failed'::text)))),
+    CONSTRAINT memory_provisioning_jobs_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
+    CONSTRAINT memory_provisioning_jobs_readiness_window_check CHECK ((((phase = 'create_pending'::text) AND (readiness_deadline IS NULL) AND (next_poll_at IS NULL)) OR ((phase = 'waiting_ready'::text) AND (readiness_deadline IS NOT NULL) AND (next_poll_at IS NOT NULL)) OR (phase = ANY (ARRAY['ready'::text, 'failed'::text])))),
+    CONSTRAINT memory_provisioning_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'leased'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: memory_remote_resource_lifecycles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.memory_remote_resource_lifecycles (
+    provider text NOT NULL,
+    remote_database_id text NOT NULL,
+    company_id uuid,
+    desired_state text NOT NULL,
+    operation_generation bigint DEFAULT 0 NOT NULL,
+    operation_lease_token uuid,
+    operation_lease_expires_at timestamp with time zone,
+    quiesce_until timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT memory_remote_resource_lifecycles_check CHECK ((((operation_lease_token IS NULL) AND (operation_lease_expires_at IS NULL)) OR ((operation_lease_token IS NOT NULL) AND (operation_lease_expires_at IS NOT NULL)))),
+    CONSTRAINT memory_remote_resource_lifecycles_check1 CHECK (((desired_state = 'absent'::text) OR (company_id IS NOT NULL))),
+    CONSTRAINT memory_remote_resource_lifecycles_desired_state_check CHECK ((desired_state = ANY (ARRAY['present'::text, 'absent'::text]))),
+    CONSTRAINT memory_remote_resource_lifecycles_operation_generation_check CHECK ((operation_generation >= 0)),
+    CONSTRAINT memory_remote_resource_lifecycles_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text])))
+);
+
+
+--
+-- Name: message_deliveries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_deliveries (
+    id uuid NOT NULL,
+    company_id uuid,
+    channel_id uuid,
+    message_id uuid,
+    source_binding_id uuid,
+    destination_binding_id uuid,
+    external_destination text,
+    task_id uuid,
+    depends_on_delivery_id uuid,
+    correlation_id uuid NOT NULL,
+    transport text NOT NULL,
+    purpose text NOT NULL,
+    idempotency_key text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    max_attempts integer NOT NULL,
+    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error_class text,
+    last_error_detail text,
+    execution_id uuid,
+    owner_worker_id uuid,
+    locked_at timestamp with time zone,
+    lock_expires_at timestamp with time zone,
+    delivered_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    message_audience text,
+    CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
+    CONSTRAINT message_deliveries_attribution_check CHECK ((((company_id IS NOT NULL) AND (channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((company_id IS NULL) AND (channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (task_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+    CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
+    CONSTRAINT message_deliveries_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
+    CONSTRAINT message_deliveries_external_destination_check CHECK (((external_destination IS NULL) OR ((btrim(external_destination) <> ''::text) AND (octet_length(external_destination) <= 998)))),
+    CONSTRAINT message_deliveries_idempotency_key_check CHECK (((btrim(idempotency_key) <> ''::text) AND (octet_length(idempotency_key) <= 512))),
+    CONSTRAINT message_deliveries_lease_check CHECK ((((status = 'sending'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'sending'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+    CONSTRAINT message_deliveries_message_audience_check CHECK ((((message_id IS NULL) AND (message_audience IS NULL)) OR ((message_id IS NOT NULL) AND (message_audience = 'external_conversation'::text)))),
+    CONSTRAINT message_deliveries_no_self_dependency_check CHECK (((depends_on_delivery_id IS NULL) OR (depends_on_delivery_id <> id))),
+    CONSTRAINT message_deliveries_purpose_check CHECK ((purpose = ANY (ARRAY['reply'::text, 'mirror'::text, 'outreach'::text, 'notification'::text]))),
+    CONSTRAINT message_deliveries_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'sending'::text, 'retryable'::text, 'delivered'::text, 'outcome_unknown'::text, 'dead_letter'::text]))),
+    CONSTRAINT message_deliveries_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+);
+
+
+--
+-- Name: message_delivery_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_delivery_parts (
+    id uuid NOT NULL,
+    company_id uuid,
+    delivery_id uuid NOT NULL,
+    part_index integer NOT NULL,
+    part_key text NOT NULL,
+    payload jsonb NOT NULL,
+    status text DEFAULT 'prepared'::text NOT NULL,
+    provider_message_key text,
+    content_digest text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    last_error_class text,
+    last_error_detail text,
+    request_started_at timestamp with time zone,
+    delivered_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT message_delivery_parts_attempt_check CHECK ((attempt_count >= 0)),
+    CONSTRAINT message_delivery_parts_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
+    CONSTRAINT message_delivery_parts_digest_check CHECK (((btrim(content_digest) <> ''::text) AND (octet_length(content_digest) <= 128))),
+    CONSTRAINT message_delivery_parts_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
+    CONSTRAINT message_delivery_parts_index_check CHECK (((part_index >= 0) AND (part_index < 50))),
+    CONSTRAINT message_delivery_parts_key_check CHECK (((btrim(part_key) <> ''::text) AND (octet_length(part_key) <= 200))),
+    CONSTRAINT message_delivery_parts_payload_check CHECK (((jsonb_typeof(payload) = 'object'::text) AND (jsonb_typeof((payload -> 'transport'::text)) = 'string'::text) AND (jsonb_typeof((payload -> 'version'::text)) = 'number'::text) AND (octet_length((payload)::text) <= 262144))),
+    CONSTRAINT message_delivery_parts_provider_key_check CHECK (((provider_message_key IS NULL) OR ((btrim(provider_message_key) <> ''::text) AND (octet_length(provider_message_key) <= 998)))),
+    CONSTRAINT message_delivery_parts_started_check CHECK (((status <> 'delivered'::text) OR (request_started_at IS NOT NULL))),
+    CONSTRAINT message_delivery_parts_status_check CHECK ((status = ANY (ARRAY['prepared'::text, 'sending'::text, 'delivered'::text, 'outcome_unknown'::text, 'retryable'::text, 'dead'::text])))
+);
+
+
+--
+-- Name: message_participants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_participants (
+    company_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    participant_identity_id uuid NOT NULL,
+    kind text NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT message_participants_kind_check CHECK ((kind = ANY (ARRAY['sender'::text, 'to'::text, 'cc'::text]))),
+    CONSTRAINT message_participants_position_check CHECK (("position" >= 0))
+);
+
+
+--
+-- Name: messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.messages (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    author_principal_id uuid NOT NULL,
+    authored_identity_id uuid,
+    subject text NOT NULL,
+    clean_text_body text NOT NULL,
+    attachments jsonb,
+    direction text NOT NULL,
+    role text NOT NULL,
+    correlation_id uuid NOT NULL,
+    content_hash bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    audience text DEFAULT 'legacy_unclassified'::text NOT NULL,
+    CONSTRAINT messages_attachments_check CHECK (((attachments IS NULL) OR ((jsonb_typeof(attachments) = 'object'::text) AND ((attachments -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachments -> 'items'::text)) = 'array'::text) AND (octet_length((attachments)::text) <= 262144)))),
+    CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'legacy_unclassified'::text]))),
+    CONSTRAINT messages_content_hash_check CHECK ((octet_length(content_hash) = 32)),
+    CONSTRAINT messages_direction_check CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))),
+    CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['human'::text, 'agent'::text, 'system'::text]))),
+    CONSTRAINT messages_subject_check CHECK ((octet_length(subject) <= 2048))
+);
+
+
+--
+-- Name: notification_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notification_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    notification_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    source_kind text NOT NULL,
+    source_id uuid NOT NULL,
+    action_kind text NOT NULL,
+    source_generation bigint NOT NULL,
+    actor_principal_id uuid,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 10 NOT NULL,
+    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    execution_id uuid,
+    owner_worker_id uuid,
+    locked_at timestamp with time zone,
+    lock_expires_at timestamp with time zone,
+    last_error_class text,
+    last_error_detail text,
+    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    projected_at timestamp with time zone,
+    CONSTRAINT notification_events_action_kind_check CHECK ((action_kind = ANY (ARRAY['assignment'::text, 'response_review'::text, 'delegation_timeout'::text, 'task_failure'::text, 'delivery_failure'::text]))),
+    CONSTRAINT notification_events_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
+    CONSTRAINT notification_events_error_check CHECK (((last_error_class IS NULL) OR (last_error_class = ANY (ARRAY['database'::text, 'composition'::text, 'invalid_source'::text, 'lease_expired'::text, 'internal'::text])))),
+    CONSTRAINT notification_events_lease_check CHECK ((((status = 'processing'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+    CONSTRAINT notification_events_projection_check CHECK (((status = 'projected'::text) = (projected_at IS NOT NULL))),
+    CONSTRAINT notification_events_source_generation_check CHECK ((source_generation > 0)),
+    CONSTRAINT notification_events_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text, 'response_review'::text, 'delegation'::text, 'delivery'::text]))),
+    CONSTRAINT notification_events_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'projected'::text, 'dead_letter'::text])))
+);
+
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    recipient_user_id uuid NOT NULL,
+    recipient_principal_id uuid,
+    event_id uuid NOT NULL,
+    source_kind text NOT NULL,
+    source_id uuid NOT NULL,
+    action_kind text NOT NULL,
+    source_generation bigint NOT NULL,
+    channel_id uuid NOT NULL,
+    state text DEFAULT 'active'::text NOT NULL,
+    read_at timestamp with time zone,
+    state_changed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    email_delivery_id uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT notifications_action_kind_check CHECK ((action_kind = ANY (ARRAY['assignment'::text, 'response_review'::text, 'delegation_timeout'::text, 'task_failure'::text, 'delivery_failure'::text]))),
+    CONSTRAINT notifications_source_generation_check CHECK ((source_generation > 0)),
+    CONSTRAINT notifications_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text, 'response_review'::text, 'delegation'::text, 'delivery'::text]))),
+    CONSTRAINT notifications_state_check CHECK ((state = ANY (ARRAY['active'::text, 'resolved'::text, 'withdrawn'::text])))
+);
+
+
+--
+-- Name: participant_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.participant_identities (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    transport text NOT NULL,
+    namespace text NOT NULL,
+    subject text NOT NULL,
+    display_label text,
+    status text NOT NULL,
+    claim_metadata jsonb NOT NULL,
+    provenance text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT participant_identities_claim_metadata_check CHECK (((jsonb_typeof(claim_metadata) = 'object'::text) AND ((claim_metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((claim_metadata -> 'kind'::text)) = 'string'::text) AND ((claim_metadata ->> 'kind'::text) = ANY (ARRAY['observation'::text, 'account'::text, 'provider_profile'::text])) AND (octet_length((claim_metadata)::text) <= 8192))),
+    CONSTRAINT participant_identities_display_label_check CHECK (((display_label IS NULL) OR (octet_length(display_label) <= 255))),
+    CONSTRAINT participant_identities_namespace_check CHECK (((btrim(namespace) <> ''::text) AND (octet_length(namespace) <= 255))),
+    CONSTRAINT participant_identities_provenance_check CHECK ((provenance = ANY (ARRAY['account'::text, 'agent'::text, 'channel_allowlist'::text, 'transport_ingress'::text, 'provider_profile_claim'::text, 'system'::text]))),
+    CONSTRAINT participant_identities_status_check CHECK ((status = ANY (ARRAY['observed'::text, 'verified'::text, 'disabled'::text]))),
+    CONSTRAINT participant_identities_subject_check CHECK (((btrim(subject) <> ''::text) AND (octet_length(subject) <= 320))),
+    CONSTRAINT participant_identities_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+);
+
+
+--
+-- Name: pending_account_changes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pending_account_changes (
+    user_id uuid NOT NULL,
+    kind text NOT NULL,
+    new_email public.citext,
+    new_password_hash text,
+    confirmation_code_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pending_account_changes_email_not_blank CHECK (((new_email IS NULL) OR (btrim((new_email)::text) <> ''::text))),
+    CONSTRAINT pending_account_changes_kind_check CHECK ((kind = ANY (ARRAY['email'::text, 'password'::text]))),
+    CONSTRAINT pending_account_changes_payload_matches_kind CHECK ((((kind = 'email'::text) AND (new_email IS NOT NULL) AND (new_password_hash IS NULL)) OR ((kind = 'password'::text) AND (new_password_hash IS NOT NULL) AND (new_email IS NULL))))
+);
+
+
+--
+-- Name: pending_user_registrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pending_user_registrations (
+    email public.citext NOT NULL,
+    username public.citext NOT NULL,
+    password_hash text NOT NULL,
+    confirmation_code_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pending_user_registrations_email_not_blank CHECK ((btrim((email)::text) <> ''::text)),
+    CONSTRAINT pending_user_registrations_username_not_blank CHECK ((btrim((username)::text) <> ''::text))
+);
+
+
+--
+-- Name: response_draft_evidence; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.response_draft_evidence (
+    company_id uuid NOT NULL,
+    draft_id uuid NOT NULL,
+    draft_version integer NOT NULL,
+    id uuid NOT NULL,
+    "position" integer NOT NULL,
+    source_reference jsonb NOT NULL,
+    source_version text NOT NULL,
+    content_digest text NOT NULL,
+    audience text NOT NULL,
+    support text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT response_draft_evidence_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'company_restricted'::text]))),
+    CONSTRAINT response_draft_evidence_digest_check CHECK (((btrim(content_digest) <> ''::text) AND (octet_length(content_digest) <= 128))),
+    CONSTRAINT response_draft_evidence_position_check CHECK ((("position" >= 0) AND ("position" < 128))),
+    CONSTRAINT response_draft_evidence_source_check CHECK (((jsonb_typeof(source_reference) = 'object'::text) AND (jsonb_typeof((source_reference -> 'kind'::text)) = 'string'::text) AND ((source_reference ->> 'kind'::text) = ANY (ARRAY['message'::text, 'note'::text, 'attachment'::text, 'delegated_result'::text, 'retained_tool_result'::text, 'external_url'::text])) AND (octet_length((source_reference)::text) <= 8192))),
+    CONSTRAINT response_draft_evidence_support_check CHECK ((support = ANY (ARRAY['direct_evidence'::text, 'inference'::text]))),
+    CONSTRAINT response_draft_evidence_version_check CHECK (((btrim(source_version) <> ''::text) AND (octet_length(source_version) <= 256)))
+);
+
+
+--
+-- Name: response_draft_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.response_draft_publications (
+    company_id uuid NOT NULL,
+    draft_id uuid NOT NULL,
+    draft_version integer NOT NULL,
+    message_id uuid NOT NULL,
+    message_audience text DEFAULT 'external_conversation'::text NOT NULL,
+    delivery_id uuid NOT NULL,
+    published_by_principal_id uuid NOT NULL,
+    published_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT response_draft_publications_audience_check CHECK ((message_audience = 'external_conversation'::text))
+);
+
+
+--
+-- Name: response_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.response_drafts (
+    id uuid NOT NULL,
+    version integer NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    task_id uuid,
+    source_handoff_generation uuid,
+    author_principal_id uuid NOT NULL,
+    reviewer_principal_id uuid NOT NULL,
+    proposed_message_id uuid NOT NULL,
+    subject text NOT NULL,
+    body text NOT NULL,
+    attachment_snapshot jsonb NOT NULL,
+    recipient_snapshot jsonb NOT NULL,
+    transport_snapshot jsonb NOT NULL,
+    publication_snapshot jsonb NOT NULL,
+    status text DEFAULT 'pending_review'::text NOT NULL,
+    created_by_principal_id uuid NOT NULL,
+    updated_by_principal_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT response_drafts_attachment_snapshot_check CHECK (((jsonb_typeof(attachment_snapshot) = 'object'::text) AND ((attachment_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachment_snapshot -> 'items'::text)) = 'array'::text) AND (octet_length((attachment_snapshot)::text) <= 262144))),
+    CONSTRAINT response_drafts_body_check CHECK (((btrim(body) <> ''::text) AND (octet_length(body) <= 262144))),
+    CONSTRAINT response_drafts_publication_snapshot_check CHECK (((jsonb_typeof(publication_snapshot) = 'object'::text) AND ((publication_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((publication_snapshot)::text) <= 16777216))),
+    CONSTRAINT response_drafts_recipient_snapshot_check CHECK (((jsonb_typeof(recipient_snapshot) = 'object'::text) AND ((recipient_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((recipient_snapshot -> 'to'::text)) = 'array'::text) AND (jsonb_typeof((recipient_snapshot -> 'cc'::text)) = 'array'::text) AND (octet_length((recipient_snapshot)::text) <= 32768))),
+    CONSTRAINT response_drafts_status_check CHECK ((status = ANY (ARRAY['pending_review'::text, 'rejected'::text, 'expired'::text, 'superseded'::text, 'published'::text]))),
+    CONSTRAINT response_drafts_subject_check CHECK ((octet_length(subject) <= 2048)),
+    CONSTRAINT response_drafts_transport_snapshot_check CHECK (((jsonb_typeof(transport_snapshot) = 'object'::text) AND ((transport_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((transport_snapshot)::text) <= 8192))),
+    CONSTRAINT response_drafts_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: response_review_commands; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.response_review_commands (
+    company_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    draft_id uuid NOT NULL,
+    expected_draft_version integer NOT NULL,
+    action text NOT NULL,
+    command_fingerprint text NOT NULL,
+    resulting_draft_version integer NOT NULL,
+    published_message_id uuid,
+    published_delivery_id uuid,
+    published_delivery_created boolean,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT response_review_commands_action_check CHECK ((action = ANY (ARRAY['approve'::text, 'edit'::text, 'reject'::text, 'reassign'::text]))),
+    CONSTRAINT response_review_commands_fingerprint_check CHECK (((btrim(command_fingerprint) <> ''::text) AND (octet_length(command_fingerprint) <= 128))),
+    CONSTRAINT response_review_commands_publication_result_check CHECK ((((published_delivery_id IS NULL) AND (published_delivery_created IS NULL)) OR ((published_delivery_id IS NOT NULL) AND (published_delivery_created IS NOT NULL)))),
+    CONSTRAINT response_review_commands_version_check CHECK (((expected_draft_version > 0) AND (resulting_draft_version > 0)))
+);
+
+
+--
+-- Name: response_reviews; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.response_reviews (
+    company_id uuid NOT NULL,
+    draft_id uuid NOT NULL,
+    draft_version integer NOT NULL,
+    reviewer_principal_id uuid NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    feedback text,
+    reviewer_rationale text,
+    decided_by_principal_id uuid,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    notification_actor_principal_id uuid,
+    CONSTRAINT response_reviews_decision_shape_check CHECK ((((status = 'pending'::text) AND (decided_by_principal_id IS NULL) AND (feedback IS NULL) AND (reviewer_rationale IS NULL)) OR ((status = 'rejected'::text) AND (decided_by_principal_id IS NOT NULL) AND (feedback IS NOT NULL)) OR ((status = 'published'::text) AND (decided_by_principal_id IS NOT NULL)) OR (status = ANY (ARRAY['expired'::text, 'superseded'::text])))),
+    CONSTRAINT response_reviews_expiry_check CHECK ((expires_at > created_at)),
+    CONSTRAINT response_reviews_feedback_check CHECK (((feedback IS NULL) OR ((btrim(feedback) <> ''::text) AND (octet_length(feedback) <= 8192)))),
+    CONSTRAINT response_reviews_rationale_check CHECK (((reviewer_rationale IS NULL) OR ((btrim(reviewer_rationale) <> ''::text) AND (octet_length(reviewer_rationale) <= 2048)))),
+    CONSTRAINT response_reviews_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'rejected'::text, 'expired'::text, 'superseded'::text, 'published'::text])))
+);
+
+
+--
+-- Name: runtime_metric_samples; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runtime_metric_samples (
+    machine_id text NOT NULL,
+    machine_region text,
+    sampled_at timestamp with time zone NOT NULL,
+    process_rss_bytes bigint,
+    memory_limit_bytes bigint,
+    cpu_utilization_percent double precision,
+    cpu_steal_percent double precision,
+    cpu_throttle_percent double precision,
+    database_acquire_duration_ms double precision NOT NULL,
+    database_acquire_succeeded boolean NOT NULL,
+    pool_size integer NOT NULL,
+    pool_idle integer NOT NULL,
+    pool_active integer NOT NULL,
+    active_task_executions integer DEFAULT 0 NOT NULL,
+    task_worker_concurrency_limit integer DEFAULT 1 NOT NULL,
+    hydradb_calls integer DEFAULT 0 NOT NULL,
+    hydradb_failures integer DEFAULT 0 NOT NULL,
+    hydradb_duration_ms double precision DEFAULT 0 NOT NULL,
+    CONSTRAINT runtime_metric_samples_acquire_duration_nonnegative CHECK ((database_acquire_duration_ms >= (0)::double precision)),
+    CONSTRAINT runtime_metric_samples_active_tasks_nonnegative CHECK ((active_task_executions >= 0)),
+    CONSTRAINT runtime_metric_samples_active_tasks_within_limit CHECK ((active_task_executions <= task_worker_concurrency_limit)),
+    CONSTRAINT runtime_metric_samples_cpu_steal_nonnegative CHECK (((cpu_steal_percent IS NULL) OR (cpu_steal_percent >= (0)::double precision))),
+    CONSTRAINT runtime_metric_samples_cpu_throttle_nonnegative CHECK (((cpu_throttle_percent IS NULL) OR (cpu_throttle_percent >= (0)::double precision))),
+    CONSTRAINT runtime_metric_samples_cpu_utilization_nonnegative CHECK (((cpu_utilization_percent IS NULL) OR (cpu_utilization_percent >= (0)::double precision))),
+    CONSTRAINT runtime_metric_samples_hydradb_calls_nonnegative CHECK ((hydradb_calls >= 0)),
+    CONSTRAINT runtime_metric_samples_hydradb_duration_needs_calls CHECK (((hydradb_calls > 0) OR (hydradb_duration_ms = (0)::double precision))),
+    CONSTRAINT runtime_metric_samples_hydradb_duration_nonnegative CHECK ((hydradb_duration_ms >= (0)::double precision)),
+    CONSTRAINT runtime_metric_samples_hydradb_failures_within_calls CHECK (((hydradb_failures >= 0) AND (hydradb_failures <= hydradb_calls))),
+    CONSTRAINT runtime_metric_samples_memory_limit_nonnegative CHECK (((memory_limit_bytes IS NULL) OR (memory_limit_bytes >= 0))),
+    CONSTRAINT runtime_metric_samples_pool_active_nonnegative CHECK ((pool_active >= 0)),
+    CONSTRAINT runtime_metric_samples_pool_idle_nonnegative CHECK ((pool_idle >= 0)),
+    CONSTRAINT runtime_metric_samples_pool_parts_fit CHECK (((pool_idle + pool_active) = pool_size)),
+    CONSTRAINT runtime_metric_samples_pool_size_nonnegative CHECK ((pool_size >= 0)),
+    CONSTRAINT runtime_metric_samples_rss_nonnegative CHECK (((process_rss_bytes IS NULL) OR (process_rss_bytes >= 0))),
+    CONSTRAINT runtime_metric_samples_worker_limit_positive CHECK ((task_worker_concurrency_limit > 0))
+);
+
+
+--
+-- Name: schedule_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_runs (
+    id uuid NOT NULL,
+    schedule_id uuid NOT NULL,
+    scheduled_for timestamp with time zone NOT NULL,
+    schedule_snapshot jsonb NOT NULL,
+    thread_id uuid,
+    task_id uuid,
+    last_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    materialization_status text DEFAULT 'pending'::text NOT NULL,
+    materialization_attempts integer DEFAULT 0 NOT NULL,
+    materialization_available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    materialization_worker_id uuid,
+    materialization_generation uuid,
+    materialization_locked_at timestamp with time zone,
+    materialization_lock_expires_at timestamp with time zone,
+    CONSTRAINT schedule_runs_materialization_attempts_check CHECK (((materialization_attempts >= 0) AND (materialization_attempts <= 5))),
+    CONSTRAINT schedule_runs_materialization_state_check CHECK ((((materialization_status = 'pending'::text) AND (task_id IS NULL) AND (materialization_attempts < 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'materializing'::text) AND (task_id IS NULL) AND ((materialization_attempts >= 1) AND (materialization_attempts <= 5)) AND (materialization_worker_id IS NOT NULL) AND (materialization_generation IS NOT NULL) AND (materialization_locked_at IS NOT NULL) AND (materialization_lock_expires_at IS NOT NULL) AND (materialization_lock_expires_at > materialization_locked_at)) OR ((materialization_status = 'materialized'::text) AND (task_id IS NOT NULL) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'failed'::text) AND (task_id IS NULL) AND (materialization_attempts = 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)))),
+    CONSTRAINT schedule_runs_snapshot_object_check CHECK ((jsonb_typeof(schedule_snapshot) = 'object'::text)),
+    CONSTRAINT schedule_runs_task_requires_thread_check CHECK (((task_id IS NULL) OR (thread_id IS NOT NULL)))
+);
+
+
+--
+-- Name: skills; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skills (
+    id uuid NOT NULL,
+    company_id uuid,
+    slug public.citext NOT NULL,
+    name text NOT NULL,
+    description text NOT NULL,
+    trigger text NOT NULL,
+    instructions jsonb NOT NULL,
+    created_by jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT skills_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT skills_description_bounded CHECK (((btrim(description) <> ''::text) AND (char_length(description) <= 500))),
+    CONSTRAINT skills_instructions_shape CHECK (((jsonb_typeof(instructions) = 'array'::text) AND ((jsonb_array_length(instructions) >= 1) AND (jsonb_array_length(instructions) <= 32)) AND (octet_length((instructions)::text) <= 524288))),
+    CONSTRAINT skills_name_bounded CHECK (((btrim(name) <> ''::text) AND (char_length(name) <= 120))),
+    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+    CONSTRAINT skills_trigger_bounded CHECK (((btrim(trigger) <> ''::text) AND (char_length(trigger) <= 500)))
+);
+
+
+--
+-- Name: start_agent_task_commands; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.start_agent_task_commands (
+    company_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    task_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: task_agent_instruction_notes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_agent_instruction_notes (
+    instruction_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    note_id uuid NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT task_agent_instruction_notes_position_check CHECK ((("position" >= 0) AND ("position" < 50)))
+);
+
+
+--
+-- Name: task_agent_instructions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_agent_instructions (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    requested_by_principal_id uuid NOT NULL,
+    requested_ownership_version bigint NOT NULL,
+    wake_outcome text NOT NULL,
+    consumed_execution_generation uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    consumed_at timestamp with time zone,
+    CONSTRAINT task_agent_instructions_consumption_check CHECK ((((consumed_execution_generation IS NULL) AND (consumed_at IS NULL)) OR ((consumed_execution_generation IS NOT NULL) AND (consumed_at IS NOT NULL)))),
+    CONSTRAINT task_agent_instructions_requested_ownership_version_check CHECK ((requested_ownership_version > 0)),
+    CONSTRAINT task_agent_instructions_wake_outcome_check CHECK ((wake_outcome = ANY (ARRAY['queued'::text, 'requeued'::text, 'parked'::text])))
+);
+
+
+--
+-- Name: task_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_attempts (
+    id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    attempt_number integer NOT NULL,
+    status text NOT NULL,
+    error text,
+    stop_reason text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    result jsonb,
+    started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    finished_at timestamp with time zone,
+    execution_generation uuid NOT NULL,
+    worker_id uuid NOT NULL,
+    machine_id text NOT NULL,
+    machine_region text,
+    CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
+    CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
+    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text]))),
+    CONSTRAINT task_attempts_token_check CHECK ((((prompt_tokens IS NULL) OR (prompt_tokens >= 0)) AND ((completion_tokens IS NULL) OR (completion_tokens >= 0))))
+);
+
+
+--
+-- Name: task_channel_targets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_channel_targets (
+    task_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    recipient_role text NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT task_channel_targets_position_check CHECK (("position" >= 0)),
+    CONSTRAINT task_channel_targets_role_check CHECK ((recipient_role = ANY (ARRAY['to'::text, 'cc'::text])))
+);
+
+
+--
+-- Name: task_outreach_replies; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_outreach_replies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    outreach_id uuid NOT NULL,
+    target_id uuid NOT NULL,
+    response_association_id uuid NOT NULL,
+    disposition text NOT NULL,
+    received_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT task_outreach_replies_disposition_check CHECK ((disposition = ANY (ARRAY['counted'::text, 'late'::text, 'duplicate'::text])))
+);
+
+
+--
+-- Name: task_outreach_targets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_outreach_targets (
+    outreach_id uuid NOT NULL,
+    email public.citext NOT NULL,
+    responded_at timestamp with time zone,
+    response_association_id uuid,
+    delivery_id uuid,
+    request_message_id uuid,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    target_kind text DEFAULT 'external'::text NOT NULL,
+    internal_channel_id uuid,
+    external_transport text,
+    external_namespace text,
+    external_subject text,
+    status text DEFAULT 'active'::text NOT NULL,
+    replaces_target_id uuid,
+    CONSTRAINT task_outreach_targets_identity_check CHECK ((((target_kind = 'internal_channel'::text) AND (internal_channel_id IS NOT NULL) AND (external_transport IS NULL) AND (external_namespace IS NULL) AND (external_subject IS NULL)) OR ((target_kind = 'external'::text) AND (internal_channel_id IS NULL) AND (external_transport IS NOT NULL) AND (external_namespace IS NOT NULL) AND (external_subject IS NOT NULL) AND (btrim(external_namespace) <> ''::text) AND (btrim(external_subject) <> ''::text)))),
+    CONSTRAINT task_outreach_targets_kind_check CHECK ((target_kind = ANY (ARRAY['internal_channel'::text, 'external'::text]))),
+    CONSTRAINT task_outreach_targets_response_check CHECK (((response_association_id IS NULL) OR (responded_at IS NOT NULL))),
+    CONSTRAINT task_outreach_targets_response_state_check CHECK ((((status = 'responded'::text) AND (responded_at IS NOT NULL) AND (response_association_id IS NOT NULL)) OR ((status <> 'responded'::text) AND (responded_at IS NULL) AND (response_association_id IS NULL)))),
+    CONSTRAINT task_outreach_targets_status_check CHECK ((status = ANY (ARRAY['active'::text, 'responded'::text, 'cancelled'::text, 'superseded'::text, 'expired'::text]))),
+    CONSTRAINT task_outreach_targets_transport_check CHECK (((external_transport IS NULL) OR (external_transport = ANY (ARRAY['email'::text, 'slack'::text]))))
+);
+
+
+--
+-- Name: task_outreaches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_outreaches (
+    id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    status text NOT NULL,
+    required_threshold_percent numeric(5,2) NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    outreach_key text NOT NULL,
+    subject text NOT NULL,
+    body text NOT NULL,
+    company_id uuid NOT NULL,
+    version bigint DEFAULT 1 NOT NULL,
+    created_by_principal_id uuid,
+    created_by_principal_kind text,
+    CONSTRAINT task_outreaches_body_check CHECK ((length(btrim(body)) > 0)),
+    CONSTRAINT task_outreaches_creator_shape_check CHECK ((((created_by_principal_id IS NULL) AND (created_by_principal_kind IS NULL)) OR ((created_by_principal_id IS NOT NULL) AND (created_by_principal_kind = 'agent'::text)))),
+    CONSTRAINT task_outreaches_expiry_check CHECK ((expires_at > created_at)),
+    CONSTRAINT task_outreaches_status_check CHECK ((status = ANY (ARRAY['waiting'::text, 'threshold_met'::text, 'timeout_pending_approval'::text, 'proceed_partial'::text, 'cancelled'::text, 'completed'::text]))),
+    CONSTRAINT task_outreaches_subject_check CHECK ((length(btrim(subject)) > 0)),
+    CONSTRAINT task_outreaches_threshold_check CHECK (((required_threshold_percent > (0)::numeric) AND (required_threshold_percent <= (100)::numeric))),
+    CONSTRAINT task_outreaches_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: task_ownership_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_ownership_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    task_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    sequence bigint NOT NULL,
+    from_version bigint NOT NULL,
+    to_version bigint NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    operation text NOT NULL,
+    actor_principal_id uuid,
+    actor_kind text NOT NULL,
+    previous_owner_principal_id uuid,
+    previous_owner_kind text,
+    previous_owner_label text,
+    new_owner_principal_id uuid,
+    new_owner_kind text,
+    new_owner_label text,
+    reason text NOT NULL,
+    reason_detail text,
+    handoff_instruction text,
+    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT task_ownership_events_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['system'::text, 'human'::text, 'agent'::text]))),
+    CONSTRAINT task_ownership_events_handoff_check CHECK (((handoff_instruction IS NULL) OR ((btrim(handoff_instruction) <> ''::text) AND (octet_length(handoff_instruction) <= 8192)))),
+    CONSTRAINT task_ownership_events_new_owner_check CHECK ((((new_owner_principal_id IS NULL) AND (new_owner_kind = 'unassigned'::text)) OR ((new_owner_principal_id IS NOT NULL) AND (new_owner_kind = ANY (ARRAY['human'::text, 'agent'::text]))))),
+    CONSTRAINT task_ownership_events_operation_check CHECK ((operation = ANY (ARRAY['initial_assignment'::text, 'claim'::text, 'assign'::text, 'transfer'::text, 'release'::text, 'owner_removed'::text]))),
+    CONSTRAINT task_ownership_events_previous_owner_check CHECK ((((previous_owner_principal_id IS NULL) AND (previous_owner_kind = 'unassigned'::text)) OR ((previous_owner_principal_id IS NOT NULL) AND (previous_owner_kind = ANY (ARRAY['human'::text, 'agent'::text]))))),
+    CONSTRAINT task_ownership_events_reason_check CHECK ((reason = ANY (ARRAY['initial_assignment'::text, 'self_claim'::text, 'manual_assignment'::text, 'delegated'::text, 'workload_rebalance'::text, 'owner_unavailable'::text, 'released'::text, 'owner_removed'::text]))),
+    CONSTRAINT task_ownership_events_reason_detail_check CHECK (((reason_detail IS NULL) OR (octet_length(reason_detail) <= 512))),
+    CONSTRAINT task_ownership_events_transfer_handoff_check CHECK ((((operation = 'transfer'::text) AND (handoff_instruction IS NOT NULL)) OR ((operation <> 'transfer'::text) AND (handoff_instruction IS NULL)))),
+    CONSTRAINT task_ownership_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1)) AND (sequence = to_version)))
+);
+
+
+--
+-- Name: task_status_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_status_events (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    correlation_id uuid NOT NULL,
+    sequence integer NOT NULL,
+    from_status text,
+    to_status text NOT NULL,
+    reason text NOT NULL,
+    actor_kind text NOT NULL,
+    actor_id uuid,
+    related_approval_id uuid,
+    related_outreach_id uuid,
+    retry_count integer NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    execution_generation uuid,
+    transitioned_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT task_status_events_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text]))),
+    CONSTRAINT task_status_events_from_status_check CHECK (((from_status IS NULL) OR (from_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))),
+    CONSTRAINT task_status_events_reason_check CHECK ((reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'unknown'::text]))),
+    CONSTRAINT task_status_events_related_source_check CHECK (((related_approval_id IS NULL) OR (related_outreach_id IS NULL))),
+    CONSTRAINT task_status_events_retry_count_check CHECK ((retry_count >= 0)),
+    CONSTRAINT task_status_events_sequence_check CHECK ((sequence > 0)),
+    CONSTRAINT task_status_events_to_status_check CHECK ((to_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))
+);
+
+
+--
+-- Name: thread_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.thread_messages (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    entry_kind text NOT NULL,
+    CONSTRAINT thread_messages_entry_kind_check CHECK ((entry_kind = ANY (ARRAY['conversation'::text, 'note'::text, 'delegation'::text, 'system_event'::text])))
+);
+
+
+--
+-- Name: thread_principals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.thread_principals (
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT thread_principals_role_check CHECK ((role = ANY (ARRAY['author'::text, 'participant'::text])))
+);
+
+
+--
+-- Name: threads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.threads (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    subject text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: user_login_methods; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_login_methods (
+    user_id uuid NOT NULL,
+    provider text NOT NULL,
+    provider_subject text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT user_login_methods_provider_check CHECK ((provider = ANY (ARRAY['password'::text, 'google'::text, 'apple'::text]))),
+    CONSTRAINT user_login_methods_subject_check CHECK ((((provider = 'password'::text) AND (provider_subject IS NULL)) OR ((provider = ANY (ARRAY['google'::text, 'apple'::text])) AND (provider_subject IS NOT NULL) AND (btrim(provider_subject) <> ''::text))))
+);
+
+
+--
+-- Name: user_notification_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_notification_preferences (
+    user_id uuid NOT NULL,
+    assignment_email_enabled boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    response_review_email_enabled boolean DEFAULT true NOT NULL,
+    delegation_timeout_email_enabled boolean DEFAULT true NOT NULL,
+    task_failure_email_enabled boolean DEFAULT true NOT NULL,
+    delivery_failure_email_enabled boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id uuid NOT NULL,
+    username public.citext NOT NULL,
+    email public.citext NOT NULL,
+    password_hash text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    avatar_url text,
+    CONSTRAINT users_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
+    CONSTRAINT users_email_not_blank CHECK ((btrim((email)::text) <> ''::text)),
+    CONSTRAINT users_username_not_blank CHECK ((btrim((username)::text) <> ''::text))
+);
+
+
+--
+-- Name: agent_channel_provisions agent_channel_provisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_channel_provisions
+    ADD CONSTRAINT agent_channel_provisions_pkey PRIMARY KEY (task_id, request_hash);
+
+
+--
+-- Name: agent_skills agent_skills_agent_position_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_skills
+    ADD CONSTRAINT agent_skills_agent_position_key UNIQUE (agent_id, "position");
+
+
+--
+-- Name: agent_skills agent_skills_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_skills
+    ADD CONSTRAINT agent_skills_pkey PRIMARY KEY (agent_id, skill_id);
+
+
+--
+-- Name: agent_sub_agents agent_sub_agents_agent_position_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sub_agents
+    ADD CONSTRAINT agent_sub_agents_agent_position_key UNIQUE (agent_id, "position");
+
+
+--
+-- Name: agent_sub_agents agent_sub_agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sub_agents
+    ADD CONSTRAINT agent_sub_agents_pkey PRIMARY KEY (agent_id, sub_agent_id);
+
+
+--
+-- Name: agents agents_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: agents agents_company_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug);
+
+
+--
+-- Name: agents agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: attention_source_events attention_source_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attention_source_events
+    ADD CONSTRAINT attention_source_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: attention_source_events attention_source_events_source_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attention_source_events
+    ADD CONSTRAINT attention_source_events_source_command_key UNIQUE (company_id, source_kind, source_id, command_id);
+
+
+--
+-- Name: background_tasks background_tasks_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: background_tasks background_tasks_company_source_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_company_source_message_key UNIQUE (company_id, source_message_uuid);
+
+
+--
+-- Name: background_tasks background_tasks_company_source_schedule_run_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_company_source_schedule_run_key UNIQUE (company_id, source_schedule_run_id);
+
+
+--
+-- Name: background_tasks background_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: binding_audit_events binding_audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.binding_audit_events
+    ADD CONSTRAINT binding_audit_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: channel_agents channel_agents_channel_position_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_agents
+    ADD CONSTRAINT channel_agents_channel_position_key UNIQUE (channel_id, "position");
+
+
+--
+-- Name: channel_agents channel_agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_agents
+    ADD CONSTRAINT channel_agents_pkey PRIMARY KEY (channel_id, agent_id);
+
+
+--
+-- Name: channel_bindings channel_bindings_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: channel_bindings channel_bindings_company_transport_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_company_transport_key UNIQUE (company_id, id, transport);
+
+
+--
+-- Name: channel_bindings channel_bindings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: channel_principal_grants channel_principal_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_principal_grants
+    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability);
+
+
+--
+-- Name: channel_schedules channel_schedules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_schedules
+    ADD CONSTRAINT channel_schedules_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: channel_slugs channel_slugs_company_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_slugs
+    ADD CONSTRAINT channel_slugs_company_slug_key UNIQUE (company_id, slug);
+
+
+--
+-- Name: channel_slugs channel_slugs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_slugs
+    ADD CONSTRAINT channel_slugs_pkey PRIMARY KEY (channel_id, slug);
+
+
+--
+-- Name: channels channels_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: channels channels_owner_agent_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_owner_agent_key UNIQUE (owner_agent_id);
+
+
+--
+-- Name: channels channels_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: companies companies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.companies
+    ADD CONSTRAINT companies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: companies companies_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.companies
+    ADD CONSTRAINT companies_slug_key UNIQUE (slug);
+
+
+--
+-- Name: company_invites company_invites_company_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_invites
+    ADD CONSTRAINT company_invites_company_email_key UNIQUE (company_id, email);
+
+
+--
+-- Name: company_invites company_invites_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_invites
+    ADD CONSTRAINT company_invites_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: company_members company_members_company_user_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_members
+    ADD CONSTRAINT company_members_company_user_key UNIQUE (company_id, user_id);
+
+
+--
+-- Name: company_members company_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_members
+    ADD CONSTRAINT company_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: company_model_connections company_model_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_model_connections
+    ADD CONSTRAINT company_model_connections_pkey PRIMARY KEY (company_id, provider);
+
+
+--
+-- Name: company_resend_api_integrations company_resend_api_integrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_resend_api_integrations
+    ADD CONSTRAINT company_resend_api_integrations_pkey PRIMARY KEY (company_id);
+
+
+--
+-- Name: company_resend_api_integrations company_resend_api_integrations_webhook_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_resend_api_integrations
+    ADD CONSTRAINT company_resend_api_integrations_webhook_token_key UNIQUE (webhook_token);
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_task_command_key UNIQUE (task_id, command_id);
+
+
+--
+-- Name: email_message_metadata email_message_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_message_metadata
+    ADD CONSTRAINT email_message_metadata_pkey PRIMARY KEY (message_id);
+
+
+--
+-- Name: external_messages external_messages_binding_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_binding_key_key UNIQUE (binding_id, external_message_key);
+
+
+--
+-- Name: external_messages external_messages_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: external_messages external_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: external_threads external_threads_binding_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_threads
+    ADD CONSTRAINT external_threads_binding_key_key UNIQUE (binding_id, external_thread_key);
+
+
+--
+-- Name: external_threads external_threads_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_threads
+    ADD CONSTRAINT external_threads_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: external_threads external_threads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_threads
+    ADD CONSTRAINT external_threads_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: human_approvals human_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: human_approvals human_approvals_thread_step_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_thread_step_key UNIQUE (company_id, channel_id, thread_id, step_key);
+
+
+--
+-- Name: human_approvals human_approvals_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_token_key UNIQUE (token);
+
+
+--
+-- Name: human_task_completions human_task_completions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_task_completions
+    ADD CONSTRAINT human_task_completions_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: human_task_completions human_task_completions_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_task_completions
+    ADD CONSTRAINT human_task_completions_task_command_key UNIQUE (task_id, command_id);
+
+
+--
+-- Name: inbound_events inbound_events_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inbound_events
+    ADD CONSTRAINT inbound_events_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: inbound_events inbound_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inbound_events
+    ADD CONSTRAINT inbound_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: inbound_events inbound_events_transport_external_event_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inbound_events
+    ADD CONSTRAINT inbound_events_transport_external_event_key UNIQUE (transport, external_event_key);
+
+
+--
+-- Name: integration_credentials integration_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_credentials
+    ADD CONSTRAINT integration_credentials_pkey PRIMARY KEY (company_id, installation_id, credential_kind);
+
+
+--
+-- Name: integration_installations integration_installations_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_installations
+    ADD CONSTRAINT integration_installations_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: integration_installations integration_installations_company_transport_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_installations
+    ADD CONSTRAINT integration_installations_company_transport_key UNIQUE (company_id, id, transport);
+
+
+--
+-- Name: integration_installations integration_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_installations
+    ADD CONSTRAINT integration_installations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: integration_installations integration_installations_tenant_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_installations
+    ADD CONSTRAINT integration_installations_tenant_key UNIQUE (transport, external_tenant_key);
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_company_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_note_tombstones
+    ADD CONSTRAINT internal_note_tombstones_company_command_key UNIQUE (company_id, command_id);
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_note_tombstones
+    ADD CONSTRAINT internal_note_tombstones_pkey PRIMARY KEY (note_id);
+
+
+--
+-- Name: internal_notes internal_notes_company_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_company_command_key UNIQUE (company_id, command_id);
+
+
+--
+-- Name: internal_notes internal_notes_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: internal_notes internal_notes_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_message_key UNIQUE (company_id, message_id);
+
+
+--
+-- Name: internal_notes internal_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: internal_notes internal_notes_supersedes_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_supersedes_key UNIQUE (supersedes_note_id);
+
+
+--
+-- Name: manual_handoffs manual_handoffs_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: manual_handoffs manual_handoffs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: memory_cleanup_jobs memory_cleanup_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_cleanup_jobs
+    ADD CONSTRAINT memory_cleanup_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: memory_cleanup_jobs memory_cleanup_jobs_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_cleanup_jobs
+    ADD CONSTRAINT memory_cleanup_jobs_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
+
+
+--
+-- Name: memory_provider_connections memory_provider_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provider_connections
+    ADD CONSTRAINT memory_provider_connections_pkey PRIMARY KEY (company_id, provider);
+
+
+--
+-- Name: memory_provider_connections memory_provider_connections_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provider_connections
+    ADD CONSTRAINT memory_provider_connections_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_jobs_company_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provisioning_jobs
+    ADD CONSTRAINT memory_provisioning_jobs_company_id_provider_key UNIQUE (company_id, provider);
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provisioning_jobs
+    ADD CONSTRAINT memory_provisioning_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_jobs_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provisioning_jobs
+    ADD CONSTRAINT memory_provisioning_jobs_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
+
+
+--
+-- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_company_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_remote_resource_lifecycles
+    ADD CONSTRAINT memory_remote_resource_lifecycles_company_id_provider_key UNIQUE (company_id, provider);
+
+
+--
+-- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_remote_resource_lifecycles
+    ADD CONSTRAINT memory_remote_resource_lifecycles_pkey PRIMARY KEY (provider, remote_database_id);
+
+
+--
+-- Name: message_deliveries message_deliveries_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: message_deliveries message_deliveries_destination_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_destination_key_key UNIQUE (destination_binding_id, idempotency_key);
+
+
+--
+-- Name: message_deliveries message_deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_delivery_index_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_delivery_index_key UNIQUE (delivery_id, part_index);
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_delivery_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_delivery_key_key UNIQUE (delivery_id, part_key);
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: message_participants message_participants_identity_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_participants
+    ADD CONSTRAINT message_participants_identity_kind_key UNIQUE (message_id, kind, participant_identity_id);
+
+
+--
+-- Name: message_participants message_participants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_participants
+    ADD CONSTRAINT message_participants_pkey PRIMARY KEY (message_id, kind, "position");
+
+
+--
+-- Name: messages messages_company_id_id_audience_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_company_id_id_audience_key UNIQUE (company_id, id, audience);
+
+
+--
+-- Name: messages messages_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notification_events notification_events_identity_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_identity_key UNIQUE (company_id, source_kind, source_id, action_kind, source_generation);
+
+
+--
+-- Name: notification_events notification_events_notification_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_notification_id_key UNIQUE (notification_id);
+
+
+--
+-- Name: notification_events notification_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notifications notifications_email_delivery_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_email_delivery_key UNIQUE (email_delivery_id);
+
+
+--
+-- Name: notifications notifications_identity_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_identity_key UNIQUE (company_id, recipient_user_id, source_kind, source_id, action_kind, source_generation);
+
+
+--
+-- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: participant_identities participant_identities_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.participant_identities
+    ADD CONSTRAINT participant_identities_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: participant_identities participant_identities_company_principal_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.participant_identities
+    ADD CONSTRAINT participant_identities_company_principal_id_key UNIQUE (company_id, principal_id, id);
+
+
+--
+-- Name: participant_identities participant_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.participant_identities
+    ADD CONSTRAINT participant_identities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: participant_identities participant_identities_qualified_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.participant_identities
+    ADD CONSTRAINT participant_identities_qualified_key UNIQUE (company_id, transport, namespace, subject);
+
+
+--
+-- Name: pending_account_changes pending_account_changes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pending_account_changes
+    ADD CONSTRAINT pending_account_changes_pkey PRIMARY KEY (user_id, kind);
+
+
+--
+-- Name: pending_user_registrations pending_user_registrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pending_user_registrations
+    ADD CONSTRAINT pending_user_registrations_pkey PRIMARY KEY (email);
+
+
+--
+-- Name: principals principals_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: principals principals_company_id_id_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_company_id_id_kind_key UNIQUE (company_id, id, kind);
+
+
+--
+-- Name: principals principals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: response_draft_evidence response_draft_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_evidence
+    ADD CONSTRAINT response_draft_evidence_pkey PRIMARY KEY (draft_id, draft_version, id);
+
+
+--
+-- Name: response_draft_evidence response_draft_evidence_position_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_evidence
+    ADD CONSTRAINT response_draft_evidence_position_key UNIQUE (draft_id, draft_version, "position");
+
+
+--
+-- Name: response_draft_publications response_draft_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_publications
+    ADD CONSTRAINT response_draft_publications_pkey PRIMARY KEY (draft_id);
+
+
+--
+-- Name: response_drafts response_drafts_company_id_id_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_company_id_id_version_key UNIQUE (company_id, id, version);
+
+
+--
+-- Name: response_drafts response_drafts_company_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_company_message_key UNIQUE (company_id, proposed_message_id);
+
+
+--
+-- Name: response_drafts response_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_pkey PRIMARY KEY (id, version);
+
+
+--
+-- Name: response_review_commands response_review_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_review_commands
+    ADD CONSTRAINT response_review_commands_pkey PRIMARY KEY (company_id, command_id);
+
+
+--
+-- Name: response_reviews response_reviews_company_id_draft_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_company_id_draft_key UNIQUE (company_id, draft_id, draft_version);
+
+
+--
+-- Name: response_reviews response_reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_pkey PRIMARY KEY (draft_id, draft_version);
+
+
+--
+-- Name: runtime_metric_samples runtime_metric_samples_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runtime_metric_samples
+    ADD CONSTRAINT runtime_metric_samples_pkey PRIMARY KEY (machine_id, sampled_at);
+
+
+--
+-- Name: CONSTRAINT runtime_metric_samples_pkey ON runtime_metric_samples; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON CONSTRAINT runtime_metric_samples_pkey ON public.runtime_metric_samples IS 'Supports runtime history reads on (machine_id, sampled_at)';
+
+
+--
+-- Name: schedule_runs schedule_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_runs
+    ADD CONSTRAINT schedule_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_runs schedule_runs_schedule_slot_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_runs
+    ADD CONSTRAINT schedule_runs_schedule_slot_key UNIQUE (schedule_id, scheduled_for);
+
+
+--
+-- Name: skills skills_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: skills skills_company_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_company_slug_key UNIQUE (company_id, slug);
+
+
+--
+-- Name: skills skills_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: start_agent_task_commands start_agent_task_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.start_agent_task_commands
+    ADD CONSTRAINT start_agent_task_commands_pkey PRIMARY KEY (company_id, command_id);
+
+
+--
+-- Name: task_agent_instruction_notes task_agent_instruction_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instruction_notes
+    ADD CONSTRAINT task_agent_instruction_notes_pkey PRIMARY KEY (instruction_id, note_id);
+
+
+--
+-- Name: task_agent_instruction_notes task_agent_instruction_notes_position_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instruction_notes
+    ADD CONSTRAINT task_agent_instruction_notes_position_key UNIQUE (instruction_id, "position");
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_company_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instructions
+    ADD CONSTRAINT task_agent_instructions_company_command_key UNIQUE (company_id, command_id);
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instructions
+    ADD CONSTRAINT task_agent_instructions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_attempts task_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_attempts
+    ADD CONSTRAINT task_attempts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_attempts task_attempts_task_attempt_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_attempts
+    ADD CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number);
+
+
+--
+-- Name: task_channel_targets task_channel_targets_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_channel_targets
+    ADD CONSTRAINT task_channel_targets_channel_key UNIQUE (task_id, channel_id);
+
+
+--
+-- Name: task_channel_targets task_channel_targets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_channel_targets
+    ADD CONSTRAINT task_channel_targets_pkey PRIMARY KEY (task_id, "position");
+
+
+--
+-- Name: task_outreach_replies task_outreach_replies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_replies
+    ADD CONSTRAINT task_outreach_replies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_outreach_replies task_outreach_replies_response_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_replies
+    ADD CONSTRAINT task_outreach_replies_response_key UNIQUE (response_association_id);
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_company_outreach_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_company_outreach_id_key UNIQUE (company_id, outreach_id, id);
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_pkey PRIMARY KEY (outreach_id, email);
+
+
+--
+-- Name: task_outreaches task_outreaches_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: task_outreaches task_outreaches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_outreaches task_outreaches_task_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_task_key UNIQUE (task_id, outreach_key);
+
+
+--
+-- Name: task_ownership_events task_ownership_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_ownership_events
+    ADD CONSTRAINT task_ownership_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_ownership_events task_ownership_events_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_ownership_events
+    ADD CONSTRAINT task_ownership_events_task_command_key UNIQUE (task_id, command_id);
+
+
+--
+-- Name: task_ownership_events task_ownership_events_task_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_ownership_events
+    ADD CONSTRAINT task_ownership_events_task_sequence_key UNIQUE (task_id, sequence);
+
+
+--
+-- Name: task_status_events task_status_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_status_events
+    ADD CONSTRAINT task_status_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_status_events task_status_events_task_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_status_events
+    ADD CONSTRAINT task_status_events_task_sequence_key UNIQUE (task_id, sequence);
+
+
+--
+-- Name: thread_messages thread_messages_channel_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_channel_message_key UNIQUE (channel_id, message_id);
+
+
+--
+-- Name: thread_messages thread_messages_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: thread_messages thread_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: thread_messages thread_messages_thread_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_thread_message_key UNIQUE (thread_id, message_id);
+
+
+--
+-- Name: thread_principals thread_principals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_principals
+    ADD CONSTRAINT thread_principals_pkey PRIMARY KEY (company_id, channel_id, thread_id, principal_id, role);
+
+
+--
+-- Name: threads threads_channel_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_channel_id_key UNIQUE (channel_id, id);
+
+
+--
+-- Name: threads threads_company_channel_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_company_channel_id_key UNIQUE (company_id, channel_id, id);
+
+
+--
+-- Name: threads threads_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: threads threads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_login_methods user_login_methods_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_login_methods
+    ADD CONSTRAINT user_login_methods_pkey PRIMARY KEY (user_id, provider);
+
+
+--
+-- Name: user_notification_preferences user_notification_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_notification_preferences
+    ADD CONSTRAINT user_notification_preferences_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: agent_skills_skill_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_skills_skill_idx ON public.agent_skills USING btree (skill_id, agent_id);
+
+
+--
+-- Name: agent_sub_agents_sub_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_sub_agents_sub_idx ON public.agent_sub_agents USING btree (sub_agent_id, agent_id);
+
+
+--
+-- Name: agents_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agents_company_created_idx ON public.agents USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: agents_library_slug_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agents_library_slug_key ON public.agents USING btree (slug) WHERE (company_id IS NULL);
+
+
+--
+-- Name: background_tasks_company_channel_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_company_channel_created_idx ON public.background_tasks USING btree (company_id, channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: background_tasks_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_company_created_idx ON public.background_tasks USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: background_tasks_company_status_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_company_status_created_idx ON public.background_tasks USING btree (company_id, status, created_at DESC, id DESC);
+
+
+--
+-- Name: background_tasks_company_updated_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_company_updated_idx ON public.background_tasks USING btree (company_id, updated_at DESC);
+
+
+--
+-- Name: background_tasks_correlation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_correlation_idx ON public.background_tasks USING btree (correlation_id, created_at);
+
+
+--
+-- Name: background_tasks_pending_ready_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks USING btree (run_at, created_at, id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: background_tasks_processing_lease_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_processing_lease_idx ON public.background_tasks USING btree (lock_expires_at, id) WHERE (status = 'processing'::text);
+
+
+--
+-- Name: background_tasks_schedule_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_schedule_idx ON public.background_tasks USING btree (((payload ->> 'schedule_id'::text))) WHERE (task_type = 'scheduled_agent_run'::text);
+
+
+--
+-- Name: background_tasks_thread_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_thread_idx ON public.background_tasks USING btree (thread_id) WHERE (thread_id IS NOT NULL);
+
+
+--
+-- Name: background_tasks_waiting_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_waiting_due_idx ON public.background_tasks USING btree (wait_expires_at, id) WHERE ((status = 'waiting_for_third_party_reply'::text) AND (wait_expires_at IS NOT NULL));
+
+
+--
+-- Name: binding_audit_events_binding_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX binding_audit_events_binding_idx ON public.binding_audit_events USING btree (company_id, binding_id, created_at DESC, id DESC);
+
+
+--
+-- Name: channel_agents_agent_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_agents_agent_idx ON public.channel_agents USING btree (agent_id, channel_id);
+
+
+--
+-- Name: channel_bindings_canonical_deployment_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channel_bindings_canonical_deployment_idx ON public.channel_bindings USING btree (company_id, channel_id, transport) WHERE ((installation_id IS NULL) AND (status = ANY (ARRAY['active'::text, 'paused'::text])));
+
+
+--
+-- Name: channel_bindings_channel_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_bindings_channel_idx ON public.channel_bindings USING btree (company_id, channel_id, transport, status);
+
+
+--
+-- Name: channel_bindings_deployment_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channel_bindings_deployment_endpoint_idx ON public.channel_bindings USING btree (transport, namespace, external_endpoint_key) WHERE ((installation_id IS NULL) AND (status = ANY (ARRAY['active'::text, 'paused'::text])));
+
+
+--
+-- Name: channel_bindings_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_bindings_installation_idx ON public.channel_bindings USING btree (installation_id, status) WHERE (installation_id IS NOT NULL);
+
+
+--
+-- Name: channel_bindings_installed_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channel_bindings_installed_endpoint_idx ON public.channel_bindings USING btree (installation_id, transport, namespace, external_endpoint_key) WHERE ((installation_id IS NOT NULL) AND (status = ANY (ARRAY['active'::text, 'paused'::text])));
+
+
+--
+-- Name: channel_principal_grants_principal_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_principal_grants_principal_idx ON public.channel_principal_grants USING btree (company_id, principal_id, channel_id, capability);
+
+
+--
+-- Name: channel_schedules_channel_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_schedules_channel_idx ON public.channel_schedules USING btree (channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: channel_schedules_company_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_schedules_company_idx ON public.channel_schedules USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: channel_schedules_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_schedules_due_idx ON public.channel_schedules USING btree (next_run_at, id) WHERE ((enabled = true) AND (next_run_at IS NOT NULL));
+
+
+--
+-- Name: channel_slugs_primary_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channel_slugs_primary_idx ON public.channel_slugs USING btree (channel_id) WHERE is_primary;
+
+
+--
+-- Name: channels_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channels_company_created_idx ON public.channels USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: companies_user_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX companies_user_created_idx ON public.companies USING btree (user_id, created_at DESC, id DESC);
+
+
+--
+-- Name: company_invites_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_invites_company_created_idx ON public.company_invites USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: company_invites_email_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_invites_email_created_idx ON public.company_invites USING btree (email, created_at DESC, id DESC);
+
+
+--
+-- Name: company_members_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_members_company_created_idx ON public.company_members USING btree (company_id, created_at, id);
+
+
+--
+-- Name: company_members_one_owner_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX company_members_one_owner_idx ON public.company_members USING btree (company_id) WHERE (role = 'owner'::text);
+
+
+--
+-- Name: company_members_user_company_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_members_user_company_idx ON public.company_members USING btree (user_id, company_id);
+
+
+--
+-- Name: company_model_connections_one_default_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_model_connections USING btree (company_id) WHERE is_default;
+
+
+--
+-- Name: delegation_control_commands_outreach_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX delegation_control_commands_outreach_idx ON public.delegation_control_commands USING btree (outreach_id, occurred_at, id);
+
+
+--
+-- Name: email_message_metadata_company_rfc_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX email_message_metadata_company_rfc_idx ON public.email_message_metadata USING btree (company_id, rfc_message_id);
+
+
+--
+-- Name: email_message_metadata_in_reply_to_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX email_message_metadata_in_reply_to_idx ON public.email_message_metadata USING btree (company_id, in_reply_to) WHERE (in_reply_to IS NOT NULL);
+
+
+--
+-- Name: email_message_metadata_thread_index_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX email_message_metadata_thread_index_idx ON public.email_message_metadata USING btree (company_id, thread_index) WHERE (thread_index IS NOT NULL);
+
+
+--
+-- Name: external_messages_delivery_part_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX external_messages_delivery_part_idx ON public.external_messages USING btree (delivery_part_id) WHERE (delivery_part_id IS NOT NULL);
+
+
+--
+-- Name: external_messages_message_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX external_messages_message_idx ON public.external_messages USING btree (company_id, message_id, binding_id);
+
+
+--
+-- Name: external_threads_thread_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX external_threads_thread_idx ON public.external_threads USING btree (company_id, thread_id, binding_id);
+
+
+--
+-- Name: human_approvals_channel_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX human_approvals_channel_created_idx ON public.human_approvals USING btree (company_id, channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: human_approvals_pending_expiry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX human_approvals_pending_expiry_idx ON public.human_approvals USING btree (expires_at, id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: human_approvals_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX human_approvals_task_idx ON public.human_approvals USING btree (task_id) WHERE (task_id IS NOT NULL);
+
+
+--
+-- Name: inbound_events_claimable_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inbound_events_claimable_idx ON public.inbound_events USING btree (available_at, received_at, id) WHERE (status = ANY (ARRAY['pending'::text, 'retryable'::text]));
+
+
+--
+-- Name: inbound_events_company_installation_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inbound_events_company_installation_created_idx ON public.inbound_events USING btree (company_id, installation_id, created_at DESC, id DESC);
+
+
+--
+-- Name: inbound_events_processed_retention_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inbound_events_processed_retention_idx ON public.inbound_events USING btree (status, processed_at, id) WHERE (status = ANY (ARRAY['completed'::text, 'ignored'::text, 'dead_letter'::text]));
+
+
+--
+-- Name: inbound_events_processing_lease_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inbound_events_processing_lease_idx ON public.inbound_events USING btree (lock_expires_at, id) WHERE (status = 'processing'::text);
+
+
+--
+-- Name: integration_installations_company_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX integration_installations_company_idx ON public.integration_installations USING btree (company_id, transport, installed_at DESC, id DESC);
+
+
+--
+-- Name: memory_cleanup_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX memory_cleanup_jobs_due_idx ON public.memory_cleanup_jobs USING btree (available_at, created_at, id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: memory_provisioning_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX memory_provisioning_jobs_due_idx ON public.memory_provisioning_jobs USING btree ((
+CASE phase
+    WHEN 'waiting_ready'::text THEN next_poll_at
+    ELSE available_at
+END), created_at, id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: message_deliveries_claimable_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_claimable_idx ON public.message_deliveries USING btree (available_at, id) WHERE (status = ANY (ARRAY['pending'::text, 'retryable'::text]));
+
+
+--
+-- Name: message_deliveries_company_channel_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_company_channel_created_idx ON public.message_deliveries USING btree (company_id, channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: message_deliveries_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_company_created_idx ON public.message_deliveries USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: message_deliveries_company_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_company_status_idx ON public.message_deliveries USING btree (company_id, status);
+
+
+--
+-- Name: message_deliveries_company_updated_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_company_updated_idx ON public.message_deliveries USING btree (company_id, updated_at DESC);
+
+
+--
+-- Name: message_deliveries_correlation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_correlation_idx ON public.message_deliveries USING btree (correlation_id, created_at);
+
+
+--
+-- Name: message_deliveries_dependency_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_dependency_idx ON public.message_deliveries USING btree (depends_on_delivery_id) WHERE (depends_on_delivery_id IS NOT NULL);
+
+
+--
+-- Name: message_deliveries_message_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_message_idx ON public.message_deliveries USING btree (company_id, message_id);
+
+
+--
+-- Name: message_deliveries_sending_lease_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_sending_lease_idx ON public.message_deliveries USING btree (lock_expires_at, id) WHERE (status = 'sending'::text);
+
+
+--
+-- Name: message_deliveries_standalone_key_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX message_deliveries_standalone_key_key ON public.message_deliveries USING btree (transport, idempotency_key) WHERE (destination_binding_id IS NULL);
+
+
+--
+-- Name: message_deliveries_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_deliveries_task_idx ON public.message_deliveries USING btree (task_id) WHERE (task_id IS NOT NULL);
+
+
+--
+-- Name: message_delivery_parts_delivery_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_delivery_parts_delivery_idx ON public.message_delivery_parts USING btree (delivery_id, part_index);
+
+
+--
+-- Name: message_delivery_parts_provider_key_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX message_delivery_parts_provider_key_idx ON public.message_delivery_parts USING btree (company_id, provider_message_key) WHERE (provider_message_key IS NOT NULL);
+
+
+--
+-- Name: message_delivery_parts_unfinished_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_delivery_parts_unfinished_idx ON public.message_delivery_parts USING btree (delivery_id, part_index) WHERE (status = ANY (ARRAY['prepared'::text, 'retryable'::text]));
+
+
+--
+-- Name: message_participants_identity_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX message_participants_identity_idx ON public.message_participants USING btree (company_id, participant_identity_id, message_id);
+
+
+--
+-- Name: messages_author_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX messages_author_idx ON public.messages USING btree (company_id, author_principal_id);
+
+
+--
+-- Name: messages_company_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX messages_company_created_idx ON public.messages USING btree (company_id, created_at DESC, id DESC);
+
+
+--
+-- Name: notification_events_claimable_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notification_events_claimable_idx ON public.notification_events USING btree (available_at, occurred_at, id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: notification_events_processing_lease_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notification_events_processing_lease_idx ON public.notification_events USING btree (lock_expires_at, id) WHERE (status = 'processing'::text);
+
+
+--
+-- Name: notification_events_source_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notification_events_source_idx ON public.notification_events USING btree (company_id, source_kind, source_id, action_kind, source_generation DESC);
+
+
+--
+-- Name: notifications_active_age_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_active_age_idx ON public.notifications USING btree (created_at, id) WHERE (state = 'active'::text);
+
+
+--
+-- Name: notifications_one_active_action_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX notifications_one_active_action_idx ON public.notifications USING btree (company_id, recipient_user_id, source_kind, source_id, action_kind) WHERE (state = 'active'::text);
+
+
+--
+-- Name: notifications_recipient_list_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_recipient_list_idx ON public.notifications USING btree (company_id, recipient_user_id, state, created_at DESC, id DESC);
+
+
+--
+-- Name: participant_identities_principal_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX participant_identities_principal_idx ON public.participant_identities USING btree (company_id, principal_id, created_at, id);
+
+
+--
+-- Name: pending_user_registrations_username_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX pending_user_registrations_username_key ON public.pending_user_registrations USING btree (username);
+
+
+--
+-- Name: principals_company_agent_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX principals_company_agent_key ON public.principals USING btree (company_id, agent_id) WHERE (agent_id IS NOT NULL);
+
+
+--
+-- Name: principals_company_system_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX principals_company_system_key ON public.principals USING btree (company_id) WHERE (kind = 'system'::text);
+
+
+--
+-- Name: principals_company_user_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX principals_company_user_key ON public.principals USING btree (company_id, user_id) WHERE (user_id IS NOT NULL);
+
+
+--
+-- Name: response_drafts_one_pending_version_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX response_drafts_one_pending_version_idx ON public.response_drafts USING btree (id) WHERE (status = 'pending_review'::text);
+
+
+--
+-- Name: response_drafts_reviewer_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX response_drafts_reviewer_pending_idx ON public.response_drafts USING btree (company_id, reviewer_principal_id, created_at, id) WHERE (status = 'pending_review'::text);
+
+
+--
+-- Name: response_drafts_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX response_drafts_scope_idx ON public.response_drafts USING btree (company_id, channel_id, thread_id, id, version DESC);
+
+
+--
+-- Name: response_reviews_pending_expiry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX response_reviews_pending_expiry_idx ON public.response_reviews USING btree (expires_at, draft_id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: schedule_runs_materialization_expired_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_runs_materialization_expired_idx ON public.schedule_runs USING btree (materialization_lock_expires_at, created_at, id) WHERE (materialization_status = 'materializing'::text);
+
+
+--
+-- Name: schedule_runs_materialization_ready_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_runs_materialization_ready_idx ON public.schedule_runs USING btree (materialization_available_at, created_at, id) WHERE (materialization_status = 'pending'::text);
+
+
+--
+-- Name: schedule_runs_schedule_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_runs_schedule_created_idx ON public.schedule_runs USING btree (schedule_id, created_at DESC, id DESC);
+
+
+--
+-- Name: skills_library_slug_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX skills_library_slug_key ON public.skills USING btree (slug) WHERE (company_id IS NULL);
+
+
+--
+-- Name: task_channel_targets_channel_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_channel_targets_channel_task_idx ON public.task_channel_targets USING btree (company_id, channel_id, task_id);
+
+
+--
+-- Name: task_channel_targets_thread_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_channel_targets_thread_idx ON public.task_channel_targets USING btree (company_id, channel_id, thread_id);
+
+
+--
+-- Name: task_outreach_replies_target_received_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreach_replies_target_received_idx ON public.task_outreach_replies USING btree (target_id, received_at, id);
+
+
+--
+-- Name: task_outreach_targets_delivery_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX task_outreach_targets_delivery_idx ON public.task_outreach_targets USING btree (delivery_id) WHERE (delivery_id IS NOT NULL);
+
+
+--
+-- Name: task_outreach_targets_email_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreach_targets_email_waiting_idx ON public.task_outreach_targets USING btree (email, outreach_id) WHERE (responded_at IS NULL);
+
+
+--
+-- Name: task_outreach_targets_request_message_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreach_targets_request_message_idx ON public.task_outreach_targets USING btree (request_message_id) WHERE (request_message_id IS NOT NULL);
+
+
+--
+-- Name: task_outreach_targets_response_association_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreach_targets_response_association_idx ON public.task_outreach_targets USING btree (response_association_id) WHERE (response_association_id IS NOT NULL);
+
+
+--
+-- Name: task_outreaches_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreaches_due_idx ON public.task_outreaches USING btree (expires_at, id) WHERE ((status = 'waiting'::text) AND (expires_at IS NOT NULL));
+
+
+--
+-- Name: task_outreaches_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreaches_task_idx ON public.task_outreaches USING btree (task_id);
+
+
+--
+-- Name: task_outreaches_task_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_outreaches_task_status_idx ON public.task_outreaches USING btree (task_id, status);
+
+
+--
+-- Name: task_status_events_company_correlation_timeline_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_status_events_company_correlation_timeline_idx ON public.task_status_events USING btree (company_id, correlation_id, transitioned_at, task_id, sequence, id);
+
+
+--
+-- Name: task_status_events_task_history_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_status_events_task_history_idx ON public.task_status_events USING btree (task_id, transitioned_at, sequence, id);
+
+
+--
+-- Name: thread_messages_message_thread_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX thread_messages_message_thread_idx ON public.thread_messages USING btree (message_id, thread_id);
+
+
+--
+-- Name: thread_messages_thread_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX thread_messages_thread_created_idx ON public.thread_messages USING btree (thread_id, created_at, id);
+
+
+--
+-- Name: thread_principals_principal_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX thread_principals_principal_idx ON public.thread_principals USING btree (company_id, principal_id, thread_id, role);
+
+
+--
+-- Name: threads_channel_updated_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX threads_channel_updated_idx ON public.threads USING btree (channel_id, updated_at DESC, id DESC);
+
+
+--
+-- Name: user_login_methods_provider_subject_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX user_login_methods_provider_subject_key ON public.user_login_methods USING btree (provider, provider_subject) WHERE (provider_subject IS NOT NULL);
+
+
+--
+-- Name: notifications actionable_notifications_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER actionable_notifications_notify AFTER INSERT OR UPDATE OF state, read_at ON public.notifications FOR EACH ROW EXECUTE FUNCTION public.notify_actionable_notification_changed();
+
+
+--
+-- Name: agent_skills agent_skills_scope_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER agent_skills_scope_check BEFORE INSERT OR UPDATE ON public.agent_skills FOR EACH ROW EXECUTE FUNCTION public.enforce_agent_skill_scope();
+
+
+--
+-- Name: attention_source_events attention_source_events_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER attention_source_events_immutable BEFORE DELETE OR UPDATE ON public.attention_source_events FOR EACH ROW EXECUTE FUNCTION public.attention_source_events_are_immutable();
+
+
+--
+-- Name: background_tasks background_tasks_bump_attention_version; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_bump_attention_version BEFORE UPDATE OF owner_principal_id, owner_principal_kind ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.bump_task_attention_version_for_owner_change();
+
+
+--
+-- Name: background_tasks background_tasks_initialize_ownership; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_initialize_ownership BEFORE INSERT ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.initialize_task_ownership();
+
+
+--
+-- Name: background_tasks background_tasks_notify_activity; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_notify_activity AFTER INSERT OR UPDATE OF status ON public.background_tasks FOR EACH ROW WHEN ((new.thread_id IS NOT NULL)) EXECUTE FUNCTION public.notify_thread_activity();
+
+
+--
+-- Name: background_tasks background_tasks_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, owner_principal_id, owner_principal_kind, business_priority, business_due_at, attention_version ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('task');
+
+
+--
+-- Name: background_tasks background_tasks_record_initial_ownership; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_record_initial_ownership AFTER INSERT ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.record_initial_task_ownership();
+
+
+--
+-- Name: background_tasks background_tasks_record_status_event; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER background_tasks_record_status_event AFTER INSERT OR UPDATE OF status ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.record_task_status_event();
+
+
+--
+-- Name: binding_audit_events binding_audit_events_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER binding_audit_events_append_only BEFORE DELETE OR UPDATE ON public.binding_audit_events FOR EACH ROW EXECUTE FUNCTION public.reject_binding_audit_rewrite();
+
+
+--
+-- Name: channel_agents channel_agents_scope_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER channel_agents_scope_check BEFORE INSERT OR UPDATE ON public.channel_agents FOR EACH ROW EXECUTE FUNCTION public.enforce_channel_agent_scope();
+
+
+--
+-- Name: channel_agents channel_assignment_active_agent_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER channel_assignment_active_agent_check AFTER INSERT OR DELETE OR UPDATE ON public.channel_agents DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_enabled_channel_has_active_agent();
+
+
+--
+-- Name: channels channels_delete_target_tasks; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER channels_delete_target_tasks BEFORE DELETE ON public.channels FOR EACH ROW EXECUTE FUNCTION public.delete_channel_target_tasks();
+
+
+--
+-- Name: message_deliveries delivery_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER delivery_actionable_notification AFTER DELETE OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notification_from_delivery();
+
+
+--
+-- Name: channels enabled_channel_active_agent_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check AFTER INSERT OR UPDATE OF enabled ON public.channels DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_enabled_channel_has_active_agent();
+
+
+--
+-- Name: attention_source_events handoff_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handoff_actionable_notification AFTER INSERT ON public.attention_source_events FOR EACH ROW EXECUTE FUNCTION public.notification_from_attention_source();
+
+
+--
+-- Name: manual_handoffs handoff_notification_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handoff_notification_delete AFTER DELETE ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_source('handoff');
+
+
+--
+-- Name: human_approvals human_approvals_notify_chain; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER human_approvals_notify_chain AFTER INSERT OR UPDATE OF status ON public.human_approvals FOR EACH ROW WHEN ((new.task_id IS NOT NULL)) EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: inbound_events inbound_events_notify_ready; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER inbound_events_notify_ready AFTER INSERT OR UPDATE OF status, available_at ON public.inbound_events FOR EACH ROW EXECUTE FUNCTION public.notify_inbound_event_ready();
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER internal_note_tombstones_immutable BEFORE DELETE OR UPDATE ON public.internal_note_tombstones FOR EACH ROW EXECUTE FUNCTION public.internal_note_tombstones_are_immutable();
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER internal_note_tombstones_notify AFTER INSERT ON public.internal_note_tombstones FOR EACH ROW EXECUTE FUNCTION public.notify_internal_note_change();
+
+
+--
+-- Name: internal_notes internal_notes_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER internal_notes_immutable BEFORE DELETE OR UPDATE ON public.internal_notes FOR EACH ROW EXECUTE FUNCTION public.internal_notes_are_immutable();
+
+
+--
+-- Name: internal_notes internal_notes_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER internal_notes_notify AFTER INSERT ON public.internal_notes FOR EACH ROW EXECUTE FUNCTION public.notify_internal_note_change();
+
+
+--
+-- Name: agents library_agent_delete_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER library_agent_delete_guard BEFORE DELETE ON public.agents FOR EACH ROW EXECUTE FUNCTION public.prevent_assigned_library_agent_delete();
+
+
+--
+-- Name: skills library_skill_delete_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER library_skill_delete_guard BEFORE DELETE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.prevent_assigned_library_skill_delete();
+
+
+--
+-- Name: manual_handoffs manual_handoffs_bump_cleanup_version; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER manual_handoffs_bump_cleanup_version BEFORE UPDATE OF responsible_principal_id ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.bump_handoff_version_for_responsibility_cleanup();
+
+
+--
+-- Name: manual_handoffs manual_handoffs_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER manual_handoffs_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, responsible_principal_id, business_priority, business_due_at, version ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('handoff');
+
+
+--
+-- Name: memory_provider_connections memory_connection_lifecycle_compatibility_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER memory_connection_lifecycle_compatibility_delete BEFORE DELETE ON public.memory_provider_connections FOR EACH ROW EXECUTE FUNCTION public.retire_memory_lifecycle_for_legacy_connection();
+
+
+--
+-- Name: memory_provider_connections memory_connection_lifecycle_compatibility_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER memory_connection_lifecycle_compatibility_insert AFTER INSERT ON public.memory_provider_connections FOR EACH ROW EXECUTE FUNCTION public.create_memory_lifecycle_for_legacy_connection();
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_phase_compatibility_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER memory_provisioning_phase_compatibility_update BEFORE UPDATE ON public.memory_provisioning_jobs FOR EACH ROW EXECUTE FUNCTION public.synchronize_legacy_memory_provisioning_phase();
+
+
+--
+-- Name: message_deliveries message_deliveries_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_deliveries_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('delivery');
+
+
+--
+-- Name: message_deliveries message_deliveries_notify_chain; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_deliveries_notify_chain AFTER INSERT OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: messages messages_audience_no_widen; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER messages_audience_no_widen BEFORE UPDATE OF audience ON public.messages FOR EACH ROW EXECUTE FUNCTION public.prevent_message_audience_widening();
+
+
+--
+-- Name: channel_principal_grants notification_channel_grant_recheck; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER notification_channel_grant_recheck AFTER INSERT OR DELETE OR UPDATE ON public.channel_principal_grants FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_channel_access();
+
+
+--
+-- Name: channels notification_channel_policy_recheck; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER notification_channel_policy_recheck AFTER UPDATE OF access_mode ON public.channels FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_channel_access();
+
+
+--
+-- Name: company_members notification_membership_recheck; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER notification_membership_recheck AFTER DELETE OR UPDATE OF role ON public.company_members FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_membership();
+
+
+--
+-- Name: principals notification_principal_delete_recheck; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER notification_principal_delete_recheck BEFORE DELETE ON public.principals FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_principal();
+
+
+--
+-- Name: task_outreaches outreach_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER outreach_actionable_notification AFTER DELETE OR UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notification_from_outreach();
+
+
+--
+-- Name: channel_agents owned_channel_assignment_position_zero_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER owned_channel_assignment_position_zero_check AFTER INSERT OR DELETE OR UPDATE ON public.channel_agents DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_channel_position_zero();
+
+
+--
+-- Name: channels owned_channel_delete_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER owned_channel_delete_guard BEFORE DELETE ON public.channels FOR EACH ROW EXECUTE FUNCTION public.prevent_owned_channel_delete();
+
+
+--
+-- Name: channels owned_channel_position_zero_check; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER owned_channel_position_zero_check AFTER INSERT OR UPDATE OF owner_agent_id ON public.channels DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_channel_position_zero();
+
+
+--
+-- Name: principals principals_release_owned_tasks; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER principals_release_owned_tasks BEFORE DELETE ON public.principals FOR EACH ROW WHEN ((old.kind = ANY (ARRAY['person'::text, 'agent'::text]))) EXECUTE FUNCTION public.release_tasks_for_removed_principal();
+
+
+--
+-- Name: response_draft_evidence response_draft_evidence_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER response_draft_evidence_immutable BEFORE INSERT OR DELETE OR UPDATE ON public.response_draft_evidence FOR EACH ROW EXECUTE FUNCTION public.enforce_response_draft_evidence_immutability();
+
+
+--
+-- Name: response_drafts response_drafts_immutable_versions; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER response_drafts_immutable_versions BEFORE UPDATE ON public.response_drafts FOR EACH ROW EXECUTE FUNCTION public.enforce_response_draft_update();
+
+
+--
+-- Name: response_reviews response_review_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER response_review_actionable_notification AFTER INSERT OR UPDATE OF status, reviewer_principal_id ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notification_from_review();
+
+
+--
+-- Name: response_reviews response_review_notification_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER response_review_notification_delete AFTER DELETE ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_source('response_review');
+
+
+--
+-- Name: response_reviews response_reviews_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER response_reviews_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, reviewer_principal_id, expires_at ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('response_review');
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_agent_instructions_notify AFTER INSERT ON public.task_agent_instructions FOR EACH ROW EXECUTE FUNCTION public.notify_agent_instruction();
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_notify_chain; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_outreach_targets_notify_chain AFTER UPDATE OF responded_at ON public.task_outreach_targets FOR EACH ROW WHEN ((old.responded_at IS DISTINCT FROM new.responded_at)) EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_status_transition; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_outreach_targets_status_transition BEFORE UPDATE OF status ON public.task_outreach_targets FOR EACH ROW EXECUTE FUNCTION public.enforce_outreach_target_status_transition();
+
+
+--
+-- Name: task_outreaches task_outreaches_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_outreaches_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, expires_at, version ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('delegation');
+
+
+--
+-- Name: task_outreaches task_outreaches_notify_chain; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_outreaches_notify_chain AFTER INSERT OR UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: task_outreaches task_outreaches_status_transition; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_outreaches_status_transition BEFORE UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.enforce_outreach_status_transition();
+
+
+--
+-- Name: task_ownership_events task_ownership_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_ownership_actionable_notification AFTER INSERT ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.notification_from_task_ownership();
+
+
+--
+-- Name: task_ownership_events task_ownership_events_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_ownership_events_immutable BEFORE DELETE OR UPDATE ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.task_ownership_events_are_immutable();
+
+
+--
+-- Name: task_ownership_events task_ownership_events_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_ownership_events_notify AFTER INSERT ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.notify_task_ownership();
+
+
+--
+-- Name: background_tasks task_status_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_status_actionable_notification AFTER DELETE OR UPDATE OF status ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.notification_from_task_status();
+
+
+--
+-- Name: task_status_events task_status_events_notify_chain; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER task_status_events_notify_chain AFTER INSERT ON public.task_status_events FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: thread_messages thread_messages_delete_orphan_message; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER thread_messages_delete_orphan_message AFTER DELETE ON public.thread_messages FOR EACH ROW EXECUTE FUNCTION public.delete_orphan_message();
+
+
+--
+-- Name: thread_messages thread_messages_notify; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER thread_messages_notify AFTER INSERT ON public.thread_messages FOR EACH ROW EXECUTE FUNCTION public.notify_thread_message();
+
+
+--
+-- Name: agent_channel_provisions agent_channel_provisions_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_channel_provisions
+    ADD CONSTRAINT agent_channel_provisions_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_channel_provisions agent_channel_provisions_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_channel_provisions
+    ADD CONSTRAINT agent_channel_provisions_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.channels(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_channel_provisions agent_channel_provisions_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_channel_provisions
+    ADD CONSTRAINT agent_channel_provisions_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_skills agent_skills_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_skills
+    ADD CONSTRAINT agent_skills_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_skills agent_skills_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_skills
+    ADD CONSTRAINT agent_skills_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_skills agent_skills_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_skills
+    ADD CONSTRAINT agent_skills_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_sub_agents agent_sub_agents_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sub_agents
+    ADD CONSTRAINT agent_sub_agents_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_sub_agents agent_sub_agents_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sub_agents
+    ADD CONSTRAINT agent_sub_agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_sub_agents agent_sub_agents_sub_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sub_agents
+    ADD CONSTRAINT agent_sub_agents_sub_fk FOREIGN KEY (company_id, sub_agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: agents agents_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: attention_source_events attention_source_events_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attention_source_events
+    ADD CONSTRAINT attention_source_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: background_tasks background_tasks_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: background_tasks background_tasks_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: background_tasks background_tasks_owner_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_owner_principal_fk FOREIGN KEY (company_id, owner_principal_id, owner_principal_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
+
+
+--
+-- Name: background_tasks background_tasks_source_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_source_message_fk FOREIGN KEY (company_id, source_message_uuid) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (source_message_uuid);
+
+
+--
+-- Name: background_tasks background_tasks_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
+
+
+--
+-- Name: background_tasks background_tasks_transition_approval_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_transition_approval_fk FOREIGN KEY (transition_approval_id) REFERENCES public.human_approvals(id);
+
+
+--
+-- Name: background_tasks background_tasks_transition_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_transition_outreach_fk FOREIGN KEY (transition_outreach_id) REFERENCES public.task_outreaches(id);
+
+
+--
+-- Name: binding_audit_events binding_audit_events_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.binding_audit_events
+    ADD CONSTRAINT binding_audit_events_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_agents channel_agents_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_agents
+    ADD CONSTRAINT channel_agents_agent_fk FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_agents channel_agents_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_agents
+    ADD CONSTRAINT channel_agents_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_bindings channel_bindings_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_bindings channel_bindings_installation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_installation_fk FOREIGN KEY (company_id, installation_id, transport) REFERENCES public.integration_installations(company_id, id, transport) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_principal_grants channel_principal_grants_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_principal_grants
+    ADD CONSTRAINT channel_principal_grants_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_principal_grants channel_principal_grants_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_principal_grants
+    ADD CONSTRAINT channel_principal_grants_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_schedules channel_schedules_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_schedules
+    ADD CONSTRAINT channel_schedules_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_schedules channel_schedules_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_schedules
+    ADD CONSTRAINT channel_schedules_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: channel_schedules channel_schedules_run_as_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_schedules
+    ADD CONSTRAINT channel_schedules_run_as_user_id_fkey FOREIGN KEY (run_as_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: channel_slugs channel_slugs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_slugs
+    ADD CONSTRAINT channel_slugs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channels channels_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: channels channels_owner_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_owner_agent_fk FOREIGN KEY (company_id, owner_agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: channels channels_preferred_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_preferred_reviewer_fk FOREIGN KEY (company_id, preferred_reviewer_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (preferred_reviewer_principal_id);
+
+
+--
+-- Name: companies companies_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.companies
+    ADD CONSTRAINT companies_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: company_invites company_invites_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_invites
+    ADD CONSTRAINT company_invites_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_members company_members_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_members
+    ADD CONSTRAINT company_members_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_members company_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_members
+    ADD CONSTRAINT company_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_model_connections company_model_connections_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_model_connections
+    ADD CONSTRAINT company_model_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_resend_api_integrations company_resend_api_integrations_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_resend_api_integrations
+    ADD CONSTRAINT company_resend_api_integrations_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_actor_fk FOREIGN KEY (company_id, actor_principal_id, actor_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_target_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_target_fk FOREIGN KEY (company_id, outreach_id, target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE RESTRICT;
+
+
+--
+-- Name: delegation_control_commands delegation_control_commands_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delegation_control_commands
+    ADD CONSTRAINT delegation_control_commands_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: email_message_metadata email_message_metadata_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_message_metadata
+    ADD CONSTRAINT email_message_metadata_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: external_messages external_messages_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: external_messages external_messages_delivery_part_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_delivery_part_fk FOREIGN KEY (company_id, delivery_part_id) REFERENCES public.message_delivery_parts(company_id, id) ON DELETE SET NULL (delivery_part_id);
+
+
+--
+-- Name: external_messages external_messages_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_messages
+    ADD CONSTRAINT external_messages_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: external_threads external_threads_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_threads
+    ADD CONSTRAINT external_threads_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: external_threads external_threads_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.external_threads
+    ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, thread_id) REFERENCES public.threads(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: human_approvals human_approvals_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: human_approvals human_approvals_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: human_approvals human_approvals_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: human_task_completions human_task_completions_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_task_completions
+    ADD CONSTRAINT human_task_completions_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE RESTRICT;
+
+
+--
+-- Name: human_task_completions human_task_completions_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_task_completions
+    ADD CONSTRAINT human_task_completions_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: inbound_events inbound_events_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inbound_events
+    ADD CONSTRAINT inbound_events_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: inbound_events inbound_events_installation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inbound_events
+    ADD CONSTRAINT inbound_events_installation_fk FOREIGN KEY (company_id, installation_id, transport) REFERENCES public.integration_installations(company_id, id, transport) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_credentials integration_credentials_installation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_credentials
+    ADD CONSTRAINT integration_credentials_installation_fk FOREIGN KEY (company_id, installation_id) REFERENCES public.integration_installations(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_installations integration_installations_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_installations
+    ADD CONSTRAINT integration_installations_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_note_tombstones
+    ADD CONSTRAINT internal_note_tombstones_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: internal_note_tombstones internal_note_tombstones_note_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_note_tombstones
+    ADD CONSTRAINT internal_note_tombstones_note_fk FOREIGN KEY (company_id, note_id) REFERENCES public.internal_notes(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: internal_notes internal_notes_author_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: internal_notes internal_notes_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_message_fk FOREIGN KEY (company_id, message_id, message_audience) REFERENCES public.messages(company_id, id, audience) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: internal_notes internal_notes_supersedes_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_supersedes_fk FOREIGN KEY (company_id, supersedes_note_id) REFERENCES public.internal_notes(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: internal_notes internal_notes_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_handoffs manual_handoffs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_handoffs manual_handoffs_creator_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_creator_fk FOREIGN KEY (company_id, created_by_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (created_by_principal_id);
+
+
+--
+-- Name: manual_handoffs manual_handoffs_resolver_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_resolver_fk FOREIGN KEY (company_id, resolved_by_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (resolved_by_principal_id);
+
+
+--
+-- Name: manual_handoffs manual_handoffs_responsible_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_responsible_fk FOREIGN KEY (company_id, responsible_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responsible_principal_id);
+
+
+--
+-- Name: manual_handoffs manual_handoffs_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.manual_handoffs
+    ADD CONSTRAINT manual_handoffs_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: memory_cleanup_jobs memory_cleanup_jobs_lifecycle_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_cleanup_jobs
+    ADD CONSTRAINT memory_cleanup_jobs_lifecycle_fkey FOREIGN KEY (provider, remote_database_id) REFERENCES public.memory_remote_resource_lifecycles(provider, remote_database_id);
+
+
+--
+-- Name: memory_provider_connections memory_provider_connections_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provider_connections
+    ADD CONSTRAINT memory_provider_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_jobs_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provisioning_jobs
+    ADD CONSTRAINT memory_provisioning_jobs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: memory_provisioning_jobs memory_provisioning_jobs_lifecycle_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_provisioning_jobs
+    ADD CONSTRAINT memory_provisioning_jobs_lifecycle_fkey FOREIGN KEY (provider, remote_database_id) REFERENCES public.memory_remote_resource_lifecycles(provider, remote_database_id);
+
+
+--
+-- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.memory_remote_resource_lifecycles
+    ADD CONSTRAINT memory_remote_resource_lifecycles_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE SET NULL;
+
+
+--
+-- Name: message_deliveries message_deliveries_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_deliveries message_deliveries_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_deliveries message_deliveries_dependency_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_dependency_fk FOREIGN KEY (company_id, depends_on_delivery_id) REFERENCES public.message_deliveries(company_id, id) ON DELETE SET NULL (depends_on_delivery_id);
+
+
+--
+-- Name: message_deliveries message_deliveries_destination_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_destination_binding_fk FOREIGN KEY (company_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, id, transport) ON DELETE CASCADE;
+
+
+--
+-- Name: message_deliveries message_deliveries_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_message_fk FOREIGN KEY (company_id, message_id, message_audience) REFERENCES public.messages(company_id, id, audience) ON DELETE CASCADE;
+
+
+--
+-- Name: message_deliveries message_deliveries_source_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_source_binding_fk FOREIGN KEY (company_id, source_binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_deliveries message_deliveries_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_deliveries
+    ADD CONSTRAINT message_deliveries_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE SET NULL (task_id);
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_delivery_fk FOREIGN KEY (company_id, delivery_id) REFERENCES public.message_deliveries(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_delivery_parts message_delivery_parts_delivery_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_delivery_parts
+    ADD CONSTRAINT message_delivery_parts_delivery_id_fk FOREIGN KEY (delivery_id) REFERENCES public.message_deliveries(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_participants message_participants_identity_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_participants
+    ADD CONSTRAINT message_participants_identity_fk FOREIGN KEY (company_id, participant_identity_id) REFERENCES public.participant_identities(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_participants message_participants_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_participants
+    ADD CONSTRAINT message_participants_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: messages messages_author_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: messages messages_authored_identity_author_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_authored_identity_author_fk FOREIGN KEY (company_id, author_principal_id, authored_identity_id) REFERENCES public.participant_identities(company_id, principal_id, id) ON DELETE SET NULL (authored_identity_id);
+
+
+--
+-- Name: messages messages_authored_identity_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_authored_identity_fk FOREIGN KEY (company_id, authored_identity_id) REFERENCES public.participant_identities(company_id, id) ON DELETE SET NULL (authored_identity_id);
+
+
+--
+-- Name: messages messages_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notification_events notification_events_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (actor_principal_id);
+
+
+--
+-- Name: notification_events notification_events_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_email_delivery_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_email_delivery_id_fkey FOREIGN KEY (email_delivery_id) REFERENCES public.message_deliveries(id) ON DELETE SET NULL;
+
+
+--
+-- Name: notifications notifications_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.notification_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_event_identity_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_event_identity_fk FOREIGN KEY (company_id, source_kind, source_id, action_kind, source_generation) REFERENCES public.notification_events(company_id, source_kind, source_id, action_kind, source_generation) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_recipient_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_recipient_fk FOREIGN KEY (company_id, recipient_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (recipient_principal_id);
+
+
+--
+-- Name: notifications notifications_recipient_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_recipient_user_id_fkey FOREIGN KEY (recipient_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: participant_identities participant_identities_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.participant_identities
+    ADD CONSTRAINT participant_identities_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: pending_account_changes pending_account_changes_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pending_account_changes
+    ADD CONSTRAINT pending_account_changes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: principals principals_company_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: principals principals_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: principals principals_company_user_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.principals
+    ADD CONSTRAINT principals_company_user_fk FOREIGN KEY (company_id, user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: response_draft_evidence response_draft_evidence_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_evidence
+    ADD CONSTRAINT response_draft_evidence_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
+
+
+--
+-- Name: response_draft_publications response_draft_publications_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_publications
+    ADD CONSTRAINT response_draft_publications_delivery_fk FOREIGN KEY (company_id, delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_draft_publications response_draft_publications_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_publications
+    ADD CONSTRAINT response_draft_publications_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_draft_publications response_draft_publications_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_publications
+    ADD CONSTRAINT response_draft_publications_message_fk FOREIGN KEY (company_id, message_id, message_audience) REFERENCES public.messages(company_id, id, audience) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_draft_publications response_draft_publications_publisher_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_draft_publications
+    ADD CONSTRAINT response_draft_publications_publisher_fk FOREIGN KEY (company_id, published_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_drafts response_drafts_author_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_drafts response_drafts_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: response_drafts response_drafts_created_by_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_created_by_fk FOREIGN KEY (company_id, created_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_drafts response_drafts_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_reviewer_fk FOREIGN KEY (company_id, reviewer_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_drafts response_drafts_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE SET NULL (task_id);
+
+
+--
+-- Name: response_drafts response_drafts_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: response_drafts response_drafts_updated_by_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_drafts
+    ADD CONSTRAINT response_drafts_updated_by_fk FOREIGN KEY (company_id, updated_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_review_commands response_review_commands_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_review_commands
+    ADD CONSTRAINT response_review_commands_delivery_fk FOREIGN KEY (company_id, published_delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_review_commands response_review_commands_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_review_commands
+    ADD CONSTRAINT response_review_commands_draft_fk FOREIGN KEY (company_id, draft_id, expected_draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
+
+
+--
+-- Name: response_reviews response_reviews_decider_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_decider_fk FOREIGN KEY (company_id, decided_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: response_reviews response_reviews_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
+
+
+--
+-- Name: response_reviews response_reviews_notification_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_notification_actor_fk FOREIGN KEY (company_id, notification_actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (notification_actor_principal_id);
+
+
+--
+-- Name: response_reviews response_reviews_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.response_reviews
+    ADD CONSTRAINT response_reviews_reviewer_fk FOREIGN KEY (company_id, reviewer_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: schedule_runs schedule_runs_schedule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_runs
+    ADD CONSTRAINT schedule_runs_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.channel_schedules(id) ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_runs schedule_runs_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_runs
+    ADD CONSTRAINT schedule_runs_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE SET NULL;
+
+
+--
+-- Name: schedule_runs schedule_runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_runs
+    ADD CONSTRAINT schedule_runs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skills skills_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: start_agent_task_commands start_agent_task_commands_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.start_agent_task_commands
+    ADD CONSTRAINT start_agent_task_commands_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_agent_instruction_notes task_agent_instruction_notes_instruction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instruction_notes
+    ADD CONSTRAINT task_agent_instruction_notes_instruction_id_fkey FOREIGN KEY (instruction_id) REFERENCES public.task_agent_instructions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_agent_instruction_notes task_agent_instruction_notes_note_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instruction_notes
+    ADD CONSTRAINT task_agent_instruction_notes_note_fk FOREIGN KEY (company_id, note_id) REFERENCES public.internal_notes(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instructions
+    ADD CONSTRAINT task_agent_instructions_actor_fk FOREIGN KEY (company_id, requested_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instructions
+    ADD CONSTRAINT task_agent_instructions_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_agent_instructions task_agent_instructions_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_agent_instructions
+    ADD CONSTRAINT task_agent_instructions_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_attempts task_attempts_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_attempts
+    ADD CONSTRAINT task_attempts_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_channel_targets task_channel_targets_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_channel_targets
+    ADD CONSTRAINT task_channel_targets_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_channel_targets task_channel_targets_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_channel_targets
+    ADD CONSTRAINT task_channel_targets_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_replies task_outreach_replies_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_replies
+    ADD CONSTRAINT task_outreach_replies_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_replies task_outreach_replies_response_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_replies
+    ADD CONSTRAINT task_outreach_replies_response_fk FOREIGN KEY (company_id, response_association_id) REFERENCES public.thread_messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_replies task_outreach_replies_target_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_replies
+    ADD CONSTRAINT task_outreach_replies_target_fk FOREIGN KEY (company_id, outreach_id, target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_delivery_fk FOREIGN KEY (company_id, delivery_id) REFERENCES public.message_deliveries(company_id, id) ON DELETE SET NULL (delivery_id);
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_internal_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_internal_channel_fk FOREIGN KEY (company_id, internal_channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_replacement_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_replacement_fk FOREIGN KEY (company_id, outreach_id, replaces_target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE RESTRICT;
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_request_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_request_message_fk FOREIGN KEY (company_id, request_message_id) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (request_message_id);
+
+
+--
+-- Name: task_outreach_targets task_outreach_targets_response_association_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreach_targets
+    ADD CONSTRAINT task_outreach_targets_response_association_fk FOREIGN KEY (company_id, response_association_id) REFERENCES public.thread_messages(company_id, id) ON DELETE SET NULL (response_association_id);
+
+
+--
+-- Name: task_outreaches task_outreaches_creator_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_creator_fk FOREIGN KEY (company_id, created_by_principal_id, created_by_principal_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
+
+
+--
+-- Name: task_outreaches task_outreaches_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_ownership_events task_ownership_events_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_ownership_events
+    ADD CONSTRAINT task_ownership_events_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_status_events task_status_events_related_approval_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_status_events
+    ADD CONSTRAINT task_status_events_related_approval_id_fkey FOREIGN KEY (related_approval_id) REFERENCES public.human_approvals(id) ON DELETE SET NULL;
+
+
+--
+-- Name: task_status_events task_status_events_related_outreach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_status_events
+    ADD CONSTRAINT task_status_events_related_outreach_id_fkey FOREIGN KEY (related_outreach_id) REFERENCES public.task_outreaches(id) ON DELETE SET NULL;
+
+
+--
+-- Name: task_status_events task_status_events_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_status_events
+    ADD CONSTRAINT task_status_events_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_messages thread_messages_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_messages thread_messages_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_messages
+    ADD CONSTRAINT thread_messages_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_principals thread_principals_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_principals
+    ADD CONSTRAINT thread_principals_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_principals thread_principals_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_principals
+    ADD CONSTRAINT thread_principals_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: threads threads_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_login_methods user_login_methods_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_login_methods
+    ADD CONSTRAINT user_login_methods_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_notification_preferences user_notification_preferences_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_notification_preferences
+    ADD CONSTRAINT user_notification_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--

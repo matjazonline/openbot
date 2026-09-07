@@ -51,6 +51,18 @@ fn the_harness_reports_the_kind_it_implements() {
     assert_eq!(AiAgentsHarness::new().kind(), HarnessKind::AiAgents);
 }
 
+#[test]
+fn xai_uses_openai_tool_transport_at_the_official_endpoint() {
+    let transport =
+        provider_transport(&ModelProvider::canonical("xai"), None).expect("xAI has a transport");
+
+    assert_eq!(transport.provider_type, ai_agents::ProviderType::OpenAI);
+    assert_eq!(
+        transport.base_url.as_deref(),
+        Some(XAI_OPENAI_COMPATIBLE_BASE_URL)
+    );
+}
+
 /// `build_agent` is split across a sync/async/sync seam so that only the two `auto_configure_*`
 /// calls sit in the future. This drives the whole seam on the configuration shape production
 /// actually sends, and reads back the delivery context -- which the last of the three stages is

@@ -153,12 +153,9 @@ mandatory private handoff instruction tells the new owner what to do.
 - Verification includes formatting, offline compilation, migrations, SQLx metadata regeneration,
   the database-backed suite, competing-claimant tests, and the stock-stack budget because the
   worker supervision path changes.
-- Roll out in two stages behind `TASK_OWNERSHIP_CONTROLS_ENABLED=false`:
-  1. Apply the additive migration and deploy ownership-aware workers while mutations and the agent
-     tool remain disabled.
-  2. After all old workers are gone and backfill/unassigned metrics are verified, enable controls.
-- Once ownership mutations are enabled, do not roll back to workers that ignore ownership fences.
-  Disable new mutations first and roll forward with a corrected ownership-aware build.
+- Stop all workers, reset the database, apply the squashed baseline, and deploy ownership-aware
+  workers. Ownership controls are always available, so mixed deployments with workers that ignore
+  ownership fences are unsupported.
 
 ## Assumptions
 

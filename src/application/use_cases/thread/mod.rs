@@ -1512,10 +1512,6 @@ impl ThreadUseCases {
             .await
     }
 
-    pub fn task_ownership_controls_enabled(&self) -> bool {
-        self.config.task_ownership_controls_enabled()
-    }
-
     pub async fn change_task_ownership(
         &self,
         command: TaskOwnershipCommand,

@@ -15,7 +15,7 @@
 //!
 //! The wire shape is OpenAI's `POST {base_url}/chat/completions`, because the `llm` crate's OpenAI
 //! backend is what `ai-agents` reaches for and `mail_agents` permits only
-//! `google | openai | anthropic | groq` (so `openai-compatible` is not an option).
+//! `google | openai | anthropic | groq | xai` (so `openai-compatible` is not an option).
 //!
 //! # Why not [`crate::adapters::memory::test_support`]
 //!

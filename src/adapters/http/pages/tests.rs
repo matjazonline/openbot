@@ -48,6 +48,7 @@ fn legacy_approval_prompts_escape_every_external_field() {
         task_id: None,
         step_key: "step".into(),
         approver_email: r#"approver" onmouseover="alert(1)@example.com"#.into(),
+        approver_principal_id: None,
         action_type: "<script>type</script>".into(),
         action_title: "Approve <img src=x onerror=alert(1)>".into(),
         action_summary: "Summary </p><script>alert(1)</script>".into(),
@@ -594,7 +595,6 @@ fn a_detail_column_with_nothing_open_says_so() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -2391,7 +2391,6 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -2548,7 +2547,6 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -2589,7 +2587,6 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -2892,7 +2889,6 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -2950,7 +2946,6 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -3299,7 +3294,6 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -3485,7 +3479,6 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         work: None,
         viewer_principal_id: None,
         viewer_manages_tasks: false,
-        ownership_controls_enabled: false,
         private_handoff: None,
         ownership_error: None,
         owner_candidates: &[],
@@ -3847,7 +3840,6 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         task: &task,
         channel: Some(&channel),
         error: Some("Failed to stop task: worker unreachable"),
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
@@ -3886,7 +3878,6 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         attempts: &[],
         attempts_error: None,
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
@@ -3951,7 +3942,6 @@ fn task_detail_delegation_controls_name_irreversible_external_consequences() {
         attempts: &[],
         attempts_error: None,
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: Some(&summary),
@@ -3966,6 +3956,41 @@ fn task_detail_delegation_controls_name_irreversible_external_consequences() {
     assert!(html.contains("do not recall email"));
     assert!(!html.to_lowercase().contains("recall email</button>"));
     assert!(html.contains("hx-target=\"#task-pane\""));
+}
+
+#[test]
+fn released_task_collaboration_status_asks_a_manager_to_assign_an_owner() {
+    let now = Utc::now();
+    let summary = CollaborationSummary {
+        task_id: Uuid::new_v4(),
+        outreach_id: None,
+        outreach_version: None,
+        correlation_id: CorrelationId::new(),
+        owner: CollaborationOwner {
+            kind: CollaborationOwnerKind::Unassigned,
+            principal_id: None,
+            label: "Unassigned".into(),
+            available: true,
+        },
+        status: OutreachBusinessStatus::ReadyToResume,
+        progress: None,
+        expires_at: None,
+        next_action: Some(CollaborationNextAction {
+            actor: NextActionActor::CompanyManager,
+            action: NextActionKind::AssignTaskOwner,
+            due_at: None,
+            href: None,
+        }),
+        children: Vec::new(),
+        as_of: now,
+        truncated: false,
+        detail_href: None,
+    };
+
+    let html = collaboration_status(&summary);
+
+    assert!(html.contains("company manager must assign an available owner"));
+    assert!(!html.contains("task queue must resume the task"));
 }
 
 #[test]
@@ -4046,7 +4071,6 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
         attempts: &attempts,
         attempts_error: Some("Execution attempts were partially unavailable"),
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
@@ -4180,7 +4204,6 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
         attempts: &attempts,
         attempts_error: None,
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
@@ -5123,7 +5146,6 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         task: &task,
         channel: Some(&channel),
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,
@@ -5153,7 +5175,6 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         task: &task,
         channel: Some(&channel),
         error: None,
-        ownership_controls_enabled: false,
         ownership_events: &[],
         owner_candidates: &[],
         collaboration: None,

@@ -24,7 +24,7 @@ uuid = { version = "1.18.0", features = ["serde", "v4"] }
 chrono = { version = "0.4.41", features = ["serde"] }
 thiserror = "2.0"
 async-trait = "0.1.89"
-axum-extra = { version = "0.10", features = ["cookie"] }
+axum-extra = { version = "0.10", features = ["cookie", "form"] }
 time = "0.3"
 ai-agents = { git = "https://github.com/geminik23/ai-agents.git", rev = "9ea972e3e3a5b777496c6d6b1b471cac4513a1e4" }
 lettre = { version = "0.11", default-features = false, features = ["tokio1", "tokio1-rustls-tls", "builder", "smtp-transport"] }

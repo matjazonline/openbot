@@ -1,4 +1,5 @@
-//! Human-operational work projected from authoritative tasks, handoffs, reviews and failures.
+//! Human-operational work projected from authoritative tasks, handoffs, approvals, reviews and
+//! failures.
 //!
 //! None of the states in this module is persisted as another workflow. Resolving an item always
 //! means changing its source; reading this projection is side-effect free.
@@ -64,6 +65,7 @@ impl fmt::Display for BusinessPriority {
 pub enum AttentionSourceKind {
     Task,
     Handoff,
+    Approval,
     ResponseReview,
     DelegationDecision,
     DeliveryFailure,
@@ -74,6 +76,7 @@ impl AttentionSourceKind {
         match self {
             Self::Task => "task",
             Self::Handoff => "handoff",
+            Self::Approval => "approval",
             Self::ResponseReview => "response_review",
             Self::DelegationDecision => "delegation_decision",
             Self::DeliveryFailure => "delivery_failure",
@@ -88,6 +91,7 @@ impl FromStr for AttentionSourceKind {
         match value {
             "task" => Ok(Self::Task),
             "handoff" => Ok(Self::Handoff),
+            "approval" => Ok(Self::Approval),
             "response_review" => Ok(Self::ResponseReview),
             "delegation_decision" => Ok(Self::DelegationDecision),
             "delivery_failure" => Ok(Self::DeliveryFailure),
@@ -109,6 +113,7 @@ pub enum AttentionView {
 pub enum AttentionResponsibility {
     Principal(PrincipalId),
     ChannelTeam,
+    External,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -28,8 +28,8 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
             ""
         }
     };
-    let custom_provider =
-        !fields.provider.is_empty() && fields.provider != "google" && fields.provider != "openai";
+    let custom_provider = !fields.provider.is_empty()
+        && crate::model_providers::preset_models(fields.provider).is_empty();
     let custom_selected = if custom_provider { " selected" } else { "" };
     let custom_hidden = if custom_provider { "" } else { " hidden" };
     let model_option = |model: &str| {
@@ -40,19 +40,10 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
         };
         format!(r#"<option value="{model}"{selected}>{model}</option>"#)
     };
-    let model_options = match fields.provider {
-        "google" => format!(
-            "{}{}",
-            model_option("gemini-3.6-flash"),
-            model_option("gemini-3.7-flash")
-        ),
-        "openai" => format!(
-            "{}{}",
-            model_option("gpt-5.6-sol"),
-            model_option("gpt-5.6-terra")
-        ),
-        _ => String::new(),
-    };
+    let model_options = crate::model_providers::preset_models(fields.provider)
+        .iter()
+        .map(|model| model_option(model))
+        .collect::<String>();
     let model_select_hidden = if custom_provider { " hidden" } else { "" };
     let model_select_disabled = if fields.provider.is_empty() {
         " disabled"
@@ -73,6 +64,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
                     <option value="">Server default</option>
                     <option value="google"{google_selected}>google</option>
                     <option value="openai"{openai_selected}>openai</option>
+                    <option value="xai"{xai_selected}>xai</option>
                     <option value="__custom__"{custom_selected}>Custom…</option>
                 </select>
                 <input type="text"{provider_id} name="provider" value="{provider}" placeholder="Custom provider" autocomplete="off" class="input mt-2 w-full font-mono text-sm{custom_hidden}">
@@ -95,6 +87,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
         api_key_id = field_id("api-key"),
         google_selected = selected("google"),
         openai_selected = selected("openai"),
+        xai_selected = selected("xai"),
         custom_selected = custom_selected,
         custom_hidden = custom_hidden,
         model_select_hidden = model_select_hidden,
@@ -121,6 +114,15 @@ mod tests {
         assert!(google.contains(r#"value="gemini-3.7-flash" selected"#));
         assert!(!google.contains(r#"<option value="gpt-5.6-sol""#));
         assert!(google.contains(r#"name="api_key" value="""#));
+
+        let xai = model_connection_fields(&ModelConnectionFields {
+            agent_id_suffix: None,
+            provider: "xai",
+            model: "grok-4.6",
+        });
+        assert!(xai.contains(r#"value="xai" selected"#));
+        assert!(xai.contains(r#"value="grok-4.6" selected"#));
+        assert!(!xai.contains(r#"value="__custom__" selected"#));
 
         let custom = model_connection_fields(&ModelConnectionFields {
             agent_id_suffix: None,

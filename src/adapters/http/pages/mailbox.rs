@@ -220,7 +220,6 @@ pub struct MessagePane<'a> {
     pub work: Option<ThreadWorkSummary>,
     pub viewer_principal_id: Option<PrincipalId>,
     pub viewer_manages_tasks: bool,
-    pub ownership_controls_enabled: bool,
     /// Private ownership metadata, provided only for the owner or a manager.
     pub private_handoff: Option<&'a str>,
     pub ownership_error: Option<&'a str>,
@@ -946,7 +945,7 @@ document.addEventListener('change', function (event) {
             var modelSelect = grid.querySelector('[data-model-select]');
             var modelInput = grid.querySelector('[data-model-input]');
             var custom = control.value === '__custom__';
-            var models = control.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : control.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : [];
+            var models = control.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : control.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : control.value === 'xai' ? ['grok-4.6'] : [];
             providerInput.value = custom ? '' : control.value;
             providerInput.classList.toggle('hidden', !custom);
             modelSelect.replaceChildren(new Option(control.value ? 'Select model' : 'Select provider first', ''), ...models.map(function (model) { return new Option(model, model); }));
@@ -2330,7 +2329,7 @@ fn task_owner_panel(pane: &MessagePane<'_>) -> String {
 }
 
 fn ownership_transfer_form(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> String {
-    if !pane.ownership_controls_enabled || pane.owner_candidates.is_empty() {
+    if pane.owner_candidates.is_empty() {
         return String::new();
     }
     let options: String = pane
@@ -2383,7 +2382,7 @@ fn ownership_action_form(
     label: &str,
     button_class: &str,
 ) -> String {
-    if !pane.ownership_controls_enabled || pane.viewer_principal_id.is_none() {
+    if pane.viewer_principal_id.is_none() {
         return String::new();
     }
     format!(
@@ -2410,10 +2409,7 @@ fn human_completion_composer(pane: &MessagePane<'_>) -> String {
     let TaskOwner::Human(owner) = work.ownership.owner else {
         return String::new();
     };
-    if !pane.ownership_controls_enabled
-        || Some(owner) != pane.viewer_principal_id
-        || pane.activity != Some(ThreadActivity::Queued)
-    {
+    if Some(owner) != pane.viewer_principal_id || pane.activity != Some(ThreadActivity::Queued) {
         return String::new();
     }
     format!(

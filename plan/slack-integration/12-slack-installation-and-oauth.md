@@ -26,7 +26,7 @@ leaking into canonical use cases.
 
 ## OAuth state storage
 
-Add `migrations/20260902060000_add_integration_oauth_states.sql` for
+Define `integration_oauth_states` in `migrations/20260817000000_init_schema.sql` for
 `integration_oauth_states`, containing hashed random token, company/user IDs, provider, exact
 redirect/scope snapshot, status, exchange execution fence, expiry, consumed time, and creation
 time. State is:

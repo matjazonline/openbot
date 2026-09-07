@@ -130,13 +130,11 @@ impl FromStr for TaskStatus {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+        match s {
             "pending" => Ok(TaskStatus::Pending),
             "processing" => Ok(TaskStatus::Processing),
-            "pending_approval" | "pendingapproval" => Ok(TaskStatus::PendingApproval),
-            "waiting_for_third_party_reply" | "waitingforthirdpartyreply" => {
-                Ok(TaskStatus::WaitingForThirdPartyReply)
-            }
+            "pending_approval" => Ok(TaskStatus::PendingApproval),
+            "waiting_for_third_party_reply" => Ok(TaskStatus::WaitingForThirdPartyReply),
             "completed" => Ok(TaskStatus::Completed),
             "failed" => Ok(TaskStatus::Failed),
             "dead_letter" => Ok(TaskStatus::DeadLetter),
@@ -1828,5 +1826,28 @@ mod tests {
             TaskFailureOutcome::DeadLetter.status(),
             TaskStatus::DeadLetter
         );
+    }
+
+    #[test]
+    fn task_status_accepts_only_canonical_stored_values() {
+        for status in [
+            TaskStatus::Pending,
+            TaskStatus::Processing,
+            TaskStatus::PendingApproval,
+            TaskStatus::WaitingForThirdPartyReply,
+            TaskStatus::Completed,
+            TaskStatus::Failed,
+            TaskStatus::DeadLetter,
+            TaskStatus::Stopped,
+        ] {
+            assert_eq!(status.as_str().parse::<TaskStatus>().unwrap(), status);
+        }
+
+        for noncanonical in ["PENDING", "pendingapproval", "waitingforthirdpartyreply"] {
+            assert!(
+                noncanonical.parse::<TaskStatus>().is_err(),
+                "{noncanonical}"
+            );
+        }
     }
 }

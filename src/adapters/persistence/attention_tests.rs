@@ -1,14 +1,17 @@
 use super::*;
 use crate::{
     adapters::persistence::test_support::test_pool,
+    application::task_queue::TaskPersistence,
     entities::{
         attention::{AttentionView, BusinessPriority},
         creation::CreationProvenance,
+        task::{ResumeActor, TaskOwner, TaskStatus},
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite},
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
+        thread::ThreadPersistence,
         user::UserPersistence,
     },
 };
@@ -69,6 +72,277 @@ async fn fixture(persistence: &PostgresPersistence) -> (Uuid, Uuid, PrincipalId)
     .await
     .unwrap();
     (company.id, channel.id, PrincipalId::new(principal))
+}
+
+#[tokio::test]
+async fn pending_approvals_belong_to_the_approver_without_duplicating_the_task() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let (company_id, channel_id, task_owner) = fixture(&persistence).await;
+    let suffix = Uuid::new_v4().simple().to_string();
+    let reviewer_email = format!("attention-reviewer-{suffix}@example.com");
+    let reviewer = persistence
+        .create_user(
+            &format!("attention-reviewer-{suffix}"),
+            &reviewer_email,
+            "hash",
+        )
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(reviewer.id)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    let reviewer_principal = PrincipalId::random();
+    sqlx::query(
+        r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
+           VALUES ($1, $2, 'person', $3, 'Approval Reviewer')"#,
+    )
+    .bind(reviewer_principal.as_uuid())
+    .bind(company_id)
+    .bind(reviewer.id)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+
+    let thread = persistence
+        .create_thread(channel_id, "Approval responsibility", &[])
+        .await
+        .unwrap();
+    let internal_task =
+        insert_approval_task(&persistence, company_id, channel_id, thread.id, task_owner).await;
+    let external_task =
+        insert_approval_task(&persistence, company_id, channel_id, thread.id, task_owner).await;
+    let internal_approval = insert_pending_approval(
+        &persistence,
+        company_id,
+        channel_id,
+        thread.id,
+        internal_task,
+        "internal@example.com",
+        Some(reviewer_principal),
+    )
+    .await;
+    let external_approval = insert_pending_approval(
+        &persistence,
+        company_id,
+        channel_id,
+        thread.id,
+        external_task,
+        "external@example.net",
+        None,
+    )
+    .await;
+    let visible = [channel_id];
+
+    let reviewer_work = persistence
+        .list_attention(query(
+            company_id,
+            &visible,
+            reviewer_principal,
+            AttentionView::MyWork,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reviewer_work.items.len(), 1);
+    assert_eq!(reviewer_work.items[0].source_id, internal_approval);
+    assert_eq!(
+        reviewer_work.items[0].source_kind,
+        AttentionSourceKind::Approval
+    );
+    assert_eq!(
+        reviewer_work.items[0].responsibility,
+        AttentionResponsibility::Principal(reviewer_principal)
+    );
+
+    assert!(
+        persistence
+            .list_attention(query(
+                company_id,
+                &visible,
+                task_owner,
+                AttentionView::MyWork,
+            ))
+            .await
+            .unwrap()
+            .items
+            .is_empty(),
+        "the task owner must not receive a duplicate approval card"
+    );
+    assert!(
+        persistence
+            .list_attention(query(
+                company_id,
+                &visible,
+                task_owner,
+                AttentionView::Unassigned,
+            ))
+            .await
+            .unwrap()
+            .items
+            .is_empty(),
+        "an email-only approver is external, not unassigned channel work"
+    );
+
+    let team_work = persistence
+        .list_attention(query(
+            company_id,
+            &visible,
+            task_owner,
+            AttentionView::TeamWork,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(team_work.items.len(), 2);
+    let external = team_work
+        .items
+        .iter()
+        .find(|item| item.source_id == external_approval)
+        .unwrap();
+    assert_eq!(external.responsibility, AttentionResponsibility::External);
+    assert_eq!(
+        persistence
+            .operational_summary(company_id, &visible)
+            .await
+            .unwrap()
+            .unassigned_count,
+        0,
+        "external approvals must not inflate the unassigned channel-team count"
+    );
+
+    sqlx::query("UPDATE human_approvals SET status = 'approved' WHERE company_id = $1 AND id = $2")
+        .bind(company_id)
+        .bind(internal_approval)
+        .execute(persistence.pool())
+        .await
+        .unwrap();
+    let resumed = persistence
+        .resume_task(internal_task, ResumeActor::Approval(internal_approval))
+        .await
+        .unwrap();
+    assert_eq!(resumed.status, TaskStatus::Pending);
+    assert_eq!(
+        resumed.ownership.owner,
+        TaskOwner::Human(task_owner),
+        "approval resolution must not transfer the underlying task"
+    );
+    let owner_work = persistence
+        .list_attention(query(
+            company_id,
+            &visible,
+            task_owner,
+            AttentionView::MyWork,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(owner_work.items.len(), 1);
+    assert_eq!(owner_work.items[0].source_kind, AttentionSourceKind::Task);
+    assert_eq!(owner_work.items[0].source_id, internal_task);
+}
+
+#[tokio::test]
+async fn approval_assignee_cannot_cross_the_company_boundary() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let (company_id, channel_id, _) = fixture(&persistence).await;
+    let (_, _, foreign_principal) = fixture(&persistence).await;
+    let thread = persistence
+        .create_thread(channel_id, "Tenant-scoped approver", &[])
+        .await
+        .unwrap();
+
+    let result = sqlx::query(
+        r#"INSERT INTO human_approvals (
+               id, company_id, channel_id, thread_id, step_key, approver_email,
+               approver_principal_id, action_type, action_title, action_summary, payload, token,
+               status, expires_at
+           ) VALUES ($1, $2, $3, $4, $5, 'reviewer@example.com', $6, 'tool', 'Approve',
+                     'Confirm', '{}', $7, 'pending', $8)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(channel_id)
+    .bind(thread.id)
+    .bind(format!("cross-tenant-{}", Uuid::new_v4()))
+    .bind(foreign_principal.as_uuid())
+    .bind(Uuid::new_v4())
+    .bind(Utc::now() + chrono::Duration::hours(1))
+    .execute(persistence.pool())
+    .await;
+
+    assert!(
+        result.is_err(),
+        "the composite foreign key must reject a foreign approver"
+    );
+}
+
+async fn insert_approval_task(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    owner: PrincipalId,
+) -> Uuid {
+    let task_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO background_tasks (
+               id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
+               owner_principal_id, owner_principal_kind
+           ) VALUES ($1, $2, $3, $4, $5, 'approval-test', 'pending_approval', '{}', $6, 'person')"#,
+    )
+    .bind(task_id)
+    .bind(company_id)
+    .bind(channel_id)
+    .bind(thread_id)
+    .bind(Uuid::new_v4())
+    .bind(owner.as_uuid())
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    task_id
+}
+
+async fn insert_pending_approval(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    task_id: Uuid,
+    approver_email: &str,
+    approver_principal_id: Option<PrincipalId>,
+) -> Uuid {
+    let approval_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO human_approvals (
+               id, company_id, channel_id, thread_id, task_id, step_key, approver_email,
+               approver_principal_id, action_type, action_title, action_summary, payload, token,
+               status, expires_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'tool', 'Approve deployment',
+                     'Confirm the deployment', '{}', $9, 'pending', $10)"#,
+    )
+    .bind(approval_id)
+    .bind(company_id)
+    .bind(channel_id)
+    .bind(thread_id)
+    .bind(task_id)
+    .bind(format!("approval-{approval_id}"))
+    .bind(approver_email)
+    .bind(approver_principal_id.map(PrincipalId::as_uuid))
+    .bind(Uuid::new_v4())
+    .bind(Utc::now() + chrono::Duration::hours(1))
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    approval_id
 }
 
 fn query<'a>(

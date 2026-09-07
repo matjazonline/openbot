@@ -55,7 +55,7 @@ use crate::{
 
 use super::{
     AgentAuthor, AgentExecutionResult, ChannelMatch, InboundIngestResult, MessageAuthorWrite,
-    MessageCorrelation, MessageWrite, PipelineStep, RecipientRole, ReplyDelivery, ThreadUseCases,
+    MessageCorrelation, MessageWrite, RecipientRole, ReplyDelivery, ThreadUseCases,
     scrub_json_secrets,
     support::{DirectoryCache, build_prompt_text, outbound_reference_ids, rfc_message_id},
 };
@@ -780,13 +780,14 @@ impl ThreadUseCases {
         let Some(envelope) = ingest.envelope.as_deref() else {
             return Ok(DispatchOutcome::Skipped);
         };
-        let Some(matches) = channel_matches_of(ingest) else {
+        let matches = ingest.channel_matches.as_slice();
+        if matches.is_empty() {
             return Ok(DispatchOutcome::Skipped);
-        };
+        }
 
         // The fattest of this function's children by a wide margin: it runs the agents.
         let Some(run) =
-            Box::pin(self.run_agents(&matches, envelope, ingest, lease, correlation_id)).await?
+            Box::pin(self.run_agents(matches, envelope, ingest, lease, correlation_id)).await?
         else {
             info!("Agent execution suspended for task approval or outreach");
             return Ok(DispatchOutcome::Suspended);
@@ -805,7 +806,7 @@ impl ThreadUseCases {
         // message it exposes, and that id is minted here so the message and the queue rows can be
         // written in one transaction.
         let mut reply = Self::agent_reply_write(
-            &matches,
+            matches,
             run.primary_agent.as_ref(),
             reply_subject(envelope.content.subject()),
             &response,
@@ -814,7 +815,7 @@ impl ThreadUseCases {
         let planned = self
             .plan_agent_deliveries(
                 AgentDelivery {
-                    matches: &matches,
+                    matches,
                     envelope,
                     ingest,
                     lease,
@@ -1862,29 +1863,6 @@ fn context_only_message_id(ingest: &InboundIngestResult) -> Option<&str> {
     None
 }
 
-/// Matches recorded by ingest, falling back to the legacy single-channel fields on payloads
-/// enqueued before pipelines existed.
-fn channel_matches_of(ingest: &InboundIngestResult) -> Option<Vec<ChannelMatch>> {
-    if !ingest.channel_matches.is_empty() {
-        return Some(ingest.channel_matches.clone());
-    }
-    let (company, channel, thread, inbound_message) = (
-        ingest.company.as_ref()?,
-        ingest.channel.as_ref()?,
-        ingest.thread.as_ref()?,
-        ingest.inbound_message.as_ref()?,
-    );
-    Some(vec![ChannelMatch {
-        company: company.clone(),
-        channel: channel.clone(),
-        matched_slug: None,
-        thread: thread.clone(),
-        inbound_message: inbound_message.clone(),
-        recipient_role: RecipientRole::To,
-        step: PipelineStep::only(),
-    }])
-}
-
 fn combine_metadata(outputs: &[AgentOutput<'_>]) -> Option<serde_json::Value> {
     if let [only] = outputs {
         return only.metadata.clone();
@@ -1968,6 +1946,7 @@ mod guardrail_trust_tests {
 
 #[cfg(test)]
 mod agent_reply_tests {
+    use super::super::PipelineStep;
     use super::*;
     use crate::entities::{
         channel::{Channel, ChannelAccessMode},

@@ -48,6 +48,11 @@ pub trait ApprovalPersistence: Send + Sync {
         step_key: &str,
     ) -> AppResult<Option<HumanApproval>>;
     async fn get_approval_by_token(&self, token: &str) -> AppResult<Option<HumanApproval>>;
+    async fn get_approval_by_id(
+        &self,
+        company_id: Uuid,
+        approval_id: Uuid,
+    ) -> AppResult<Option<HumanApproval>>;
     async fn consume_pending_approval(
         &self,
         token: &str,
@@ -117,6 +122,16 @@ impl ApprovalUseCases {
             .await?;
 
         Ok(approval.map(|a| a.status))
+    }
+
+    pub async fn get_approval_by_id(
+        &self,
+        company_id: Uuid,
+        approval_id: Uuid,
+    ) -> AppResult<Option<HumanApproval>> {
+        self.approval_persistence
+            .get_approval_by_id(company_id, approval_id)
+            .await
     }
 
     pub async fn create_and_send_approval_request(
@@ -754,6 +769,7 @@ mod tests {
                 task_id: subject.suspension.map(TaskSuspension::task_id),
                 step_key: action.step_key.clone(),
                 approver_email: subject.approver_email.to_string(),
+                approver_principal_id: None,
                 action_type: action.action_type.clone(),
                 action_title: action.title.clone(),
                 action_summary: action.summary.clone(),
@@ -796,6 +812,20 @@ mod tests {
                 .unwrap()
                 .iter()
                 .find(|a| a.token == token)
+                .cloned())
+        }
+
+        async fn get_approval_by_id(
+            &self,
+            company_id: Uuid,
+            approval_id: Uuid,
+        ) -> AppResult<Option<HumanApproval>> {
+            Ok(self
+                .approvals
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|approval| approval.company_id == company_id && approval.id == approval_id)
                 .cloned())
         }
 

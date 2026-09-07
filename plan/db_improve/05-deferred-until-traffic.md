@@ -12,7 +12,7 @@ machinery needed to reopen it are recorded together.
 
 The original audit refused to act on these because the test database had no meaningful cardinality.
 Collection has since been turned on — `pg_stat_statements` is preloaded by the derived PostgreSQL
-image, the extension is created by `migrations/20260901000000_enable_pg_stat_statements.sql`, the
+image, the extension is created by `migrations/20260817000000_init_schema.sql`, the
 operator-only "Database query health" panel and `scripts/db-stats.sh` read it, and `docs/deploy.md`
 carries the activation-verification and controlled-`EXPLAIN` procedures. What collection cannot do
 is manufacture cardinality: **the project is not in production**, so the counters are accruing

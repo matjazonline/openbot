@@ -15,6 +15,7 @@ use crate::{
         memory::MemoryProviderKind,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
+    model_providers::is_supported_model_provider,
 };
 
 pub const MAX_COMPANY_MODEL_CONNECTIONS: usize = 8;
@@ -46,10 +47,7 @@ impl CompanyModelConnectionWrite {
                 "A model provider is missing or too long.".into(),
             ));
         }
-        if !matches!(
-            provider.as_str(),
-            "google" | "openai" | "anthropic" | "groq"
-        ) {
+        if !is_supported_model_provider(&provider) {
             return Err(AppError::BadRequest(format!(
                 "Unsupported model provider '{provider}'."
             )));
@@ -704,6 +702,16 @@ mod tests {
         .unwrap();
         CompanyUseCases::validate_model_connections(std::slice::from_ref(&one))
             .expect("a single default provider is a valid set");
+
+        let xai = CompanyModelConnectionWrite::new(
+            "xai",
+            Some("xai-key".into()),
+            vec!["grok-4.6".into()],
+            true,
+        )
+        .expect("xAI is a supported company provider");
+        CompanyUseCases::validate_model_connections(std::slice::from_ref(&xai))
+            .expect("xAI can be the company's default provider");
 
         let no_default = CompanyModelConnectionWrite::new(
             "anthropic",

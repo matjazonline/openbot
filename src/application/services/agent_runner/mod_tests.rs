@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use super::*;
 use crate::adapters::harness::ai_agents::{AiAgentsHarness, AiAgentsTextClassifier};
-use crate::entities::{agent::Agent as AgentEntity, harness::HarnessKind};
+use crate::entities::{agent::Agent as AgentEntity, harness::HarnessKind, value_objects::ToolId};
 use crate::services::harness::HarnessRegistry;
 use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, StubHarness, register_scripted_agent_base_url,
@@ -37,19 +37,27 @@ fn company() -> Company {
 
 /// A fixture agent whose trusted connection endpoint points at the scripted provider.
 fn agent_with(base_url: &str) -> AgentEntity {
+    agent_with_provider(base_url, SCRIPTED_PROVIDER, Vec::new())
+}
+
+fn agent_with_provider(
+    base_url: &str,
+    provider: &str,
+    granted_tool_ids: Vec<ToolId>,
+) -> AgentEntity {
     let agent = AgentEntity {
         memory_enabled: false,
         id: Uuid::new_v4(),
         company_id: None,
         name: "Scripted".into(),
         slug: "scripted".into(),
-        provider: Some(SCRIPTED_PROVIDER.into()),
+        provider: Some(provider.into()),
         model: Some(SCRIPTED_MODEL.into()),
         run_timeout_secs: None,
         system_prompt: Some("Answer briefly.".into()),
         description: None,
         harness_kind: HarnessKind::default(),
-        granted_tool_ids: Vec::new(),
+        granted_tool_ids,
         native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
         config_json: None,
         memory_persistence_mode: Default::default(),
@@ -207,6 +215,51 @@ async fn agent_execution_sends_resolved_current_date_to_llm() -> anyhow::Result<
             .as_u64()
             .unwrap_or_default()
             > "What date is it today?".chars().count() as u64
+    );
+
+    Ok(())
+}
+
+/// Regression for the provider failure that motivated xAI support: the first model response asks
+/// for a tool, and the second request must preserve the call id and send the result as a `tool`
+/// message. A one-turn completion test cannot prove this protocol works.
+#[tokio::test]
+async fn xai_completes_a_two_turn_tool_loop_through_ai_agents() -> anyhow::Result<()> {
+    let mut llm = scripted_llm(vec![
+        LlmTurn::tool_call("todo", serde_json::json!({ "operation": "list" })),
+        LlmTurn::text("No tasks are pending."),
+    ])
+    .await;
+    let company = company();
+    let agent = agent_with_provider(&llm.base_url, "xai", vec![ToolId::from("todo")]);
+    let params = ResolvedAgentCapabilities::new(Some(&company), Some(&agent))?;
+
+    let output = AgentRunner::new("Check the task list.", &params)
+        .harnesses(registry_of(Arc::new(AiAgentsHarness::new())), classifier())
+        .execute()
+        .await?;
+    assert_eq!(output.content, "No tasks are pending.");
+
+    let requests = llm.observed();
+    assert_eq!(requests.len(), 2);
+    assert!(
+        requests[0]["tools"]
+            .as_array()
+            .is_some_and(|tools| { tools.iter().any(|tool| tool["function"]["name"] == "todo") })
+    );
+
+    let second_messages = requests[1]["messages"]
+        .as_array()
+        .expect("the follow-up carries conversation messages");
+    assert!(second_messages.iter().any(|message| {
+        message["role"] == "assistant"
+            && message["tool_calls"][0]["id"] == "call_0"
+            && message["tool_calls"][0]["function"]["name"] == "todo"
+    }));
+    assert!(
+        second_messages
+            .iter()
+            .any(|message| { message["role"] == "tool" && message["tool_call_id"] == "call_0" })
     );
 
     Ok(())

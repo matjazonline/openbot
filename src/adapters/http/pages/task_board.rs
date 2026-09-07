@@ -279,7 +279,7 @@ pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> 
         detail.agent_names.join(", ")
     );
     format!(
-        r##"<aside id="task-chain-pane" class="fixed inset-y-0 right-0 z-30 flex w-full flex-col border-l border-base-300 bg-base-100 shadow-2xl sm:w-[34rem] xl:static xl:z-auto xl:shadow-none"
+        r##"<aside id="task-chain-pane" class="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-base-300 bg-base-100 shadow-2xl sm:w-[34rem] xl:static xl:z-auto xl:shadow-none"
             sse-swap="task-chain" hx-target="this" hx-swap="outerHTML" data-correlation-id="{correlation_id}">
             <header class="border-b border-base-300 px-4 py-3">
                 <div class="flex items-start justify-between gap-3">
@@ -425,6 +425,7 @@ fn collaboration_next_action(action: &CollaborationNextAction) -> String {
     };
     let verb = match action.action {
         NextActionKind::RunTask => "resume the task",
+        NextActionKind::AssignTaskOwner => "assign an available owner",
         NextActionKind::DeliverRequest => "send the request",
         NextActionKind::ProvideResponse => "provide a response",
         NextActionKind::ReviewTimeout => "review the deadline",

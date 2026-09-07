@@ -435,20 +435,14 @@ impl<'a> AgentRunner<'a> {
 
             let mut context = context;
             context.sub_agent_scope = self.params.spec().sub_agents.clone();
-            if self
-                .app_config
-                .as_ref()
-                .is_some_and(|config| config.task_ownership_controls_enabled())
-            {
-                host = host.with_task_ownership(TaskOwnershipTool::new(
-                    task_persistence.clone(),
-                    TaskOwnershipToolContext {
-                        company_id: context.company_id,
-                        channel_id: context.channel_id,
-                        lease: context.lease,
-                    },
-                ));
-            }
+            host = host.with_task_ownership(TaskOwnershipTool::new(
+                task_persistence.clone(),
+                TaskOwnershipToolContext {
+                    company_id: context.company_id,
+                    channel_id: context.channel_id,
+                    lease: context.lease,
+                },
+            ));
             let mut outreach = OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,

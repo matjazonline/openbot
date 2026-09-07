@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::entities::{
     correlation::CorrelationId,
     task::TaskSuspension,
+    transport::PrincipalId,
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 
@@ -57,6 +58,9 @@ pub struct HumanApproval {
     pub task_id: Option<Uuid>,
     pub step_key: String,
     pub approver_email: String,
+    /// The in-app teammate assigned to decide this approval. `None` means the approver is an
+    /// email-only external participant and therefore has no personal work queue.
+    pub approver_principal_id: Option<PrincipalId>,
     pub action_type: String,
     pub action_title: String,
     pub action_summary: String,

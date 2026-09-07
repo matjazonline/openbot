@@ -91,6 +91,7 @@ pub enum NextActionActor {
 #[serde(rename_all = "snake_case")]
 pub enum NextActionKind {
     RunTask,
+    AssignTaskOwner,
     DeliverRequest,
     ProvideResponse,
     ReviewTimeout,

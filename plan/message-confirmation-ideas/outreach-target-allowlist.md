@@ -51,7 +51,7 @@ array. The database and application bound the list to 64 entries. Application no
 - Deduplicates entries.
 - Requires a DNS-shaped multi-label domain with valid label lengths and characters.
 
-The migration is `migrations/20260905010000_company_outreach_allowlist_domains.sql`.
+The schema belongs in `migrations/20260817000000_init_schema.sql`.
 
 Both company settings interfaces expose the list and warn that it applies company-wide and makes
 every mailbox at each domain reachable by agents configured for `known_plus_domains`. Public

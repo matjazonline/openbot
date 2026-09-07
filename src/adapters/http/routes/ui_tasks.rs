@@ -743,11 +743,6 @@ async fn mutate_task_ownership(
     form: OwnershipForm,
     operation: TaskOwnershipOperation,
 ) -> AppResult<Response> {
-    if !workspace.config.task_ownership_controls_enabled() {
-        return Err(AppError::NotFound(
-            "Task ownership controls are disabled.".into(),
-        ));
-    }
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
     let task = view.require_task(task_id).await?;
@@ -1096,7 +1091,6 @@ impl TaskMonitorView<'_> {
             attempts: &attempts,
             attempts_error,
             error,
-            ownership_controls_enabled: self.config.task_ownership_controls_enabled(),
             ownership_events: &ownership_events,
             owner_candidates: &owner_candidates,
             collaboration: collaboration.as_ref(),

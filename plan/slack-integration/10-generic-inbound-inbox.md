@@ -8,7 +8,7 @@ ingress afterward.
 
 ## Migration
 
-Create `migrations/20260902040000_add_inbound_events.sql` with `inbound_events`:
+Define `inbound_events` in `migrations/20260817000000_init_schema.sql`:
 
 - ID, transport, installation ID, external event key, received correlation ID, bounded raw payload
   (`BYTEA` preferred when signature fidelity matters), content type/hash, safe header facts, status,
@@ -66,4 +66,3 @@ Create `migrations/20260902040000_add_inbound_events.sql` with `inbound_events`:
   business ingress inline.
 - No process crash after successful storage can permanently lose an acknowledged event.
 - Queue ownership and canonical ingestion share one execution fence and one final transaction.
-

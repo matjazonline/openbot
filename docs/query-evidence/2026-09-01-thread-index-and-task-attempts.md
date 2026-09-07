@@ -29,7 +29,7 @@ No index migration is included in this change:
 - The local database has no representative `email_message_metadata`, `thread_messages`, or
   `task_attempts` population from which to capture meaningful `EXPLAIN (ANALYZE, BUFFERS)` output.
 - Statistics collection is live — `pg_stat_statements` is preloaded, the extension is created by
-  `migrations/20260901000000_enable_pg_stat_statements.sql`, and the operator query-health panel and
+  `migrations/20260817000000_init_schema.sql`, and the operator query-health panel and
   `scripts/db-stats.sh` read it — but its counters are accruing against a near-empty database, and
   the skewed-seed and workload tooling tracked in `plan/db_improve/05-deferred-until-traffic.md` is
   not present yet.

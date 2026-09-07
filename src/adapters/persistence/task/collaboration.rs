@@ -124,6 +124,13 @@ impl Projection<'_> {
         let progress = projected
             .stored_status
             .map(|_| collaboration_progress(&projected));
+        let next_action = summary_next_action(
+            &task,
+            &owner,
+            business_status,
+            projected.expires_at,
+            &projected.children,
+        );
         Ok(Some(CollaborationSummary {
             task_id,
             outreach_id: projected.outreach_id,
@@ -133,12 +140,7 @@ impl Projection<'_> {
             status: business_status,
             progress,
             expires_at: projected.expires_at,
-            next_action: summary_next_action(
-                &task,
-                business_status,
-                projected.expires_at,
-                &projected.children,
-            ),
+            next_action,
             children: projected.children,
             as_of: self.as_of,
             truncated: false,
@@ -463,6 +465,7 @@ fn target_next_action(
 
 fn summary_next_action(
     task: &CollaborationTaskDb,
+    owner: &CollaborationOwner,
     status: OutreachBusinessStatus,
     expires_at: Option<DateTime<Utc>>,
     children: &[CollaborationTargetSummary],
@@ -472,12 +475,29 @@ fn summary_next_action(
             .iter()
             .filter_map(|child| child.next_action.clone())
             .min_by_key(|action| action.due_at),
-        OutreachBusinessStatus::ReadyToResume => Some(CollaborationNextAction {
-            actor: NextActionActor::TaskQueue,
-            action: NextActionKind::RunTask,
-            due_at: Some(task.run_at),
-            href: None,
-        }),
+        OutreachBusinessStatus::ReadyToResume => {
+            let (actor, action, due_at) = match (owner.kind, owner.available) {
+                (CollaborationOwnerKind::Agent, true) => (
+                    NextActionActor::TaskQueue,
+                    NextActionKind::RunTask,
+                    Some(task.run_at),
+                ),
+                (CollaborationOwnerKind::Human, true) => {
+                    (NextActionActor::CurrentOwner, NextActionKind::RunTask, None)
+                }
+                _ => (
+                    NextActionActor::CompanyManager,
+                    NextActionKind::AssignTaskOwner,
+                    None,
+                ),
+            };
+            Some(CollaborationNextAction {
+                actor,
+                action,
+                due_at,
+                href: None,
+            })
+        }
         OutreachBusinessStatus::NeedsDecision => children
             .iter()
             .filter_map(|child| child.next_action.clone())
@@ -816,6 +836,62 @@ mod tests {
         assert_eq!(owner.principal_id, Some(owner_id.into()));
         assert_eq!(owner.label, "Former operator");
         assert!(!owner.available);
+    }
+
+    #[test]
+    fn released_pending_task_asks_for_an_owner_instead_of_promising_a_queue_run() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let task_id = Uuid::new_v4();
+        let released = CollaborationTaskDb {
+            status: TaskStatus::Pending.as_str().into(),
+            ..task(task_id, channel_id)
+        };
+        let visible_channel_ids = [channel_id];
+        let mut projection = projection(
+            company_id,
+            &visible_channel_ids,
+            vec![released],
+            HashMap::new(),
+        );
+
+        let summary = projection.build(task_id, 0).unwrap().unwrap();
+        let next = summary.next_action.unwrap();
+
+        assert_eq!(summary.status, OutreachBusinessStatus::ReadyToResume);
+        assert_eq!(next.actor, NextActionActor::CompanyManager);
+        assert_eq!(next.action, NextActionKind::AssignTaskOwner);
+        assert_eq!(next.due_at, None);
+    }
+
+    #[test]
+    fn agent_owned_pending_task_still_names_the_queue_and_run_time() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let task_id = Uuid::new_v4();
+        let run_at = as_of() + chrono::Duration::minutes(2);
+        let pending = CollaborationTaskDb {
+            status: TaskStatus::Pending.as_str().into(),
+            owner_principal_id: Some(Uuid::new_v4()),
+            owner_principal_kind: Some("agent".into()),
+            owner_label: Some("Queue agent".into()),
+            run_at,
+            ..task(task_id, channel_id)
+        };
+        let visible_channel_ids = [channel_id];
+        let mut projection = projection(
+            company_id,
+            &visible_channel_ids,
+            vec![pending],
+            HashMap::new(),
+        );
+
+        let summary = projection.build(task_id, 0).unwrap().unwrap();
+        let next = summary.next_action.unwrap();
+
+        assert_eq!(next.actor, NextActionActor::TaskQueue);
+        assert_eq!(next.action, NextActionKind::RunTask);
+        assert_eq!(next.due_at, Some(run_at));
     }
 
     #[test]

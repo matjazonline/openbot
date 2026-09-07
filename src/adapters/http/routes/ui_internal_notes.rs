@@ -8,6 +8,7 @@ use axum::{
     http::StatusCode,
     response::Html,
 };
+use axum_extra::extract::Form as HtmlForm;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -278,7 +279,7 @@ async fn ask_owner_ui(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
-    Form(form): Form<NoteActionForm>,
+    HtmlForm(form): HtmlForm<NoteActionForm>,
 ) -> AppResult<Html<String>> {
     let scope = load_scope(
         &company_use_cases,
@@ -327,7 +328,7 @@ async fn start_task_ui(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
-    Form(form): Form<NoteActionForm>,
+    HtmlForm(form): HtmlForm<NoteActionForm>,
 ) -> AppResult<Html<String>> {
     let scope = load_scope(
         &company_use_cases,
@@ -529,4 +530,49 @@ async fn start_task_api(
             },
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::FromRequest,
+        http::{Request, header},
+    };
+
+    use super::{HtmlForm, NoteActionForm};
+
+    #[tokio::test]
+    async fn note_action_form_accepts_one_or_multiple_selected_notes() {
+        let first_note = uuid::Uuid::new_v4();
+        let second_note = uuid::Uuid::new_v4();
+        let common_fields = format!(
+            "company_id={}&channel_id={}&thread_id={}&command_id={}",
+            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4()
+        );
+
+        let one = extract_note_action_form(format!("{common_fields}&note_ids={first_note}")).await;
+        assert_eq!(one.note_ids, vec![first_note]);
+
+        let multiple = extract_note_action_form(format!(
+            "{common_fields}&note_ids={first_note}&note_ids={second_note}"
+        ))
+        .await;
+        assert_eq!(multiple.note_ids, vec![first_note, second_note]);
+    }
+
+    async fn extract_note_action_form(body: String) -> NoteActionForm {
+        let request = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        HtmlForm::<NoteActionForm>::from_request(request, &())
+            .await
+            .unwrap()
+            .0
+    }
 }

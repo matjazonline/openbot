@@ -11,7 +11,10 @@ use crate::{
         thread::insert_message_on,
     },
     app_error::{AppError, AppResult},
-    entities::approval::{ApprovalStatus, HumanApproval, QuorumTimeoutAction},
+    entities::{
+        approval::{ApprovalStatus, HumanApproval, QuorumTimeoutAction},
+        transport::PrincipalId,
+    },
     use_cases::approval::{ApprovalPersistence, NewApproval},
 };
 
@@ -24,6 +27,7 @@ pub struct HumanApprovalDb {
     pub task_id: Option<Uuid>,
     pub step_key: String,
     pub approver_email: String,
+    pub approver_principal_id: Option<Uuid>,
     pub action_type: String,
     pub action_title: String,
     pub action_summary: String,
@@ -37,7 +41,7 @@ pub struct HumanApprovalDb {
 
 const APPROVAL_COLUMNS: &str = r#"id, company_id, channel_id, thread_id, task_id,
     step_key, approver_email, action_type, action_title, action_summary, payload, token,
-    status, expires_at, created_at, updated_at"#;
+    status, expires_at, created_at, updated_at, approver_principal_id"#;
 
 impl TryFrom<HumanApprovalDb> for HumanApproval {
     type Error = AppError;
@@ -54,6 +58,7 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
             task_id: db.task_id,
             step_key: db.step_key,
             approver_email: db.approver_email,
+            approver_principal_id: db.approver_principal_id.map(PrincipalId::new),
             action_type: db.action_type,
             action_title: db.action_title,
             action_summary: db.action_summary,
@@ -65,6 +70,32 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
             updated_at: db.updated_at,
         })
     }
+}
+
+async fn approver_principal_id(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    approver_email: &str,
+) -> AppResult<Option<Uuid>> {
+    sqlx::query_scalar::<_, Uuid>(
+        r#"SELECT principal.id
+           FROM participant_identities AS identity
+           JOIN principals AS principal
+             ON principal.company_id = identity.company_id
+            AND principal.id = identity.principal_id
+           WHERE identity.company_id = $1
+             AND identity.transport = 'email'
+             AND identity.status = 'verified'
+             AND LOWER(identity.subject) = LOWER($2)
+             AND principal.kind = 'person'
+           ORDER BY identity.created_at, identity.id
+           LIMIT 1"#,
+    )
+    .bind(company_id)
+    .bind(approver_email)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)
 }
 
 #[async_trait]
@@ -82,20 +113,26 @@ impl ApprovalPersistence for PostgresPersistence {
             expires_at,
         } = new_approval;
         let task_id = subject.suspension.map(TaskSuspension::task_id);
-        let id = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let approver_principal_id =
+            approver_principal_id(&mut tx, subject.company_id, subject.approver_email.as_str())
+                .await?;
+        let id = Uuid::new_v4();
         let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             INSERT INTO human_approvals (
                 id, company_id, channel_id, thread_id, task_id,
                 step_key, approver_email, action_type, action_title,
-                action_summary, payload, token, status, expires_at
+                action_summary, payload, token, status, expires_at, approver_principal_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', $13, $14)
             ON CONFLICT ON CONSTRAINT human_approvals_thread_step_key
             DO UPDATE SET
                 approver_email = CASE WHEN human_approvals.status = 'expired'
                     THEN EXCLUDED.approver_email ELSE human_approvals.approver_email END,
+                approver_principal_id = CASE WHEN human_approvals.status = 'expired'
+                    THEN EXCLUDED.approver_principal_id
+                    ELSE human_approvals.approver_principal_id END,
                 action_type = CASE WHEN human_approvals.status = 'expired'
                     THEN EXCLUDED.action_type ELSE human_approvals.action_type END,
                 action_title = CASE WHEN human_approvals.status = 'expired'
@@ -130,6 +167,7 @@ impl ApprovalPersistence for PostgresPersistence {
         .bind(&action.payload)
         .bind(token)
         .bind(expires_at)
+        .bind(approver_principal_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(|e| AppError::Internal(format!("Failed to create human approval: {}", e)))?;
@@ -240,6 +278,23 @@ impl ApprovalPersistence for PostgresPersistence {
         .map_err(|e| AppError::Internal(format!("Failed to query approval by token: {}", e)))?;
 
         db.map(|d| d.try_into()).transpose()
+    }
+
+    async fn get_approval_by_id(
+        &self,
+        company_id: Uuid,
+        approval_id: Uuid,
+    ) -> AppResult<Option<HumanApproval>> {
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
+            r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
+               WHERE company_id = $1 AND id = $2"#
+        ))
+        .bind(company_id)
+        .bind(approval_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn consume_pending_approval(
@@ -895,6 +950,19 @@ mod tests {
             .await
             .unwrap();
         assert!(created);
+        let owner_principal = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(company.id)
+        .bind(owner.id)
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            approval.approver_principal_id,
+            Some(PrincipalId::new(owner_principal)),
+            "a verified teammate address is snapshotted as the in-app approval assignee"
+        );
 
         // Counted by key alone, with no `status` filter. What is under test is that creating an
         // approval queues exactly one notification; whether a worker has since claimed it is the
@@ -918,14 +986,32 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(noticed, 1);
+        let reloaded = persistence
+            .find_approval_by_step_key(company.id, channel.id, thread.id, "deploy-step")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reloaded.id, approval.id);
+        assert_eq!(
+            reloaded.approver_principal_id,
+            approval.approver_principal_id
+        );
         assert_eq!(
             persistence
-                .find_approval_by_step_key(company.id, channel.id, thread.id, "deploy-step",)
+                .get_approval_by_id(company.id, approval.id)
                 .await
                 .unwrap()
                 .unwrap()
                 .id,
             approval.id
+        );
+        assert!(
+            persistence
+                .get_approval_by_id(Uuid::new_v4(), approval.id)
+                .await
+                .unwrap()
+                .is_none(),
+            "an approval id from another company must not cross the tenant scope"
         );
 
         let now = chrono::Utc::now();

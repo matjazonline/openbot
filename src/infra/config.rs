@@ -1,4 +1,4 @@
-use std::{env, sync::OnceLock, time::Duration as StdDuration};
+use std::{env, time::Duration as StdDuration};
 
 use p256::{ecdsa::VerifyingKey, pkcs8::DecodePublicKey};
 use secrecy::SecretString;
@@ -20,14 +20,6 @@ use crate::{
 pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
 pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
 pub const DEFAULT_AGENT_RUN_TIMEOUT_SECS: u64 = 300;
-static TASK_OWNERSHIP_CONTROLS_ENABLED: OnceLock<bool> = OnceLock::new();
-
-fn read_task_ownership_controls_enabled() -> bool {
-    env::var("TASK_OWNERSHIP_CONTROLS_ENABLED")
-        .unwrap_or_else(|_| "false".to_string())
-        .parse()
-        .expect("TASK_OWNERSHIP_CONTROLS_ENABLED must be true or false")
-}
 
 /// Stack size for the async runtime's worker and blocking threads.
 ///
@@ -156,12 +148,6 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    /// Rollout gate for mutation surfaces. Workers honor ownership unconditionally, so disabling
-    /// this only prevents new browser/agent commands while an ownership-aware deployment settles.
-    pub fn task_ownership_controls_enabled(&self) -> bool {
-        *TASK_OWNERSHIP_CONTROLS_ENABLED.get_or_init(read_task_ownership_controls_enabled)
-    }
-
     /// The memory providers this deployment carries credentials for. Derived from the config
     /// rather than stored, so it cannot fall out of step with what `infra::setup` registers.
     pub fn configured_memory_providers(&self) -> ConfiguredMemoryProviders {
@@ -709,9 +695,6 @@ impl AppConfig {
             .unwrap_or_else(|_| "false".to_string())
             .parse()
             .unwrap_or(false);
-        let ownership_controls_enabled = read_task_ownership_controls_enabled();
-        let _ = TASK_OWNERSHIP_CONTROLS_ENABLED.set(ownership_controls_enabled);
-
         let gcs = GcsConfig::from_env(&app_domain_name);
         let hydradb = MemoryProviderHttpConfig::from_env("HYDRA_DB");
         let hindsight = MemoryProviderHttpConfig::from_env("HINDSIGHT");

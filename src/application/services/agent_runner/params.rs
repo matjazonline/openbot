@@ -14,13 +14,8 @@ use crate::entities::harness::{
     AgentCapabilitySpec, HarnessConfig, HarnessKind, NativeToolPolicy, SubAgentScope,
 };
 use crate::entities::value_objects::{ModelName, ModelProvider};
+use crate::model_providers::{SUPPORTED_MODEL_PROVIDERS, is_supported_model_provider};
 use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
-
-/// The providers this platform will build an agent for.
-///
-/// Mirrored by the company model-connection check in `use_cases/company.rs`: a company cannot
-/// store a credential for a provider that is not here, and an agent cannot select one.
-const SUPPORTED_PROVIDERS: [&str; 4] = ["google", "openai", "anthropic", "groq"];
 
 /// What an agent says it is when nothing has told it. Public because it is a value a reader may
 /// need to recognise -- an agent answering with this has no prompt of its own.
@@ -110,11 +105,11 @@ impl ResolvedAgentCapabilities {
         model: &ModelName,
         api_key: &str,
     ) -> AppResult<Self> {
-        if !SUPPORTED_PROVIDERS.contains(&provider.as_str()) {
+        if !is_supported_model_provider(provider.as_str()) {
             return Err(AppError::BadRequest(format!(
                 "Unsupported agent provider '{}'. Allowed providers are: {}",
                 provider,
-                SUPPORTED_PROVIDERS.join(", ")
+                SUPPORTED_MODEL_PROVIDERS.join(", ")
             )));
         }
         if model.as_str().is_empty() {

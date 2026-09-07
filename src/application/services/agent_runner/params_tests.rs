@@ -37,7 +37,7 @@ fn an_unsupported_provider_is_refused_before_a_credential_is_touched() {
         &ModelName::canonical("model"),
         "key",
     )
-    .expect_err("a blank provider is not one of the four");
+    .expect_err("a blank provider is not supported");
     assert!(error.to_string().contains("Unsupported agent provider"));
 }
 
@@ -142,7 +142,7 @@ fn an_agent_with_a_blank_prompt_falls_back_to_the_default() {
 fn every_supported_provider_resolves_and_nothing_else_does() {
     let company = company_named("Acme Corp");
 
-    for provider in ["google", "openai", "anthropic", "groq"] {
+    for provider in ["google", "openai", "anthropic", "groq", "xai"] {
         let resolved = ResolvedAgentCapabilities::from_connection(
             Some(&company),
             None,

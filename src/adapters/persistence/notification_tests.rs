@@ -284,6 +284,22 @@ fn notification_email(
 }
 
 #[tokio::test]
+async fn notification_census_executes_against_postgres() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+
+    let census = persistence.notification_census().await.unwrap();
+
+    assert!(
+        census
+            .oldest_active_age_seconds
+            .is_none_or(|seconds| seconds >= 0.0)
+    );
+}
+
+#[tokio::test]
 async fn assignment_projection_is_fenced_idempotent_and_never_owns_task_state() {
     let Some(pool) = test_pool().await else {
         return;

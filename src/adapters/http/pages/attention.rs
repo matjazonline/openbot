@@ -119,6 +119,7 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
     let source = match item.source_kind {
         AttentionSourceKind::Task => "Task",
         AttentionSourceKind::Handoff => "Handoff",
+        AttentionSourceKind::Approval => "Approval",
         AttentionSourceKind::ResponseReview => "Review",
         AttentionSourceKind::DelegationDecision => "Delegation decision",
         AttentionSourceKind::DeliveryFailure => "Delivery failure",
@@ -242,5 +243,51 @@ mod tests {
         assert!(rendered.contains("Casey &amp; &lt;team&gt;"));
         assert!(rendered.contains("cursor&amp;next"));
         assert!(rendered.contains("href=\"/ui?x=&quot;&amp;y=&lt;unsafe&gt;\""));
+    }
+
+    #[test]
+    fn list_identifies_external_approval_work() {
+        let now = Utc::now();
+        let company_id = Uuid::new_v4();
+        let approval_id = Uuid::new_v4();
+        let rendered = attention_list(
+            company_id,
+            AttentionView::TeamWork,
+            &AttentionPage {
+                items: vec![AttentionItem {
+                    source_kind: AttentionSourceKind::Approval,
+                    source_id: approval_id,
+                    company_id,
+                    channel_id: Uuid::new_v4(),
+                    thread_id: Some(Uuid::new_v4()),
+                    task_id: Some(Uuid::new_v4()),
+                    correlation_id: None,
+                    state: "pending".into(),
+                    responsibility: AttentionResponsibility::External,
+                    responsibility_label: "External approver".into(),
+                    title: "Approve deployment".into(),
+                    next_action: "Approve or reject the requested action".into(),
+                    priority: BusinessPriority::Normal,
+                    due_at: None,
+                    expires_at: None,
+                    version: 1,
+                    created_at: now,
+                    updated_at: now,
+                    href: Some(format!(
+                        "/ui/approvals/{approval_id}?company_id={company_id}"
+                    )),
+                }],
+                next_cursor: None,
+                as_of: now,
+                working_set_size: 1,
+                truncated: false,
+            },
+        );
+
+        assert!(rendered.contains("Approval"));
+        assert!(rendered.contains("External approver"));
+        assert!(rendered.contains(&format!(
+            "/ui/approvals/{approval_id}?company_id={company_id}"
+        )));
     }
 }

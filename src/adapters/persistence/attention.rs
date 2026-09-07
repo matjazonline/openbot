@@ -29,6 +29,7 @@ struct AttentionRow {
     correlation_id: Option<Uuid>,
     state: String,
     responsible_principal_id: Option<Uuid>,
+    responsibility_kind: String,
     responsibility_label: String,
     title: String,
     next_action: String,
@@ -55,10 +56,19 @@ impl TryFrom<AttentionRow> for AttentionItem {
             task_id: row.task_id,
             correlation_id: row.correlation_id.map(CorrelationId::from),
             state: row.state,
-            responsibility: row
-                .responsible_principal_id
-                .map(|id| AttentionResponsibility::Principal(PrincipalId::new(id)))
-                .unwrap_or(AttentionResponsibility::ChannelTeam),
+            responsibility: match (
+                row.responsibility_kind.as_str(),
+                row.responsible_principal_id,
+            ) {
+                ("principal", Some(id)) => AttentionResponsibility::Principal(PrincipalId::new(id)),
+                ("channel_team", None) => AttentionResponsibility::ChannelTeam,
+                ("external", None) => AttentionResponsibility::External,
+                (kind, principal_id) => {
+                    return Err(AppError::Internal(format!(
+                        "Invalid attention responsibility {kind} with principal {principal_id:?}"
+                    )));
+                }
+            },
             responsibility_label: row.responsibility_label,
             title: row.title,
             next_action: row.next_action,
@@ -84,6 +94,8 @@ WITH params AS (
            CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END
                AS responsible_principal_id,
            CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END AS responsibility_kind,
+           CASE WHEN task.owner_principal_kind = 'person'
                 THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END
                AS responsibility_label,
            task.task_type AS title,
@@ -105,6 +117,11 @@ WITH params AS (
                           'waiting_for_third_party_reply', 'failed', 'dead_letter')
       AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
            OR task.status IN ('pending_approval', 'failed', 'dead_letter'))
+      AND NOT EXISTS (
+          SELECT 1 FROM human_approvals AS approval
+          WHERE approval.company_id = task.company_id AND approval.task_id = task.id
+            AND approval.status = 'pending'
+      )
       AND NOT EXISTS (
           SELECT 1 FROM response_reviews AS review
           WHERE review.company_id = task.company_id AND review.status = 'pending'
@@ -131,6 +148,8 @@ WITH params AS (
     SELECT 'handoff', handoff.id, handoff.company_id, handoff.channel_id, handoff.thread_id,
            NULL::uuid, handoff.correlation_id, handoff.status,
            handoff.responsible_principal_id,
+           CASE WHEN handoff.responsible_principal_id IS NULL
+                THEN 'channel_team' ELSE 'principal' END,
            COALESCE(responsible.display_label, 'Channel team'), handoff.title,
            handoff.next_action, handoff.business_priority, handoff.business_due_at,
            NULL::timestamptz, handoff.version, handoff.created_at, handoff.updated_at
@@ -143,9 +162,32 @@ WITH params AS (
 
     UNION ALL
 
+    SELECT 'approval', approval.id, approval.company_id, approval.channel_id,
+           approval.thread_id, approval.task_id, task.correlation_id, approval.status,
+           approval.approver_principal_id,
+           CASE WHEN approval.approver_principal_id IS NULL
+                THEN 'external' ELSE 'principal' END,
+           CASE WHEN approval.approver_principal_id IS NULL
+                THEN 'External approver'
+                ELSE COALESCE(approver.display_label, 'Assigned approver') END,
+           approval.action_title, 'Approve or reject the requested action',
+           COALESCE(task.business_priority, 'normal'),
+           COALESCE(task.business_due_at, approval.expires_at), approval.expires_at,
+           1::bigint, approval.created_at, approval.updated_at
+    FROM human_approvals AS approval
+    LEFT JOIN background_tasks AS task
+      ON task.company_id = approval.company_id AND task.id = approval.task_id
+    LEFT JOIN principals AS approver
+      ON approver.company_id = approval.company_id
+     AND approver.id = approval.approver_principal_id
+    WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
+      AND approval.status = 'pending'
+
+    UNION ALL
+
     SELECT 'response_review', review.draft_id, review.company_id, draft.channel_id,
            draft.thread_id, draft.task_id, task.correlation_id, review.status,
-           review.reviewer_principal_id, reviewer.display_label,
+           review.reviewer_principal_id, 'principal', reviewer.display_label,
            draft.subject, 'Review the proposed external response',
            COALESCE(task.business_priority, 'normal'), task.business_due_at,
            review.expires_at, draft.version::bigint, review.created_at, review.updated_at
@@ -165,6 +207,8 @@ WITH params AS (
            task.thread_id, task.id, task.correlation_id, outreach.status,
            CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
            CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END,
+           CASE WHEN task.owner_principal_kind = 'person'
                 THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
            outreach.subject, 'Review the delegation timeout', task.business_priority,
            CASE WHEN task.business_due_at IS NULL THEN outreach.expires_at
@@ -182,6 +226,8 @@ WITH params AS (
     SELECT 'delivery_failure', delivery.id, delivery.company_id, delivery.channel_id,
            task.thread_id, delivery.task_id, delivery.correlation_id, delivery.status,
            CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END,
            CASE WHEN task.owner_principal_kind = 'person'
                 THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
            message.subject,
@@ -214,8 +260,9 @@ WITH params AS (
                AS priority_rank
     FROM raw CROSS JOIN params
     WHERE ($4 = 'team_work'
-           OR ($4 = 'my_work' AND raw.responsible_principal_id = $3)
-           OR ($4 = 'unassigned' AND raw.responsible_principal_id IS NULL))
+           OR ($4 = 'my_work' AND raw.responsibility_kind = 'principal'
+                                  AND raw.responsible_principal_id = $3)
+           OR ($4 = 'unassigned' AND raw.responsibility_kind = 'channel_team'))
 ), after_cursor AS (
     SELECT * FROM ranked
     WHERE NOT $6 OR (due_rank, priority_rank, created_at, source_kind, source_id)
@@ -233,6 +280,10 @@ LIMIT $13
 fn item_href(item: &AttentionItem) -> String {
     match item.source_kind {
         AttentionSourceKind::ResponseReview => format!("/reviews/{}", item.source_id),
+        AttentionSourceKind::Approval => format!(
+            "/ui/approvals/{}?company_id={}",
+            item.source_id, item.company_id
+        ),
         AttentionSourceKind::DeliveryFailure => {
             format!("/ui/deliveries?company_id={}", item.company_id)
         }
@@ -600,7 +651,10 @@ impl AttentionPersistence for PostgresPersistence {
                         .map_err(AppError::from)?;
                     row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
                 }
-                _ => unreachable!(),
+                AttentionSourceKind::Approval
+                | AttentionSourceKind::ResponseReview
+                | AttentionSourceKind::DelegationDecision
+                | AttentionSourceKind::DeliveryFailure => unreachable!(),
             };
         if let Some(responsible) = command.responsible_principal_id {
             require_channel_principal(&mut tx, command.company_id, channel_id, responsible).await?;
@@ -667,7 +721,10 @@ impl AttentionPersistence for PostgresPersistence {
                 .await
                 .map_err(AppError::from)?;
             }
-            _ => unreachable!(),
+            AttentionSourceKind::Approval
+            | AttentionSourceKind::ResponseReview
+            | AttentionSourceKind::DelegationDecision
+            | AttentionSourceKind::DeliveryFailure => unreachable!(),
         }
         let operation = if old_responsible != new_responsible {
             "reassigned"
@@ -821,7 +878,9 @@ impl AttentionPersistence for PostgresPersistence {
                current_actionable AS (
                  SELECT task.created_at,
                         CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END AS responsible_principal_id
+                             THEN task.owner_principal_id END AS responsible_principal_id,
+                        CASE WHEN task.owner_principal_kind = 'person'
+                             THEN 'principal' ELSE 'channel_team' END AS responsibility_kind
                  FROM background_tasks AS task
                  WHERE task.company_id = $1 AND task.channel_id = ANY($2)
                    AND task.status IN ('pending','processing','pending_approval',
@@ -829,6 +888,11 @@ impl AttentionPersistence for PostgresPersistence {
                    AND (task.owner_principal_kind = 'person'
                         OR task.owner_principal_id IS NULL
                         OR task.status IN ('pending_approval','failed','dead_letter'))
+                   AND NOT EXISTS (
+                       SELECT 1 FROM human_approvals AS approval
+                       WHERE approval.company_id = task.company_id
+                         AND approval.task_id = task.id AND approval.status = 'pending'
+                   )
                    AND NOT EXISTS (
                        SELECT 1 FROM response_reviews AS review
                        JOIN response_drafts AS draft
@@ -852,12 +916,21 @@ impl AttentionPersistence for PostgresPersistence {
                          AND delivery.last_error_class IS DISTINCT FROM 'superseded'
                    )
                  UNION ALL
-                 SELECT handoff.created_at, handoff.responsible_principal_id
+                 SELECT handoff.created_at, handoff.responsible_principal_id,
+                        CASE WHEN handoff.responsible_principal_id IS NULL
+                             THEN 'channel_team' ELSE 'principal' END
                  FROM manual_handoffs AS handoff
                  WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
                    AND handoff.status = 'open'
                  UNION ALL
-                 SELECT review.created_at, review.reviewer_principal_id
+                 SELECT approval.created_at, approval.approver_principal_id,
+                        CASE WHEN approval.approver_principal_id IS NULL
+                             THEN 'external' ELSE 'principal' END
+                 FROM human_approvals AS approval
+                 WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
+                   AND approval.status = 'pending'
+                 UNION ALL
+                 SELECT review.created_at, review.reviewer_principal_id, 'principal'
                  FROM response_reviews AS review
                  JOIN response_drafts AS draft
                    ON draft.company_id = review.company_id AND draft.id = review.draft_id
@@ -867,7 +940,9 @@ impl AttentionPersistence for PostgresPersistence {
                  UNION ALL
                  SELECT outreach.created_at,
                         CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END
+                             THEN task.owner_principal_id END,
+                        CASE WHEN task.owner_principal_kind = 'person'
+                             THEN 'principal' ELSE 'channel_team' END
                  FROM task_outreaches AS outreach
                  JOIN background_tasks AS task ON task.id = outreach.task_id
                  WHERE task.company_id = $1 AND task.channel_id = ANY($2)
@@ -875,7 +950,9 @@ impl AttentionPersistence for PostgresPersistence {
                  UNION ALL
                  SELECT delivery.created_at,
                         CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END
+                             THEN task.owner_principal_id END,
+                        CASE WHEN task.owner_principal_kind = 'person'
+                             THEN 'principal' ELSE 'channel_team' END
                  FROM message_deliveries AS delivery
                  LEFT JOIN background_tasks AS task
                    ON task.company_id = delivery.company_id AND task.id = delivery.task_id
@@ -921,7 +998,7 @@ impl AttentionPersistence for PostgresPersistence {
                )
                SELECT clock.as_of,
                  (SELECT COUNT(*) FROM current_actionable
-                   WHERE responsible_principal_id IS NULL)::bigint AS unassigned_count,
+                   WHERE responsibility_kind = 'channel_team')::bigint AS unassigned_count,
                  (SELECT EXTRACT(EPOCH FROM (clock.as_of - MIN(created_at)))::float8
                     FROM current_actionable) AS oldest_actionable_age_seconds,
                  (SELECT AVG(EXTRACT(EPOCH FROM (claim.occurred_at - task.created_at)))::float8

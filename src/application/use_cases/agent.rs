@@ -1003,7 +1003,8 @@ impl PromptGeneratorLlm {
                 )
             })?;
         let model = ModelName::canonical(
-            non_empty(model_override).unwrap_or_else(|| default_model_for(&provider)),
+            non_empty(model_override)
+                .unwrap_or_else(|| crate::model_providers::default_model_for(&provider)),
         );
         let api_key = non_empty(api_key_override)
             .ok_or_else(|| {
@@ -1042,17 +1043,6 @@ impl PromptGeneratorLlm {
 
 fn non_empty(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
-}
-
-fn default_model_for(provider: &str) -> &'static str {
-    match provider {
-        "openai" => "gpt-4o",
-        "anthropic" => "claude-3-5-sonnet-20241022",
-        "groq" => "llama-3.3-70b-versatile",
-        // Providers without a tailored default use the Google model default; unsupported
-        // providers are rejected when the prompt generator is built.
-        _ => "gemini-2.5-flash",
-    }
 }
 
 #[cfg(test)]
