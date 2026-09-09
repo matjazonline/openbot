@@ -38,6 +38,8 @@ jobs:
         run: npm ci
       - name: Generated CSS is current
         run: npm run check:css
+      - name: SSE navigation lifecycle
+        run: node --test scripts/tests/sse-navigation.mjs
       - name: Deployment script tests
         run: |
           scripts/tests/deploy.sh

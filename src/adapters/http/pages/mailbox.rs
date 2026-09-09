@@ -843,13 +843,39 @@ pub(crate) fn application_javascript() -> String {
 const EVENT_DELEGATION_SCRIPT: &str = r##"
 function closeLiveStreamsForNavigation(event, link) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download')) return;
-    var target = link.getAttribute('target');
+    var target = link.getAttribute('target') || document.querySelector('base[target]')?.getAttribute('target');
     if (target && target.toLowerCase() !== '_self') return;
+    if ((link.getAttribute('href') || '').startsWith('#')) return;
+    var url = new URL(link.href, document.baseURI);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+    var current = new URL(window.location.href);
+    if (url.hash && url.origin === current.origin && url.pathname === current.pathname && url.search === current.search) return;
+    closeLiveStreams();
+}
+function closeLiveStreams() {
     if (!window.htmx) return;
     document.querySelectorAll('[sse-connect], [data-sse-connect]').forEach(function (owner) {
         window.htmx.trigger(owner, 'htmx:beforeCleanupElement');
     });
 }
+// Run after document-level handlers so HTMX and cancelled clicks retain their streams.
+// Plain links (including task Board/List and detail links) need the same cleanup as the rail.
+window.addEventListener('click', function (event) {
+    var link = event.target.closest('a[href]');
+    if (link) closeLiveStreamsForNavigation(event, link);
+});
+// Native filter forms also navigate. Release streams after submit handlers have
+// accepted the request, without interrupting HTMX requests or cancelled submits.
+window.addEventListener('submit', function (event) {
+    if (event.defaultPrevented) return;
+    var form = event.target;
+    var submitter = event.submitter;
+    var method = submitter?.getAttribute('formmethod') || form.getAttribute('method') || 'get';
+    if (method.toLowerCase() === 'dialog') return;
+    var target = submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? document.querySelector('base[target]')?.getAttribute('target');
+    if (target && target.toLowerCase() !== '_self') return;
+    closeLiveStreams();
+});
 document.addEventListener('click', function (event) {
     var control = event.target.closest('[data-action]');
     if (!control) return;
@@ -861,7 +887,6 @@ document.addEventListener('click', function (event) {
         case 'toggle-rail': toggleRail(); break;
         case 'close-rail': setRailOpen(false); break;
         case 'dismiss-request-error': hideRequestError(); break;
-        case 'navigate-workspace': closeLiveStreamsForNavigation(event, control); break;
         case 'pane-back': setMobilePane('list'); break;
         case 'show-agent-tab': showAgentTab(control.dataset.tab); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;

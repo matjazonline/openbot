@@ -385,6 +385,13 @@ async fn assignment_projection_is_fenced_idempotent_and_never_owns_task_state() 
         .unwrap();
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.unread_count, 1);
+    // A non-NULL age exercises SQLx's PostgreSQL-to-f64 type check.
+    let census = persistence.notification_census().await.unwrap();
+    assert!(
+        census
+            .oldest_active_age_seconds
+            .is_some_and(|seconds| seconds.is_finite() && seconds >= 0.0)
+    );
     let notification = &page.items[0];
     let other = make_fixture(&persistence).await;
     assert!(

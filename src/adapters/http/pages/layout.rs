@@ -483,12 +483,12 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
             if (form.dataset.busy) return false;
             form.dataset.busy = 'true';
             form.setAttribute('aria-busy', 'true');
+            var progress = form.querySelector('[data-progress]');
+            if (progress) progress.classList.remove('hidden');
             var button = form.querySelector('[type=submit]');
             if (button) {
                 button.classList.add('pointer-events-none');
                 button.setAttribute('aria-disabled', 'true');
-                var progress = button.querySelector('[data-progress]');
-                if (progress) progress.classList.remove('hidden');
                 var label = button.querySelector('[data-label]');
                 if (label) label.textContent = form.dataset.pendingLabel || '';
             }

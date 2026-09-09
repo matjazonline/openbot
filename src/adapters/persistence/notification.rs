@@ -348,7 +348,7 @@ impl NotificationPersistence for PostgresPersistence {
         let row: (Option<f64>, i64, i64) = sqlx::query_as(
             r#"SELECT EXTRACT(EPOCH FROM (
                           CURRENT_TIMESTAMP - MIN(created_at) FILTER (WHERE state = 'active')
-                      )),
+                      ))::double precision,
                       (SELECT COUNT(*) FROM notification_events WHERE status = 'pending'),
                       (SELECT COUNT(*) FROM notification_events WHERE status = 'dead_letter')
                  FROM notifications"#,

@@ -809,9 +809,9 @@ fn every_workspace_rail_link_closes_live_streams_before_navigation() {
 fn workspace_navigation_cleanup_uses_the_htmx_sse_extension_lifecycle() {
     let script = application_javascript();
 
-    assert!(script.contains(
-        "case 'navigate-workspace': closeLiveStreamsForNavigation(event, control); break;"
-    ));
+    assert!(script.contains("window.addEventListener('click'"));
+    assert!(script.contains("event.target.closest('a[href]')"));
+    assert!(script.contains("if (link) closeLiveStreamsForNavigation(event, link);"));
     assert!(script.contains("document.querySelectorAll('[sse-connect], [data-sse-connect]')"));
     assert!(script.contains("window.htmx.trigger(owner, 'htmx:beforeCleanupElement')"));
     assert!(script.contains("event.defaultPrevented || event.button !== 0"));

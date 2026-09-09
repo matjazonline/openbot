@@ -86,7 +86,7 @@ fn owned_tasks_filter(company_id: Uuid, view: AttentionView, all_owned: bool) ->
     }
     format!(
         r#"<form method="get" action="/ui/work" class="px-5 pt-4"
-                 data-submit="busy-once" data-pending-label="Loading tasks…">
+                 data-submit="busy-once">
             <input type="hidden" name="company_id" value="{company_id}">
             <input type="hidden" name="view" value="my_work">
             <label class="flex items-center gap-2 text-sm">
@@ -94,7 +94,7 @@ fn owned_tasks_filter(company_id: Uuid, view: AttentionView, all_owned: bool) ->
                        data-action="submit-form"{checked}>
                 Show all owned tasks
             </label>
-            <button type="submit" class="btn btn-sm mt-2"><span data-label>Apply</span></button>
+            <span data-progress role="status" class="hidden text-sm opacity-60">Loading tasks…</span>
         </form>"#,
         checked = if all_owned { " checked" } else { "" },
     )
