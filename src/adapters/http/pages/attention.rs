@@ -9,6 +9,7 @@ pub struct AttentionPageView<'a> {
     pub companies: &'a [Company],
     pub company: &'a Company,
     pub view: AttentionView,
+    pub all_owned: bool,
     pub page: &'a AttentionPage,
     pub manager: bool,
 }
@@ -37,7 +38,10 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
             )
         })
         .collect::<String>();
-    let list_url = format!("/ui/work/list?company_id={company_id}&view={selected}");
+    let all_owned = page.all_owned;
+    let filter = owned_tasks_filter(company_id, page.view, all_owned);
+    let list_url =
+        format!("/ui/work/list?company_id={company_id}&view={selected}&all_owned={all_owned}");
     let content = format!(
         r##"<section class="flex min-w-0 flex-1 flex-col overflow-y-auto bg-base-100"
                 hx-ext="sse" sse-connect="/companies/{company_id}/attention/events">
@@ -48,6 +52,7 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
                 </div>
                 <form method="get" action="/ui/work">
                     <input type="hidden" name="view" value="{selected}">
+                    <input type="hidden" name="all_owned" value="{all_owned}">
                     <div class="join">
                         <select class="select select-sm join-item" name="company_id"
                                 aria-label="Company">{company_options}</select>
@@ -58,12 +63,13 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
             <nav class="tabs tabs-border px-5 pt-3" aria-label="Work queue views">
                 {my_tab}{unassigned_tab}{team_tab}
             </nav>
+            {filter}
             <div id="attention-list" hx-get="{list_url}" hx-trigger="sse:reconcile"
                  hx-sync="#attention-list:replace">{list}</div>
         </section>"##,
         my_tab = tab(company_id, AttentionView::MyWork, page.view),
         unassigned_tab = tab(company_id, AttentionView::Unassigned, page.view),
-        list = attention_list(company_id, page.view, page.page),
+        list = attention_list(company_id, page.view, page.page, all_owned),
     );
     ui_shell(&UiShell {
         title: "Operational work",
@@ -72,6 +78,26 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
         section: UiSection::Work,
         content: &content,
     })
+}
+
+fn owned_tasks_filter(company_id: Uuid, view: AttentionView, all_owned: bool) -> String {
+    if view != AttentionView::MyWork {
+        return String::new();
+    }
+    format!(
+        r#"<form method="get" action="/ui/work" class="px-5 pt-4"
+                 data-submit="busy-once" data-pending-label="Loading tasks…">
+            <input type="hidden" name="company_id" value="{company_id}">
+            <input type="hidden" name="view" value="my_work">
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" class="checkbox checkbox-sm" name="all_owned" value="true"
+                       data-action="submit-form"{checked}>
+                Show all owned tasks
+            </label>
+            <button type="submit" class="btn btn-sm mt-2"><span data-label>Apply</span></button>
+        </form>"#,
+        checked = if all_owned { " checked" } else { "" },
+    )
 }
 
 fn tab(company_id: Uuid, target: AttentionView, selected: AttentionView) -> String {
@@ -87,14 +113,20 @@ fn tab(company_id: Uuid, target: AttentionView, selected: AttentionView) -> Stri
     )
 }
 
-pub fn attention_list(company_id: Uuid, view: AttentionView, page: &AttentionPage) -> String {
+pub fn attention_list(
+    company_id: Uuid,
+    view: AttentionView,
+    page: &AttentionPage,
+    all_owned: bool,
+) -> String {
     let warning = if page.truncated {
         r#"<div class="alert alert-warning mx-5 mt-4 text-sm">The working set reached 1,000 items. Narrow or resolve work before relying on totals.</div>"#
     } else {
         ""
     };
     let body = if page.items.is_empty() {
-        r#"<div class="p-10 text-center text-sm opacity-60">No unresolved human action in this view.</div>"#.to_string()
+        r#"<div class="p-10 text-center text-sm opacity-60">No work items in this view.</div>"#
+            .to_string()
     } else {
         page.items
             .iter()
@@ -103,7 +135,7 @@ pub fn attention_list(company_id: Uuid, view: AttentionView, page: &AttentionPag
     };
     let next = page.next_cursor.as_ref().map_or_else(String::new, |cursor| {
         format!(
-            r#"<div class="p-5 text-center"><a class="btn btn-sm" href="/ui/work?company_id={company_id}&amp;view={}&amp;cursor={}">Next page</a></div>"#,
+            r#"<div class="p-5 text-center"><a class="btn btn-sm" href="/ui/work?company_id={company_id}&amp;view={}&amp;all_owned={all_owned}&amp;cursor={}">Next page</a></div>"#,
             view_name(view), escape_html_attr(cursor)
         )
     });
@@ -235,6 +267,7 @@ mod tests {
                 working_set_size: 1,
                 truncated: false,
             },
+            false,
         );
 
         assert!(!rendered.contains("<script>"));
@@ -282,6 +315,7 @@ mod tests {
                 working_set_size: 1,
                 truncated: false,
             },
+            false,
         );
 
         assert!(rendered.contains("Approval"));

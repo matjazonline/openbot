@@ -243,6 +243,7 @@ pub struct AttentionQuery<'a> {
     pub principal_id: PrincipalId,
     pub visible_channel_ids: &'a [Uuid],
     pub view: AttentionView,
+    pub all_owned: bool,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: usize,
 }

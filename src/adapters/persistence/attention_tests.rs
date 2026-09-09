@@ -75,6 +75,81 @@ async fn fixture(persistence: &PostgresPersistence) -> (Uuid, Uuid, PrincipalId)
 }
 
 #[tokio::test]
+async fn all_owned_includes_completed_tasks_but_preserves_scope() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let (company_id, channel_id, owner) = fixture(&persistence).await;
+    let thread = persistence
+        .create_thread(channel_id, "Owned tasks", &[])
+        .await
+        .unwrap();
+    let task_id =
+        insert_approval_task(&persistence, company_id, channel_id, thread.id, owner).await;
+    sqlx::query("UPDATE background_tasks SET status = 'completed' WHERE id = $1")
+        .bind(task_id)
+        .execute(persistence.pool())
+        .await
+        .unwrap();
+    let channels = [channel_id];
+    let mut request = query(company_id, &channels, owner, AttentionView::MyWork);
+    assert!(
+        persistence
+            .list_attention(request)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    request.all_owned = true;
+    let page = persistence.list_attention(request).await.unwrap();
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].source_id, task_id);
+    assert_eq!(page.items[0].state, "completed");
+
+    request.principal_id = PrincipalId::new(Uuid::new_v4());
+    assert!(
+        persistence
+            .list_attention(request)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    request.principal_id = owner;
+    request.visible_channel_ids = &[];
+    assert!(
+        persistence
+            .list_attention(request)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    request.visible_channel_ids = &channels;
+    request.company_id = Uuid::new_v4();
+    assert!(
+        persistence
+            .list_attention(request)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    request.company_id = company_id;
+    request.view = AttentionView::TeamWork;
+    assert!(
+        persistence
+            .list_attention(request)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+}
+
+#[tokio::test]
 async fn pending_approvals_belong_to_the_approver_without_duplicating_the_task() {
     let Some(pool) = test_pool().await else {
         return;
@@ -356,6 +431,7 @@ fn query<'a>(
         principal_id,
         visible_channel_ids: channel_ids,
         view,
+        all_owned: false,
         cursor: None,
         limit: 50,
     }

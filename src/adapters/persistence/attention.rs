@@ -100,6 +100,8 @@ WITH params AS (
                AS responsibility_label,
            task.task_type AS title,
            CASE task.status
+             WHEN 'completed' THEN 'View the completed task'
+             WHEN 'stopped' THEN 'View the stopped task'
              WHEN 'pending_approval' THEN 'Review the pending approval'
              WHEN 'dead_letter' THEN 'Decide how to recover the failed task'
              WHEN 'failed' THEN 'Decide how to recover the failed task'
@@ -113,16 +115,19 @@ WITH params AS (
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
     WHERE task.company_id = $1 AND task.channel_id = ANY($2)
-      AND task.status IN ('pending', 'processing', 'pending_approval',
+      AND (
+        ($14 AND $4 = 'my_work' AND task.owner_principal_id = $3
+         AND task.owner_principal_kind = 'person')
+        OR (task.status IN ('pending', 'processing', 'pending_approval',
                           'waiting_for_third_party_reply', 'failed', 'dead_letter')
-      AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
+        AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
            OR task.status IN ('pending_approval', 'failed', 'dead_letter'))
-      AND NOT EXISTS (
+        AND NOT EXISTS (
           SELECT 1 FROM human_approvals AS approval
           WHERE approval.company_id = task.company_id AND approval.task_id = task.id
             AND approval.status = 'pending'
-      )
-      AND NOT EXISTS (
+        )
+        AND NOT EXISTS (
           SELECT 1 FROM response_reviews AS review
           WHERE review.company_id = task.company_id AND review.status = 'pending'
             AND EXISTS (
@@ -131,16 +136,18 @@ WITH params AS (
                   AND draft.version = review.draft_version AND draft.task_id = task.id
                   AND draft.status = 'pending_review'
             )
-      )
-      AND NOT EXISTS (
+        )
+        AND NOT EXISTS (
           SELECT 1 FROM task_outreaches AS outreach
           WHERE outreach.task_id = task.id AND outreach.status = 'timeout_pending_approval'
-      )
-      AND NOT EXISTS (
+        )
+        AND NOT EXISTS (
           SELECT 1 FROM message_deliveries AS delivery
           WHERE delivery.company_id = task.company_id AND delivery.task_id = task.id
             AND delivery.status IN ('outcome_unknown', 'dead_letter')
             AND delivery.last_error_class IS DISTINCT FROM 'superseded'
+        )
+        )
       )
 
     UNION ALL
@@ -473,6 +480,7 @@ impl AttentionPersistence for PostgresPersistence {
             .bind(cursor.map_or(sentinel_id, |cursor| cursor.source_id))
             .bind((AttentionQuery::MAX_WORKING_SET + 1) as i64)
             .bind((limit + 1) as i64)
+            .bind(query.all_owned)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;

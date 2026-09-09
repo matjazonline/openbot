@@ -63,6 +63,8 @@ struct ListQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
+    #[serde(default)]
+    all_owned: bool,
 }
 
 impl ListQuery {
@@ -140,6 +142,7 @@ async fn read_page(
             principal_id: context.principal_id,
             visible_channel_ids: &context.visible_channel_ids,
             view,
+            all_owned: query.all_owned && view == AttentionView::MyWork,
             cursor: cursor.as_ref(),
             limit: query.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
         })
@@ -406,6 +409,8 @@ struct WorkQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
+    #[serde(default)]
+    all_owned: bool,
 }
 
 async fn work_page(
@@ -428,6 +433,7 @@ async fn work_page(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
+        all_owned: query.all_owned,
     };
     let page = read_page(
         state.attention.as_ref(),
@@ -448,6 +454,7 @@ async fn work_page(
         companies: &company_list,
         company: &access.company,
         view: list_query.view()?,
+        all_owned: list_query.all_owned,
         page: &page,
         manager: access.membership.manages_company_operations(),
     })))
@@ -469,6 +476,7 @@ async fn work_list(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
+        all_owned: query.all_owned,
     };
     let view = list_query.view()?;
     let page = read_page(
@@ -478,5 +486,10 @@ async fn work_list(
         &list_query,
     )
     .await?;
-    Ok(Html(pages::attention_list(access.company.id, view, &page)))
+    Ok(Html(pages::attention_list(
+        access.company.id,
+        view,
+        &page,
+        list_query.all_owned,
+    )))
 }
