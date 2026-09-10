@@ -22,7 +22,7 @@ use crate::{
     task_queue::{DelegationCommandRequest, OutreachTargetIdentity, OutreachTargetRequest},
 };
 
-use super::{TransitionAttribution, required_response_count};
+use super::{TransitionAttribution, required_response_count, tally_outreach_targets};
 
 const MAX_OUTREACH_DEADLINE_HOURS: i64 = 720;
 
@@ -390,15 +390,12 @@ async fn maybe_reach_quorum(
     outreach: &LockedOutreach,
     actor: TransitionActor,
 ) -> AppResult<()> {
-    let (eligible, responded): (i64, i64) = sqlx::query_as(
-        r#"SELECT COUNT(*) FILTER (WHERE status IN ('active', 'responded'))::bigint,
-                  COUNT(*) FILTER (WHERE status = 'responded')::bigint
-           FROM task_outreach_targets WHERE outreach_id = $1"#,
+    let (eligible, responded) = tally_outreach_targets(
+        &mut **tx,
+        command.company_id,
+        command.operation.outreach_id(),
     )
-    .bind(command.operation.outreach_id())
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
     let required = required_response_count(eligible, outreach.required_threshold_percent) as i64;
     if eligible > 0 && responded >= required {
         sqlx::query(

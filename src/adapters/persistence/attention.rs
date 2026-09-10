@@ -139,7 +139,8 @@ WITH params AS (
         )
         AND NOT EXISTS (
           SELECT 1 FROM task_outreaches AS outreach
-          WHERE outreach.task_id = task.id AND outreach.status = 'timeout_pending_approval'
+          WHERE outreach.company_id = task.company_id AND outreach.task_id = task.id
+            AND outreach.status = 'timeout_pending_approval'
         )
         AND NOT EXISTS (
           SELECT 1 FROM message_deliveries AS delivery
@@ -222,7 +223,8 @@ WITH params AS (
                 ELSE LEAST(task.business_due_at, outreach.expires_at) END,
            outreach.expires_at, outreach.version, outreach.created_at, outreach.updated_at
     FROM task_outreaches AS outreach
-    JOIN background_tasks AS task ON task.id = outreach.task_id
+    JOIN background_tasks AS task
+      ON task.company_id = outreach.company_id AND task.id = outreach.task_id
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
     WHERE task.company_id = $1 AND task.channel_id = ANY($2)
@@ -255,8 +257,9 @@ WITH params AS (
       AND delivery.last_error_class IS DISTINCT FROM 'superseded'
       AND NOT EXISTS (
           SELECT 1 FROM task_outreach_targets AS target
-          JOIN task_outreaches AS outreach ON outreach.id = target.outreach_id
-          WHERE target.delivery_id = delivery.id
+          JOIN task_outreaches AS outreach
+            ON outreach.company_id = target.company_id AND outreach.id = target.outreach_id
+          WHERE target.company_id = delivery.company_id AND target.delivery_id = delivery.id
             AND outreach.status = 'timeout_pending_approval'
       )
 ), ranked AS (

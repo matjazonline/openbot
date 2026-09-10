@@ -5130,13 +5130,6 @@ CREATE INDEX human_approvals_channel_created_idx ON public.human_approvals USING
 
 
 --
--- Name: human_approvals_expiry_due; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX human_approvals_expiry_due ON public.human_approvals USING btree (expires_at, id) WHERE (status = 'pending'::text);
-
-
---
 -- Name: human_approvals_pending_expiry_idx; Type: INDEX; Schema: public; Owner: -
 --
 

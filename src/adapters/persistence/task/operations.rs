@@ -222,15 +222,8 @@ pub(crate) async fn record_outreach_reply_on(
         .map_err(AppError::from)?;
     }
 
-    let (target_count, response_count): (i64, i64) = sqlx::query_as(
-        r#"SELECT COUNT(*) FILTER (WHERE status IN ('active', 'responded'))::bigint,
-                  COUNT(*) FILTER (WHERE status = 'responded')::bigint
-           FROM task_outreach_targets WHERE outreach_id = $1"#,
-    )
-    .bind(matched.outreach_id)
-    .fetch_one(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
+    let (target_count, response_count) =
+        tally_outreach_targets(&mut *connection, company_id, matched.outreach_id).await?;
     let required = required_response_count(target_count, threshold);
     let reached = response_count >= required as i64;
 
@@ -614,15 +607,8 @@ impl TaskPersistence for PostgresPersistence {
             }
         }
 
-        let (target_count, response_count): (i64, i64) = sqlx::query_as(
-            r#"SELECT COUNT(*) FILTER (WHERE status IN ('active', 'responded'))::bigint,
-                      COUNT(*) FILTER (WHERE status = 'responded')::bigint
-               FROM task_outreach_targets WHERE outreach_id = $1"#,
-        )
-        .bind(outreach.id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
+        let (target_count, response_count) =
+            tally_outreach_targets(&mut *tx, request.company_id, outreach.id).await?;
         let progress =
             outreach_progress(&outreach, status, target_count, response_count, suspended);
         if !suspended && let Some(reference) = request.invocation {

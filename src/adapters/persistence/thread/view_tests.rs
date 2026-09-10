@@ -504,3 +504,166 @@ async fn find_thread_for_message_resolves_thread_and_scopes_by_channel() {
 
     fixture.cleanup().await;
 }
+
+/// One task row, seeded straight into the table: the lookup under test reads `background_tasks`
+/// directly, so the tasks it has to find are written the same way.
+async fn seed_thread_task(
+    fixture: &Fixture,
+    task_type: &str,
+    correlation_id: Uuid,
+    source_message_uuid: Option<Uuid>,
+    created_at: DateTime<Utc>,
+) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO background_tasks
+               (id, company_id, channel_id, thread_id, correlation_id, source_message_uuid,
+                task_type, payload, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, '{}', $8)"#,
+    )
+    .bind(id)
+    .bind(fixture.company_id)
+    .bind(fixture.channel_id)
+    .bind(fixture.thread.id)
+    .bind(correlation_id)
+    .bind(source_message_uuid)
+    .bind(task_type)
+    .bind(created_at)
+    .execute(&fixture.pool)
+    .await
+    .expect("the task row belongs to the fixture's thread");
+    id
+}
+
+/// A rendered turn keeps the run that produced it, whichever way the link is made.
+///
+/// The lookup behind the three page reads is scoped to the rows on the page -- by canonical id, or
+/// by correlation when the task carries no source message -- rather than to every task the thread
+/// has ever run. That narrowing is a shape change and invisible from here; what is visible, and
+/// what this pins, is that neither match path lost a task on the way, that the *main* task still
+/// wins a correlation with several tasks on it even when it is not the newest, and that a task on
+/// an unrelated correlation is nobody's answer.
+#[tokio::test]
+async fn every_rendered_turn_keeps_the_task_that_produced_it() {
+    let Some(fixture) = Fixture::new("view_task_link").await else {
+        return;
+    };
+    let author = agent_author(&fixture).await;
+    let base = Utc::now() - chrono::Duration::seconds(60);
+
+    // The turn a task names outright, through `source_message_uuid`.
+    let dispatched = fixture
+        .persistence
+        .create_message(&internal_message(
+            fixture.thread.id,
+            "Triage started.",
+            author.clone(),
+        ))
+        .await
+        .unwrap();
+    // The turn a task can only be reached from by correlation.
+    let correlated = fixture
+        .persistence
+        .create_message(&internal_message(
+            fixture.thread.id,
+            "Follow-up sent.",
+            author,
+        ))
+        .await
+        .unwrap();
+
+    let dispatch_task = seed_thread_task(
+        &fixture,
+        "email_agent_dispatch",
+        dispatched.correlation_id.as_uuid(),
+        Some(dispatched.canonical_id.as_uuid()),
+        base,
+    )
+    .await;
+    // Three tasks share the second turn's correlation, and the one that answers for it is the main
+    // run rather than the newest row.
+    seed_thread_task(
+        &fixture,
+        "outreach_follow_up",
+        correlated.correlation_id.as_uuid(),
+        None,
+        base + chrono::Duration::seconds(1),
+    )
+    .await;
+    let main_run = seed_thread_task(
+        &fixture,
+        "scheduled_agent_run",
+        correlated.correlation_id.as_uuid(),
+        None,
+        base + chrono::Duration::seconds(2),
+    )
+    .await;
+    seed_thread_task(
+        &fixture,
+        "outreach_follow_up",
+        correlated.correlation_id.as_uuid(),
+        None,
+        base + chrono::Duration::seconds(3),
+    )
+    .await;
+    // A task on the same thread that neither turn can reach.
+    let unrelated = seed_thread_task(
+        &fixture,
+        "email_agent_dispatch",
+        Uuid::new_v4(),
+        None,
+        base + chrono::Duration::seconds(4),
+    )
+    .await;
+
+    let link_of = |views: &[ThreadMessageView], canonical: CanonicalMessageId| {
+        views
+            .iter()
+            .find(|view| view.canonical_id == canonical)
+            .expect("the turn is in its thread")
+            .task_id
+    };
+
+    let views = fixture
+        .persistence
+        .list_thread_message_views(fixture.thread.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        link_of(&views, dispatched.canonical_id),
+        Some(dispatch_task)
+    );
+    assert_eq!(link_of(&views, correlated.canonical_id), Some(main_run));
+    assert!(
+        !views.iter().any(|view| view.task_id == Some(unrelated)),
+        "a task on an unrelated correlation is nobody's answer"
+    );
+
+    // The forward-walking read and the single-row read resolve the same links, and the single-row
+    // read is the narrowest window the lookup ever runs against.
+    let streamed = fixture
+        .persistence
+        .list_thread_message_views_after(fixture.thread.id, None, 50)
+        .await
+        .unwrap();
+    assert_eq!(
+        link_of(&streamed, dispatched.canonical_id),
+        Some(dispatch_task)
+    );
+    assert_eq!(link_of(&streamed, correlated.canonical_id), Some(main_run));
+
+    for (canonical, expected) in [
+        (dispatched.canonical_id, dispatch_task),
+        (correlated.canonical_id, main_run),
+    ] {
+        let view = fixture
+            .persistence
+            .get_thread_message_view(fixture.thread.id, canonical)
+            .await
+            .unwrap()
+            .expect("the turn reads back one at a time too");
+        assert_eq!(view.task_id, Some(expected));
+    }
+
+    fixture.cleanup().await;
+}

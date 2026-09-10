@@ -120,8 +120,8 @@ mod tests {
     //! sqlx pins its own sessions to UTC, so the app stays self-consistent and the divergence only
     //! shows up through another client — which is exactly what makes it easy to reintroduce.
     //!
-    //! Both tests need a live database and no-op without one, so the rest of the suite still runs
-    //! with no `DATABASE_URL` set.
+    //! Every test here needs a live database and no-ops without one, so the rest of the suite still
+    //! runs with no `DATABASE_URL` set.
 
     use chrono::{DateTime, Utc};
     use uuid::Uuid;
@@ -154,6 +154,38 @@ mod tests {
             "these columns are `timestamp without time zone`, so CURRENT_TIMESTAMP writes the \
              session's local wall clock into them and any non-UTC client silently disagrees with \
              the app's own clock: {naive:?}"
+        );
+    }
+
+    /// Two indexes with the same definition are both maintained on every insert and every update
+    /// that touches their columns, and the planner will only ever choose one of them. Grouping on
+    /// the definition with the index name stripped catches the *next* duplicate, not only the
+    /// `human_approvals` pair this was written for.
+    #[tokio::test]
+    async fn no_two_indexes_share_a_definition() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+
+        let duplicates: Vec<(String, String)> = sqlx::query_as(
+            r#"SELECT definition.tablename, string_agg(definition.indexname, ', ')
+                 FROM (SELECT tablename, indexname,
+                              regexp_replace(indexdef, '^CREATE (UNIQUE )?INDEX \S+ ON',
+                                             'CREATE \1INDEX ON') AS body
+                         FROM pg_indexes
+                        WHERE schemaname = 'public') AS definition
+                GROUP BY definition.tablename, definition.body
+               HAVING COUNT(*) > 1
+                ORDER BY definition.tablename"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("pg_indexes is readable");
+
+        assert!(
+            duplicates.is_empty(),
+            "these indexes are identical apart from their names, so every write maintains all of \
+             them and the planner can only use one: {duplicates:?}"
         );
     }
 

@@ -94,6 +94,7 @@ struct ThreadMessageDb {
         Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
     id: Uuid,
     canonical_id: Uuid,
+    company_id: Uuid,
     thread_id: Uuid,
     #[sqlx(flatten)]
     author: AuthorDb,
@@ -171,17 +172,55 @@ struct ThreadTaskLookupDb {
     created_at: DateTime<Utc>,
 }
 
-async fn fetch_thread_tasks(pool: &PgPool, thread_id: Uuid) -> AppResult<Vec<ThreadTaskLookupDb>> {
-    sqlx::query_as::<_, ThreadTaskLookupDb>(
+/// The ceiling on the task lookup behind one page of messages.
+///
+/// A rendered row is answered by at most one task matched on its canonical id; the correlation
+/// fallback below can match a handful more -- the dispatch, its outreach follow-ups, a retry. Four
+/// per row covers that fan-out for a full `THREAD_HISTORY_LIMIT` page, and bounds a thread a
+/// scheduled agent has been running against for months.
+const THREAD_TASK_LOOKUP_LIMIT: usize = THREAD_HISTORY_LIMIT * 4;
+
+/// The tasks that can answer `rendered`, oldest first.
+///
+/// Scoped to the rendered window rather than to the whole thread: [`match_task_id`] only ever looks
+/// a row up by its canonical id or its correlation, so every other task the thread has ever run is
+/// read for nothing. The `LIMIT` is the backstop for a correlation that fans out further than the
+/// page does -- the query orders newest-first so a truncation drops the tasks least likely to be
+/// the answer, then the result is reversed into the oldest-first order `match_task_id` reads.
+async fn fetch_thread_tasks(
+    pool: &PgPool,
+    company_id: Uuid,
+    thread_id: Uuid,
+    rendered: &[ThreadMessageDb],
+) -> AppResult<Vec<ThreadTaskLookupDb>> {
+    let canonical_ids = distinct_ids(rendered.iter().map(|row| row.canonical_id));
+    let correlation_ids = distinct_ids(rendered.iter().map(|row| row.correlation_id));
+
+    let mut tasks = sqlx::query_as::<_, ThreadTaskLookupDb>(
         r#"SELECT id, source_message_uuid, correlation_id, task_type, created_at
              FROM background_tasks
-            WHERE thread_id = $1
-            ORDER BY created_at ASC"#,
+            WHERE company_id = $1 AND thread_id = $2
+              AND (source_message_uuid = ANY($3) OR correlation_id = ANY($4))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $5"#,
     )
+    .bind(company_id)
     .bind(thread_id)
+    .bind(&canonical_ids)
+    .bind(&correlation_ids)
+    .bind(THREAD_TASK_LOOKUP_LIMIT as i64)
     .fetch_all(pool)
     .await
-    .map_err(AppError::from)
+    .map_err(AppError::from)?;
+    tasks.reverse();
+    Ok(tasks)
+}
+
+fn distinct_ids(ids: impl Iterator<Item = Uuid>) -> Vec<Uuid> {
+    let mut collected: Vec<Uuid> = ids.collect();
+    collected.sort_unstable();
+    collected.dedup();
+    collected
 }
 
 fn match_task_id(
@@ -218,6 +257,7 @@ fn thread_message_select() -> String {
         r#"
     SELECT association.id,
            message.id AS canonical_id,
+           association.company_id,
            association.thread_id,
 {AUTHOR_COLUMNS},
            message.subject,
@@ -271,11 +311,13 @@ pub(super) async fn list_thread_messages(
         .await
         .map_err(AppError::from)?;
 
-    if rows.is_empty() {
+    // The thread's company, read off a row already in hand rather than looked up again: the
+    // composite key on `thread_messages` is what makes any row of the window as good as any other.
+    let Some(company_id) = rows.first().map(|row| row.company_id) else {
         return Ok(Vec::new());
-    }
+    };
 
-    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
             let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
@@ -316,11 +358,11 @@ pub(super) async fn list_thread_messages_after(
         .await
         .map_err(AppError::from)?;
 
-    if rows.is_empty() {
+    let Some(company_id) = rows.first().map(|row| row.company_id) else {
         return Ok(Vec::new());
-    }
+    };
 
-    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
             let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
@@ -349,7 +391,8 @@ pub(super) async fn get_thread_message(
         return Ok(None);
     };
 
-    let tasks = fetch_thread_tasks(pool, thread_id).await?;
+    let tasks =
+        fetch_thread_tasks(pool, row.company_id, thread_id, std::slice::from_ref(&row)).await?;
     let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
     Ok(Some(row.into_view(task_id)?))
 }

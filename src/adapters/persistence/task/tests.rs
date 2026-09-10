@@ -3896,6 +3896,99 @@ async fn collaboration_targets_reject_cross_company_internal_channels() {
         .unwrap();
 }
 
+/// The tally behind every outreach threshold decision, in the one place it is derived.
+///
+/// A reply landing, a control command and the timeout sweep each weigh these two numbers, so they
+/// have to weigh the same ones. `active` and `responded` are the targets still in the quorum;
+/// anything else has left it, and only `responded` has answered.
+#[tokio::test]
+async fn the_outreach_tally_counts_the_quorum_within_one_company() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let (bystander, _) = seed_company_and_channel(&persistence).await;
+    let task = enqueue_chain(&persistence, company.id, channel.id, "outreach-tally").await;
+
+    let outreach_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO task_outreaches
+               (id, task_id, company_id, status, required_threshold_percent, expires_at,
+                outreach_key, subject, body)
+           VALUES ($1, $2, $3, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
+                   $4, 'Question', 'Body')"#,
+    )
+    .bind(outreach_id)
+    .bind(task.id)
+    .bind(company.id)
+    .bind(format!("outreach-tally-{outreach_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // A `responded` target has to name the association it answered with -- the row constraint
+    // refuses the status otherwise.
+    let response = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: task.thread_id.unwrap(),
+            message_id: format!("<tally-{outreach_id}@partner.test>").into(),
+            sender: "answered@partner.test".into(),
+            subject: "Re: Question".into(),
+            clean_text_body: "Yes.".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+
+    for status in ["active", "responded", "cancelled"] {
+        sqlx::query(
+            r#"INSERT INTO task_outreach_targets
+                   (outreach_id, company_id, email, target_kind, external_transport,
+                    external_namespace, external_subject, status, responded_at,
+                    response_association_id)
+               VALUES ($1, $2, $3, 'external', 'email', 'email', $3, $4,
+                       CASE WHEN $4 = 'responded' THEN CURRENT_TIMESTAMP END,
+                       CASE WHEN $4 = 'responded' THEN $5 END)"#,
+        )
+        .bind(outreach_id)
+        .bind(company.id)
+        .bind(format!("{status}-{outreach_id}@partner.test"))
+        .bind(status)
+        .bind(response.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    assert_eq!(
+        tally_outreach_targets(&pool, company.id, outreach_id)
+            .await
+            .unwrap(),
+        (2, 1),
+        "the cancelled target has left the quorum, and only the responded one has answered"
+    );
+
+    // The tenant identifier is a predicate, not a comment. A real outreach id read under another
+    // company tallies nothing, so a threshold can never be weighed against a stranger's targets.
+    assert_eq!(
+        tally_outreach_targets(&pool, bystander.id, outreach_id)
+            .await
+            .unwrap(),
+        (0, 0)
+    );
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+    CompanyPersistence::delete(&persistence, bystander.id)
+        .await
+        .unwrap();
+}
+
 /// The outreach mail the agent sent lands in the thread *and* is marked as the question, in one
 /// transaction.
 ///
