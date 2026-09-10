@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn an_xai_classifier_uses_the_supported_compatible_transport() {
+    fn an_xai_classifier_is_wired_from_a_companys_own_credential() {
         let provider = ModelProvider::canonical("xai");
         let model = ModelName::canonical("grok-4.6");
 

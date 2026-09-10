@@ -220,18 +220,18 @@ async fn agent_execution_sends_resolved_current_date_to_llm() -> anyhow::Result<
     Ok(())
 }
 
-/// Regression for the provider failure that motivated xAI support: the first model response asks
+/// The first model response asks
 /// for a tool, and the second request must preserve the call id and send the result as a `tool`
 /// message. A one-turn completion test cannot prove this protocol works.
 #[tokio::test]
-async fn xai_completes_a_two_turn_tool_loop_through_ai_agents() -> anyhow::Result<()> {
+async fn completes_a_two_turn_tool_loop_through_ai_agents() -> anyhow::Result<()> {
     let mut llm = scripted_llm(vec![
         LlmTurn::tool_call("todo", serde_json::json!({ "operation": "list" })),
         LlmTurn::text("No tasks are pending."),
     ])
     .await;
     let company = company();
-    let agent = agent_with_provider(&llm.base_url, "xai", vec![ToolId::from("todo")]);
+    let agent = agent_with_provider(&llm.base_url, SCRIPTED_PROVIDER, vec![ToolId::from("todo")]);
     let params = ResolvedAgentCapabilities::new(Some(&company), Some(&agent))?;
 
     let output = AgentRunner::new("Check the task list.", &params)

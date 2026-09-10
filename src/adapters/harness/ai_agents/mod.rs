@@ -43,11 +43,6 @@ use compile::{CompiledConfig, compile};
 use hooks::AiAgentsTraceShim;
 use tools::NativeToolShim;
 
-/// xAI's OpenAI-compatible API supports the function-call message protocol used by this runtime.
-/// The pinned library's native xAI backend does not forward tools, so selecting it would silently
-/// remove an agent's capabilities.
-const XAI_OPENAI_COMPATIBLE_BASE_URL: &str = "https://api.x.ai/v1/";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ProviderTransport {
     provider_type: ai_agents::ProviderType,
@@ -57,20 +52,12 @@ struct ProviderTransport {
 /// Resolve a logical company provider to the transport implementation `ai-agents` should use.
 ///
 /// A supplied URL is the test-only trusted endpoint carried by the compiled capability spec. In
-/// production xAI always receives the fixed official endpoint below; companies cannot supply an
+/// production the native provider chooses its default endpoint; companies cannot supply an
 /// arbitrary provider URL.
 fn provider_transport(
     provider: &ModelProvider,
     configured_base_url: Option<String>,
 ) -> AppResult<ProviderTransport> {
-    if provider.as_str() == "xai" {
-        return Ok(ProviderTransport {
-            provider_type: ai_agents::ProviderType::OpenAI,
-            base_url: configured_base_url
-                .or_else(|| Some(XAI_OPENAI_COMPATIBLE_BASE_URL.to_string())),
-        });
-    }
-
     let provider_type = std::str::FromStr::from_str(provider.as_str())
         .map_err(|_| AppError::BadRequest(format!("Unsupported LLM provider '{provider}'.")))?;
     Ok(ProviderTransport {
