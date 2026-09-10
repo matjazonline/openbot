@@ -49,6 +49,12 @@ provider-specific compatibility checks and enforcement tests; V1 does not accept
 Model, credential, endpoint, tools, approval policy, lease/retry policy, and output/prompt ceilings
 remain outside advanced agent JSON. Preserve separate `native_tool_policy`, grants, and skills.
 
+Add company-owned HTTP MCP definitions, encrypted credentials, and remote tool grants, plus a
+many-to-many agent selection table as specified in [step 4a](04a-http-mcp.md). Agents store only
+company connection IDs, outside `config_json`; no endpoint settings or credentials are copied onto
+agents. Preserve selections on unrelated edits and enforce company/selection revisions, shared
+credential rotation, and cross-company foreign keys.
+
 Add an additive migration replacing `agents_harness_kind_check` with a constraint accepting exactly
 `ai_agents` and `rig`. Set the column's static default to `rig` without rewriting existing row
 values. Every production application insert must bind its resolved harness explicitly, so SQL's

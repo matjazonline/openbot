@@ -8,7 +8,15 @@ Dependencies: step 1. Main files: `Cargo.toml`, `Cargo.lock`, proposed
 Compile a minimal adapter-side proof against the candidate Rig 0.42.0 release: construct a model
 with explicit credentials and a controlled HTTP transport, create a dynamic native tool, execute
 a bounded turn, and stop execution from a lifecycle hook. Confirm cancellation and tool call IDs.
+Drive that proof through the existing `scripted_llm` endpoint and extend its wire fixtures for the
+selected API as needed; no real provider endpoint is required. Build the request-checked scenario
+support described in [step 9](09-verification-and-ci.md#request-checked-scenarios) alongside this
+proof so subsequent steps can reuse it, rather than deferring test infrastructure until step 9.
 Record the working crate names, features, Rust version, and API references in a short adapter note.
+
+Include the [step 4a HTTP MCP](04a-http-mcp.md) proof: pin a compatible `rmcp` client/transport,
+initialize a scripted endpoint, discover tools, handle JSON/SSE responses, and cancel supervised
+transport work. Prove calls can use our guarded bridge without automatic remote-tool registration.
 
 Use the published `rig` facade if this proof confirms its required surface. Pin the selected version
 and commit `Cargo.lock`; keep the existing ai-agents revision. Enable only needed runtime/provider/
@@ -57,6 +65,10 @@ key. Do not log the request struct or implement secret-revealing `Debug`/`Displa
 Production endpoints remain server-selected. The existing `provider_base_url` is populated by a
 test-only scripted endpoint hook; retain that trust boundary. Agent JSON must not enable custom
 URLs, headers, proxies, redirects carrying credentials, or arbitrary provider parameters.
+Reuse `register_scripted_agent_base_url` from `src/application/services/test_support.rs` for
+application tests. Provider-adapter tests inject the same local fixture through the trusted
+construction seam. Exercise each real provider factory against its own protocol fixtures;
+an OpenAI-shaped response is not evidence for a different provider API.
 
 ## Verification and acceptance
 

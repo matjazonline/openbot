@@ -17,6 +17,15 @@ Show advanced configuration fields and help for the selected harness. Replace th
 ai-agents label with appropriate copy. Rig exposes only its typed V1 settings. Keep provider/model,
 tool grants, skills, and sub-agent controls conceptually separate from runtime selection.
 
+Add company **MCP servers** settings and company-scoped API operations from
+[step 4a](04a-http-mcp.md): HTTP definition CRUD, write-only credentials, connection test/tool refresh,
+and company-level remote tool grants. Agent UI only selects multiple entries from that company's
+catalog, and agent writes store connection IDs rather than configuration or credentials. MCP calls
+require no approval; expose no per-tool approval setting. Preserve selections on unrelated edits,
+never echo/copy/export credentials, and show unsupported-harness, unavailable-definition, or
+changed-schema errors without silently dropping selections. Company edits affect every selecting
+agent; removing an agent selection must not remove a shared company definition.
+
 When switching harnesses, show which configuration fields must change and whether any attached
 capability is unsupported. Require explicit target config submission; do not silently clear stored
 values in JavaScript or drop granted tools/skills. Apply the same rules server-side without JS.
@@ -48,4 +57,7 @@ harness for new executions without relabeling old ai-agents history as Rig.
 - A Rig agent edited only for its description retains its harness and config.
 - Harness switching rejects incompatible config and active/suspended task conflicts.
 - Simulation executes the selected harness and displays only sanitized configuration.
+  Drive its queued execution through the existing test-only simulated model endpoint, including
+  a tool-call/result continuation. The product simulation page is not itself a provider stub;
+  keep endpoint/scenario selection in test fixture wiring, outside user prompts and agent JSON.
 - Existing page snapshot/CSS/navigation checks pass where affected.

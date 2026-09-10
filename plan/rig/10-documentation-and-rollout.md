@@ -24,6 +24,14 @@ Publish the verified provider/tool/skill compatibility table, execution limits, 
 behavior, and diagnostics fields. Describe Rig as in-process execution, without implying a sandbox.
 State that the separate spam/prompt-generation classifier still uses ai-agents.
 
+Document company HTTP MCP setup and agent multi-selection from [step 4a](04a-http-mcp.md), separately
+from model credentials. Definitions and secrets are company-owned; agents store references only.
+Cover shared configuration changes and their effect on selecting agents, plus
+supported transport/authentication, endpoint restrictions, connection tests, selected tool grants,
+execution without MCP approval prompts, explicit workflow checkpoints, schema changes, and
+remote-effect recovery. Pilot against a controlled MCP
+endpoint before enabling connection settings; apply its credential/connection migrations first.
+
 Document that credentials come from company model connections and are not configured via Rig's
 example environment keys. Name only options the application actually reads. Distinguish startup
 checks, per-agent validation, stubbed contract tests, and optional remote authentication/model tests.

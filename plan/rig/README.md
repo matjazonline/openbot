@@ -33,6 +33,7 @@ dependencies, database state, or defaults are changed by saving these files.
 | 2 | [Pinned dependency and ProviderRegistry](02-dependency-and-provider-registry.md) | 1 |
 | 3 | [Typed configuration and persistence](03-configuration-and-persistence.md) | 1; bounds agreed with 2 and 6 |
 | 4 | [Tool declarations and execution bridge](04-tool-bridge.md) | 1–3 |
+| 4a | [Company HTTP MCP catalog and agent selections](04a-http-mcp.md) | 2–4; recovery completed with 6 |
 | 5 | [Skills and runtime context](05-skills-and-context.md) | 4 |
 | 6 | [Bounded execution, approvals, and suspension](06-execution-and-approvals.md) | 2–5 |
 | 7 | [Application wiring and diagnostics](07-wiring-and-diagnostics.md) | 6 |
@@ -57,9 +58,18 @@ Target all five currently allowed logical providers: `google`, `openai`, `anthro
 must be demonstrated with tool-call fixtures; advertising a provider because its text endpoint
 works is insufficient.
 
+Reuse our existing simulated agent endpoint (`scripted_llm`) for model-backed tests. It already
+emits tool calls that the real harness executes. Extend it with explicit request-checked scenarios,
+provider-specific wire formats, and local-only network execution; select scripts in test setup
+rather than by magic strings in prompts. [Step 9](09-verification-and-ci.md) specifies the fixture
+contract and coverage; begin that support with the dependency proof in step 2.
+
 Preserve native-tool authorization, approval, suspension, delegation restrictions, memory context,
 and ordered skill execution. Rig is in process and confers no sandbox privileges. Do not enable
-shell, filesystem, arbitrary MCP, provider-hosted tools, or new providers as a side effect.
+shell, filesystem, provider-hosted tools, or new providers as a side effect. Company-owned HTTP MCP
+definitions/credentials/tool grants and multiple selections per agent are in scope through step 4a;
+agents store references only. MCP tool calls require no approval. Model-selected arbitrary
+endpoints, local MCP processes, and automatic grants from discovery remain excluded.
 
 Leave the separate deployment-wide classifier on `AiAgentsTextClassifier` in this release; a Rig
 agent still uses the existing spam guardrail and prompt-generation path. Replacing that classifier,

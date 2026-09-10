@@ -31,6 +31,19 @@ Support all four current native tools through the generic bridge: `list_company_
 `create_agent_channel`, `outreach_and_await_quorum`, and `transfer_or_release_task`. Business rules
 stay in their application implementations. Approval and suspension handling are completed in step 6.
 
+Add the planned `request_approval` native tool through the same catalogue, grants, declarations,
+and host bridge. It creates an explicit human checkpoint and suspends through the task system;
+its body owns that approval, so do not add a second pre-execution approval gate around it. Its
+schema, identity, resume behavior, and harness compatibility gate are specified in
+[step 6](06-execution-and-approvals.md#explicit-checkpoints-through-request_approval).
+
+Extend this guarded bridge to company HTTP MCP tools selected by each agent in
+[step 4a](04a-http-mcp.md). Resolve selected company definitions, expose their configured tool grants,
+discover remote schemas through those connections, and retain a stable
+connection/tool identity through dispatch and persistence. MCP calls need no human approval and
+must skip the generic approval gate. Do not register remote tools outside
+this bridge or merge arbitrary server tool names into the static native/built-in catalogue.
+
 ## Built-in compatibility
 
 The catalogue's ten built-ins are ai-agents implementations, not automatically present in Rig:
@@ -44,8 +57,8 @@ a generic JSON echo implementation or silently omit tools during a harness switc
 
 Keep mutable tool state scoped to one run, especially `todo`; do not share it through a singleton
 registry. Preserve `web_fetch` URL/DNS/IP and redirect protections, response-size bounds, and
-timeouts. No replacement may broaden host/network access. Keep denied shell/filesystem/MCP tools
-denied even if Rig provides a convenient integration.
+timeouts. No replacement may broaden host/network access. Keep denied shell/filesystem tools and
+arbitrary MCP/process access denied; configured HTTP MCP access follows step 4a's endpoint policy.
 
 Enforce argument bytes, output/result size, per-tool deadlines, and total tool invocations. Apply
 `NativeToolSafety` limits and policy rather than treating them as descriptive metadata. Start with
@@ -53,6 +66,11 @@ sequential tool execution so suspension stops later side effects within the same
 
 ## Verification and acceptance
 
+- Use the existing simulated agent endpoint to emit tool calls, then validate the actual results
+  in its next request before returning a final answer, as specified in
+  [step 9](09-verification-and-ci.md#request-checked-scenarios). Cover multi-call responses and
+  malformed/forged calls through the provider parser and real guarded dispatcher, with assertions
+  on invocation counts and effects as well as conversation messages.
 - Fixtures cover granted/ungranted/unknown IDs, skill-implied grants, schema fidelity, malformed
   arguments, missing context, output truncation, timeout, and every built-in offered by the UI.
 - A model inventing a tool cannot reach the host. Display names cannot bypass canonical IDs.
