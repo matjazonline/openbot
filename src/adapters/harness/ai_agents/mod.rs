@@ -86,12 +86,22 @@ impl AgentHarness for AiAgentsHarness {
     }
 
     async fn run(&self, run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
+        if run.spec.response_contract.is_some() {
+            return Err(AppError::BadRequest(
+                "response_contract requires the rig harness".into(),
+            ));
+        }
         let native_tools = run
             .tool_host
             .as_ref()
             .map(|host| host.available())
             .unwrap_or(&[]);
         let compiled = compile(&run.spec, run.api_key, native_tools)?;
+        #[cfg(test)]
+        crate::services::test_support::require_scripted_endpoint(
+            compiled.provider.base_url.as_deref(),
+        )
+        .map_err(|reason| AppError::BadRequest(reason.into()))?;
         let suspended = Arc::new(AtomicBool::new(false));
         let callback_failure = Arc::new(Mutex::new(None));
 
@@ -193,6 +203,7 @@ impl AgentHarness for AiAgentsHarness {
         };
 
         Ok(AgentExecutionOutput {
+            structured: None,
             content: clean_content,
             token_usage: TokenUsage::new(counted.prompt_tokens, counted.completion_tokens),
             disposition: if suspended.load(Ordering::SeqCst) {
@@ -478,3 +489,6 @@ fn count_tokens(
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod compatibility_tests;

@@ -56,6 +56,8 @@ use crate::use_cases::{
 use prompt::PromptParts;
 
 pub struct AgentRunner<'a> {
+    run_store: Option<Arc<dyn crate::services::harness::runs::HarnessRunStore>>,
+    deadline: Option<tokio::time::Instant>,
     prompt: &'a str,
     /// Subject of the message `prompt` came from, if it has one.
     subject: Option<&'a str>,
@@ -95,6 +97,8 @@ pub struct AgentRunner<'a> {
 impl<'a> AgentRunner<'a> {
     pub fn new(prompt: &'a str, params: &'a ResolvedAgentCapabilities) -> Self {
         Self {
+            run_store: None,
+            deadline: None,
             prompt,
             subject: None,
             history: &[],
@@ -267,6 +271,19 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    pub fn run_store(
+        mut self,
+        store: Option<Arc<dyn crate::services::harness::runs::HarnessRunStore>>,
+    ) -> Self {
+        self.run_store = store;
+        self
+    }
+
+    pub fn deadline(mut self, deadline: tokio::time::Instant) -> Self {
+        self.deadline = Some(deadline);
+        self
+    }
+
     pub async fn execute(self) -> AppResult<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         let history_message_count = self.history.len();
@@ -310,7 +327,27 @@ impl<'a> AgentRunner<'a> {
         let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
         info!("Full prompt context length: {}", full_prompt.len());
 
+        let deadline = self
+            .deadline
+            .unwrap_or_else(|| tokio::time::Instant::now() + std::time::Duration::from_secs(300));
+        let execution = self
+            .run_store
+            .clone()
+            .zip(self.approval_context.as_ref())
+            .and_then(|(store, context)| {
+                context
+                    .suspension
+                    .and_then(|suspension| suspension.lease())
+                    .map(|lease| crate::services::harness::runs::RunExecution {
+                        company_id: context.company_id,
+                        lease,
+                        store,
+                    })
+            });
         let run = AgentRun {
+            company_id: self.company_id,
+            execution,
+            deadline,
             spec: Box::new(self.params.spec().clone()),
             agent_id: self.params.agent_id,
             api_key: key,
@@ -326,7 +363,13 @@ impl<'a> AgentRunner<'a> {
         // the provider call itself instead of detaching a still-running Tokio task. Boxing keeps
         // that property while leaving only a pointer in this frame -- and it is the one seam
         // `src/AGENTS.md` asks for at a descent into an external runtime.
-        let task_result = Box::pin(harness.run(run)).await;
+        let task_result = tokio::time::timeout_at(deadline, Box::pin(harness.run(run)))
+            .await
+            .unwrap_or_else(|_| {
+                Err(AppError::Timeout(
+                    "Agent execution deadline exceeded".into(),
+                ))
+            });
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
         match task_result {
@@ -454,7 +497,15 @@ impl<'a> AgentRunner<'a> {
         }
 
         if let Some((persistence, context)) = self.agent_channel_tool.clone() {
-            host = host.with_agent_channels(CreateAgentChannelTool::new(persistence, context));
+            host = host.with_agent_channels(
+                CreateAgentChannelTool::new(persistence, context).with_default_agent_harness(
+                    self.app_config
+                        .as_ref()
+                        .map_or_else(crate::entities::harness::HarnessKind::default, |config| {
+                            config.default_agent_harness
+                        }),
+                ),
+            );
         }
 
         (!host.is_empty()).then(|| Arc::new(host) as Arc<dyn HarnessToolHost>)
@@ -501,6 +552,7 @@ impl<'a> AgentRunner<'a> {
 fn sanitize_error(error: AppError, api_key: &str) -> AppError {
     let clean = |message: String| sanitize_text(&message, Some(api_key));
     match error {
+        AppError::Execution(kind) => AppError::Execution(kind),
         AppError::Database(message) => AppError::Database(clean(message)),
         AppError::InvalidCredentials => AppError::InvalidCredentials,
         AppError::BadRequest(message) => AppError::BadRequest(clean(message)),
@@ -513,6 +565,7 @@ fn sanitize_error(error: AppError, api_key: &str) -> AppError {
 
 fn error_type(error: &AppError) -> &'static str {
     match error {
+        AppError::Execution(_) => "execution_terminal",
         AppError::Database(_) => "database",
         AppError::InvalidCredentials => "invalid_credentials",
         AppError::BadRequest(_) => "bad_request",

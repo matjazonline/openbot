@@ -67,6 +67,7 @@ fn spec_with(extra_config: serde_json::Value) -> AgentCapabilitySpec {
             .expect("test config must use the reviewed schema")
     };
     AgentCapabilitySpec {
+        response_contract: None,
         harness: HarnessKind::AiAgents,
         name: "Support".to_string(),
         system_prompt: "You are a helpful email agent.".to_string(),

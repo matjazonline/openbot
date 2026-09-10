@@ -114,6 +114,7 @@ pub struct AgentApprovalHandler {
 #[async_trait]
 impl HarnessApprovals for AgentApprovalHandler {
     async fn decide(&self, ask: ApprovalAsk<'_>) -> AppResult<ApprovalVerdict> {
+        validate_checkpoint(&self.context, &ask)?;
         // Ahead of the approver check on purpose: delegating to a colleague needs no approver, and
         // a coordinator channel with no configured participant must still be able to do it.
         if let Some(policy) = self.delegation.as_ref()
@@ -143,15 +144,17 @@ impl HarnessApprovals for AgentApprovalHandler {
             .await?
         {
             Some(ApprovalStatus::Approved) => return Ok(ApprovalVerdict::Approved),
-            Some(ApprovalStatus::Rejected) => {
+            Some(ApprovalStatus::Rejected | ApprovalStatus::Expired) => {
                 return Ok(ApprovalVerdict::rejected(
                     "Approval previously rejected by human",
                 ));
             }
-            Some(ApprovalStatus::Pending | ApprovalStatus::Expired) | None => {}
+            Some(ApprovalStatus::Pending) | None => {}
         }
 
-        let action_summary = if ask.message.is_empty() {
+        let action_summary = if let ApprovalTrigger::Checkpoint { proposal, .. } = ask.trigger {
+            proposal.to_string()
+        } else if ask.message.is_empty() {
             step_raw.clone()
         } else {
             ask.message.to_string()
@@ -165,6 +168,7 @@ impl HarnessApprovals for AgentApprovalHandler {
             .approval_use_cases
             .create_and_send_approval_request(
                 &self.context,
+                ask.invocation,
                 ApprovalAction {
                     step_key,
                     action_type: ask.trigger.kind().to_string(),
@@ -185,6 +189,32 @@ impl HarnessApprovals for AgentApprovalHandler {
             ),
         })
     }
+}
+
+fn validate_checkpoint(context: &ApprovalSubject, ask: &ApprovalAsk<'_>) -> AppResult<()> {
+    let ApprovalTrigger::Checkpoint {
+        invocation_id,
+        proposal_fingerprint,
+        proposal,
+        ..
+    } = ask.trigger
+    else {
+        return Ok(());
+    };
+    if ask
+        .invocation
+        .is_none_or(|reference| reference.invocation_id != invocation_id)
+        || proposal_fingerprint != format!("{:x}", Sha256::digest(proposal.as_bytes()))
+        || context
+            .suspension
+            .and_then(|suspension| suspension.lease())
+            .is_none()
+    {
+        return Err(crate::app_error::AppError::BadRequest(
+            "Checkpoint requires a trusted durable invocation and proposal".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl AgentApprovalHandler {
@@ -214,6 +244,11 @@ impl AgentApprovalHandler {
 /// load-bearing for every approval already stored.
 fn step_text(trigger: &ApprovalTrigger<'_>) -> String {
     match trigger {
+        ApprovalTrigger::Checkpoint {
+            invocation_id,
+            proposal_fingerprint,
+            ..
+        } => format!("checkpoint:v1:{}:{}", invocation_id.0, proposal_fingerprint),
         ApprovalTrigger::Tool { name, args } => format!(
             "tool:{}:{}",
             name,
@@ -227,6 +262,7 @@ fn step_text(trigger: &ApprovalTrigger<'_>) -> String {
 /// The subject line a human sees in the approval mail.
 fn action_title(trigger: &ApprovalTrigger<'_>) -> String {
     match trigger {
+        ApprovalTrigger::Checkpoint { title, .. } => title.to_string(),
         ApprovalTrigger::Tool { name, .. } => format!("Tool Execution: {name}"),
         ApprovalTrigger::Condition { name, .. } => format!("Condition Approval: {name}"),
         ApprovalTrigger::State { to, .. } => format!("State Transition: {to}"),

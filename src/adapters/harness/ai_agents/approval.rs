@@ -44,6 +44,7 @@ impl ai_agents::hitl::ApprovalHandler for AiAgentsApprovalShim {
         };
         let context = serde_json::to_value(&req.context).unwrap_or(serde_json::Value::Null);
         let ask = ApprovalAsk {
+            invocation: None,
             trigger,
             message: &req.message,
             context: &context,

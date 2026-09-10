@@ -89,7 +89,10 @@ pub struct AgentDraft<'a> {
     pub memory_recall_mode: &'a str,
     pub memory_max_results: u8,
     pub config_json: &'a str,
-    pub harness_kind: HarnessKind,
+    pub response_format: &'a str,
+    pub response_schema: String,
+    pub harness_kind_raw: Option<&'a str>,
+    pub harness_kind: Option<HarnessKind>,
     pub granted_tool_ids: Vec<ToolId>,
     pub skill_ids: Vec<Uuid>,
     pub sub_agent_ids: Vec<Uuid>,
@@ -118,7 +121,10 @@ impl Default for AgentDraft<'_> {
             memory_recall_mode: MemoryRecallMode::default().as_str(),
             memory_max_results: default_memory_max_results(),
             config_json: "",
-            harness_kind: HarnessKind::default(),
+            response_format: "text",
+            response_schema: String::new(),
+            harness_kind_raw: None,
+            harness_kind: None,
             granted_tool_ids: Vec::new(),
             skill_ids: Vec::new(),
             sub_agent_ids: Vec::new(),
@@ -471,7 +477,8 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {used_by_html}
-                <form hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                <a class="btn btn-ghost mb-4" href="/ui/companies/{company_id}/agents/{agent_id}/mcp-selection">MCP servers</a>
+                <form method="post" action="/ui/agents/{agent_id}?company_id={company_id}" hx-disabled-elt="find button[type='submit']" hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
                     {fields}
@@ -670,9 +677,10 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                 </div>
                 {easy_form}
                 <form id="agent-tab-simple" class="{simple_hidden} space-y-4"
-                    hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    method="post" action="/ui/agents?company_id={company_id}" hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
+                    {simple_runtime}
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Support Triage"
@@ -699,7 +707,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                     </button>
                 </form>
                 <form id="agent-tab-advanced" class="{advanced_hidden} space-y-4"
-                    hx-post="/ui/agents/new/channel?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    method="post" action="/ui/agents/new/channel?company_id={company_id}" hx-post="/ui/agents/new/channel?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="advanced">
                     {agent_step}
@@ -728,6 +736,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         name = escape_html_text(pane.draft.name),
         avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
+        simple_runtime = super::agent_runtime_settings::fields(pane.draft),
         simple_run_timeout = pane
             .draft
             .run_timeout_secs
@@ -797,7 +806,7 @@ pub fn agent_channel_step_pane(pane: &AgentChannelStepPane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <form class="space-y-4"
-                    hx-post="/ui/agents/new/create?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    method="post" action="/ui/agents/new/create?company_id={company_id}" hx-post="/ui/agents/new/create?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     {steps}
                     {carried}
@@ -887,7 +896,14 @@ fn carried_agent_fields(draft: &AgentDraft<'_>) -> String {
             &draft.memory_max_results.to_string(),
         ),
         hidden("agent_config_json", draft.config_json),
-        hidden("agent_harness_kind", draft.harness_kind.as_str()),
+        hidden("agent_response_format", draft.response_format),
+        hidden("agent_response_schema", &draft.response_schema),
+        hidden(
+            "agent_harness_kind",
+            draft
+                .harness_kind_raw
+                .unwrap_or_else(|| draft.harness_kind.map_or("", HarnessKind::as_str)),
+        ),
         hidden(
             "agent_granted_tool_ids",
             &csv_tools(&draft.granted_tool_ids),
@@ -964,7 +980,7 @@ fn agent_easy_tab(pane: &AgentCreatePane<'_>, hidden: &str) -> EasyTab {
         ),
         form: format!(
             r##"<form id="agent-tab-easy" class="{hidden} space-y-4"
-                    hx-post="/ui/agents/from-library?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    method="post" action="/ui/agents/from-library?company_id={company_id}" hx-post="/ui/agents/from-library?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     {picker}
                     <button type="submit" class="btn btn-primary">
@@ -1084,6 +1100,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         {generator}
                         {prompt_textarea}
                     </div>
+                    {runtime_settings}
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Capabilities &amp; advanced options</summary>
                         <div class="collapse-content space-y-4">
@@ -1130,13 +1147,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                 <input type="text" id="agent-description-{id_prefix}" name="description" value="{description}" placeholder="Answers supplier capacity and delivery-date questions"
                                     class="input w-full text-sm">
                             </label>
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">ai-agents advanced options</span></div>
-                                <textarea name="config_json" rows="4" placeholder='{{"version":1,"reasoning":{{"mode":"react","max_iterations":8}}}}'
-                                    class="textarea w-full font-mono text-xs">{config_json}</textarea>
-                                <div class="label"><span class="text-[11px] opacity-60"><a class="link" href="#agent-advanced-shape-{id_prefix}">Accepted shape</a>: version 1 with bounded reasoning, reflection, and disambiguation options. Capabilities, models, prompts, planning, approvals, tool security, context, runtime/spawner/persona, storage, and provider settings are managed elsewhere and rejected here.</span></div>
-                                <code id="agent-advanced-shape-{id_prefix}" class="block overflow-x-auto text-[11px] opacity-60">{{"version":1,"reasoning":{{"mode":"react","max_iterations":8}},"reflection":{{"enabled":"auto","max_retries":2}},"disambiguation":{{"enabled":true}}}}</code>
-                            </label>
+
                         </div>
                     </details>
         "##,
@@ -1149,7 +1160,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         slug = escape_html_text(draft.slug),
         description_help = description_help,
         description = escape_html_text(draft.description),
-        config_json = escape_html_text(draft.config_json),
+        runtime_settings = super::agent_runtime_settings::fields(draft),
         avatar_field = agent_avatar_field(&id_prefix, draft),
         memory_audience_selected = if draft.memory_persistence_mode == "audience_only" {
             " selected"
@@ -1189,42 +1200,6 @@ fn csv_tools(ids: &[ToolId]) -> String {
 
 fn capability_picker(fields: &AgentFields<'_>) -> String {
     let draft = fields.draft;
-    let harness_options = HarnessKind::ALL
-        .into_iter()
-        .map(|kind| {
-            format!(
-                r#"<option value="{}"{}>{}</option>"#,
-                kind.as_str(),
-                if kind == draft.harness_kind {
-                    " selected"
-                } else {
-                    ""
-                },
-                escape_html_text(kind.label()),
-            )
-        })
-        .collect::<String>();
-    let single_harness = HarnessKind::ALL.len() == 1;
-    let harness = format!(
-        r##"<label class="form-control"><span class="label text-xs opacity-70">Harness</span>
-            <select class="select w-full"{name}{disabled}>{harness_options}</select>
-            {hidden}<span class="label text-[11px] opacity-60">Other runtimes are not yet available.</span></label>"##,
-        name = if single_harness {
-            ""
-        } else {
-            " name=\"harness_kind\""
-        },
-        disabled = if single_harness { " disabled" } else { "" },
-        hidden = if single_harness {
-            format!(
-                r#"<input type="hidden" name="harness_kind" value="{}">"#,
-                draft.harness_kind.as_str()
-            )
-        } else {
-            String::new()
-        },
-    );
-
     let mut implied = Vec::<ToolId>::new();
     for skill in fields
         .capability_options
@@ -1278,7 +1253,7 @@ fn capability_picker(fields: &AgentFields<'_>) -> String {
     format!(
         r##"<section class="space-y-5 rounded-box border border-base-300 bg-base-100 p-4" data-agent-capability-picker>
             <div><h3 class="font-semibold">Agent capabilities</h3><p class="text-xs opacity-60">Explicitly choose what this agent may use.</p></div>
-            {harness}{tool_picker}{skills}{sub_agents}
+            {tool_picker}{skills}{sub_agents}
         </section>"##
     )
 }
@@ -1286,6 +1261,8 @@ fn capability_picker(fields: &AgentFields<'_>) -> String {
 fn tool_group(source: ToolSource, draft: &AgentDraft<'_>, implied: &[ToolId]) -> String {
     let cards = CatalogueTool::grantable()
         .filter(|tool| tool.source == source)
+        .filter(|tool| tool.supports_harness(draft.harness_kind.unwrap_or_default())
+            || draft.granted_tool_ids.iter().any(|id| id.as_str() == tool.id))
         .map(|tool| {
             let selected = draft
                 .granted_tool_ids
@@ -1567,7 +1544,7 @@ fn prompt_generator(scope: AgentFormScope, agent_id: Option<Uuid>, id_prefix: &s
                                 class="textarea w-full text-xs"></textarea>
                             <div class="flex items-center gap-3">
                                 <button type="button" class="btn btn-primary btn-outline btn-sm"
-                                    hx-post="{url}"
+                                    method="post" action="{url}" hx-post="{url}"
                                     hx-include="#agent-instructions-{id_prefix}, #agent-provider-{id_prefix}, #agent-model-{id_prefix}, #agent-api-key-{id_prefix}"{vals}
                                     hx-target="#agent-generator-status-{id_prefix}" hx-swap="innerHTML"
                                     hx-disabled-elt="this">
@@ -1696,7 +1673,14 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         memory_recall_mode: agent.memory_recall_mode.as_str(),
         memory_max_results: agent.memory_max_results,
         config_json,
-        harness_kind: agent.harness_kind,
+        response_format: if agent.response_contract.is_some() {
+            "json_schema"
+        } else {
+            "text"
+        },
+        response_schema: agent_response_schema(agent),
+        harness_kind_raw: None,
+        harness_kind: Some(agent.harness_kind),
         granted_tool_ids: agent.granted_tool_ids.clone(),
         skill_ids: Vec::new(),
         sub_agent_ids: Vec::new(),
@@ -1716,6 +1700,17 @@ pub fn stored_agent_config(agent: &Agent) -> String {
         Some(config) => serde_json::to_string_pretty(config).unwrap_or_else(|_| config.to_string()),
         None => String::new(),
     }
+}
+
+/// Schema text is rendered and edited separately from runtime configuration.
+pub fn agent_response_schema(agent: &Agent) -> String {
+    agent
+        .response_contract
+        .as_ref()
+        .map(|contract| {
+            serde_json::to_string_pretty(contract.schema()).expect("JSON value serializes")
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -1759,13 +1754,13 @@ mod capability_tests {
     }
 
     #[test]
-    fn the_harness_select_lists_every_kind_and_submits_a_disabled_value() {
+    fn the_harness_select_lists_every_kind_and_preserves_omission() {
         let html = library_agent_fields(&AgentDraft::default(), None);
         for kind in HarnessKind::ALL {
             assert!(html.contains(&format!("value=\"{}\"", kind.as_str())));
         }
-        assert!(html.contains("<select class=\"select w-full\" disabled>"));
-        assert!(html.contains("type=\"hidden\" name=\"harness_kind\" value=\"ai_agents\""));
+        assert!(html.contains("name=\"harness_kind\""));
+        assert!(html.contains("value=\"\" selected>Deployment default"));
     }
 
     #[test]

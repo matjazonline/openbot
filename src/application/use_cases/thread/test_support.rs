@@ -267,6 +267,7 @@ impl InMemoryThreads {
             .iter()
             .find(|canonical| canonical.id == association.message_id)?;
         Some(Message {
+            response_contract: None,
             id: association.id,
             canonical_id: canonical.id,
             company_id: self.company_id,
@@ -1014,6 +1015,7 @@ impl ThreadPersistence for InMemoryThreads {
 /// The email-shaped stored message projected the way the SQL reads project it.
 fn thread_message_view(message: &Message) -> ThreadMessageView {
     ThreadMessageView {
+        response_contract: message.response_contract.clone(),
         id: message.id,
         canonical_id: message.canonical_id,
         thread_id: message.thread_id,
@@ -1152,6 +1154,7 @@ pub fn stored_email(draft: EmailMessageDraft) -> Message {
     }
 
     Message {
+        response_contract: None,
         id: draft.id,
         canonical_id: CanonicalMessageId::random(),
         company_id: Uuid::nil(),
@@ -1246,6 +1249,7 @@ pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
     }
 
     MessageWrite {
+        structured: None,
         id: CanonicalMessageId::random(),
         thread_id: draft.thread_id,
         author: MessageAuthorWrite::Observed(IdentityObservation {
@@ -1683,6 +1687,7 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
         ));
     }
     MessageWrite {
+        structured: None,
         id: CanonicalMessageId::random(),
         thread_id,
         author: MessageAuthorWrite::Observed(IdentityObservation {

@@ -54,6 +54,8 @@ pub(super) struct MessageDb {
     pub author_subject: Option<String>,
     pub subject: String,
     pub clean_text_body: String,
+    pub response_contract:
+        Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
     pub attachments: Option<Value>,
     pub direction: String,
     pub role: String,
@@ -91,6 +93,7 @@ pub(super) const MESSAGE_SELECT: &str = r#"
            author_identity.subject AS author_subject,
            message.subject,
            message.clean_text_body,
+           message.structured_response->'contract' AS response_contract,
            message.attachments,
            message.direction,
            message.role,
@@ -154,6 +157,7 @@ impl TryFrom<MessageDb> for Message {
             },
             subject: db.subject,
             clean_text_body: db.clean_text_body,
+            response_contract: db.response_contract.map(|contract| contract.0),
             attachments: decode_attachments(db.attachments)?,
             direction,
             role,
@@ -396,6 +400,7 @@ pub(super) fn canonical_message_hash(
             })
             .collect::<Vec<_>>(),
         "subject": write.subject,
+        "response_contract": write.structured.as_ref().map(|response| response.contract()),
         "canonical_body": email.is_none().then_some(write.clean_text_body.as_str()),
         "direction": write.direction.as_str(),
         "role": write.role.as_str(),
@@ -688,13 +693,19 @@ pub(super) async fn insert_canonical_message(
     attachments: Option<&Value>,
     content_hash: &[u8],
 ) -> AppResult<CanonicalMessageId> {
+    if let Some(structured) = &write.structured {
+        structured.verify(
+            &write.clean_text_body,
+            &crate::adapters::response_schema::JsonResponseValidator,
+        )?;
+    }
     let id = write.id;
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
                 clean_text_body, attachments, direction, role, correlation_id, content_hash,
-                created_at, audience
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"#,
+                created_at, audience, structured_response
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
     )
     .bind(id.as_uuid())
     .bind(company_id)
@@ -709,6 +720,7 @@ pub(super) async fn insert_canonical_message(
     .bind(content_hash)
     .bind(write.created_at)
     .bind(write.audience.as_str())
+    .bind(write.structured.as_ref().map(sqlx::types::Json))
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;

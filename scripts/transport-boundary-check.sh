@@ -44,7 +44,7 @@ scan_production() {
     local file
     while IFS= read -r file; do
         case "$file" in
-            *_tests.rs|*/tests.rs|*/test_support.rs) continue ;;
+            *_tests.rs|*/tests.rs|*/test_support.rs|*/test_support/*.rs) continue ;;
         esac
         if production_source "$file" | rg -n --pcre2 "$pattern" >>"$failures"; then
             printf '%s in %s\n' "$description" "$file" >>"$failures"
@@ -58,10 +58,10 @@ scan_production() {
 # provider or a database. An allowlist belongs here rather than in a reviewer's memory -- keep it
 # empty for as long as it can be kept empty.
 scan_production 'application boundary violation' \
-    '(^|[^[:alnum:]_])(crate::)?adapters::|\b(sqlx|axum|lettre|mail_parser|slack_morphism)::' \
+    '(^|[^[:alnum:]_])(crate::)?adapters::|\b(sqlx|axum|lettre|mail_parser|slack_morphism|rig|rig_core|rig_agent)::' \
     src/application
 scan_production 'domain boundary violation' \
-    '\b(sqlx|axum|lettre|mail_parser|slack_morphism)::|crate::adapters::' \
+    '\b(sqlx|axum|lettre|mail_parser|slack_morphism|rig|rig_core|rig_agent)::|crate::adapters::' \
     src/domain
 
 # The canonical spine is what every transport shares. A provider's vocabulary on one of these three

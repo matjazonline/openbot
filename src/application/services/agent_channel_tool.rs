@@ -34,7 +34,7 @@ pub struct AgentChannelToolContext {
     pub source_agent_id: Uuid,
     pub source_agent_name: String,
     pub source_channel_id: Uuid,
-    pub task_id: Uuid,
+    pub lease: crate::entities::task::TaskLeaseRef,
     pub app_domain_name: String,
     pub channel_defaults: CompanyChannelDefaults,
     pub spam_scanning: SpamScanning,
@@ -56,9 +56,11 @@ struct CreateAgentChannelInput {
 
 #[derive(Debug, Clone)]
 pub struct ProvisionAgentChannelRequest {
+    pub invocation: Option<crate::services::harness::runs::InvocationRef>,
     pub request_hash: String,
     pub company_id: Uuid,
-    pub source_task_id: Uuid,
+    pub lease: crate::entities::task::TaskLeaseRef,
+    pub response: ProvisionResponseContext,
     pub agent: AgentWrite,
     pub skill_slugs: Vec<SkillSlug>,
     pub channel: ChannelWrite,
@@ -73,6 +75,29 @@ pub struct ProvisionedAgentChannel {
     pub warnings: Vec<ProvisioningWarning>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ProvisionResponseContext {
+    pub name: String,
+    pub slug: ChannelSlug,
+    pub company_slug: CompanySlug,
+    pub app_domain_name: String,
+}
+
+pub(crate) fn provision_response(
+    context: &ProvisionResponseContext,
+    result: &ProvisionedAgentChannel,
+) -> Value {
+    let address = crate::entities::channel::Channel::address_for(
+        &context.slug,
+        &context.company_slug,
+        &context.app_domain_name,
+    );
+    serde_json::json!({"created":result.created, "agent_id":result.agent_id, "channel_id":result.channel_id,
+        "channel":ChannelSelector::CurrentCompany(context.slug.clone()).to_string(), "name":context.name,
+        "slug":context.slug, "interfaces":[{"transport":TransportKind::Email.as_str(),"display_address":address.as_str()}],
+        "warnings":result.warnings})
+}
+
 #[async_trait]
 pub trait AgentChannelProvisioning: Send + Sync {
     async fn provision_agent_channel(
@@ -82,6 +107,7 @@ pub trait AgentChannelProvisioning: Send + Sync {
 }
 
 pub struct CreateAgentChannelTool {
+    default_agent_harness: crate::entities::harness::HarnessKind,
     persistence: Arc<dyn AgentChannelProvisioning>,
     context: AgentChannelToolContext,
 }
@@ -92,9 +118,18 @@ impl CreateAgentChannelTool {
         context: AgentChannelToolContext,
     ) -> Self {
         Self {
+            default_agent_harness: crate::entities::harness::HarnessKind::default(),
             persistence,
             context,
         }
+    }
+
+    pub fn with_default_agent_harness(
+        mut self,
+        kind: crate::entities::harness::HarnessKind,
+    ) -> Self {
+        self.default_agent_harness = kind;
+        self
     }
 
     fn request(
@@ -110,7 +145,7 @@ impl CreateAgentChannelTool {
             self.context.source_agent_id,
             self.context.source_agent_name.clone(),
             self.context.source_channel_id,
-            self.context.task_id,
+            self.context.lease.task_id,
         );
         let mut skill_slugs = Vec::new();
         for raw_slug in input.skill_slugs {
@@ -139,6 +174,7 @@ impl CreateAgentChannelTool {
             created_by: Some(provenance.clone()),
             ..AgentWrite::default()
         };
+        agent.resolve_harness(self.default_agent_harness);
         agent.normalize().map_err(|e| e.to_string())?;
         let mut decision = personal_channel_write(
             &agent,
@@ -160,9 +196,16 @@ impl CreateAgentChannelTool {
         });
         let request_hash = format!("{:x}", Sha256::digest(canonical.to_string().as_bytes()));
         Ok(ProvisionAgentChannelRequest {
+            invocation: None,
             request_hash,
             company_id: self.context.company_id,
-            source_task_id: self.context.task_id,
+            lease: self.context.lease,
+            response: ProvisionResponseContext {
+                name: agent.name.clone(),
+                slug: ChannelSlug::from(decision.channel.slug.clone()),
+                company_slug: self.context.company_slug.clone(),
+                app_domain_name: self.context.app_domain_name.clone(),
+            },
             agent,
             skill_slugs,
             channel: decision.channel,
@@ -204,42 +247,26 @@ impl CreateAgentChannelTool {
     /// something the *model* should read and retry differently -- a slug that is taken, a blank
     /// description. Those are `success: false` with the reason, exactly as they were when this was
     /// an `ai_agents::Tool`, and not errors that end the run.
-    pub async fn call(&self, args: Value) -> ToolInvocation {
+    pub async fn call(
+        &self,
+        args: Value,
+        invocation: Option<crate::services::harness::runs::InvocationRef>,
+    ) -> crate::app_error::AppResult<ToolInvocation> {
         let input = match serde_json::from_value(args) {
             Ok(input) => input,
-            Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
+            Err(error) => return Ok(ToolInvocation::failure(format!("Invalid input: {error}"))),
         };
-        let request = match self.request(input) {
+        let mut request = match self.request(input) {
             Ok(request) => request,
-            Err(error) => return ToolInvocation::failure(error),
+            Err(error) => return Ok(ToolInvocation::failure(error)),
         };
-        let name = request.agent.name.clone();
-        let slug = ChannelSlug::from(request.channel.slug.clone());
+        request.invocation = invocation;
+        let response = request.response.clone();
         match self.persistence.provision_agent_channel(request).await {
-            Ok(result) => {
-                // What the caller delegates by is the selector and the id, not the address. The
-                // address is reported because a person reading the transcript wants it, and is
-                // labelled as display data so it is not copied back as a routing key.
-                let address = crate::entities::channel::Channel::address_for(
-                    &slug,
-                    &self.context.company_slug,
-                    &self.context.app_domain_name,
-                );
-                ToolInvocation::success(serde_json::json!({
-                    "created": result.created,
-                    "agent_id": result.agent_id,
-                    "channel_id": result.channel_id,
-                    "channel": ChannelSelector::CurrentCompany(slug.clone()).to_string(),
-                    "name": name,
-                    "slug": slug.as_str(),
-                    "interfaces": [{ "transport": TransportKind::Email.as_str(),
-                                     "display_address": address.as_str() }],
-                    "warnings": result.warnings,
-                }))
-            }
-            Err(error) => {
-                ToolInvocation::failure(format!("Failed to create agent channel: {error}"))
-            }
+            Ok(result) => Ok(ToolInvocation::success(provision_response(
+                &response, &result,
+            ))),
+            Err(error) => ToolInvocation::denial_or_error(error),
         }
     }
 }
@@ -269,7 +296,13 @@ mod tests {
                 source_agent_id: Uuid::from_u128(1),
                 source_agent_name: "Coordinator".into(),
                 source_channel_id: Uuid::from_u128(2),
-                task_id: Uuid::from_u128(3),
+                lease: crate::entities::task::TaskLeaseRef {
+                    task_id: Uuid::from_u128(3),
+                    worker_id: Uuid::new_v4(),
+                    execution_generation: Uuid::new_v4(),
+                    claimed_owner: Default::default(),
+                    ownership_version: 1,
+                },
                 app_domain_name: "mailagents.test".into(),
                 channel_defaults: CompanyChannelDefaults::default(),
                 spam_scanning: SpamScanning::Available,
@@ -279,28 +312,32 @@ mod tests {
 
     #[test]
     fn request_is_normalized_internal_and_attributed_to_parent() {
-        let request = tool()
-            .request(CreateAgentChannelInput {
-                name: "  Research Helper  ".into(),
-                slug: "Research Helper".into(),
-                description: " Finds sources ".into(),
-                instructions: " Research carefully ".into(),
-                granted_tool_ids: vec!["web_fetch".into()],
-                skill_slugs: vec!["  SOURCE-REVIEW  ".into()],
-            })
-            .unwrap();
+        for harness in crate::entities::harness::HarnessKind::ALL {
+            let request = tool()
+                .with_default_agent_harness(harness)
+                .request(CreateAgentChannelInput {
+                    name: "  Research Helper  ".into(),
+                    slug: "Research Helper".into(),
+                    description: " Finds sources ".into(),
+                    instructions: " Research carefully ".into(),
+                    granted_tool_ids: vec!["web_fetch".into()],
+                    skill_slugs: vec!["  SOURCE-REVIEW  ".into()],
+                })
+                .unwrap();
 
-        assert_eq!(request.agent.slug, "research-helper");
-        assert_eq!(request.agent.provider, None);
-        assert_eq!(request.agent.granted_tool_ids, [ToolId::from("web_fetch")]);
-        assert_eq!(request.skill_slugs, [SkillSlug::from("source-review")]);
-        assert_eq!(request.channel.agent_ids, None);
-        assert!(request.channel.enabled);
-        assert!(request.channel.add_3rd_party);
-        let provenance = request.agent.created_by.unwrap();
-        assert_eq!(provenance.actor_id, Some(Uuid::from_u128(1)));
-        assert_eq!(provenance.source_channel_id, Some(Uuid::from_u128(2)));
-        assert_eq!(provenance.source_task_id, Some(Uuid::from_u128(3)));
+            assert_eq!(request.agent.harness_kind, Some(harness));
+            assert_eq!(request.agent.slug, "research-helper");
+            assert_eq!(request.agent.provider, None);
+            assert_eq!(request.agent.granted_tool_ids, [ToolId::from("web_fetch")]);
+            assert_eq!(request.skill_slugs, [SkillSlug::from("source-review")]);
+            assert_eq!(request.channel.agent_ids, None);
+            assert!(request.channel.enabled);
+            assert!(request.channel.add_3rd_party);
+            let provenance = request.agent.created_by.unwrap();
+            assert_eq!(provenance.actor_id, Some(Uuid::from_u128(1)));
+            assert_eq!(provenance.source_channel_id, Some(Uuid::from_u128(2)));
+            assert_eq!(provenance.source_task_id, Some(Uuid::from_u128(3)));
+        }
     }
 
     #[test]

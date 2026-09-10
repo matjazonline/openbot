@@ -1,6 +1,6 @@
 use crate::{
     adapters::{
-        harness::ai_agents::{AiAgentsHarness, AiAgentsTextClassifier},
+        harness::ai_agents::AiAgentsTextClassifier,
         http::{app_state::AppState, session::SessionAuthority},
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
@@ -12,9 +12,7 @@ use crate::{
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
-    entities::{
-        harness::HarnessKind, memory::MemoryProviderKind, runtime_metrics::MachineIdentity,
-    },
+    entities::{memory::MemoryProviderKind, runtime_metrics::MachineIdentity},
     infra::{
         argon2_password_hasher,
         config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
@@ -23,7 +21,7 @@ use crate::{
     },
     services::{
         database_query_health::DatabaseQueryHealthService,
-        harness::{HarnessRegistry, TextClassifier},
+        harness::TextClassifier,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
@@ -78,7 +76,11 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         None => None,
     };
 
-    let postgres_arc = Arc::new(postgres_persistence().await?);
+    let postgres_arc = Arc::new(
+        postgres_persistence()
+            .await?
+            .with_default_agent_harness(config.default_agent_harness),
+    );
     install_builtin_agent_library(postgres_arc.as_ref()).await?;
     let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
     let memory_provider_activity = MemoryProviderActivity::default();
@@ -144,6 +146,26 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             config: config.clone(),
         });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
+    let mcp_policy = crate::adapters::mcp::policy::EndpointPolicy::new(
+        std::env::var("MCP_INTERNAL_ENDPOINTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned),
+    )?;
+    let mcp_client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(mcp_policy));
+    let mcp_runtime = Arc::new(crate::services::mcp_runtime::McpRuntime::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        mcp_client.clone(),
+    ));
+    let mcp_use_cases = Arc::new(crate::use_cases::mcp::McpUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        mcp_client,
+    ));
     let company_resend_api_use_cases =
         Arc::new(CompanyResendApiUseCases::new(postgres_arc.clone()));
     // One resolver, shared by the three places that act as a company at Resend: the delivery
@@ -164,16 +186,12 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         )
         .with_memory_persistence(postgres_arc.clone()),
     );
-    // The runtimes an agent may be executed on. One today; the registry is what a second one
-    // attaches to, and what makes an agent asking for a harness this deployment does not carry
-    // fail loudly instead of silently running somewhere else.
-    let harnesses = Arc::new(
-        HarnessRegistry::new()
-            .register(HarnessKind::AiAgents, Arc::new(AiAgentsHarness::new()))
-            .map_err(|error| {
-                anyhow::anyhow!("Could not register the ai-agents harness: {error}")
-            })?,
-    );
+    let harnesses = Arc::new(crate::adapters::harness::deployment_registry(
+        config.default_agent_harness,
+        postgres_arc.clone(),
+        mcp_runtime,
+    )?);
+    tracing::info!(default_agent_harness = %config.default_agent_harness, "Agent harnesses configured");
     let text_classifier: Arc<dyn TextClassifier> = Arc::new(AiAgentsTextClassifier::new());
 
     let agent_use_cases = AgentUseCases::new(
@@ -186,6 +204,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             crate::use_cases::agent::SpamScanning::Unavailable
         },
     )
+    .with_default_agent_harness(config.default_agent_harness)
+    .with_response_validator(Arc::new(
+        crate::adapters::response_schema::JsonResponseValidator,
+    ))
     .with_prompt_classifier(text_classifier.clone());
     let skill_use_cases = Arc::new(SkillUseCases::new(
         postgres_arc.clone(),
@@ -212,8 +234,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
         postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
         delivery_composer.clone(),
         config.clone(),
     ));
@@ -237,7 +257,11 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             renderers.clone(),
             config.clone(),
         )
+        .with_response_validator(Arc::new(
+            crate::adapters::response_schema::JsonResponseValidator,
+        ))
         .with_agent_run_timeout(agent_run_timeout)
+        .with_harness_run_store(postgres_arc.clone())
         .with_agent_persistence(postgres_arc.clone())
         .with_agent_capability_reader(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
@@ -307,6 +331,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     Ok(AppState {
         db: postgres_arc.pool().clone(),
+        mcp_use_cases,
         config,
         monitoring,
         user_use_cases: Arc::new(user_use_cases),

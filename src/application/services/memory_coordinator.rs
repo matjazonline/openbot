@@ -625,6 +625,7 @@ mod tests {
 
     fn memory_agent(company_id: Uuid) -> Agent {
         Agent {
+            response_contract: None,
             memory_enabled: true,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,

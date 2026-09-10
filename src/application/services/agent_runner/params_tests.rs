@@ -81,7 +81,7 @@ fn a_company_without_an_agent_resolves_to_a_spec_that_grants_nothing() {
     assert_eq!(resolved.api_key(), "company-api-key");
 
     let spec = resolved.spec();
-    assert_eq!(spec.harness, HarnessKind::AiAgents);
+    assert_eq!(spec.harness, HarnessKind::Rig);
     assert_eq!(spec.name, "Acme Corp");
     assert_eq!(spec.system_prompt, "You are a helpful assistant.");
     assert!(spec.granted_tools.is_empty());
@@ -89,7 +89,7 @@ fn a_company_without_an_agent_resolves_to_a_spec_that_grants_nothing() {
     assert_eq!(spec.sub_agents, SubAgentScope::AllCompanySiblings);
     assert_eq!(
         spec.harness_config,
-        crate::entities::harness::HarnessConfig::empty(HarnessKind::AiAgents)
+        crate::entities::harness::HarnessConfig::empty(HarnessKind::Rig)
     );
 }
 
@@ -274,6 +274,7 @@ impl crate::use_cases::company::CompanyPersistence for StubCompanyPersistence {
 
 fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
     AgentEntity {
+        response_contract: None,
         memory_enabled: false,
         id: Uuid::new_v4(),
         company_id: None,
@@ -284,7 +285,7 @@ fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
         run_timeout_secs: None,
         system_prompt: Some("Answer the question.".into()),
         description: None,
-        harness_kind: HarnessKind::default(),
+        harness_kind: HarnessKind::AiAgents,
         granted_tool_ids: Vec::new(),
         native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
         config_json: None,
@@ -581,4 +582,51 @@ async fn an_absent_capability_snapshot_fails_explicitly() {
 
     assert!(matches!(error, crate::app_error::AppError::NotFound(_)));
     assert!(error.to_string().contains(&agent_id.to_string()));
+}
+
+#[test]
+fn an_unresolved_snapshot_uses_the_injected_harness_override() {
+    let params = ResolvedAgentCapabilities::from_snapshot_connection(
+        None,
+        super::AgentSnapshot {
+            agent: None,
+            skills: vec![],
+            sub_agents: SubAgentScope::AllCompanySiblings,
+            default_harness: HarnessKind::AiAgents,
+        },
+        &ModelProvider::from("openai"),
+        &ModelName::from("model"),
+        "synthetic-key",
+    )
+    .unwrap();
+    assert_eq!(params.spec().harness, HarnessKind::AiAgents);
+    assert!(params.spec().harness_config.ai_agents().is_some());
+}
+
+#[test]
+fn omission_defaults_and_explicit_selections_are_independent_of_provider_selection() {
+    for default in HarnessKind::ALL {
+        for selection in [None, Some(HarnessKind::Rig), Some(HarnessKind::AiAgents)] {
+            let agent = selection.map(|kind| {
+                let mut agent = agent_selecting(Some("openai"), Some("model"));
+                agent.harness_kind = kind;
+                agent
+            });
+            let params = ResolvedAgentCapabilities::from_snapshot_connection(
+                None,
+                super::AgentSnapshot {
+                    agent: agent.as_ref(),
+                    skills: vec![],
+                    sub_agents: SubAgentScope::AllCompanySiblings,
+                    default_harness: default,
+                },
+                &"openai".into(),
+                &"model".into(),
+                "key",
+            )
+            .unwrap();
+            assert_eq!(params.spec().harness, selection.unwrap_or(default));
+            assert_eq!(params.provider().as_str(), "openai");
+        }
+    }
 }

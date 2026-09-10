@@ -23,9 +23,12 @@
 
 pub mod approvals;
 pub mod classifier;
+pub mod context;
+pub mod mcp;
 pub mod ports;
 pub mod redaction;
 pub mod registry;
+pub mod runs;
 
 pub use approvals::{AgentApprovalHandler, InternalDelegationPolicy};
 pub use classifier::{ClassificationRequest, TextClassifier};

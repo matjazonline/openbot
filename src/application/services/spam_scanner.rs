@@ -344,6 +344,7 @@ mod tests {
     #[tokio::test]
     async fn test_spam_scanner_service_composite() {
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),

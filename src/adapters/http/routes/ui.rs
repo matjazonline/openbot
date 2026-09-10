@@ -1456,6 +1456,8 @@ async fn change_visible_task_ownership(
     };
     let outcome = thread_use_cases
         .change_task_ownership(TaskOwnershipCommand {
+            execution: None,
+            invocation: None,
             task_id,
             company_id: company.id,
             command_id: form.command_id,

@@ -792,6 +792,8 @@ async fn mutate_task_ownership(
     let outcome = workspace
         .thread_use_cases
         .change_task_ownership(TaskOwnershipCommand {
+            execution: None,
+            invocation: None,
             task_id,
             company_id: company.id,
             command_id: form.command_id,
@@ -1082,7 +1084,23 @@ impl TaskMonitorView<'_> {
             .list_task_owner_candidates(self.company.id, task.channel_id)
             .await?;
 
+        let (harness_diagnostics, harness_diagnostics_error) = match self
+            .thread_use_cases
+            .harness_run_diagnostics(self.company.id, task.id)
+            .await
+        {
+            Ok(value) => (value, None),
+            Err(error) => {
+                warn!(task_id = %task.id, %error, "Could not load harness diagnostics");
+                (
+                    None,
+                    Some("Harness diagnostics could not be loaded. Reload the task to try again."),
+                )
+            }
+        };
         Ok(pages::task_detail_pane(&pages::TaskDetailPane {
+            harness_diagnostics: harness_diagnostics.as_ref(),
+            harness_diagnostics_error,
             company_id: self.company.id,
             task,
             channel: channel.as_ref(),

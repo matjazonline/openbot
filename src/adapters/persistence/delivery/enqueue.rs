@@ -32,6 +32,18 @@ pub async fn insert_delivery_on(
             "Internal-only and unclassified messages cannot be delivered externally.".into(),
         ));
     }
+    let structured: Option<
+        sqlx::types::Json<crate::services::response_contract::StructuredResponse>,
+    > = sqlx::query_scalar(
+        "SELECT structured_response FROM messages WHERE company_id = $1 AND id = $2",
+    )
+    .bind(delivery.company_id)
+    .bind(delivery.message_id.as_uuid())
+    .fetch_one(&mut **tx)
+    .await?;
+    if let Some(response) = structured {
+        crate::adapters::response_schema::validate_delivery(&response.0, delivery)?;
+    }
     let inserted: Option<(Uuid,)> = sqlx::query_as(
         r#"INSERT INTO message_deliveries (
                 id, company_id, channel_id, message_id, source_binding_id,

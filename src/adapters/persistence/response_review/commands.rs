@@ -119,6 +119,29 @@ pub(super) async fn execute_command(
                 }
             }
             ReviewAction::Edit { replacement } => {
+                let original: DraftPublicationSnapshot =
+                    decode_json(snapshot, "draft publication")?;
+                let original_contract = original
+                    .message()
+                    .structured
+                    .as_ref()
+                    .map(|response| response.contract());
+                let replacement_contract = replacement
+                    .publication
+                    .message()
+                    .structured
+                    .as_ref()
+                    .map(|response| response.contract());
+                if original_contract != replacement_contract {
+                    return Err(AppError::BadRequest(
+                        "response: the saved response contract is immutable".into(),
+                    ));
+                }
+                crate::adapters::response_schema::validate_publication(
+                    replacement.publication.message(),
+                    replacement.publication.delivery(),
+                )?;
+
                 sqlx::query(
                     r#"UPDATE response_drafts SET status = 'superseded',
                           updated_by_principal_id = $4, updated_at = CURRENT_TIMESTAMP
@@ -204,6 +227,10 @@ async fn approve_on(
     rationale: Option<&str>,
 ) -> AppResult<ReviewCommandResult> {
     let publication: DraftPublicationSnapshot = decode_json(snapshot, "draft publication")?;
+    crate::adapters::response_schema::validate_publication(
+        publication.message(),
+        publication.delivery(),
+    )?;
     let message = publication.message();
     let delivery = publication.delivery();
     if message.id != delivery.message_id || delivery.company_id != command.company_id {

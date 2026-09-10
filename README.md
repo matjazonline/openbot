@@ -3,6 +3,16 @@
 A transport-neutral agent automation platform built in Rust. Email is the initial/default channel
 binding; canonical channels, actors, messages, threads, and deliveries are not email-shaped.
 
+Agents run on **Rig** by default, with ai-agents selectable per agent. Choose the runtime in agent
+settings or send `"harness_kind":"rig"` with `"config_json":{"version":1}` to the agent API.
+Credentials come from company model connections. Rig supports guarded tools, company HTTP MCP,
+skills, durable approval/resume, and optional validated JSON answers through a separate
+`response_contract` field. It executes in the server process and is not a sandbox.
+
+See the [Rig configuration and operator guide](docs/rig.md) for tested examples, compatibility and
+limits, [custom tools](docs/custom_tools.md) for grants and native policy, and the
+[fresh-database rollout](docs/deploy.md#rig-rollout-on-a-fresh-database) for deployment and recovery.
+
 ## Architecture Glossary
 
 - **Channel:** The company-scoped business object that owns agents, policy, memory, threads, and
@@ -381,14 +391,11 @@ LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebr
 ### Database Migrations
 
 Migrations are automatically executed on server startup via `sqlx::migrate!()`.
+The single baseline, `migrations/20260817000000_init_schema.sql`, includes the schema through
+2026-09-10 and requires an empty database. Reset databases that applied the previous migration
+history before starting this release; startup does not reset them or rewrite migration checksums.
 
-To run migrations manually using `psql`:
-
-```bash
-/opt/homebrew/opt/postgresql@16/bin/psql -d <database_name> -f migrations/20260817000000_init_schema.sql
-```
-
-Alternatively, install `sqlx-cli` to run migrations:
+To run migrations manually with SQLx migration tracking:
 
 ```bash
 cargo install sqlx-cli --no-default-features --features postgres

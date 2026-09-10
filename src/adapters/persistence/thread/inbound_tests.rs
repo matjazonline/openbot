@@ -1015,6 +1015,12 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
     .execute(&fixture.pool)
     .await
     .unwrap();
+    sqlx::query("UPDATE background_tasks SET awaited_outreach_id = $2 WHERE id = $1")
+        .bind(task.id)
+        .bind(outreach_id)
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
     sqlx::query(
         r#"INSERT INTO task_outreach_targets (
                outreach_id, company_id, email, target_kind,

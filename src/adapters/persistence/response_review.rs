@@ -192,6 +192,10 @@ pub(crate) async fn create_review_draft_on(
     draft: &PreparedReviewDraft,
     assigned_reviewer: Option<PrincipalId>,
 ) -> AppResult<PrincipalId> {
+    crate::adapters::response_schema::validate_publication(
+        draft.publication.message(),
+        draft.publication.delivery(),
+    )?;
     let reviewer = match assigned_reviewer {
         Some(reviewer)
             if reviewer_is_eligible_on(tx, draft.company_id, draft.channel_id, reviewer)

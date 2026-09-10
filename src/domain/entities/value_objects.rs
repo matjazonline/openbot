@@ -126,6 +126,9 @@ impl ModelName {
 // A channel's URL slug, e.g. the `support` in `support@acme.mailagents.com`.
 string_newtype!(ChannelSlug);
 
+// A company MCP catalog identifier, distinct from a mail channel address.
+string_newtype!(McpConnectionSlug);
+
 // An email address as seen on the wire (not necessarily normalized/lowercased
 // by construction — callers that need a normalized form should still trim /
 // lowercase explicitly, this type only prevents mixing addresses up with

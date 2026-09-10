@@ -39,17 +39,23 @@ jobs:
       - name: Generated CSS is current
         run: npm run check:css
       - name: SSE navigation lifecycle
-        run: node --test scripts/tests/sse-navigation.mjs
+        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs
       - name: Deployment script tests
         run: |
           scripts/tests/deploy.sh
           scripts/tests/credential-key-rotation.sh
       - name: Formatting
         run: cargo fmt --all -- --check
+      - name: Patch whitespace
+        run: git diff --check
       - name: Transport abstraction boundary
-        run: scripts/transport-boundary-check.sh
+        run: |
+          scripts/tests/transport-boundary.sh
+          scripts/transport-boundary-check.sh
+      - name: Fetch locked Rust dependencies
+        run: cargo fetch --locked
       - name: Offline compilation
-        run: cargo check --locked --all-targets
+        run: cargo check --locked --offline --all-targets
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Install SQLx CLI
@@ -84,11 +90,17 @@ jobs:
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atqc \
             "SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1" \
             | grep -Eq '^-?[0-9]+$'
-      - name: Database-backed test suite
-        run: cargo test --locked --all-targets
+      - name: SQLx metadata matches migrated schema
+        env:
+          SQLX_OFFLINE: "false"
+        run: cargo sqlx prepare --check -- --all-targets
+      - name: Compile tests before denying network access
+        run: cargo test --locked --offline --all-targets --no-run
+      - name: Database-backed test suite (isolated network)
+        run: scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
       # .cargo/config.toml gives every test thread 16 MiB, which is what keeps the
       # task-worker -> dispatch -> agent-runner chain off the guard page -- and which would also
       # let that chain grow twelvefold before anything complained. Re-run the suite at the stack a
       # thread gets by default, so growth is a red build rather than a crash months later.
       - name: Stack budget
-        run: scripts/stack-budget.sh
+        run: scripts/test-network-isolation.sh scripts/stack-budget.sh --offline

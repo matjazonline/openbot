@@ -401,6 +401,9 @@ pub trait ThreadPersistence: Send + Sync {
 
 #[derive(Clone)]
 pub struct ThreadUseCases {
+    response_validator:
+        Option<Arc<dyn crate::services::response_contract::ResponseContractValidator>>,
+    harness_run_store: Option<Arc<dyn crate::services::harness::runs::HarnessRunStore>>,
     thread_persistence: Arc<dyn ThreadPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
@@ -458,6 +461,8 @@ impl ThreadUseCases {
         let deliveries = DeliveryComposer::new(renderers, ingest.bindings.clone());
 
         Self {
+            response_validator: None,
+            harness_run_store: None,
             thread_persistence: stores.threads,
             channel_persistence: stores.channels,
             company_persistence: stores.companies,
@@ -495,6 +500,35 @@ impl ThreadUseCases {
             .into_iter()
             .next()
             .map(|identity| EmailAddress::from(identity.subject.into_string())))
+    }
+
+    /// The caller first authorizes access to the task; the store independently scopes its read.
+    pub async fn harness_run_diagnostics(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<Option<crate::services::harness::runs::RunDiagnostics>> {
+        self.harness_run_store
+            .as_ref()
+            .ok_or_else(|| AppError::Internal("Harness run storage unavailable".into()))?
+            .diagnostics(company_id, task_id)
+            .await
+    }
+
+    pub fn with_response_validator(
+        mut self,
+        validator: Arc<dyn crate::services::response_contract::ResponseContractValidator>,
+    ) -> Self {
+        self.response_validator = Some(validator);
+        self
+    }
+
+    pub fn with_harness_run_store(
+        mut self,
+        store: Arc<dyn crate::services::harness::runs::HarnessRunStore>,
+    ) -> Self {
+        self.harness_run_store = Some(store);
+        self
     }
 
     pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
@@ -2005,6 +2039,8 @@ pub enum SimulationMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentExecutionResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_contract: Option<crate::entities::response_contract::ResponseContract>,
     /// The canonical reply this run produced, named by its own id rather than by the RFC header of
     /// whichever mail happened to carry it.
     pub reply_message_id: Option<CanonicalMessageId>,

@@ -68,6 +68,7 @@ pub struct CredentialRotationReport {
 /// whose rows never rotate, and nothing else in the system would notice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CredentialTable {
+    CompanyMcpCredentials,
     /// `company_model_connections.api_key` — the legacy `enc:v1` direct-key format.
     ModelConnections,
     /// `integration_credentials.envelope` — `enc:v2`, rotated by rewrapping the data key.
@@ -79,6 +80,7 @@ enum CredentialTable {
 
 impl CredentialTable {
     const ALL: &'static [Self] = &[
+        Self::CompanyMcpCredentials,
         Self::ModelConnections,
         Self::IntegrationCredentials,
         Self::CompanyResendApiIntegrations,
@@ -91,6 +93,10 @@ impl CredentialTable {
 /// key of a batch is exactly where the next batch starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CredentialKey {
+    CompanyMcpCredential {
+        company_id: Uuid,
+        connection_id: Uuid,
+    },
     ModelConnection {
         company_id: Uuid,
         provider: String,
@@ -420,6 +426,11 @@ async fn store_rotated_credential(
     rotated: &str,
 ) -> AppResult<bool> {
     let changed = match &row.key {
+        CredentialKey::CompanyMcpCredential { company_id, connection_id } => {
+            sqlx::query("UPDATE company_mcp_credentials SET envelope = $3 WHERE company_id = $1 AND connection_id = $2 AND envelope = $4")
+                .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
+        }
+
         CredentialKey::ModelConnection {
             company_id,
             provider,
@@ -550,6 +561,9 @@ async fn fetch_credential_batch(
     cursor: Option<&CredentialKey>,
 ) -> AppResult<Vec<InventoryRow>> {
     match table {
+        CredentialTable::CompanyMcpCredentials => {
+            fetch_mcp_credential_batch(connection, cursor).await
+        }
         CredentialTable::ModelConnections => fetch_model_connection_batch(connection, cursor).await,
         CredentialTable::IntegrationCredentials => {
             fetch_integration_credential_batch(connection, cursor).await
@@ -723,3 +737,42 @@ async fn release_rotation_lock(connection: &mut PgConnection) -> AppResult<()> {
 #[cfg(test)]
 #[path = "credential_rotation_tests.rs"]
 mod tests;
+
+#[derive(sqlx::FromRow)]
+struct McpCredentialRow {
+    company_id: Uuid,
+    connection_id: Uuid,
+    envelope: String,
+}
+
+async fn fetch_mcp_credential_batch(
+    connection: &mut PgConnection,
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    let (company, id) = match cursor {
+        None => (None, None),
+        Some(CredentialKey::CompanyMcpCredential {
+            company_id,
+            connection_id,
+        }) => (Some(*company_id), Some(*connection_id)),
+        Some(_) => return Err(AppError::Internal("MCP credential cursor mismatch".into())),
+    };
+    let rows = sqlx::query_as::<_, McpCredentialRow>("SELECT company_id, connection_id, envelope FROM company_mcp_credentials WHERE $1::uuid IS NULL OR (company_id, connection_id) > ($1, $2) ORDER BY company_id, connection_id LIMIT $3")
+        .bind(company).bind(id).bind(CREDENTIAL_BATCH_SIZE).fetch_all(connection).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| InventoryRow {
+            key: CredentialKey::CompanyMcpCredential {
+                company_id: row.company_id,
+                connection_id: row.connection_id,
+            },
+            format: CredentialFormat::Envelope(
+                super::credentials::envelope::CredentialContext::company_mcp_credential(
+                    row.company_id,
+                    row.connection_id,
+                ),
+            ),
+            stored: row.envelope,
+        })
+        .collect())
+}

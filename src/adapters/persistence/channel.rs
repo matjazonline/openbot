@@ -383,9 +383,10 @@ impl ChannelPersistence for PostgresPersistence {
     async fn create_with_agent(
         &self,
         company_id: Uuid,
-        agent: AgentWrite,
+        mut agent: AgentWrite,
         channel: ChannelWrite,
     ) -> AppResult<(Agent, Channel)> {
+        agent.resolve_harness(self.default_agent_harness);
         let agent_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let channel_created_by = serde_json::to_value(
@@ -681,6 +682,7 @@ async fn create_owned_agent_channel(
     channel: ChannelWrite,
     library_agent_id: Option<Uuid>,
 ) -> AppResult<(Agent, Channel)> {
+    agent.resolve_harness(persistence.default_agent_harness);
     let agent_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
     let channel_created_by = serde_json::to_value(
@@ -872,7 +874,8 @@ mod tests {
             AgentWrite {
                 name: "Primary Agent".to_string(),
                 slug: "primary-agent".to_string(),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -883,7 +886,8 @@ mod tests {
             AgentWrite {
                 name: "Secondary Agent".to_string(),
                 slug: "secondary-agent".to_string(),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -1057,7 +1061,8 @@ mod tests {
             AgentWrite {
                 name: "Rolled back".into(),
                 slug: "rolled-back".into(),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
             ChannelWrite {
                 name: "Collision".into(),
@@ -1083,7 +1088,8 @@ mod tests {
             AgentWrite {
                 name: "Atomic agent".into(),
                 slug: "atomic-agent".into(),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
             ChannelWrite {
                 name: "Atomic channel".into(),
@@ -1243,7 +1249,8 @@ mod tests {
                 slug: "personal-agent".into(),
                 memory_enabled: true,
                 created_by: Some(CreationProvenance::user(user.id)),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
             ChannelWrite {
                 name: "Personal agent".into(),
@@ -1268,7 +1275,8 @@ mod tests {
         let contender_agent = AgentWrite {
             name: "Contended".into(),
             slug: "contended".into(),
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         };
         let contender_channel = ChannelWrite {
             name: "Contended".into(),
@@ -1316,7 +1324,8 @@ mod tests {
                 slug: "contended".into(),
                 memory_enabled: true,
                 created_by: Some(agent.created_by.clone()),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await;
@@ -1346,7 +1355,8 @@ mod tests {
                 slug: "renamed-agent".into(),
                 memory_enabled: true,
                 created_by: Some(agent.created_by.clone()),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -1360,7 +1370,8 @@ mod tests {
                 slug: renamed.slug.clone(),
                 memory_enabled: true,
                 created_by: Some(renamed.created_by.clone()),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -1486,7 +1497,8 @@ mod tests {
             AgentWrite {
                 name: "Desk Agent".to_string(),
                 slug: "desk-agent".to_string(),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await

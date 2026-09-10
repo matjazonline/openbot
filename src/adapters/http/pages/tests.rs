@@ -1844,6 +1844,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        response_contract: None,
         memory_enabled: false,
         memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
         memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
@@ -2427,6 +2428,7 @@ fn mailbox_message(thread_id: Uuid, body: &str) -> ThreadMessageView {
 /// schedule prompt and an in-app reply share.
 fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
     ThreadMessageView {
+        response_contract: None,
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
         thread_id,
@@ -3832,6 +3834,8 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
     };
 
     let html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         deliveries: &[],
         delivery_error: None,
         attempts: &[],
@@ -3870,6 +3874,8 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         ..monitored_task(company.id, channel.id, TaskStatus::Stopped)
     };
     let stopped_html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         company_id: company.id,
         task: &stopped,
         channel: None,
@@ -3934,6 +3940,8 @@ fn task_detail_delegation_controls_name_irreversible_external_consequences() {
         detail_href: None,
     };
     let html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -4063,6 +4071,8 @@ fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
     ];
 
     let html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -4196,6 +4206,8 @@ fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
     }];
 
     let pane_html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -5138,6 +5150,8 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
     };
 
     let html = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         deliveries: std::slice::from_ref(&failed),
         delivery_error: None,
         attempts: &[],
@@ -5167,6 +5181,8 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
 
     // A task that sent nothing must not grow an empty section.
     let quiet = task_detail_pane(&TaskDetailPane {
+        harness_diagnostics: None,
+        harness_diagnostics_error: None,
         deliveries: &[],
         delivery_error: None,
         attempts: &[],

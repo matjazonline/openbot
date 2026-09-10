@@ -243,6 +243,7 @@ async fn start_agent_task_is_idempotent_and_delivers_selected_notes_to_its_first
     let started = persistence.start_agent_task(&command, actor).await.unwrap();
     let retry = persistence.start_agent_task(&command, actor).await.unwrap();
     assert_eq!(retry.id, started.id);
+    assert_note_request_uses_platform_author(&pool, company.id).await;
     assert_eq!(started.status, TaskStatus::Pending);
     assert!(matches!(started.ownership.owner, TaskOwner::Agent(_)));
 
@@ -360,6 +361,8 @@ fn ownership_command(
     new_owner: TaskOwner,
 ) -> TaskOwnershipCommand {
     TaskOwnershipCommand {
+        execution: None,
+        invocation: None,
         task_id: task.id,
         company_id: task.company_id,
         command_id: Uuid::new_v4(),
@@ -512,7 +515,8 @@ async fn agent_transfer_revokes_the_old_execution_and_preserves_private_handoff(
             name: "Second Agent".into(),
             slug: format!("second-agent-{}", Uuid::new_v4().simple()),
             created_by: Some(CreationProvenance::system()),
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         },
     )
     .await
@@ -2281,6 +2285,7 @@ async fn an_operator_stop_after_an_outreach_drops_the_outreach_source() {
     let outreach_id = Uuid::new_v4();
     let progress = persistence
         .create_outreach_and_pause(CreateOutreachRequest {
+            invocation: None,
             correlation_id: task.correlation_id,
             id: outreach_id,
             lease,
@@ -3650,6 +3655,7 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
     let delivery_id = asked.delivery.id;
     let progress = persistence
         .create_outreach_and_pause(CreateOutreachRequest {
+            invocation: None,
             correlation_id: CorrelationId::new(),
             id: outreach_id,
             lease,
@@ -3984,6 +3990,7 @@ async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
     let outreach_id = Uuid::new_v4();
     persistence
         .create_outreach_and_pause(CreateOutreachRequest {
+            invocation: None,
             correlation_id: task.correlation_id,
             id: outreach_id,
             lease,
@@ -4156,6 +4163,7 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
     let asked = question.id;
     persistence
         .create_outreach_and_pause(CreateOutreachRequest {
+            invocation: None,
             correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             lease,
@@ -4223,7 +4231,8 @@ async fn seed_channel_agent(
             name: format!("{label} agent"),
             slug: format!("{label}-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         },
     )
     .await
@@ -4268,7 +4277,8 @@ async fn seed_company_and_channel(
             name: "Chain Agent".into(),
             slug: format!("chain-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         },
     )
     .await
@@ -4444,6 +4454,7 @@ async fn park_for_approval(
 
     let (approval, created) = persistence
         .create_approval(NewApproval {
+            invocation: None,
             subject: &subject,
             action: &ApprovalAction {
                 step_key,
@@ -5992,6 +6003,7 @@ async fn delegation_fixture(
     let outreach_id = Uuid::new_v4();
     persistence
         .create_outreach_and_pause(CreateOutreachRequest {
+            invocation: None,
             id: outreach_id,
             lease,
             company_id: company.id,
@@ -6903,4 +6915,22 @@ async fn database_enforces_complete_outreach_and_target_transition_matrices() {
     CompanyPersistence::delete(&persistence, fixture.company.id)
         .await
         .unwrap();
+}
+
+async fn assert_note_request_uses_platform_author(pool: &sqlx::PgPool, company_id: Uuid) {
+    let count: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM messages AS message
+            JOIN principals AS author
+              ON (author.company_id, author.id) = (message.company_id, message.author_principal_id)
+           WHERE message.company_id = $1 AND message.subject = 'Internal note request'
+             AND author.kind = 'system' AND message.authored_identity_id IS NULL"#,
+    )
+    .bind(company_id)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        count, 1,
+        "retries reuse one platform-authored event without a synthetic transport identity"
+    );
 }

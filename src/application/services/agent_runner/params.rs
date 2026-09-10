@@ -55,6 +55,15 @@ impl std::fmt::Debug for ResolvedAgentCapabilities {
     }
 }
 
+/// The fallback is injected by the caller only for an unresolved selection. Production snapshots
+/// always contain a persisted agent; test/simulation callers can exercise deployment policy.
+struct AgentSnapshot<'a> {
+    agent: Option<&'a AgentEntity>,
+    skills: Vec<crate::entities::skill::Skill>,
+    sub_agents: SubAgentScope,
+    default_harness: HarnessKind,
+}
+
 impl ResolvedAgentCapabilities {
     #[cfg(test)]
     pub(crate) fn new(company: Option<&Company>, agent: Option<&AgentEntity>) -> AppResult<Self> {
@@ -87,9 +96,12 @@ impl ResolvedAgentCapabilities {
     ) -> AppResult<Self> {
         Self::from_snapshot_connection(
             company,
-            agent,
-            Vec::new(),
-            SubAgentScope::AllCompanySiblings,
+            AgentSnapshot {
+                agent,
+                skills: Vec::new(),
+                sub_agents: SubAgentScope::AllCompanySiblings,
+                default_harness: HarnessKind::default(),
+            },
             provider,
             model,
             api_key,
@@ -98,13 +110,17 @@ impl ResolvedAgentCapabilities {
 
     fn from_snapshot_connection(
         company: Option<&Company>,
-        agent: Option<&AgentEntity>,
-        skills: Vec<crate::entities::skill::Skill>,
-        sub_agents: SubAgentScope,
+        snapshot: AgentSnapshot<'_>,
         provider: &ModelProvider,
         model: &ModelName,
         api_key: &str,
     ) -> AppResult<Self> {
+        let AgentSnapshot {
+            agent,
+            skills,
+            sub_agents,
+            default_harness,
+        } = snapshot;
         if !is_supported_model_provider(provider.as_str()) {
             return Err(AppError::BadRequest(format!(
                 "Unsupported agent provider '{}'. Allowed providers are: {}",
@@ -133,7 +149,12 @@ impl ResolvedAgentCapabilities {
             .unwrap_or(DEFAULT_SYSTEM_PROMPT)
             .to_string();
 
-        let harness = agent.map_or_else(HarnessKind::default, |agent| agent.harness_kind);
+        let harness = agent.map_or(default_harness, |agent| agent.harness_kind);
+        if let Some(contract) = agent.and_then(|agent| agent.response_contract.as_ref()) {
+            contract
+                .require_harness(harness)
+                .map_err(|error| AppError::BadRequest(error.into()))?;
+        }
         let harness_config =
             HarnessConfig::parse(harness, agent.and_then(|agent| agent.config_json.as_ref()))
                 .map_err(AppError::BadRequest)?;
@@ -165,6 +186,7 @@ impl ResolvedAgentCapabilities {
                     .map(|agent| agent.granted_tool_ids.clone())
                     .unwrap_or_default(),
                 sub_agents,
+                response_contract: agent.and_then(|agent| agent.response_contract.clone()),
                 harness_config,
             }),
             agent_id,
@@ -283,9 +305,12 @@ pub async fn resolve_agent_capabilities(
         .await?;
     ResolvedAgentCapabilities::from_snapshot_connection(
         Some(company),
-        Some(&agent),
-        skills,
-        sub_agent_scope,
+        AgentSnapshot {
+            agent: Some(&agent),
+            skills,
+            sub_agents: sub_agent_scope,
+            default_harness: agent.harness_kind,
+        },
         &provider,
         &model,
         api_key.as_deref().unwrap_or_default(),

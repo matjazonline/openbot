@@ -73,6 +73,15 @@ pub fn compile(
     api_key: &str,
     native_tools: &[NativeToolDeclaration],
 ) -> AppResult<CompiledConfig> {
+    for id in spec.required_tool_ids() {
+        if CatalogueTool::get(&id).is_some_and(|tool| {
+            !tool.supports_harness(crate::entities::harness::HarnessKind::AiAgents)
+        }) {
+            return Err(AppError::BadRequest(format!(
+                "Tool '{id}' is unsupported by this harness."
+            )));
+        }
+    }
     let mut config = base_agent_config();
     let advanced = spec.harness_config.ai_agents().ok_or_else(|| {
         AppError::BadRequest("The stored config does not match the ai-agents harness.".into())

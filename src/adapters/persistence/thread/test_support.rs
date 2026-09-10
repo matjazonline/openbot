@@ -268,6 +268,7 @@ pub(super) fn inbound_email(
     body: &str,
 ) -> MessageWrite {
     MessageWrite {
+        structured: None,
         id: CanonicalMessageId::random(),
         thread_id,
         author: observed("sender@partner.test", IdentityProvenance::TransportIngress),

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
+    #[error("Execution stopped: {0}")]
+    Execution(ExecutionFailure),
     #[error("Database error: {0}")]
     Database(String),
 
@@ -38,4 +40,21 @@ impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
         AppError::Internal(err.to_string())
     }
+}
+
+/// Terminal execution categories never become an agent reply or an automatic provider retry.
+#[derive(Error, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionFailure {
+    #[error("structured final response is invalid")]
+    InvalidOutput,
+    #[error("execution budget exhausted")]
+    Budget,
+    #[error("invalid provider or checkpoint protocol")]
+    Protocol,
+    #[error("indeterminate effect requires reconciliation")]
+    IndeterminateEffect,
+    #[error("human checkpoint rejected or expired")]
+    CheckpointDenied,
+    #[error("execution ownership lost")]
+    OwnershipLost,
 }

@@ -199,7 +199,7 @@ impl ListCompanyAgentsTool {
     }
 
     /// The callable siblings of this run's channel.
-    pub async fn call(&self, _args: Value) -> ToolInvocation {
+    pub async fn call(&self, _args: Value) -> crate::app_error::AppResult<ToolInvocation> {
         let max_results = usize::from(self.policy.max_results);
 
         let channels = match self
@@ -209,9 +209,7 @@ impl ListCompanyAgentsTool {
         {
             Ok(channels) => channels,
             Err(error) => {
-                return ToolInvocation::failure(format!(
-                    "Failed to list company channels: {error}"
-                ));
+                return Err(error);
             }
         };
 
@@ -248,10 +246,10 @@ impl ListCompanyAgentsTool {
             agents,
         };
         match serde_json::to_value(&output) {
-            Ok(json) => ToolInvocation::success(json),
-            Err(error) => {
-                ToolInvocation::failure(format!("Failed to serialize tool output: {error}"))
-            }
+            Ok(json) => Ok(ToolInvocation::success(json)),
+            Err(error) => Ok(ToolInvocation::failure(format!(
+                "Failed to serialize tool output: {error}"
+            ))),
         }
     }
 }
@@ -478,6 +476,7 @@ mod tests {
             },
         );
         let result = tool.call(Json::Null).await;
+        let result = result.unwrap();
         assert!(result.success, "{:?}", result.output);
         result.output
     }

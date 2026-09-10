@@ -153,6 +153,7 @@ async fn serve() -> anyhow::Result<()> {
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
     let memory_worker = app_state.memory_worker.clone();
+    let mcp_use_cases = app_state.mcp_use_cases.clone();
     let inbound_event_worker: Arc<InboundEventWorker> = app_state.inbound_event_worker.clone();
     let notification_worker: Arc<NotificationWorker> = app_state.notification_worker.clone();
 
@@ -259,6 +260,9 @@ async fn serve() -> anyhow::Result<()> {
     // Also covers an HTTP server that ended without a signal: every background owner receives the
     // same stop notification, and the sampler is explicitly joined rather than detached.
     let _ = shutdown_tx.send(());
+    if let Err(error) = mcp_use_cases.shutdown().await {
+        warn!(error = %error, "MCP shutdown failed");
+    }
     let mut task_worker_handle = task_worker_handle;
     let mut smtp_handle = smtp_handle;
     let mut mailbox_listener_handle = mailbox_listener_handle;

@@ -1,5 +1,5 @@
 use crate::{
-    app_error::AppResult,
+    app_error::{AppError, AppResult},
     entities::{
         channel::Channel,
         correlation::CorrelationId,
@@ -159,16 +159,20 @@ impl OutreachAndAwaitQuorumTool {
     }
 
     /// Queue the mail and park the task, or say why the request was refused.
-    pub async fn call(&self, args: Value) -> ToolInvocation {
+    pub async fn call(
+        &self,
+        args: Value,
+        invocation: Option<crate::services::harness::runs::InvocationRef>,
+    ) -> crate::app_error::AppResult<ToolInvocation> {
         let input: OutreachInput = match serde_json::from_value(args) {
             Ok(input) => input,
-            Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
+            Err(error) => return Ok(ToolInvocation::failure(format!("Invalid input: {error}"))),
         };
 
         let limits = OutreachLimits::from_policy(&self.policy);
         let email_renderer = match self.deliveries.renderer(TransportKind::Email) {
             Ok(renderer) => renderer,
-            Err(error) => return ToolInvocation::failure(error.to_string()),
+            Err(error) => return Err(error),
         };
         let resolved = match resolve_targets(
             &input,
@@ -183,24 +187,25 @@ impl OutreachAndAwaitQuorumTool {
         .await
         {
             Ok(targets) => targets,
-            Err(error) => return ToolInvocation::failure(error),
+            Err(error) => return ToolInvocation::denial_or_error(error),
         };
         // The idempotency key is hashed over the *resolved* destinations, so the short and long
         // forms of one request re-attach instead of mailing everybody twice.
         let canonical_targets: Vec<String> = resolved.iter().map(|target| target.key()).collect();
         let request = match ValidatedOutreach::from_input(&input, limits) {
             Ok(request) => request,
-            Err(error) => return ToolInvocation::failure(error),
+            Err(error) => return Ok(ToolInvocation::failure(error)),
         };
 
         let targets = match self.build_target_requests(&resolved, &request).await {
             Ok(targets) => targets,
-            Err(error) => return ToolInvocation::failure(error),
+            Err(error) => return ToolInvocation::denial_or_error(error),
         };
 
         let progress = match self
             .persistence
             .create_outreach_and_pause(CreateOutreachRequest {
+                invocation,
                 id: Uuid::new_v4(),
                 lease: self.context.lease,
                 company_id: self.context.company_id,
@@ -218,32 +223,16 @@ impl OutreachAndAwaitQuorumTool {
         {
             Ok(progress) => progress,
             Err(error) => {
-                return ToolInvocation::failure(format!("Failed to create outreach: {error}"));
+                return ToolInvocation::denial_or_error(error);
             }
         };
 
-        let output = OutreachOutput {
-            accepted: true,
-            status: progress.status.as_str().to_string(),
-            outreach_id: progress.id,
-            target_count: progress.target_count,
-            response_count: progress.response_count,
-            required_threshold_percent: progress.required_threshold_percent,
-            required_response_count: progress.required_response_count,
-            queued_message_count: if progress.suspended {
-                progress.target_count
-            } else {
-                0
-            },
-            expires_at: progress.expires_at.to_rfc3339(),
-        };
-        match serde_json::to_value(&output) {
-            Ok(output) if progress.suspended => ToolInvocation::suspended(output),
-            Ok(output) => ToolInvocation::success(output),
-            Err(error) => {
-                ToolInvocation::failure(format!("Failed to serialize tool output: {error}"))
-            }
-        }
+        let output = outreach_output(&progress)?;
+        Ok(if progress.suspended {
+            ToolInvocation::suspended(output)
+        } else {
+            ToolInvocation::success(output)
+        })
     }
 }
 
@@ -342,14 +331,10 @@ impl OutreachAndAwaitQuorumTool {
         &self,
         targets: &[NormalizedOutreachTarget],
         request: &ValidatedOutreach<'_>,
-    ) -> Result<Vec<OutreachTargetRequest>, String> {
+    ) -> AppResult<Vec<OutreachTargetRequest>> {
         let mut built = Vec::with_capacity(targets.len());
         for (position, target) in targets.iter().enumerate() {
-            built.push(
-                self.target_request(target, request, position)
-                    .await
-                    .map_err(|error| format!("Failed to prepare an outreach target: {error}"))?,
-            );
+            built.push(self.target_request(target, request, position).await?);
         }
         Ok(built)
     }
@@ -574,14 +559,14 @@ async fn resolve_targets(
     context: &OutreachToolContext,
     channels: &dyn ChannelPersistence,
     email_renderer: &dyn TransportRenderer,
-) -> Result<Vec<NormalizedOutreachTarget>, String> {
+) -> AppResult<Vec<NormalizedOutreachTarget>> {
     let requested = input.target_channels.len() + input.target_emails.len();
     if requested == 0 || requested > policy.max_targets {
-        return Err(format!(
+        return Err(AppError::BadRequest(format!(
             "an outreach must name between 1 and {} targets across target_channels and \
              target_emails",
             policy.max_targets
-        ));
+        )));
     }
 
     let mut targets: Vec<NormalizedOutreachTarget> = Vec::with_capacity(requested);
@@ -592,7 +577,8 @@ async fn resolve_targets(
     for value in &input.target_emails {
         push_unique(
             &mut targets,
-            resolve_email_target(value, policy.scope, email_renderer)?,
+            resolve_email_target(value, policy.scope, email_renderer)
+                .map_err(AppError::BadRequest)?,
         );
     }
     targets.sort_by_key(NormalizedOutreachTarget::key);
@@ -605,13 +591,14 @@ async fn resolve_channel_target(
     scope: AllowedTargetScope,
     context: &OutreachToolContext,
     channels: &dyn ChannelPersistence,
-) -> Result<NormalizedOutreachTarget, String> {
+) -> AppResult<NormalizedOutreachTarget> {
     if scope == AllowedTargetScope::ExternalOnly {
-        return Err(format!(
+        return Err(AppError::BadRequest(format!(
             "This tool policy permits no platform channels as targets: {value}"
-        ));
+        )));
     }
-    let selector = ChannelSelector::parse(value).map_err(|error| error.to_string())?;
+    let selector =
+        ChannelSelector::parse(value).map_err(|error| AppError::BadRequest(error.to_string()))?;
     let outcome = resolve_internal_target(
         &selector,
         context.company_id,
@@ -619,8 +606,7 @@ async fn resolve_channel_target(
         &context.sub_agent_scope,
         channels,
     )
-    .await
-    .map_err(|error| format!("Failed to resolve platform channel {selector}: {error}"))?;
+    .await?;
     match outcome {
         InternalTargetOutcome::Callable(channel) => Ok(NormalizedOutreachTarget {
             destination: OutreachDestination::Channel {
@@ -631,7 +617,7 @@ async fn resolve_channel_target(
                 channel_id: channel.id,
             },
         }),
-        InternalTargetOutcome::Rejected(reason) => Err(reason),
+        InternalTargetOutcome::Rejected(reason) => Err(AppError::BadRequest(reason)),
     }
 }
 
@@ -672,6 +658,27 @@ fn push_unique(targets: &mut Vec<NormalizedOutreachTarget>, target: NormalizedOu
     if !targets.iter().any(|seen| seen.key() == target.key()) {
         targets.push(target);
     }
+}
+
+pub(crate) fn outreach_output(
+    progress: &crate::entities::outreach::OutreachProgress,
+) -> AppResult<Value> {
+    let output = OutreachOutput {
+        accepted: true,
+        status: progress.status.as_str().to_string(),
+        outreach_id: progress.id,
+        target_count: progress.target_count,
+        response_count: progress.response_count,
+        required_threshold_percent: progress.required_threshold_percent,
+        required_response_count: progress.required_response_count,
+        queued_message_count: if progress.suspended {
+            progress.target_count
+        } else {
+            0
+        },
+        expires_at: progress.expires_at.to_rfc3339(),
+    };
+    serde_json::to_value(output).map_err(|_| AppError::Internal("Invalid outreach result".into()))
 }
 
 #[cfg(test)]
@@ -812,6 +819,7 @@ mod tests {
             &EmailRenderer::new(&context.app_domain_name),
         )
         .await
+        .map_err(|error| error.to_string())
     }
 
     #[tokio::test]

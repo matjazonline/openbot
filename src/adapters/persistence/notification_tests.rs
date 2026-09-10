@@ -103,7 +103,8 @@ async fn make_fixture(persistence: &PostgresPersistence) -> Fixture {
             name: "Notification Agent".into(),
             slug: format!("notification-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         },
     )
     .await
@@ -177,6 +178,8 @@ async fn assign(
 ) {
     persistence
         .change_task_ownership(TaskOwnershipCommand {
+            execution: None,
+            invocation: None,
             task_id: fixture.task_id,
             company_id: fixture.company_id,
             command_id: Uuid::new_v4(),
@@ -665,6 +668,8 @@ async fn projection_resolution_serializes_with_an_owner_transfer() {
 
     let transfer_persistence = persistence.clone();
     let transfer_command = TaskOwnershipCommand {
+        execution: None,
+        invocation: None,
         task_id: fixture.task_id,
         company_id: fixture.company_id,
         command_id: Uuid::new_v4(),

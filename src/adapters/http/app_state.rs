@@ -46,6 +46,7 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
     pub monitoring: Arc<dyn MonitoringService>,
     pub user_use_cases: Arc<UserUseCases>,
+    pub mcp_use_cases: Arc<crate::use_cases::mcp::McpUseCases>,
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
     /// One company's Resend account, as its owner configures it.
@@ -234,5 +235,11 @@ impl FromRef<AppState> for Option<Arc<dyn FileStorage>> {
 impl FromRef<AppState> for MailboxEvents {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.events.clone()
+    }
+}
+
+impl axum::extract::FromRef<AppState> for Arc<crate::use_cases::mcp::McpUseCases> {
+    fn from_ref(state: &AppState) -> Self {
+        state.mcp_use_cases.clone()
     }
 }

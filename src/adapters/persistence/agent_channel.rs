@@ -27,7 +27,12 @@ impl AgentChannelProvisioning for PostgresPersistence {
     ) -> AppResult<ProvisionedAgentChannel> {
         let warnings = request.warnings.clone();
         let mut tx = self.pool().begin().await.map_err(AppError::from)?;
-        let lock_key = format!("{}:{}", request.source_task_id, request.request_hash);
+        if !super::task::lock_task_execution_on(&mut tx, request.company_id, request.lease).await? {
+            return Err(AppError::Execution(
+                crate::app_error::ExecutionFailure::OwnershipLost,
+            ));
+        }
+        let lock_key = format!("{}:{}", request.lease.task_id, request.request_hash);
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(lock_key)
             .execute(&mut *tx)
@@ -38,21 +43,27 @@ impl AgentChannelProvisioning for PostgresPersistence {
             sqlx::query_as::<_, (Uuid, Uuid, serde_json::Value)>(
             "SELECT agent_id, channel_id, warnings FROM agent_channel_provisions WHERE task_id = $1 AND request_hash = $2",
         )
-        .bind(request.source_task_id)
+        .bind(request.lease.task_id)
         .bind(&request.request_hash)
         .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?
         {
-            tx.commit().await.map_err(AppError::from)?;
-            return Ok(ProvisionedAgentChannel {
+            let result = ProvisionedAgentChannel {
                 created: false,
                 agent_id,
                 channel_id,
                 warnings: serde_json::from_value(stored_warnings).map_err(|error| {
                     AppError::Internal(format!("Stored provisioning warnings are invalid: {error}"))
                 })?,
-            });
+            };
+            if let Some(reference) = request.invocation {
+                super::task::record_harness_result_on(&mut tx, request.company_id, request.lease, reference,
+                    crate::services::agent_channel_tool::provision_response(&request.response, &result)).await?;
+            }
+            tx.commit().await?;
+            return Ok(result);
+
         }
 
         let agent_id = Uuid::new_v4();
@@ -146,7 +157,7 @@ impl AgentChannelProvisioning for PostgresPersistence {
         sqlx::query(
             "INSERT INTO agent_channel_provisions (task_id, request_hash, agent_id, channel_id, warnings) VALUES ($1, $2, $3, $4, $5)",
         )
-        .bind(request.source_task_id)
+        .bind(request.lease.task_id)
         .bind(&request.request_hash)
         .bind(agent_id)
         .bind(channel_id)
@@ -157,13 +168,24 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        tx.commit().await.map_err(AppError::from)?;
-        Ok(ProvisionedAgentChannel {
+        let result = ProvisionedAgentChannel {
             created: true,
             agent_id,
             channel_id,
             warnings,
-        })
+        };
+        if let Some(reference) = request.invocation {
+            super::task::record_harness_result_on(
+                &mut tx,
+                request.company_id,
+                request.lease,
+                reference,
+                crate::services::agent_channel_tool::provision_response(&request.response, &result),
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -292,7 +314,8 @@ mod tests {
                 name: "Coordinator".into(),
                 slug: "coordinator".into(),
                 created_by: Some(CreationProvenance::user(user.id)),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -323,16 +346,38 @@ mod tests {
             "INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, payload) \
              VALUES ($1, $2, $3, gen_random_uuid(), 'agent_run', '{}')",
         ).bind(task_id).bind(company.id).bind(source.id).execute(persistence.pool()).await.unwrap();
+        use crate::task_queue::TaskPersistence;
+        sqlx::query("UPDATE background_tasks SET owner_principal_id = (SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2) WHERE id = $3")
+            .bind(company.id).bind(parent.id).bind(task_id).execute(persistence.pool()).await.unwrap();
+        assert!(
+            persistence
+                .claim_task(
+                    task_id,
+                    Uuid::new_v4(),
+                    chrono::Utc::now() + chrono::Duration::minutes(5)
+                )
+                .await
+                .unwrap()
+        );
+        let claimed = persistence.get_task_by_id(task_id).await.unwrap().unwrap();
+        let lease = crate::entities::task::TaskLeaseRef::of(&claimed).unwrap();
         let provenance =
             CreationProvenance::agent(parent.id, parent.name.clone(), source.id, task_id);
         let request = ProvisionAgentChannelRequest {
+            invocation: None,
             warnings: vec![crate::use_cases::agent::ProvisioningWarning {
                 code: "public_access_removed".into(),
                 message: "original effective-default warning".into(),
             }],
             request_hash: "stable-request".into(),
             company_id: company.id,
-            source_task_id: task_id,
+            lease,
+            response: crate::services::agent_channel_tool::ProvisionResponseContext {
+                name: "Researcher".into(),
+                slug: "researcher".into(),
+                company_slug: company.slug.clone(),
+                app_domain_name: "example.test".into(),
+            },
             skill_slugs: vec![skill.slug.clone()],
             agent: AgentWrite {
                 name: "Researcher".into(),
@@ -341,7 +386,8 @@ mod tests {
                 system_prompt: Some("Research carefully".into()),
                 granted_tool_ids: vec![ToolId::from("web_fetch")],
                 created_by: Some(provenance.clone()),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
             channel: ChannelWrite {
                 name: "Researcher".into(),

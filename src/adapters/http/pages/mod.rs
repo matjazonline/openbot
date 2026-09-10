@@ -54,6 +54,7 @@ fn parse_platform_address(
 }
 
 mod agent_library_multi_select;
+mod agent_runtime_settings;
 mod agent_settings;
 mod agents;
 mod approvals;
@@ -72,6 +73,7 @@ mod dashboard_query_health;
 mod dashboard_runtime;
 mod deliveries;
 mod fragment;
+mod harness_diagnostics;
 mod icon;
 mod invite_settings;
 mod layout;
@@ -199,3 +201,10 @@ pub(crate) const LOCAL_TIME_SCRIPT: &str = r##"
 
 #[cfg(test)]
 mod tests;
+
+pub mod mcp;
+
+/// Render a native agent library validation failure in the same UI shell.
+pub(crate) fn agent_library_form_page(body: &str) -> String {
+    mailbox::ui_layout("Agent library", body)
+}

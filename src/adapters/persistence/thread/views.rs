@@ -90,6 +90,8 @@ fn transport_kind(value: &str) -> AppResult<TransportKind> {
 
 #[derive(sqlx::FromRow, Debug)]
 struct ThreadMessageDb {
+    response_contract:
+        Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
     id: Uuid,
     canonical_id: Uuid,
     thread_id: Uuid,
@@ -137,6 +139,7 @@ impl ThreadMessageDb {
             }
         };
         Ok(ThreadMessageView {
+            response_contract: self.response_contract.map(|value| value.0),
             id: self.id,
             canonical_id: CanonicalMessageId::new(self.canonical_id),
             thread_id: self.thread_id,
@@ -218,7 +221,7 @@ fn thread_message_select() -> String {
            association.thread_id,
 {AUTHOR_COLUMNS},
            message.subject,
-           message.clean_text_body,
+           message.clean_text_body, message.structured_response->'contract' AS response_contract,
            message.attachments,
            message.direction,
            message.role,

@@ -31,6 +31,8 @@ use crate::entities::{
 /// runtime counted it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentExecutionOutput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured: Option<crate::services::response_contract::StructuredResponse>,
     pub content: String,
     pub token_usage: TokenUsage,
     pub disposition: AgentExecutionDisposition,
@@ -82,6 +84,9 @@ pub const EXECUTION_DIAGNOSTICS_KEY: &str = "execution_diagnostics";
 /// fields and three `Option<Arc<dyn ...>>` ports sit here side by side, and positional arguments
 /// would let any two of them swap silently.
 pub struct AgentRun<'a> {
+    pub company_id: Option<uuid::Uuid>,
+    pub execution: Option<super::runs::RunExecution>,
+    pub deadline: tokio::time::Instant,
     /// Boxed: it carries every skill body, so it dominates any future or enum it lands in
     /// (`clippy::large_enum_variant`).
     pub spec: Box<AgentCapabilitySpec>,
@@ -163,6 +168,7 @@ pub trait HarnessApprovals: Send + Sync {
 /// the summary a human reads in the approval mail, and [`Self::context`] is stored verbatim on the
 /// approval row so the decision can be audited against what the agent actually saw.
 pub struct ApprovalAsk<'a> {
+    pub invocation: Option<super::runs::InvocationRef>,
     pub trigger: ApprovalTrigger<'a>,
     /// The runtime's own wording for what it is about to do. Empty when it offered none, in which
     /// case the handler falls back to describing the trigger.
@@ -179,6 +185,12 @@ pub struct ApprovalAsk<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ApprovalTrigger<'a> {
+    Checkpoint {
+        invocation_id: super::runs::InvocationId,
+        proposal_fingerprint: &'a str,
+        title: &'a str,
+        proposal: &'a str,
+    },
     Tool {
         name: &'a str,
         args: &'a serde_json::Value,
@@ -202,6 +214,7 @@ impl ApprovalTrigger<'_> {
     /// what the runtime's own `trigger_type()` produced.
     pub const fn kind(&self) -> &'static str {
         match self {
+            Self::Checkpoint { .. } => "checkpoint_v1",
             Self::Tool { .. } => "tool",
             Self::Condition { .. } => "condition",
             Self::State { .. } => "state",
@@ -265,6 +278,7 @@ pub trait HarnessToolHost: Send + Sync {
         id: &ToolId,
         call_id: &str,
         args: serde_json::Value,
+        invocation: Option<super::runs::InvocationRef>,
     ) -> AppResult<ToolInvocation>;
 }
 
@@ -331,6 +345,15 @@ pub enum ToolInvocationDisposition {
 }
 
 impl ToolInvocation {
+    /// Only a validated application rejection is model-visible. Infrastructure and ownership
+    /// errors retain their type and stop the runtime before another effect.
+    pub fn denial_or_error(error: crate::app_error::AppError) -> AppResult<Self> {
+        match error {
+            crate::app_error::AppError::BadRequest(reason) => Ok(Self::failure(reason)),
+            error => Err(error),
+        }
+    }
+
     /// A tool that did what it was asked. `output` is the structured answer the model reads.
     pub fn success(output: serde_json::Value) -> Self {
         Self {
@@ -478,6 +501,8 @@ pub enum ToolTraceOutcome {
     Failed,
     /// Blocked before the implementation ran: policy refused it, or approval did.
     NotExecuted,
+    /// Parked for an application-owned continuation rather than failed.
+    Suspended,
     TimedOut,
     Cancelled,
 }
@@ -488,6 +513,7 @@ impl ToolTraceOutcome {
             Self::Success => "success",
             Self::Failed => "failed",
             Self::NotExecuted => "not_executed",
+            Self::Suspended => "suspended",
             Self::TimedOut => "timed_out",
             Self::Cancelled => "cancelled",
         }

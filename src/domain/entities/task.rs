@@ -804,6 +804,10 @@ pub struct TaskOwnershipActor {
 /// `expected_version` makes a different command against an older view fail closed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TaskOwnershipCommand {
+    #[serde(skip)]
+    pub execution: Option<TaskLeaseRef>,
+    #[serde(skip)]
+    pub invocation: Option<super::harness_run::InvocationRef>,
     pub task_id: Uuid,
     pub company_id: Uuid,
     pub command_id: Uuid,

@@ -1,3 +1,5 @@
+mod transitions;
+
 use crate::entities::task::{TaskSuspension, TaskTransitionReason, TransitionActor};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -18,7 +20,7 @@ use crate::{
     use_cases::approval::{ApprovalPersistence, NewApproval},
 };
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Debug, Clone)]
 pub struct HumanApprovalDb {
     pub id: Uuid,
     pub company_id: Uuid,
@@ -105,6 +107,7 @@ impl ApprovalPersistence for PostgresPersistence {
         new_approval: NewApproval<'_>,
     ) -> AppResult<(HumanApproval, bool)> {
         let NewApproval {
+            invocation,
             subject,
             action,
             message,
@@ -114,6 +117,7 @@ impl ApprovalPersistence for PostgresPersistence {
         } = new_approval;
         let task_id = subject.suspension.map(TaskSuspension::task_id);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        transitions::lock_subject(&mut tx, subject).await?;
         let approver_principal_id =
             approver_principal_id(&mut tx, subject.company_id, subject.approver_email.as_str())
                 .await?;
@@ -127,30 +131,7 @@ impl ApprovalPersistence for PostgresPersistence {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', $13, $14)
             ON CONFLICT ON CONSTRAINT human_approvals_thread_step_key
-            DO UPDATE SET
-                approver_email = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.approver_email ELSE human_approvals.approver_email END,
-                approver_principal_id = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.approver_principal_id
-                    ELSE human_approvals.approver_principal_id END,
-                action_type = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.action_type ELSE human_approvals.action_type END,
-                action_title = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.action_title ELSE human_approvals.action_title END,
-                action_summary = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.action_summary ELSE human_approvals.action_summary END,
-                task_id = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.task_id ELSE human_approvals.task_id END,
-                payload = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.payload ELSE human_approvals.payload END,
-                token = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.token ELSE human_approvals.token END,
-                status = CASE WHEN human_approvals.status = 'expired'
-                    THEN 'pending' ELSE human_approvals.status END,
-                expires_at = CASE WHEN human_approvals.status = 'expired'
-                    THEN EXCLUDED.expires_at ELSE human_approvals.expires_at END,
-                updated_at = CASE WHEN human_approvals.status = 'expired'
-                    THEN CURRENT_TIMESTAMP ELSE human_approvals.updated_at END
+            DO UPDATE SET updated_at = human_approvals.updated_at
             RETURNING {APPROVAL_COLUMNS}
             "#,
         ))
@@ -173,7 +154,8 @@ impl ApprovalPersistence for PostgresPersistence {
         .map_err(|e| AppError::Internal(format!("Failed to create human approval: {}", e)))?;
 
         let created = db.token == token;
-        if created {
+        if db.status == "pending" {
+            transitions::link_wait(&mut tx, subject, &db, invocation).await?;
             if let Some(suspension) = subject.suspension {
                 // Parking a task is a write against a possibly-leased row. A run that has been
                 // superseded must not be able to make it, or it would park work the run that
@@ -224,7 +206,8 @@ impl ApprovalPersistence for PostgresPersistence {
                     ));
                 }
             }
-
+        }
+        if created {
             // The note in the thread, then the mail that carries it. Both inside the same
             // transaction as the approval and the task it parked: an approval that parked a run
             // and then failed to tell anyone is a run nobody can un-park.
@@ -297,7 +280,7 @@ impl ApprovalPersistence for PostgresPersistence {
         db.map(TryInto::try_into).transpose()
     }
 
-    async fn consume_pending_approval(
+    async fn decide_approval_and_transition(
         &self,
         token: &str,
         status: ApprovalStatus,
@@ -306,24 +289,7 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
-            r#"
-            UPDATE human_approvals
-            SET status = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE token = $1
-              AND status = 'pending'
-              AND expires_at >= $3
-            RETURNING {APPROVAL_COLUMNS}
-            "#,
-        ))
-        .bind(token)
-        .bind(status.as_str())
-        .bind(now)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to consume approval token: {}", e)))?;
-
-        db.map(TryInto::try_into).transpose()
+        self.transition_approval(token, status, now).await
     }
 
     async fn consume_quorum_timeout_action(
@@ -381,6 +347,19 @@ impl ApprovalPersistence for PostgresPersistence {
             .fetch_one(&mut *tx)
             .await
             .map_err(AppError::from)?;
+        let current_wait = sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (SELECT 1 FROM background_tasks task
+                JOIN task_outreaches outreach ON outreach.id = task.awaited_outreach_id AND outreach.task_id = task.id AND outreach.company_id = task.company_id
+                JOIN task_approval_waits wait ON wait.task_id = task.id AND wait.company_id = task.company_id
+                WHERE task.id = $1 AND task.company_id = $2 AND task.status = 'pending_approval'
+                    AND outreach.id = $3 AND outreach.ownership_version = task.ownership_version
+                    AND wait.approval_id = $4 AND wait.state = 'waiting'
+                    AND wait.ownership_version = task.ownership_version
+                    AND wait.owner_principal_id IS NOT DISTINCT FROM task.owner_principal_id)"#,
+        ).bind(task_id).bind(candidate.company_id).bind(outreach_id).bind(candidate.id).fetch_one(&mut *tx).await?;
+        if !current_wait {
+            return Ok(None);
+        }
         let approval = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
                WHERE id = $1 AND status = 'pending' AND expires_at >= $2
@@ -542,8 +521,54 @@ impl ApprovalPersistence for PostgresPersistence {
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        super::task::resolve_harness_outreach_on(&mut tx, outreach_id).await?;
+        transitions::decision_note(
+            &mut tx,
+            &approval,
+            if action == QuorumTimeoutAction::Reject {
+                ApprovalStatus::Rejected
+            } else {
+                ApprovalStatus::Approved
+            },
+        )
+        .await?;
         tx.commit().await.map_err(AppError::from)?;
         Ok(Some(updated.try_into()?))
+    }
+
+    async fn expire_due_approvals(&self, limit: u32) -> AppResult<u32> {
+        if !(1..=128).contains(&limit) {
+            return Err(AppError::BadRequest(
+                "Approval expiry batch must be 1–128".into(),
+            ));
+        }
+        let tokens = sqlx::query_scalar::<_, Uuid>(
+            r#"WITH due AS (
+                   SELECT id FROM human_approvals
+                   WHERE status = 'pending' AND expires_at < CURRENT_TIMESTAMP
+                     AND (expiry_retry_at IS NULL OR expiry_retry_at <= CURRENT_TIMESTAMP)
+                   ORDER BY expires_at, id FOR UPDATE SKIP LOCKED LIMIT $1
+               ) UPDATE human_approvals AS approval
+                 SET expiry_retry_at = CURRENT_TIMESTAMP + INTERVAL '5 minutes'
+                 FROM due WHERE approval.id = due.id RETURNING approval.token"#,
+        )
+        .bind(i64::from(limit))
+        .fetch_all(&self.pool)
+        .await?;
+        let mut settled = 0;
+        for token in tokens {
+            match self
+                .transition_approval(token, ApprovalStatus::Expired, Utc::now())
+                .await
+            {
+                Ok(Some(_)) => settled += 1,
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(%error, "Approval expiry deferred after settlement failure")
+                }
+            }
+        }
+        Ok(settled)
     }
 
     async fn expire_pending_approval(
@@ -554,23 +579,8 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
-            r#"
-            UPDATE human_approvals
-            SET status = 'expired', updated_at = CURRENT_TIMESTAMP
-            WHERE token = $1
-              AND status = 'pending'
-              AND expires_at < $2
-            RETURNING {APPROVAL_COLUMNS}
-            "#,
-        ))
-        .bind(token)
-        .bind(now)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to expire approval token: {}", e)))?;
-
-        db.map(TryInto::try_into).transpose()
+        self.transition_approval(token, ApprovalStatus::Expired, now)
+            .await
     }
 
     async fn list_approvals_by_channel(
@@ -598,6 +608,7 @@ impl ApprovalPersistence for PostgresPersistence {
 
 #[cfg(test)]
 mod tests {
+    mod continuation_tests;
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
@@ -631,7 +642,8 @@ mod tests {
                 name: format!("{label} agent"),
                 slug: format!("{label}-agent-{suffix}"),
                 created_by: Some(CreationProvenance::system()),
-                ..AgentWrite::default()
+                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+                ..Default::default()
             },
         )
         .await
@@ -796,6 +808,7 @@ mod tests {
             let (notice, delivery) = approval_notice(&persistence, &subject, step).await;
             persistence
                 .create_approval(NewApproval {
+                    invocation: None,
                     subject: &subject,
                     action: &deploy_action(step),
                     message: &notice,
@@ -867,8 +880,8 @@ mod tests {
             .expect("parking records the exact approval transition");
         assert!(requested.related_approval_id.is_some());
 
-        // Once parked there is no owner left to fence against, so the unleased sweep may act --
-        // this is the quorum-timeout path.
+        // A sweep cannot replace a pending approval with an unrelated wait.
+        // Quorum timeout transitions start from their own outreach wait.
         assert!(
             park(
                 Some(TaskSuspension::AlreadySuspended {
@@ -878,8 +891,8 @@ mod tests {
                 "sweep-step"
             )
             .await
-            .is_ok(),
-            "the timeout sweep must still be able to move an already-parked task"
+            .is_err(),
+            "an unrelated approval must not replace the current wait"
         );
 
         CompanyPersistence::delete(&persistence, company.id)
@@ -940,6 +953,7 @@ mod tests {
         let delivery_key = delivery.idempotency_key.clone();
         let (approval, created) = persistence
             .create_approval(NewApproval {
+                invocation: None,
                 subject: &subject,
                 action: &deploy_action("deploy-step"),
                 message: &notice,
@@ -1017,8 +1031,8 @@ mod tests {
         let now = chrono::Utc::now();
         let token_str = token.to_string();
         let (first, second) = tokio::join!(
-            persistence.consume_pending_approval(&token_str, ApprovalStatus::Approved, now),
-            persistence.consume_pending_approval(&token_str, ApprovalStatus::Approved, now)
+            persistence.decide_approval_and_transition(&token_str, ApprovalStatus::Approved, now),
+            persistence.decide_approval_and_transition(&token_str, ApprovalStatus::Approved, now)
         );
         assert_eq!(
             [first.unwrap(), second.unwrap()]
@@ -1118,6 +1132,7 @@ mod tests {
         let outreach_id = Uuid::new_v4();
         persistence
             .create_outreach_and_pause(CreateOutreachRequest {
+                invocation: None,
                 correlation_id: task.correlation_id,
                 id: outreach_id,
                 lease,
@@ -1163,6 +1178,7 @@ mod tests {
             approval_notice(&persistence, &quorum_subject, &format!("quorum-{suffix}")).await;
         let (approval, created) = persistence
             .create_approval(NewApproval {
+                invocation: None,
                 subject: &quorum_subject,
                 action: &ApprovalAction {
                     step_key: format!("quorum-{suffix}"),

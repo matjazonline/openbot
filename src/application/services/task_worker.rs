@@ -282,6 +282,7 @@ impl From<crate::app_error::AppError> for RunFailure {
     fn from(error: crate::app_error::AppError) -> Self {
         use crate::app_error::AppError;
         match error {
+            AppError::Execution(kind) => Self::Terminal(kind.to_string()),
             AppError::Timeout(message) => Self::TimedOut(message),
             AppError::BadRequest(message)
             | AppError::NotFound(message)
@@ -540,6 +541,11 @@ impl TaskWorker {
             Err(error) => warn!("Failed to reap expired task leases: {}", error),
         }
 
+        if let Some(approvals) = self.thread_use_cases.get_approval_use_cases()
+            && let Err(error) = approvals.expire_due_approvals().await
+        {
+            warn!(%error, "Approval expiry maintenance failed");
+        }
         self.check_quorum_timeouts().await?;
         self.report_stuck_work().await;
         Ok(Polled::Idle)
@@ -606,6 +612,9 @@ impl TaskWorker {
             }
         };
 
+        let Some(outcome) = fenced_closeout(current.as_ref(), lease, outcome) else {
+            return;
+        };
         let (err_msg, dead_letter_now, stop_reason) = match outcome {
             TaskExecutionOutcome::Suspended => {
                 info!("Background task {} suspended by its agent", task_id);
@@ -887,7 +896,7 @@ impl TaskWorker {
         };
 
         if let Err(error) = approval_use_cases
-            .create_and_send_approval_request(&subject, action)
+            .create_and_send_approval_request(&subject, None, action)
             .await
         {
             // Nobody was asked, so put the outreach back into waiting rather than stranding it.
@@ -1268,6 +1277,36 @@ impl TaskWorker {
     }
 }
 
+/// A deliberate park or handoff can win against the heartbeat or the harness return.
+/// Preserve that committed transition; never charge a replacement generation for old closeout.
+fn fenced_closeout(
+    current: Option<&BackgroundTask>,
+    lease: TaskLeaseRef,
+    outcome: TaskExecutionOutcome,
+) -> Option<TaskExecutionOutcome> {
+    if !matches!(
+        outcome,
+        TaskExecutionOutcome::Suspended
+            | TaskExecutionOutcome::LeaseLost(_)
+            | TaskExecutionOutcome::Interrupted(_)
+    ) {
+        return Some(outcome);
+    }
+    if current.is_some_and(|task| TaskLeaseRef::of(task) != Some(lease)) {
+        return None;
+    }
+    if matches!(outcome, TaskExecutionOutcome::Suspended) {
+        return Some(if current.is_some() {
+            TaskExecutionOutcome::TerminalFailure(
+                "Harness reported suspension without a durable transition".into(),
+            )
+        } else {
+            TaskExecutionOutcome::RetryableFailure("Could not verify the harness suspension".into())
+        });
+    }
+    Some(outcome)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1387,6 +1426,7 @@ mod tests {
 
     fn active_agent(company_id: Uuid, id: Uuid) -> Agent {
         Agent {
+            response_contract: None,
             memory_enabled: false,
             id,
             company_id: Some(company_id),
@@ -1397,7 +1437,7 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("Help with the request.".into()),
             description: None,
-            harness_kind: crate::entities::harness::HarnessKind::default(),
+            harness_kind: crate::entities::harness::HarnessKind::AiAgents,
             granted_tool_ids: Vec::new(),
             native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
@@ -2304,6 +2344,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn suspension_closeout_preserves_committed_parking_and_fast_decisions() {
+        let persistence = MockTaskPersistence::default();
+        persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                None,
+                "email_agent_dispatch",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        let claims = persistence
+            .claim_pending_tasks(Uuid::new_v4(), Utc::now() + chrono::Duration::minutes(1), 1)
+            .await
+            .unwrap();
+        let mut current = claims[0].clone();
+        let lease = TaskLeaseRef::of(&current).unwrap();
+        assert!(matches!(
+            fenced_closeout(Some(&current), lease, TaskExecutionOutcome::Suspended),
+            Some(TaskExecutionOutcome::TerminalFailure(_))
+        ));
+        assert!(matches!(
+            fenced_closeout(None, lease, TaskExecutionOutcome::Suspended),
+            Some(TaskExecutionOutcome::RetryableFailure(_))
+        ));
+        for status in [
+            TaskStatus::PendingApproval,
+            TaskStatus::Pending,
+            TaskStatus::Stopped,
+        ] {
+            current.status = status;
+            current.worker_id = None;
+            current.execution_generation = None;
+            assert!(
+                fenced_closeout(Some(&current), lease, TaskExecutionOutcome::Suspended).is_none()
+            );
+            assert!(
+                fenced_closeout(
+                    Some(&current),
+                    lease,
+                    TaskExecutionOutcome::LeaseLost("heartbeat raced parking".into())
+                )
+                .is_none()
+            );
+            assert_eq!(current.retry_count, 0);
+        }
+        current = claims[0].clone();
+        current.execution_generation = Some(Uuid::new_v4());
+        assert!(fenced_closeout(Some(&current), lease, TaskExecutionOutcome::Suspended).is_none());
+    }
+
+    #[tokio::test]
     async fn test_task_worker_stop_and_resume_flow() {
         let task_persistence = Arc::new(MockTaskPersistence::default());
         let thread_persistence = Arc::new(InMemoryThreads::new());
@@ -2314,6 +2407,7 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
 
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2452,6 +2546,7 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2625,6 +2720,7 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2813,6 +2909,7 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -3031,6 +3128,7 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -3164,6 +3262,7 @@ mod tests {
             .token_usage()
             .expect("token_usage must be readable on BackgroundTask");
         assert!(token_usage.total_tokens > 0);
+        assert_eq!(_llm.finish().await, Ok(1));
     }
 
     /// The one part an email delivery freezes, decoded back into the adapter's own shape.

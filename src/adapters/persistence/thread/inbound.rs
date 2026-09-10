@@ -749,6 +749,7 @@ fn message_write(
         envelope.directives.source_channel_id.is_some() || !request.outreach_transitions.is_empty();
     let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
     Ok(MessageWrite {
+        structured: None,
         id: CanonicalMessageId::random(),
         thread_id: primary_thread_id,
         author: MessageAuthorWrite::Observed(observation(author)),

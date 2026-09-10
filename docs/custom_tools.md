@@ -1,11 +1,13 @@
 # Custom Agent Tools
 
-`mail-agents-server` provides three application-owned custom tools:
+`mail-agents-server` provides five application-owned custom tools:
 
 ```text
 create_agent_channel
 outreach_and_await_quorum
 list_company_agents
+transfer_or_release_task
+request_approval
 ```
 
 `create_agent_channel` permanently provisions a specialist agent and a regular channel assigned to it. The child inherits the company's provider, model, and credentials. Creation is atomic, idempotent within the current task, and approval-gated by default. The tool only exists on task-backed runs with a resolved agent identity, so a channel-only configuration cannot impersonate an agent creator.
@@ -14,17 +16,34 @@ list_company_agents
 
 `list_company_agents` is the read-only address book that makes delegation usable: it returns the sibling agent channels this agent may call, with each one's description. Without it, callable addresses have to be hardcoded into a system prompt and go stale silently when a channel is renamed or disabled.
 
+`transfer_or_release_task` changes task ownership through the application, superseding the old
+run's conversation. `request_approval` is a Rig workflow checkpoint: it parks a durable task and
+resumes the saved tool batch after a decision. It does not grant blanket permission for subsequent
+protected tools. ai-agents rejects this checkpoint grant until it supports the continuation contract.
+
+Company HTTP MCP tools use a separate shared catalog and explicit agent selections. They execute
+without automatic approval prompts; use a workflow checkpoint when the process needs one. See
+[Rig tools, skills, MCP and recovery](rig.md).
+
 The server also installs an `agent-builder` definition into the global agent library after database migrations. Its definition lives in Rust, is inserted only when that library slug is absent, and guides a user through name, purpose, constraints, system prompt, least-privilege tool grants, and company skill selection before requesting approval to call `create_agent_channel`.
 
 ## How a tool reaches a model
 
-Each of the three lives in `src/application/services/*_tool.rs` and describes itself with a `declaration()` — its id, the copy the model reads, the JSON Schema of its arguments, and what it is safe to do with it. None of them names an agent runtime. `NativeToolHost` (`src/application/services/native_tools.rs`) assembles the ones a given run can actually serve, and the harness adapter turns each declaration into whatever its runtime declares tools with.
+Each native tool lives in `src/application/services/*_tool.rs` and describes itself with a `declaration()` — its id, the copy the model reads, the JSON Schema of its arguments, and what it is safe to do with it. `NativeToolHost` (`src/application/services/native_tools.rs`) assembles the ones a given run can actually serve, and the harness adapter turns each declaration into whatever its runtime declares tools with.
 
-Which of the three a run can serve is decided by the contexts it was given: outreach needs a durable task, the directory needs agent and binding persistence, and channel creation needs a provisioning port. Adding a fourth tool means writing a `declaration()` and a `call()` beside its logic and adding an arm to the host — not touching the adapter.
+Availability depends on the run's trusted contexts: outreach needs a durable task, the directory
+needs agent and binding persistence, channel creation needs provisioning, ownership changes need
+task ownership, and checkpoints need durable approval continuation. Tool implementations and policy
+belong in the application host; adapters bridge their declarations and results.
 
 ## The platform allowlist
 
-Independently of any agent's configuration, only the tools in `src/domain/entities/tool_catalogue.rs` may be granted. Ten of the runtime's thirty built-ins are on that list, plus the three above. The twenty absentees — `command`, the file read and write families, `git_status`/`git_diff`, `diagnostics`, `sleep`, `ask_user`, `web_search`, and unrestricted `http` — execute in this process, on this host, with no sandbox, depend on an unavailable provider, or expose unchecked host networking. Inbound mail is an untrusted prompt source. The bounded `web_fetch` tool remains available for public-web reads.
+Static grants come from `src/domain/entities/tool_catalogue.rs`: ten allowlisted built-ins plus
+the five native tools above, filtered by harness support. Rig bridges the pinned standalone
+ai-agents built-ins with additional bounds. Shell/filesystem tools, unrestricted HTTP and upstream
+spawner tools are unavailable: execution is in-process, without a sandbox. The bounded `web_fetch`
+tool remains available for public-web reads. MCP names are not static grants; they come from the
+separate company catalog and reviewed selections.
 
 The list has no environment override and no per-company escape. A grant naming anything else is dropped when the configuration is compiled, whichever route it arrived by, and logged with the agent it belonged to. Revisit it when — and only when — a sandboxed harness exists to run those tools in.
 
@@ -32,7 +51,15 @@ The list has no environment override and no per-company escape. A grant naming a
 
 Custom tools are registered by the Rust server, but registration alone does not expose them to a model. An agent stores an explicit, typed `granted_tool_ids` list. Its effective grant is the deduplicated union of that list and the tools required by its selected skills, intersected with the platform catalogue and the native tools available to that particular run.
 
-The stored `config_json` document is not runtime YAML and cannot grant tools. It is a versioned, fail-closed advanced-settings object. Version 1 accepts only bounded reasoning, reflection, and disambiguation settings. Unknown fields are rejected with their JSON path.
+The stored `config_json` document is not runtime YAML and cannot grant tools. It is a versioned,
+fail-closed advanced-settings object. Rig V1 accepts only `version` and `max_turns` (1–16, default 8):
+
+```json
+{ "version": 1, "max_turns": 8 }
+```
+
+For ai-agents, V1 accepts bounded reasoning, reflection and disambiguation settings instead.
+Unknown fields are rejected with their JSON path.
 
 ```json
 {
@@ -47,7 +74,9 @@ Tool policy is stored separately in the typed `native_tool_policy` field. It can
 
 The server rejects upstream feature-grant paths including `tools`, `skills`, `spawner`, `persona`, `hitl`, `tool_security`, `context`, `observability`, `storage`, `runtime`, `process`, `states`, `llms`, `tool_aliases`, and provider-owned `llm` configuration. In particular, upstream spawner management/orchestration tools and persona evolution cannot become indirect grants.
 
-Do not add task, company, channel, thread, or worker identifiers to the YAML or tool arguments. The server injects those values from the trusted task execution context.
+The shared `response_contract` is also separate from advanced JSON and tool policy; see the
+[parser-tested JSON Schema examples](rig.md#structured-final-answers). Task, company, channel,
+thread and worker scope come from trusted execution context, not arbitrary config or tool arguments.
 
 ## Creating an Agent Channel
 
@@ -222,14 +251,13 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 - Creating a child does not call it automatically. Use the returned address with `outreach_and_await_quorum`.
 - Dynamically created channels are immediately eligible for `list_company_agents` and internal outreach because they are enabled and have an assigned agent.
 - The canonical tool ID must be exactly `outreach_and_await_quorum` everywhere.
-- A `tools:` grant for a native tool this run cannot serve — outreach on a run with no durable task, say — is dropped when the configuration is compiled and logged, rather than offered to the model and then denied on use.
-- Omitting the tool from `tools:` means the model has no access to it.
-- Tool-specific values under `tool_security.tools.<id>.config` reach the Rust tool because the runner reads that path off the agent's own configuration and hands it to the tool directly. They do *not* arrive through `ToolExecutionContext.custom_config`: the `ai-agents` tool-security engine is disabled unless `tool_security.enabled` is set, and a disabled engine hands every tool an empty custom config. Every key there has the same default in the tool itself, so a value omitted from configuration and a value the harness compiled agree by construction.
-- Granting a tool in `tools:` is enough to make the model aware of it. A grant is only advertised when the provider has a tool choice, so the compiler sets `llm.tool_choice: auto` for any configuration that grants at least one tool; without that a configuration listing `tools:` would run with no tools and no error. Name a choice explicitly only to override it — `required` to force a call, `none` to keep the grant but disable it.
+- A native tool is advertised only when the run has its required context. A skill whose required tool cannot be served fails preflight.
+- Access comes from `granted_tool_ids` and selected-skill dependencies, subject to catalog and runtime checks.
+- Tool-specific settings come from typed `native_tool_policy.outreach` and `native_tool_policy.directory`. The runner injects them into native execution; upstream `tool_security` and `llm.tool_choice` are not accepted agent configuration paths.
 - `allowed_target_scope` accepts `external_only` (default), `same_company_channels`, or `any`.
 - `default_timeout_hours` (default 96) fills in an omitted `timeout_hours`. A default above `max_timeout_hours` is rejected, not clamped.
 - `internal_requires_approval` (default `true`) governs whether a call whose recipients are *all* same-company agent channels may skip human approval. Anything other than an explicit `false` — absent, malformed, or the wrong type — means `true`.
-- `list_company_agents` reads only `max_results` (default 50) from its own `tool_security` config block, and never requires approval.
+- `list_company_agents` uses `native_tool_policy.directory.max_results` (default 50), and never requires approval.
 - `timeout_ms` limits creation of the durable outreach, not the human response window. `timeout_hours` controls the response deadline.
 - At least one channel participant or company team member must be available as the approver when HITL is enabled.
-- Do not place secrets in tool arguments, YAML custom configuration, or tool output.
+- Do not place secrets in tool arguments, advanced configuration, or tool output.

@@ -33,6 +33,8 @@ pub struct TaskMonitorPage<'a> {
 
 /// The pane for one task: everything the queue recorded about a single run.
 pub struct TaskDetailPane<'a> {
+    pub harness_diagnostics: Option<&'a crate::services::harness::runs::RunDiagnostics>,
+    pub harness_diagnostics_error: Option<&'a str>,
     pub company_id: Uuid,
     pub task: &'a BackgroundTask,
     /// The channel this task ran for, when it is still one of the company's.
@@ -411,6 +413,8 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                 {latest_execution}
                 {facts}
                 {queue_diagnostics}
+                {harness_diagnostics}
+                {harness_diagnostics_error}
                 {attempts_error}
                 {attempts}
                 {delivery_error}
@@ -451,6 +455,8 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         latest_execution = task_latest_execution(task),
         facts = task_facts(pane),
         queue_diagnostics = task_queue_diagnostics(task),
+        harness_diagnostics = super::harness_diagnostics::render(pane.harness_diagnostics),
+        harness_diagnostics_error = data_load_warning(pane.harness_diagnostics_error),
         attempts_error = data_load_warning(pane.attempts_error),
         attempts = task_attempts(pane.attempts),
         delivery_error = data_load_warning(pane.delivery_error),

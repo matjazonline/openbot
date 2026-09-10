@@ -1,7 +1,6 @@
 //! What an agent is and may do, said once, in terms no agent runtime owns.
 //!
-//! Today there is exactly one harness -- the in-process `ai-agents` runtime -- and it reads a YAML
-//! dialect of its own. [`AgentCapabilitySpec`] is the shape that describes an agent *before* any
+//! Harnesses compile their own runtime dialects. [`AgentCapabilitySpec`] is the shape that describes an agent *before* any
 //! dialect: a harness adapter compiles it into whatever its runtime accepts, and nothing above the
 //! adapter needs to know which runtime answered.
 
@@ -28,18 +27,20 @@ pub const MAX_DIRECTORY_RESULTS: u16 = 100;
 #[serde(tag = "harness", content = "config", rename_all = "snake_case")]
 pub enum HarnessConfig {
     AiAgents(AiAgentsAdvancedConfigV1),
+    Rig(RigAdvancedConfigV1),
 }
 
 impl HarnessConfig {
     pub fn empty(kind: HarnessKind) -> Self {
         match kind {
             HarnessKind::AiAgents => Self::AiAgents(AiAgentsAdvancedConfigV1::default()),
+            HarnessKind::Rig => Self::Rig(RigAdvancedConfigV1::default()),
         }
     }
 
     /// Decode persisted or submitted JSON through a fail-closed, path-reporting schema.
     pub fn parse(kind: HarnessKind, value: Option<&serde_json::Value>) -> Result<Self, String> {
-        let Some(value) = value else {
+        let Some(value) = value.filter(|value| !value.is_null()) else {
             return Ok(Self::empty(kind));
         };
         let encoded = serde_json::to_vec(value)
@@ -51,6 +52,11 @@ impl HarnessConfig {
         }
 
         match kind {
+            HarnessKind::Rig => {
+                let config: RigAdvancedConfigV1 = parse_json_path(value)?;
+                config.validate()?;
+                Ok(Self::Rig(config))
+            }
             HarnessKind::AiAgents => {
                 parse_json_path::<AiAgentsAdvancedConfigV1>(value).and_then(|config| {
                     config.validate()?;
@@ -63,6 +69,7 @@ impl HarnessConfig {
     pub fn to_json(&self) -> Result<serde_json::Value, String> {
         match self {
             Self::AiAgents(config) => serde_json::to_value(config),
+            Self::Rig(config) => serde_json::to_value(config),
         }
         .map_err(|error| format!("Agent harness config could not be serialized: {error}"))
     }
@@ -70,6 +77,61 @@ impl HarnessConfig {
     pub fn ai_agents(&self) -> Option<&AiAgentsAdvancedConfigV1> {
         match self {
             Self::AiAgents(config) => Some(config),
+            Self::Rig(_) => None,
+        }
+    }
+}
+
+/// Requested model-call ceiling. Every provider attempt consumes the same run budget.
+/// This is independent of ai-agents reasoning iterations.
+pub const DEFAULT_RIG_MAX_TURNS: u8 = 8;
+pub const MAX_RIG_MAX_TURNS: u8 = 16;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RigAdvancedConfigV1 {
+    pub version: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_turns: Option<u8>,
+}
+
+impl Default for RigAdvancedConfigV1 {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            max_turns: None,
+        }
+    }
+}
+
+impl RigAdvancedConfigV1 {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.version != 1 {
+            return Err("Rig config path 'version' must be 1.".into());
+        }
+        if self
+            .max_turns
+            .is_some_and(|turns| !(1..=MAX_RIG_MAX_TURNS).contains(&turns))
+        {
+            return Err(format!(
+                "Rig config path 'max_turns' must be between 1 and {MAX_RIG_MAX_TURNS}."
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn effective_max_turns(&self, server_ceiling: u8) -> u8 {
+        self.max_turns
+            .unwrap_or(DEFAULT_RIG_MAX_TURNS)
+            .min(server_ceiling)
+    }
+}
+
+impl HarnessConfig {
+    pub fn rig(&self) -> Option<&RigAdvancedConfigV1> {
+        match self {
+            Self::Rig(config) => Some(config),
+            Self::AiAgents(_) => None,
         }
     }
 }
@@ -338,29 +400,27 @@ fn default_directory_results() -> u16 {
 
 /// Which runtime executes an agent.
 ///
-/// One variant looks silly and is not: it is the enum a second harness becomes a variant of, and
-/// the `match` that then fails to compile at every place a decision must be made. A sandboxed
-/// runtime -- the thing that would let the host-access built-ins be granted at all -- attaches
-/// here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HarnessKind {
-    /// The `ai-agents` runtime, in this process. The only harness today.
-    #[default]
+    /// The existing in-process runtime; its persisted wire value is unchanged.
     AiAgents,
+    #[default]
+    Rig,
 }
 
 impl HarnessKind {
     /// Every harness the application knows about, in the order the settings UI offers them.
     /// Iterating this is what keeps the wire strings, the `<select>` options and the stored-value
     /// parsing from drifting apart as harnesses are added.
-    pub const ALL: [Self; 1] = [Self::AiAgents];
+    pub const ALL: [Self; 2] = [Self::Rig, Self::AiAgents];
 
     /// The wire and database value. Must stay in sync with the `agents_harness_kind_check`
-    /// CHECK in `migrations/20260817000000_init_schema.sql`.
+    /// CHECK maintained by additive migrations.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::AiAgents => "ai_agents",
+            Self::Rig => "rig",
         }
     }
 
@@ -368,6 +428,7 @@ impl HarnessKind {
     pub fn label(self) -> &'static str {
         match self {
             Self::AiAgents => "ai-agents (in process)",
+            Self::Rig => "Rig (in process)",
         }
     }
 
@@ -436,6 +497,7 @@ pub struct AgentCapabilitySpec {
     pub skills: Vec<Skill>,
     pub granted_tools: Vec<ToolId>,
     pub sub_agents: SubAgentScope,
+    pub response_contract: Option<super::response_contract::ResponseContract>,
     pub harness_config: HarnessConfig,
 }
 
@@ -500,6 +562,7 @@ mod tests {
 
     fn spec(granted: &[&str], skills: Vec<Skill>) -> AgentCapabilitySpec {
         AgentCapabilitySpec {
+            response_contract: None,
             harness: HarnessKind::AiAgents,
             name: "Support".to_string(),
             system_prompt: "You are a helpful email agent.".to_string(),
@@ -553,7 +616,7 @@ mod tests {
 
         assert_eq!(HarnessKind::parse("opencode_microvm"), None);
         assert_eq!(HarnessKind::parse(""), None);
-        assert_eq!(HarnessKind::default(), HarnessKind::AiAgents);
+        assert_eq!(HarnessKind::default(), HarnessKind::Rig);
     }
 
     #[test]
@@ -585,5 +648,46 @@ mod tests {
         assert!(scope.allows(allowed));
         assert!(!scope.allows(excluded));
         assert_eq!(scope.allowed_ids(), [allowed]);
+    }
+}
+
+#[cfg(test)]
+mod rig_config_tests {
+    use super::*;
+    #[test]
+    fn rig_config_is_versioned_bounded_and_separate() {
+        for kind in HarnessKind::ALL {
+            let value = HarnessConfig::empty(kind).to_json().unwrap();
+            assert_eq!(value, serde_json::json!({"version":1}));
+            assert_eq!(
+                HarnessConfig::parse(kind, Some(&value)).unwrap(),
+                HarnessConfig::empty(kind)
+            );
+            assert_eq!(
+                serde_json::from_value::<HarnessKind>(serde_json::to_value(kind).unwrap()).unwrap(),
+                kind
+            );
+        }
+        assert!(HarnessConfig::empty(HarnessKind::Rig).ai_agents().is_none());
+        assert!(HarnessConfig::empty(HarnessKind::AiAgents).rig().is_none());
+        for value in [
+            serde_json::json!({"version":2}),
+            serde_json::json!({"version":1,"max_turns":0}),
+            serde_json::json!({"version":1,"max_turns":17}),
+            serde_json::json!({"version":1,"reasoning":{}}),
+            serde_json::json!({"version":1,"additional_params":{}}),
+            serde_json::json!({"max_turns":8}),
+            serde_json::json!({"version":1,"unknown":"x".repeat(MAX_AGENT_HARNESS_CONFIG_BYTES)}),
+        ] {
+            assert!(
+                HarnessConfig::parse(HarnessKind::Rig, Some(&value)).is_err(),
+                "{value:?}"
+            );
+        }
+        let value = serde_json::json!({"version":1,"max_turns":16});
+        let config = HarnessConfig::parse(HarnessKind::Rig, Some(&value)).unwrap();
+        assert_eq!(config.to_json().unwrap(), value);
+        assert_eq!(config.rig().unwrap().effective_max_turns(3), 3);
+        assert!(HarnessConfig::parse(HarnessKind::AiAgents, Some(&value)).is_err());
     }
 }

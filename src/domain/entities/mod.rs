@@ -36,3 +36,9 @@ pub mod transport;
 pub mod upload;
 pub mod user;
 pub mod value_objects;
+
+pub mod mcp;
+
+pub mod harness_run;
+
+pub mod response_contract;

@@ -54,6 +54,12 @@ fn classifier_config_yaml(request: &ClassificationRequest<'_>) -> AppResult<Stri
 #[async_trait]
 impl TextClassifier for AiAgentsTextClassifier {
     async fn complete(&self, request: ClassificationRequest<'_>) -> AppResult<String> {
+        #[cfg(test)]
+        crate::services::test_support::require_scripted_endpoint(None).map_err(|_| {
+            AppError::BadRequest(
+                "classification tests require a deterministic TextClassifier double".into(),
+            )
+        })?;
         let agent = build_classifier(&request)?;
 
         // Boxed at the descent into the provider's own future chain, which is not ours to shrink.

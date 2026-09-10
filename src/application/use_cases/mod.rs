@@ -14,3 +14,5 @@ pub mod schedule;
 pub mod skill;
 pub mod thread;
 pub mod user;
+
+pub mod mcp;

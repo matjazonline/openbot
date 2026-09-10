@@ -2,6 +2,7 @@ pub mod agent_channel_tool;
 pub mod agent_directory_tool;
 pub mod agent_runner;
 pub mod agent_trace_hooks;
+pub mod approval_tool;
 pub mod database_query_health;
 pub mod delivery_worker;
 pub mod harness;
@@ -21,5 +22,10 @@ pub mod spam_scanner;
 pub mod task_ownership_tool;
 pub mod task_worker;
 
+pub mod mcp_client;
+pub mod mcp_runtime;
 #[cfg(test)]
 pub mod test_support;
+pub mod tool_schema;
+
+pub mod response_contract;

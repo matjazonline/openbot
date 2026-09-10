@@ -313,6 +313,8 @@ pub struct Message {
     pub thread_id: Uuid,
     pub author: MessageAuthor,
     pub subject: String,
+    #[serde(default)]
+    pub response_contract: Option<super::response_contract::ResponseContract>,
     pub clean_text_body: String,
     pub attachments: Option<Vec<AttachmentMetadata>>,
     pub direction: MessageDirection,

@@ -37,6 +37,8 @@ pub struct Agent {
     pub native_tool_policy: NativeToolPolicy,
     /// Canonical JSON representation used by existing HTTP payloads and form textareas.
     /// Persistence validates it against the harness-specific typed schema before construction.
+    #[serde(default)]
+    pub response_contract: Option<super::response_contract::ResponseContract>,
     pub config_json: Option<serde_json::Value>,
     /// Master policy switch for every memory scope used by this agent.
     #[serde(default)]

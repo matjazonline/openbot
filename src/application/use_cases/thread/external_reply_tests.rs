@@ -46,6 +46,7 @@ const AGENT_ANSWER: &str = "Your invoice was reissued on 14 March.";
 
 fn external_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -364,7 +365,8 @@ async fn fixture_with_capabilities(
             system_prompt: Some("Answer the customer briefly.".to_string()),
             skill_ids,
             granted_tool_ids,
-            ..AgentWrite::default()
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+            ..Default::default()
         },
     )
     .await
@@ -651,6 +653,7 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await
         .expect("the fixture company is removed");
+    assert_eq!(llm.finish().await, Ok(1));
 }
 
 #[tokio::test]
@@ -708,6 +711,7 @@ async fn a_stored_skill_and_tool_grant_run_through_the_production_harness() {
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await
         .expect("the fixture company is removed");
+    assert_eq!(llm.finish().await, Ok(2));
 }
 
 /// A reply that names only the answer it replies to, with no `References` back to the customer's
@@ -800,6 +804,7 @@ async fn a_reply_naming_only_the_answer_still_finds_the_thread_it_answers() {
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await
         .expect("the fixture company is removed");
+    assert_eq!(llm.finish().await, Ok(1));
 }
 
 /// The scripted model is load-bearing: assert it was actually asked, and asked once.

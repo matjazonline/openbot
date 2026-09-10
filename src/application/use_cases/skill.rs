@@ -501,6 +501,7 @@ mod tests {
     #[test]
     fn an_agent_write_naming_an_ungrantable_tool_is_refused_with_the_id_named() {
         let mut candidate = crate::use_cases::agent::AgentWrite {
+            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             name: "Unsafe".into(),
             slug: "unsafe".into(),
             granted_tool_ids: vec![ToolId::from("command")],

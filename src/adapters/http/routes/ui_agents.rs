@@ -49,7 +49,7 @@ use crate::{
 
 use super::{
     agent::{
-        AgentForm, AgentInstructionRequest, ModelOverrides, create_agent_from_instructions,
+        AgentForm, AgentInstructionRequest, ModelOverrides, agent_write_from_instructions,
         parse_config_form,
     },
     channel::{ChannelForm, checkbox_ticked, parse_agent_ids_form},
@@ -69,7 +69,10 @@ pub fn router() -> Router<AppState> {
         .route("/ui/agents/generate-prompt", post(generate_prompt))
         .route(
             "/ui/agents/{agent_id}",
-            get(edit_pane).put(update_agent).delete(delete_agent),
+            get(edit_pane)
+                .put(update_agent)
+                .post(update_agent)
+                .delete(delete_agent),
         )
         .route(
             "/ui/agents/{agent_id}/channel",
@@ -157,6 +160,10 @@ pub struct CarriedAgent {
     pub system_prompt: Option<String>,
     #[serde(rename = "agent_description")]
     pub description: Option<String>,
+    #[serde(rename = "agent_response_format")]
+    pub response_format: Option<String>,
+    #[serde(rename = "agent_response_schema")]
+    pub response_schema: Option<String>,
     #[serde(rename = "agent_config_json")]
     pub config_json: Option<String>,
     #[serde(rename = "agent_harness_kind")]
@@ -223,6 +230,8 @@ impl From<CarriedAgent> for AgentForm {
             system_prompt: carried.system_prompt,
             description: carried.description,
             config_json: carried.config_json,
+            response_format: carried.response_format,
+            response_schema: carried.response_schema,
             harness_kind: carried.harness_kind,
             granted_tool_ids: carried.granted_tool_ids,
             skill_ids: carried.skill_ids,
@@ -494,15 +503,22 @@ async fn create_agent(
     let view = workspace.view(&company);
     let submitted = SubmittedAgent::new(form);
 
-    let created = if submitted.is_simple() {
-        let avatar_url = match &submitted.avatar_url {
-            Ok(avatar) => avatar.clone(),
-            Err(message) => return rejected(&view, &submitted, message).await,
-        };
-
-        create_agent_from_instructions(
+    let mut write = match submitted.agent_write() {
+        Ok(write) => write,
+        Err(message) => return rejected(&view, &submitted, &message).await,
+    };
+    if submitted.is_simple() {
+        if let Err(error) = workspace
+            .agent_use_cases
+            .validate_new_agent(workspace.user_id, company.id, write.clone())
+            .await
+        {
+            return rejected(&view, &submitted, &error.to_string()).await;
+        }
+        let generated = agent_write_from_instructions(
             &workspace.agent_use_cases,
             AgentInstructionRequest {
+                harness_kind: write.harness_kind,
                 user_id: workspace.user_id,
                 company_id: company.id,
                 name: &submitted.form.name,
@@ -510,24 +526,21 @@ async fn create_agent(
                 instructions: submitted.form.system_prompt.as_deref().unwrap_or_default(),
                 overrides: submitted.overrides(),
                 run_timeout_secs: submitted.form.run_timeout_secs,
-                avatar_url: avatar_url.as_ref(),
+                avatar_url: write.avatar_url.as_ref(),
             },
         )
+        .await;
+        match generated {
+            Ok(generated) => write.system_prompt = generated.system_prompt,
+            Err(message) => return rejected(&view, &submitted, &message).await,
+        }
+    }
+    let created = workspace
+        .agent_use_cases
+        .create_addressable_agent(workspace.user_id, company.id, write)
         .await
         .map(|provisioned| (provisioned.agent, provisioned.warnings))
-    } else {
-        let write = match submitted.agent_write() {
-            Ok(write) => write,
-            Err(message) => return rejected(&view, &submitted, &message).await,
-        };
-
-        workspace
-            .agent_use_cases
-            .create_addressable_agent(workspace.user_id, company.id, write)
-            .await
-            .map(|provisioned| (provisioned.agent, provisioned.warnings))
-            .map_err(|err| format!("Failed to create agent: {err}"))
-    };
+        .map_err(|err| format!("Failed to create agent: {err}"));
 
     match created {
         Ok((agent, warnings)) => {
@@ -1049,6 +1062,10 @@ impl AgentSettingsView<'_> {
             None => pages::AgentCreateTab::Easy,
         };
 
+        let mut draft = form.draft.clone();
+        if form.error.is_none() && draft.harness_kind.is_none() {
+            draft.harness_kind = Some(self.agent_use_cases.default_agent_harness());
+        }
         Ok(pages::agent_create_pane(&pages::AgentCreatePane {
             company: self.company,
             app_domain_name: self.app_domain_name,
@@ -1056,7 +1073,7 @@ impl AgentSettingsView<'_> {
             library_agents: &library_agents,
             selected_library_agent_ids: form.selected_library_agent_ids,
             tab,
-            draft: form.draft,
+            draft: &draft,
             error: form.error,
             capability_options: pages::AgentCapabilityOptions {
                 skills: &skills,
@@ -1178,7 +1195,14 @@ impl AgentSettingsView<'_> {
             memory_recall_mode: agent.memory_recall_mode.as_str(),
             memory_max_results: agent.memory_max_results,
             config_json: &config_json,
-            harness_kind: agent.harness_kind,
+            response_format: if agent.response_contract.is_some() {
+                "json_schema"
+            } else {
+                "text"
+            },
+            response_schema: super::super::pages::agent_response_schema(agent),
+            harness_kind_raw: None,
+            harness_kind: Some(agent.harness_kind),
             granted_tool_ids: agent.granted_tool_ids.clone(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
             sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
@@ -1307,7 +1331,7 @@ impl AgentSettingsView<'_> {
 ///
 /// It also owns the one derivation every write needs — the slug the name falls back to — so it is
 /// not re-derived at a call site.
-struct SubmittedAgent {
+pub(super) struct SubmittedAgent {
     form: AgentForm,
     slug: String,
     /// The avatar as parsed, or why it was refused. Kept as the `Result` so a bad URL comes back
@@ -1316,7 +1340,7 @@ struct SubmittedAgent {
 }
 
 impl SubmittedAgent {
-    fn new(form: AgentForm) -> Self {
+    pub(super) fn new(form: AgentForm) -> Self {
         let slug = form.slug();
         let avatar_url = form.avatar_url();
         Self {
@@ -1336,9 +1360,10 @@ impl SubmittedAgent {
     /// One builder for the three places an Advanced submit becomes a write — the one-step create,
     /// the channel step's check, and the create that ends it — so none of them can drift on what
     /// the form means.
-    fn agent_write(&self) -> Result<AgentWrite, String> {
+    pub(super) fn agent_write(&self) -> Result<AgentWrite, String> {
         let capabilities = self.form.capabilities()?;
         Ok(AgentWrite {
+            response_contract: self.form.response_contract()?,
             name: self.form.name.clone(),
             slug: self.slug.clone(),
             provider: self.form.provider.clone(),
@@ -1374,17 +1399,18 @@ impl SubmittedAgent {
         }
     }
 
-    fn draft(&self) -> pages::AgentDraft<'_> {
-        let capabilities =
-            self.form
-                .capabilities()
-                .unwrap_or_else(|_| super::agent::SubmittedCapabilities {
-                    harness_kind: crate::entities::harness::HarnessKind::default(),
-                    granted_tool_ids: Vec::new(),
-                    skill_ids: Vec::new(),
-                    sub_agent_ids: Vec::new(),
-                    native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
-                });
+    pub(super) fn draft(&self) -> pages::AgentDraft<'_> {
+        let mut for_capabilities = self.form.clone();
+        for_capabilities.harness_kind = None;
+        let capabilities = for_capabilities.capabilities().unwrap_or_else(|_| {
+            super::agent::SubmittedCapabilities {
+                harness_kind: None,
+                granted_tool_ids: Vec::new(),
+                skill_ids: Vec::new(),
+                sub_agent_ids: Vec::new(),
+                native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
+            }
+        });
         pages::AgentDraft {
             name: &self.form.name,
             slug: &self.slug,
@@ -1411,7 +1437,14 @@ impl SubmittedAgent {
                 .memory_max_results
                 .unwrap_or_else(crate::entities::memory::default_memory_max_results),
             config_json: self.form.config_json.as_deref().unwrap_or(""),
-            harness_kind: capabilities.harness_kind,
+            response_format: self.form.response_format.as_deref().unwrap_or("text"),
+            response_schema: self.form.response_schema.clone().unwrap_or_default(),
+            harness_kind_raw: self.form.harness_kind.as_deref(),
+            harness_kind: self
+                .form
+                .harness_kind
+                .as_deref()
+                .and_then(crate::entities::harness::HarnessKind::parse),
             granted_tool_ids: capabilities.granted_tool_ids,
             skill_ids: capabilities.skill_ids,
             sub_agent_ids: capabilities.sub_agent_ids,
@@ -1594,3 +1627,7 @@ mod tests {
         assert!(submitted.form.confirm_spam_disabled());
     }
 }
+
+#[cfg(test)]
+#[path = "agent_form_tests.rs"]
+mod form_tests;

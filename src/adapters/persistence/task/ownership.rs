@@ -263,6 +263,21 @@ pub(crate) async fn change_task_ownership_on(
     let fingerprint = command_fingerprint(&command)?;
     let mut tx = pool.begin().await.map_err(AppError::from)?;
 
+    if let Some(lease) = command.execution {
+        if lease.task_id != command.task_id
+            || lease.ownership_version != command.expected_version
+            || !super::lock_task_execution_on(&mut tx, command.company_id, lease).await?
+        {
+            return Err(AppError::Execution(
+                crate::app_error::ExecutionFailure::OwnershipLost,
+            ));
+        }
+    } else if command.invocation.is_some() {
+        return Err(AppError::BadRequest(
+            "An invocation ownership command requires its execution lease".into(),
+        ));
+    }
+
     let task = sqlx::query_as::<_, LockedTask>(
         r#"SELECT channel_id, status, owner_principal_id, owner_principal_kind, ownership_version,
                   execution_generation
@@ -359,6 +374,20 @@ pub(crate) async fn change_task_ownership_on(
     let new_version = current_version
         .checked_add(1)
         .ok_or_else(|| AppError::Conflict("Ownership version exhausted.".into()))?;
+
+    if let (Some(lease), Some(reference)) = (command.execution, command.invocation) {
+        super::record_harness_result_on(&mut tx, command.company_id, lease, reference, serde_json::json!({
+            "task_id":command.task_id, "operation":command.operation.as_str(), "ownership_version":new_version,
+            "owner_kind":command.new_owner.as_str(), "run_ended":true,
+        })).await?;
+    }
+    super::supersede_harness_runs_on(
+        &mut tx,
+        command.company_id,
+        command.task_id,
+        current_version,
+    )
+    .await?;
 
     sqlx::query(
         r#"UPDATE background_tasks

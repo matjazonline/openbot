@@ -17,6 +17,7 @@ use crate::entities::{
 
 fn spec() -> AgentCapabilitySpec {
     AgentCapabilitySpec {
+        response_contract: None,
         harness: HarnessKind::AiAgents,
         name: "pravnik".to_string(),
         system_prompt: "You are a legal assistant.".to_string(),
@@ -32,6 +33,9 @@ fn spec() -> AgentCapabilitySpec {
 
 fn run_of(spec: AgentCapabilitySpec, prompt: &str) -> AgentRun<'_> {
     AgentRun {
+        company_id: None,
+        execution: None,
+        deadline: tokio::time::Instant::now() + std::time::Duration::from_secs(300),
         spec: Box::new(spec),
         agent_id: uuid::Uuid::new_v4(),
         api_key: "test-key",

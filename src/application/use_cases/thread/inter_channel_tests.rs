@@ -41,6 +41,7 @@ const APP_DOMAIN: &str = "mailagents.test";
 
 fn loop_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -145,6 +146,19 @@ impl Fixture {
 }
 
 async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
+    fixture_for_harness(
+        pool,
+        agent_llm,
+        crate::entities::harness::HarnessKind::AiAgents,
+    )
+    .await
+}
+
+async fn fixture_for_harness(
+    pool: sqlx::PgPool,
+    agent_llm: Option<&str>,
+    harness: crate::entities::harness::HarnessKind,
+) -> Fixture {
     let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
     let suffix = Uuid::new_v4().simple().to_string();
     let owner_email = format!("loop_owner_{suffix}@example.com");
@@ -204,13 +218,21 @@ async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
             description: Some(description.to_string()),
             provider: agent_llm.map(|_| SCRIPTED_PROVIDER.to_string()),
             model: agent_llm.map(|_| SCRIPTED_MODEL.to_string()),
-            ..AgentWrite::default()
+            harness_kind: Some(harness),
+            ..Default::default()
         };
         if agent_llm.is_some() {
             write.granted_tool_ids = vec![
                 crate::entities::tool_catalogue::AGENT_DIRECTORY_TOOL_ID.into(),
                 crate::entities::tool_catalogue::OUTREACH_TOOL_ID.into(),
             ];
+            if harness == crate::entities::harness::HarnessKind::Rig {
+                write.granted_tool_ids.extend([
+                    "request_approval".into(),
+                    "echo".into(),
+                    "todo".into(),
+                ]);
+            }
             write.native_tool_policy.outreach.max_targets = 1;
             write.native_tool_policy.outreach.allowed_target_scope =
                 OutreachTargetScope::SameCompanyChannels;
@@ -249,11 +271,14 @@ async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
     let deliveries = DeliveryComposer::new(renderers.clone(), persistence.clone());
     let approvals = Arc::new(ApprovalUseCases::new(
         persistence.clone(),
-        persistence.clone(),
-        persistence.clone(),
         deliveries.clone(),
         config.clone(),
     ));
+    let harnesses = if harness == crate::entities::harness::HarnessKind::Rig {
+        rig_test_registry(persistence.clone())
+    } else {
+        harness_registry()
+    };
     let threads = Arc::new(
         ThreadUseCases::new(
             ThreadStores {
@@ -272,10 +297,14 @@ async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
             renderers.clone(),
             config,
         )
+        .with_response_validator(Arc::new(
+            crate::adapters::response_schema::JsonResponseValidator,
+        ))
         .with_agent_persistence(persistence.clone())
         .with_agent_capability_reader(persistence.clone())
+        .with_harness_run_store(persistence.clone())
         .with_approval_use_cases(approvals)
-        .with_harnesses(harness_registry(), text_classifier()),
+        .with_harnesses(harnesses, text_classifier()),
     );
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.
@@ -557,6 +586,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     let progress = TaskPersistence::create_outreach_and_pause(
         fx.persistence.as_ref(),
         CreateOutreachRequest {
+            invocation: None,
             correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             lease,
@@ -806,4 +836,38 @@ async fn an_agent_cannot_disable_internal_outreach_approval() {
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await
         .expect("the fixture company is removed");
+    assert_eq!(llm.finish().await, Ok(1));
 }
+
+fn rig_test_registry(
+    persistence: Arc<PostgresPersistence>,
+) -> Arc<crate::services::harness::HarnessRegistry> {
+    let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
+        crate::adapters::mcp::policy::EndpointPolicy::new(std::iter::empty::<String>()).unwrap(),
+    ));
+    let runtime = Arc::new(crate::services::mcp_runtime::McpRuntime::new(
+        persistence.clone(),
+        persistence.clone(),
+        client,
+    ));
+    Arc::new(
+        crate::services::harness::HarnessRegistry::new()
+            .register(
+                crate::entities::harness::HarnessKind::Rig,
+                Arc::new(
+                    crate::adapters::harness::rig::RigHarness::new(persistence, runtime).unwrap(),
+                ),
+            )
+            .unwrap(),
+    )
+}
+
+#[cfg(test)]
+#[path = "rig_execution_tests.rs"]
+mod rig_execution_tests;
+
+#[path = "structured_response_tests.rs"]
+mod structured_response_tests;
+
+#[path = "simulation_tests.rs"]
+mod simulation_tests;

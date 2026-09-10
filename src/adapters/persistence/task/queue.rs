@@ -256,6 +256,14 @@ pub(crate) async fn stop_task_on(
     .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
+    super::supersede_harness_runs_on(&mut tx, db.company_id, id, db.ownership_version as u64)
+        .await?;
+    sqlx::query(
+        "UPDATE task_approval_waits SET state = 'expired' WHERE task_id = $1 AND state = 'waiting'",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await.map_err(AppError::from)?;
     db.try_into()
 }

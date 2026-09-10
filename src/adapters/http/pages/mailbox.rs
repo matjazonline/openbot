@@ -794,7 +794,7 @@ const THEME_INIT_SCRIPT: &str = r#"
         })();"#;
 
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
-fn ui_layout(title: &str, body: &str) -> String {
+pub(super) fn ui_layout(title: &str, body: &str) -> String {
     let app_css = crate::adapters::http::routes::assets::app_css_url();
     let app_js = crate::adapters::http::routes::assets::app_js_url();
     let theme_init_js = crate::adapters::http::routes::assets::theme_init_js_url();
@@ -880,6 +880,8 @@ document.addEventListener('click', function (event) {
     var control = event.target.closest('[data-action]');
     if (!control) return;
     switch (control.dataset.action) {
+        // Accepted plain navigation is handled by the window listener after this dispatcher.
+        case 'navigate-workspace': break;
         case 'confirm-logout': confirmLogout(); break;
         case 'select-sidebar-item': selectSidebarItem(control); break;
         case 'select-thread-row': selectThreadRow(control); break;
@@ -932,6 +934,13 @@ document.addEventListener('change', function (event) {
     var control = event.target.closest('[data-action]');
     if (!control) return;
     switch (control.dataset.action) {
+        case 'agent-runtime': {
+            var runtime = control.closest('[data-agent-runtime]');
+            runtime.querySelectorAll('[data-harness-help]').forEach(function(help) {
+                help.hidden = !!control.value && help.dataset.harnessHelp !== control.value;
+            });
+            break;
+        }
         case 'theme-toggle': applyTheme(control.checked ? 'light' : 'dark'); break;
         case 'toggle-schedule-type': toggleScheduleType(control); break;
         case 'toggle-schedule-delivery': toggleScheduleDelivery(control); break;
@@ -2621,6 +2630,11 @@ pub fn message_bubble_chat(
         && message.audience == MessageAudience::InternalOnly;
     let body = if note_state.is_some_and(|note| note.tombstoned_at.is_some()) {
         r#"<div class="italic opacity-60">This internal note was removed. Its audit record is retained.</div>"#.to_string()
+    } else if message.response_contract.is_some() {
+        format!(
+            "<pre class=\"whitespace-pre-wrap\">{}</pre>",
+            escape_html_text(&message.body)
+        )
     } else if is_agent {
         format!(
             r##"<div class="{MARKDOWN_CONTENT_STYLES}">{}</div>"##,

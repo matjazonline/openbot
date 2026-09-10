@@ -99,6 +99,24 @@ pub struct CredentialContext {
 }
 
 impl CredentialContext {
+    pub fn company_mcp_credential(company_id: Uuid, connection_id: Uuid) -> Self {
+        Self {
+            scope: "company_mcp_credential",
+            fields: vec![
+                company_id.as_bytes().to_vec(),
+                connection_id.as_bytes().to_vec(),
+            ],
+        }
+    }
+
+    fn max_secret_bytes(&self) -> usize {
+        if self.scope == "company_mcp_credential" {
+            crate::entities::mcp::MAX_MCP_SECRET_BYTES
+        } else {
+            MAX_CREDENTIAL_BYTES
+        }
+    }
+
     /// The context for one installation's secret.
     ///
     /// Every field is part of the primary key or of the installation it hangs off, so an operator
@@ -248,7 +266,7 @@ pub fn seal(
     secret: &SecretString,
 ) -> Result<String, EnvelopeError> {
     let plaintext = secret.expose_secret();
-    if plaintext.len() > MAX_CREDENTIAL_BYTES {
+    if plaintext.len() > context.max_secret_bytes() {
         return Err(EnvelopeError::TooLong);
     }
 
@@ -351,6 +369,9 @@ fn open_payload(
     context: &CredentialContext,
     envelope: &ParsedEnvelope,
 ) -> Result<SecretString, EnvelopeError> {
+    if envelope.payload.len() > context.max_secret_bytes() + AES_256_GCM.tag_len() {
+        return Err(EnvelopeError::TooLong);
+    }
     let mut payload = envelope.payload.clone();
     let plaintext = data_key_cipher(data_key)?
         .open_in_place(

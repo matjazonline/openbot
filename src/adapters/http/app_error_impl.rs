@@ -10,6 +10,9 @@ impl IntoResponse for AppError {
         tracing::error!(error = ?self, "Request failed");
 
         match self {
+            AppError::Execution(_) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "Execution stopped").into_response()
+            }
             AppError::Database(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
             }

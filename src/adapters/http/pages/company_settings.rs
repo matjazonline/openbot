@@ -345,6 +345,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
     format!(
         r##"
                 <div role="tablist" class="tabs tabs-border -mb-px mt-3">
+                    <a role="tab" class="tab" href="/ui/companies/{company_id}/mcp-connections">MCP servers</a>
                     <a role="tab" class="tab {settings_active}" href="/ui/companies?company_id={company_id}">Settings</a>
                     <a role="tab" class="tab {team_active}" href="{team_url}">Team</a>
                     <a role="tab" class="tab {skills_active}" href="/ui/companies?company_id={company_id}&amp;tab=skills">Skills</a>

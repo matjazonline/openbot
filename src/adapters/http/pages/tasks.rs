@@ -589,11 +589,13 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
                 <span>Task Execution Parameters</span>
             </summary>
             <div class="mt-2.5">
+                {runtime_summary}
                 {summary_badges_html}
                 <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-96">{payload_str}</pre>
             </div>
         </details>
         "##,
+        runtime_summary = super::agent_runtime_settings::execution_summary(&sanitized_payload),
         disclosure = icon(Icon::ChevronRight, "h-3 w-3"),
     )
 }

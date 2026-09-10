@@ -1,6 +1,6 @@
 use chrono::Utc;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -13,19 +13,41 @@ use crate::{
         channel::Channel,
         correlation::CorrelationId,
         message::{MessageDirection, MessageRole},
-        task::{ResumeActor, StopActor, TaskSuspension},
+        task::TaskSuspension,
     },
     infra::config::AppConfig,
-    task_queue::TaskPersistence,
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
         EmailDeliveryContext, EmailThreading, NewDelivery,
     },
-    use_cases::thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
+    use_cases::thread::{MessageAuthorWrite, MessageWrite},
 };
+
+/// Shared pure rendering; the persistence decision transaction owns writing this message.
+pub(crate) fn decision_note(approval: &HumanApproval, correlation: CorrelationId) -> MessageWrite {
+    MessageWrite::internal(
+        approval.thread_id,
+        MessageAuthorWrite::Platform,
+        format!(
+            "[HITL {}]: {}",
+            approval.status.as_str(),
+            approval.action_title
+        ),
+        format!(
+            "Human approval {} for action '{}'. Assigned approver: {}.",
+            approval.status.as_str(),
+            approval.action_title,
+            approval.approver_email
+        ),
+        MessageDirection::Inbound,
+        MessageRole::System,
+        correlation,
+    )
+}
 
 /// One approval and the message/delivery that must be committed with it.
 pub struct NewApproval<'a> {
+    pub invocation: Option<crate::services::harness::runs::InvocationRef>,
     pub subject: &'a ApprovalSubject,
     pub action: &'a ApprovalAction,
     pub message: &'a MessageWrite,
@@ -53,7 +75,7 @@ pub trait ApprovalPersistence: Send + Sync {
         company_id: Uuid,
         approval_id: Uuid,
     ) -> AppResult<Option<HumanApproval>>;
-    async fn consume_pending_approval(
+    async fn decide_approval_and_transition(
         &self,
         token: &str,
         status: ApprovalStatus,
@@ -69,6 +91,7 @@ pub trait ApprovalPersistence: Send + Sync {
             "Atomic quorum approval persistence is not configured".into(),
         ))
     }
+    async fn expire_due_approvals(&self, limit: u32) -> AppResult<u32>;
     async fn expire_pending_approval(
         &self,
         token: &str,
@@ -83,8 +106,6 @@ pub trait ApprovalPersistence: Send + Sync {
 
 pub struct ApprovalUseCases {
     approval_persistence: Arc<dyn ApprovalPersistence>,
-    task_persistence: Arc<dyn TaskPersistence>,
-    thread_persistence: Arc<dyn ThreadPersistence>,
     /// Freezes the approval mail so the request row, the note in the thread and the delivery land
     /// as one transaction. An approval that parked a task but never mailed anybody is a task
     /// nobody can un-park.
@@ -95,15 +116,11 @@ pub struct ApprovalUseCases {
 impl ApprovalUseCases {
     pub fn new(
         approval_persistence: Arc<dyn ApprovalPersistence>,
-        task_persistence: Arc<dyn TaskPersistence>,
-        thread_persistence: Arc<dyn ThreadPersistence>,
         deliveries: DeliveryComposer,
         config: Arc<AppConfig>,
     ) -> Self {
         Self {
             approval_persistence,
-            task_persistence,
-            thread_persistence,
             deliveries,
             config,
         }
@@ -137,6 +154,7 @@ impl ApprovalUseCases {
     pub async fn create_and_send_approval_request(
         &self,
         subject: &ApprovalSubject,
+        invocation: Option<crate::services::harness::runs::InvocationRef>,
         action: ApprovalAction,
     ) -> AppResult<HumanApproval> {
         let token = Uuid::new_v4();
@@ -189,6 +207,7 @@ impl ApprovalUseCases {
         let (approval, created) = self
             .approval_persistence
             .create_approval(NewApproval {
+                invocation,
                 subject,
                 action: &action,
                 message: &message,
@@ -265,6 +284,11 @@ impl ApprovalUseCases {
         Ok(composed.delivery)
     }
 
+    /// Each claimed expiry is deferred before settlement, so poison rows cannot monopolize polls.
+    pub async fn expire_due_approvals(&self) -> AppResult<u32> {
+        self.approval_persistence.expire_due_approvals(32).await
+    }
+
     pub async fn process_link_action(
         &self,
         token: &str,
@@ -305,7 +329,7 @@ impl ApprovalUseCases {
             }
             _ => {
                 self.approval_persistence
-                    .consume_pending_approval(token, decision.status(), now)
+                    .decide_approval_and_transition(token, decision.status(), now)
                     .await?
             }
         };
@@ -314,175 +338,29 @@ impl ApprovalUseCases {
             return self.report_unavailable(token, now).await;
         };
 
-        let message_text = self.apply_decision(&approval, decision).await?;
+        let message_text = Self::decision_message(&approval, decision);
         Ok((updated, message_text))
     }
 
-    /// Carry out the side effects of a decision and describe them for the human who clicked.
-    ///
-    /// The approval row is already consumed by the time this runs, so a failed task transition
-    /// cannot be undone by rolling anything back -- but it must not be reported as success either.
-    /// It propagates with both ids logged, which is what a reconciliation starts from.
-    async fn apply_decision(
-        &self,
-        approval: &HumanApproval,
-        decision: LinkAction,
-    ) -> AppResult<String> {
+    /// Persistence has already committed the decision, task transition and decision notice.
+    fn decision_message(approval: &HumanApproval, decision: LinkAction) -> String {
         match decision {
-            LinkAction::QuorumTimeout(QuorumTimeoutAction::ProceedPartial) => {
-                self.record_decision_note(
-                    approval,
-                    "HITL Proceed Partial",
-                    format!(
-                        "Human decision by {}: Proceeding with partial quorum responses.",
-                        approval.approver_email
-                    ),
-                )
-                .await;
-                Ok(format!(
-                    "✓ Action '{}' confirmed: Proceeding with partial data. Channels resumed.",
-                    approval.action_title
-                ))
-            }
-            LinkAction::QuorumTimeout(QuorumTimeoutAction::Extend { hours }) => {
-                self.record_decision_note(
-                    approval,
-                    "HITL Timeout Extended",
-                    format!(
-                        "Human decision by {}: Outreach response timeout extended by {} hours.",
-                        approval.approver_email, hours
-                    ),
-                )
-                .await;
-                Ok(format!(
-                    "✓ Action '{}' confirmed: Outreach timeout extended by {} hours.",
-                    approval.action_title, hours
-                ))
-            }
-            LinkAction::Approve => {
-                if let Some(task_id) = approval.task_id {
-                    self.task_persistence
-                        .resume_task(task_id, ResumeActor::Approval(approval.id))
-                        .await
-                        .inspect_err(|error| {
-                            error!(
-                                approval_id = %approval.id,
-                                task_id = %task_id,
-                                %error,
-                                "Approval was consumed but its task could not be resumed"
-                            )
-                        })?;
-                }
-                self.record_decision_note(
-                    approval,
-                    "HITL Granted",
-                    format!(
-                        "Human approval GRANTED by {} for action '{}'.",
-                        approval.approver_email, approval.action_title
-                    ),
-                )
-                .await;
-                Ok(format!(
-                    "✓ Action '{}' has been CONFIRMED successfully. Associated automated channels have been resumed.",
-                    approval.action_title
-                ))
-            }
-            LinkAction::QuorumTimeout(QuorumTimeoutAction::Reject) => {
-                // The transaction that consumed this approval also cancelled the outreach and
-                // stopped the task, so there is no transition left to order here. The old
-                // `action_type != "quorum_timeout"` guard on the shared arm below said the same
-                // thing by re-reading a string; separate arms say it by construction.
-                Ok(self.record_rejection(approval).await)
-            }
-            LinkAction::Reject => {
-                if let Some(task_id) = approval.task_id {
-                    self.task_persistence
-                        .stop_task(task_id, StopActor::Approval(approval.id))
-                        .await
-                        .inspect_err(|error| {
-                            error!(
-                                approval_id = %approval.id,
-                                task_id = %task_id,
-                                %error,
-                                "Approval was consumed but its task could not be stopped"
-                            )
-                        })?;
-                }
-                Ok(self.record_rejection(approval).await)
-            }
-        }
-    }
-
-    /// Record a rejection on the originating thread and describe it for the human who clicked.
-    ///
-    /// Both rejection paths end here; they differ only in who stopped the task.
-    async fn record_rejection(&self, approval: &HumanApproval) -> String {
-        self.record_decision_note(
-            approval,
-            "HITL Rejected",
-            format!(
-                "Human approval REJECTED by {} for action '{}'.",
-                approval.approver_email, approval.action_title
+            LinkAction::Approve => format!(
+                "✓ Action '{}' has been CONFIRMED successfully.",
+                approval.action_title
             ),
-        )
-        .await;
-        format!(
-            "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
-            approval.action_title
-        )
-    }
-
-    /// Append the decision to the originating thread so the conversation records who decided what.
-    ///
-    /// Best-effort: a thread write failure must not undo a decision that is already persisted.
-    async fn record_decision_note(
-        &self,
-        approval: &HumanApproval,
-        subject_tag: &str,
-        body: String,
-    ) {
-        // The note belongs to the chain the approval interrupted, and a correlation id is
-        // inherited rather than minted -- so an approval with no task behind it has no chain to
-        // join and records nothing.
-        let correlation_id = match self.chain_of(approval).await {
-            Some(correlation_id) => correlation_id,
-            None => {
-                warn!(
-                    approval_id = %approval.id,
-                    "Approval decision note skipped: no task chain to attribute it to"
-                );
-                return;
-            }
-        };
-        // Nothing was sent and nothing arrived: this note is the *platform* recording that a
-        // decision was made, so it is authored by the company's system principal and carries no
-        // headers and no recipients at all.
-        //
-        // Deliberately not attributed to the approver's mailbox. An approval link proves that
-        // whoever held the token acted; it does not authenticate an address, and minting a
-        // principal for that address here would turn a click on a link into a company-scoped
-        // identity. Who decided is stated in the note's own text -- as data, which is what it is.
-        let note = MessageWrite::internal(
-            approval.thread_id,
-            MessageAuthorWrite::Platform,
-            format!("[{}]: {}", subject_tag, approval.action_title),
-            body,
-            MessageDirection::Inbound,
-            MessageRole::System,
-            correlation_id,
-        );
-        let _ = self.thread_persistence.create_message(&note).await;
-    }
-
-    /// The chain the approval's task belongs to, so the decision note joins it.
-    async fn chain_of(&self, approval: &HumanApproval) -> Option<CorrelationId> {
-        let task_id = approval.task_id?;
-        match self.task_persistence.get_task_by_id(task_id).await {
-            Ok(task) => task.map(|task| task.correlation_id),
-            Err(error) => {
-                warn!(approval_id = %approval.id, %error, "Could not read the approval's task");
-                None
-            }
+            LinkAction::Reject | LinkAction::QuorumTimeout(QuorumTimeoutAction::Reject) => format!(
+                "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
+                approval.action_title
+            ),
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::ProceedPartial) => format!(
+                "✓ Action '{}' confirmed: Proceeding with partial data. Channels resumed.",
+                approval.action_title
+            ),
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::Extend { hours }) => format!(
+                "✓ Action '{}' confirmed: Outreach timeout extended by {} hours.",
+                approval.action_title, hours
+            ),
         }
     }
 
@@ -580,6 +458,8 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_queue::TaskPersistence;
+    use crate::use_cases::thread::ThreadPersistence;
     use crate::use_cases::thread::test_support::InMemoryThreads;
 
     /// The two approval kinds offer disjoint verbs, and a verb borrowed from the other kind is
@@ -626,7 +506,7 @@ mod tests {
     }
 
     /// A quorum rejection consumes its approval as rejected like any other. It reaches
-    /// `consume_quorum_timeout_action` rather than `consume_pending_approval`, but the status it
+    /// `consume_quorum_timeout_action` rather than `decide_approval_and_transition`, but the status it
     /// records is not the thing that differs.
     #[test]
     fn a_rejection_records_the_rejected_status_whichever_kind_it_came_from() {
@@ -655,6 +535,7 @@ mod tests {
     /// The one config every test here uses; kept in one place so a new field is added once.
     fn test_config() -> Arc<AppConfig> {
         Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".into(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -706,6 +587,7 @@ mod tests {
         .await
         .expect("the fixture thread is created");
 
+        *approval_persistence.threads.lock().unwrap() = Some(thread_persistence.clone());
         let config = test_config();
         let renderers = Arc::new(
             crate::transport::ports::TransportRenderers::new()
@@ -725,18 +607,13 @@ mod tests {
         );
 
         (
-            ApprovalUseCases::new(
-                approval_persistence,
-                task_persistence,
-                thread_persistence,
-                deliveries,
-                config,
-            ),
+            ApprovalUseCases::new(approval_persistence, deliveries, config),
             thread.id,
         )
     }
 
     struct MockApprovalPersistence {
+        threads: Mutex<Option<Arc<InMemoryThreads>>>,
         approvals: Mutex<Vec<HumanApproval>>,
     }
 
@@ -747,6 +624,7 @@ mod tests {
             new_approval: NewApproval<'_>,
         ) -> AppResult<(HumanApproval, bool)> {
             let NewApproval {
+                invocation: _,
                 subject,
                 action,
                 token,
@@ -829,21 +707,32 @@ mod tests {
                 .cloned())
         }
 
-        async fn consume_pending_approval(
+        async fn decide_approval_and_transition(
             &self,
             token: &str,
             status: ApprovalStatus,
             now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<HumanApproval>> {
-            let mut list = self.approvals.lock().unwrap();
-            let Some(approval) = list.iter_mut().find(|a| {
-                a.token == token && a.status == ApprovalStatus::Pending && a.expires_at >= now
-            }) else {
-                return Ok(None);
+            let updated = {
+                let mut list = self.approvals.lock().unwrap();
+                let Some(approval) = list.iter_mut().find(|a| {
+                    a.token == token && a.status == ApprovalStatus::Pending && a.expires_at >= now
+                }) else {
+                    return Ok(None);
+                };
+                approval.status = status;
+                approval.updated_at = now;
+                approval.clone()
             };
-            approval.status = status;
-            approval.updated_at = Utc::now();
-            Ok(Some(approval.clone()))
+            let threads = self.threads.lock().unwrap().clone().unwrap();
+            threads
+                .create_message(&decision_note(&updated, CorrelationId::new()))
+                .await?;
+            Ok(Some(updated))
+        }
+
+        async fn expire_due_approvals(&self, _limit: u32) -> AppResult<u32> {
+            Ok(0)
         }
 
         async fn expire_pending_approval(
@@ -1058,6 +947,7 @@ mod tests {
     async fn an_unknown_approval_token_is_not_found_rather_than_an_internal_error() {
         let (use_cases, _thread_id) = approval_fixture(
             Arc::new(MockApprovalPersistence {
+                threads: Mutex::new(None),
                 approvals: Mutex::new(Vec::new()),
             }),
             Arc::new(InMemoryThreads::new()),
@@ -1080,6 +970,7 @@ mod tests {
     #[tokio::test]
     async fn approval_lifecycle_confirm_and_reject_flow() {
         let approval_persistence = Arc::new(MockApprovalPersistence {
+            threads: Mutex::new(None),
             approvals: Mutex::new(Vec::new()),
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
@@ -1105,6 +996,7 @@ mod tests {
         let approval = use_cases
             .create_and_send_approval_request(
                 &subject,
+                None,
                 ApprovalAction {
                     step_key: "step_key_hash_123".to_string(),
                     action_type: "tool".to_string(),
@@ -1121,6 +1013,7 @@ mod tests {
         let duplicate = use_cases
             .create_and_send_approval_request(
                 &subject,
+                None,
                 ApprovalAction {
                     step_key: "step_key_hash_123".to_string(),
                     action_type: "tool".to_string(),
@@ -1196,6 +1089,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
         let (use_cases, thread_id) = approval_fixture(
             Arc::new(MockApprovalPersistence {
+                threads: Mutex::new(None),
                 approvals: Mutex::new(Vec::new()),
             }),
             thread_persistence.clone(),
@@ -1219,6 +1113,7 @@ mod tests {
                     correlation_id: CorrelationId::new(),
                     approver_email: EmailAddress::from("manager@acme.com"),
                 },
+                None,
                 ApprovalAction {
                     step_key: "step".to_string(),
                     action_type: "tool".to_string(),
@@ -1266,6 +1161,7 @@ mod tests {
         // to the same step key or the second instance re-asks a human who already answered.
         let deploy_args = serde_json::json!({ "cmd": "deploy_prod" });
         let deploy_attempt = || ApprovalAsk {
+            invocation: None,
             trigger: ApprovalTrigger::Tool {
                 name: "command",
                 args: &deploy_args,
@@ -1276,6 +1172,7 @@ mod tests {
 
         // Shared persistent database mock across server instances
         let shared_db = Arc::new(MockApprovalPersistence {
+            threads: Mutex::new(None),
             approvals: Mutex::new(Vec::new()),
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
@@ -1379,6 +1276,7 @@ mod tests {
     #[tokio::test]
     async fn test_quorum_timeout_hitl_link_actions() {
         let approval_persistence = Arc::new(MockApprovalPersistence {
+            threads: Mutex::new(None),
             approvals: Mutex::new(Vec::new()),
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
@@ -1403,6 +1301,7 @@ mod tests {
         let approval = use_cases
             .create_and_send_approval_request(
                 &subject,
+                None,
                 ApprovalAction {
                     step_key: "step_quorum_timeout_123".to_string(),
                     action_type: "quorum_timeout".to_string(),
@@ -1426,6 +1325,7 @@ mod tests {
         let approval2 = use_cases
             .create_and_send_approval_request(
                 &subject,
+                None,
                 ApprovalAction {
                     step_key: "step_quorum_timeout_456".to_string(),
                     action_type: "quorum_timeout".to_string(),

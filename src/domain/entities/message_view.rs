@@ -81,6 +81,8 @@ impl AuthorView {
 /// read [`MessageAuditView`] instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThreadMessageView {
+    /// Saved structured output contract, independent of subsequent agent edits.
+    pub response_contract: Option<super::response_contract::ResponseContract>,
     /// `thread_messages.id` -- this message *in this thread*, and what the live stream resumes on.
     pub id: Uuid,
     /// `messages.id` -- the payload every thread association of this message shares.

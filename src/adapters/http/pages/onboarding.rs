@@ -78,14 +78,66 @@ pub fn onboarding_company_page(
     onboarding_shell("Set up your company", user, None, 1, &pane)
 }
 
+#[derive(Default)]
+pub struct OnboardingAgentDraft<'a> {
+    pub harness: &'a str,
+    pub name: &'a str,
+    pub instructions: &'a str,
+    pub library_ids: &'a [uuid::Uuid],
+}
+
 pub fn onboarding_channel_page(
     user: &MailboxUser<'_>,
     company: &Company,
     library_agents: &[Agent],
+    harness: &str,
     error: Option<&str>,
 ) -> String {
+    onboarding_channel_draft_page(
+        user,
+        company,
+        library_agents,
+        &OnboardingAgentDraft {
+            harness,
+            ..Default::default()
+        },
+        error,
+    )
+}
+
+pub fn onboarding_channel_draft_page(
+    user: &MailboxUser<'_>,
+    company: &Company,
+    library_agents: &[Agent],
+    draft: &OnboardingAgentDraft<'_>,
+    error: Option<&str>,
+) -> String {
+    let harness = draft.harness;
+    let mut harness_options = crate::entities::harness::HarnessKind::ALL
+        .into_iter()
+        .map(|kind| {
+            format!(
+                "<option value=\"{}\"{}>{}</option>",
+                kind.as_str(),
+                if kind.as_str() == harness {
+                    " selected"
+                } else {
+                    ""
+                },
+                kind.label()
+            )
+        })
+        .collect::<String>();
+    if crate::entities::harness::HarnessKind::parse(harness).is_none() {
+        harness_options.push_str(&format!(
+            "<option selected value=\"{}\">Unavailable harness: {}</option>",
+            escape_html_attr(harness),
+            escape_html_text(harness)
+        ));
+    }
     let error_html = error.map(error_alert).unwrap_or_default();
-    let library_picker = agent_library_multi_select(library_agents, &[], "library_agent_ids");
+    let library_picker =
+        agent_library_multi_select(library_agents, draft.library_ids, "library_agent_ids");
     let library_html = if library_picker.is_empty() {
         String::new()
     } else {
@@ -99,10 +151,13 @@ pub fn onboarding_channel_page(
         {error_html}
         <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5" {busy_handler}>
             {library_html}
-            <fieldset class="fieldset"><legend class="fieldset-legend">Custom agent and channel name</legend><input id="onboarding_channel_name" name="name" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">Required when creating a custom agent. For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
-            <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions."></textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
+            <label>Custom agent runtime<select name="harness_kind" class="select w-full">{harness_options}</select></label>
+            <fieldset class="fieldset"><legend class="fieldset-legend">Custom agent and channel name</legend><input id="onboarding_channel_name" name="name" value="{draft_name}" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">Required when creating a custom agent. For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
+            <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions.">{draft_instructions}</textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
             <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a>{submit_button}</div>
         </form>"##,
+        draft_name = escape_html_attr(draft.name),
+        draft_instructions = escape_html_text(draft.instructions),
         company_name = escape_html_text(&company.name),
         company_slug = escape_html_text(company.slug.as_ref()),
         company_id = company.id,

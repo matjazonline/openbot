@@ -99,6 +99,8 @@ pub struct MessageWrite {
     pub author: MessageAuthorWrite,
     pub subject: String,
     pub clean_text_body: String,
+    #[serde(default)]
+    pub structured: Option<crate::services::response_contract::StructuredResponse>,
     pub attachments: Vec<AttachmentMetadata>,
     pub direction: MessageDirection,
     pub role: MessageRole,
@@ -129,6 +131,7 @@ impl MessageWrite {
             author,
             subject: subject.into(),
             clean_text_body: clean_text_body.into(),
+            structured: None,
             attachments: Vec::new(),
             direction,
             role,
@@ -142,6 +145,14 @@ impl MessageWrite {
             correlation: MessageCorrelation::Internal,
             created_at: Utc::now(),
         }
+    }
+
+    pub fn with_structured(
+        mut self,
+        structured: Option<crate::services::response_contract::StructuredResponse>,
+    ) -> Self {
+        self.structured = structured;
+        self
     }
 
     pub fn with_participants(mut self, participants: Vec<MessageParticipantWrite>) -> Self {

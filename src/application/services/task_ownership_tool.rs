@@ -108,18 +108,25 @@ impl TaskOwnershipTool {
         }
     }
 
-    pub async fn call(&self, call_id: &str, args: serde_json::Value) -> ToolInvocation {
+    pub async fn call(
+        &self,
+        call_id: &str,
+        args: serde_json::Value,
+        invocation: Option<crate::entities::harness_run::InvocationRef>,
+    ) -> crate::app_error::AppResult<ToolInvocation> {
         let input: OwnershipToolInput = match serde_json::from_value(args) {
             Ok(input) => input,
-            Err(error) => return ToolInvocation::failure(format!("Invalid input: {error}")),
+            Err(error) => return Ok(ToolInvocation::failure(format!("Invalid input: {error}"))),
         };
         let TaskOwner::Agent(actor) = self.context.lease.claimed_owner else {
-            return ToolInvocation::failure("Only the task's owning agent may use this tool.");
+            return Ok(ToolInvocation::failure(
+                "Only the task's owning agent may use this tool.",
+            ));
         };
         let (operation, new_owner, default_reason) = match input.operation {
             OwnershipToolOperation::Release => {
                 if input.target_id.is_some() || input.target_kind.is_some() {
-                    return ToolInvocation::failure("Release does not accept a target.");
+                    return Ok(ToolInvocation::failure("Release does not accept a target."));
                 }
                 (
                     TaskOwnershipOperation::Release,
@@ -129,18 +136,18 @@ impl TaskOwnershipTool {
             }
             OwnershipToolOperation::Transfer => {
                 let Some(target_id) = input.target_id else {
-                    return ToolInvocation::failure("Transfer requires target_id.");
+                    return Ok(ToolInvocation::failure("Transfer requires target_id."));
                 };
                 let target_id = match Uuid::parse_str(target_id.trim()) {
                     Ok(id) => id,
                     Err(error) => {
-                        return ToolInvocation::failure(format!(
+                        return Ok(ToolInvocation::failure(format!(
                             "target_id must be a UUID: {error}"
-                        ));
+                        )));
                     }
                 };
                 let Some(target_kind) = input.target_kind else {
-                    return ToolInvocation::failure("Transfer requires target_kind.");
+                    return Ok(ToolInvocation::failure("Transfer requires target_kind."));
                 };
                 let selector = match target_kind {
                     OwnershipTargetKind::Agent => TaskOwnerTarget::Agent(target_id),
@@ -157,14 +164,12 @@ impl TaskOwnershipTool {
                 {
                     Ok(Some(owner)) => owner,
                     Ok(None) => {
-                        return ToolInvocation::failure(
+                        return Ok(ToolInvocation::failure(
                             "The requested owner is not eligible for this task.",
-                        );
+                        ));
                     }
                     Err(error) => {
-                        return ToolInvocation::failure(format!(
-                            "Could not resolve the requested owner: {error}"
-                        ));
+                        return Err(error);
                     }
                 };
                 (
@@ -175,9 +180,15 @@ impl TaskOwnershipTool {
             }
         };
         let command = TaskOwnershipCommand {
+            execution: Some(self.context.lease),
+            invocation,
             task_id: self.context.lease.task_id,
             company_id: self.context.company_id,
-            command_id: stable_command_id(self.context.lease.execution_generation, call_id),
+            command_id: invocation
+                .map(|inv| inv.invocation_id.0)
+                .unwrap_or_else(|| {
+                    stable_command_id(self.context.lease.execution_generation, call_id)
+                }),
             expected_version: self.context.lease.ownership_version,
             actor: TaskOwnershipActor {
                 principal_id: actor,
@@ -190,14 +201,14 @@ impl TaskOwnershipTool {
             handoff_instruction: input.handoff_instruction,
         };
         match self.persistence.change_task_ownership(command).await {
-            Ok(event) => ToolInvocation::suspended(serde_json::json!({
+            Ok(event) => Ok(ToolInvocation::suspended(serde_json::json!({
                 "task_id": event.task_id,
                 "operation": event.operation.as_str(),
                 "ownership_version": event.to_version,
                 "owner_kind": event.new_owner.as_str(),
                 "run_ended": true,
-            })),
-            Err(error) => ToolInvocation::failure(format!("Ownership change failed: {error}")),
+            }))),
+            Err(error) => ToolInvocation::denial_or_error(error),
         }
     }
 }

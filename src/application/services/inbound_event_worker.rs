@@ -643,9 +643,10 @@ fn validate_commit_request(
 
 fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
     match error {
-        AppError::BadRequest(_) | AppError::NotFound(_) | AppError::Conflict(_) => {
-            (InboundEventErrorClass::Routing, true)
-        }
+        AppError::Execution(_)
+        | AppError::BadRequest(_)
+        | AppError::NotFound(_)
+        | AppError::Conflict(_) => (InboundEventErrorClass::Routing, true),
         AppError::Timeout(_) => (InboundEventErrorClass::Deadline, false),
         AppError::Database(_) | AppError::Internal(_) | AppError::InvalidCredentials => {
             (InboundEventErrorClass::Internal, false)

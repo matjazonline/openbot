@@ -28,6 +28,7 @@ use std::sync::Mutex;
 
 fn internal_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -899,6 +900,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1011,6 +1013,7 @@ async fn test_spf_authentication_failure_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1118,6 +1121,7 @@ async fn test_high_spam_score_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1223,6 +1227,7 @@ async fn test_dmarc_authentication_failure_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1328,6 +1333,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1434,6 +1440,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1541,6 +1548,7 @@ async fn test_channel_in_cc_resolves_properly() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1678,6 +1686,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1857,6 +1866,7 @@ async fn test_pipeline_address_chaining_execution() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1997,6 +2007,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2152,6 +2163,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2359,6 +2371,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2514,6 +2527,7 @@ async fn test_sender_verification_and_delegation_target_check() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -3106,6 +3120,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -3324,6 +3339,7 @@ async fn test_context_only_quiet_mode_ingestion() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
+        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -3887,6 +3903,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
     });
     let agent_persistence = Arc::new(MockAgentPersistence {
         agents: vec![Agent {
+            response_contract: None,
             memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
@@ -4600,6 +4617,7 @@ async fn a_channel_without_its_own_description_borrows_its_agent_s() {
             id: agent_id,
             company_id: None,
             name: "VendorResearchAgent".to_string(),
+            response_contract: None,
             slug: "vendor-research".to_string(),
             provider: None,
             model: None,

@@ -274,22 +274,29 @@ pub(crate) async fn record_outreach_reply_on(
                    lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
                WHERE id = $1 AND status IN (
                    'waiting_for_third_party_reply', 'pending_approval'
-               )"#,
+               ) AND awaited_outreach_id = $2
+               AND EXISTS (SELECT 1 FROM task_outreaches outreach WHERE outreach.id = $2
+                   AND outreach.company_id = background_tasks.company_id AND outreach.task_id = background_tasks.id
+                   AND outreach.created_by_principal_id IS NOT DISTINCT FROM background_tasks.owner_principal_id
+                   AND outreach.ownership_version = background_tasks.ownership_version)"#,
             attribution = attribution.set_clause(),
         ))
         .bind(task_id)
+        .bind(matched.outreach_id)
         .execute(&mut *connection)
         .await
         .map_err(AppError::from)?;
         sqlx::query(
             r#"UPDATE human_approvals SET status = 'expired', updated_at = CURRENT_TIMESTAMP
                WHERE task_id = $1 AND action_type = 'quorum_timeout'
-                 AND status = 'pending'"#,
+                 AND payload->>'outreach_id' = $2 AND status = 'pending'"#,
         )
         .bind(task_id)
+        .bind(matched.outreach_id.to_string())
         .execute(&mut *connection)
         .await
         .map_err(AppError::from)?;
+        super::resolve_harness_outreach_on(connection, matched.outreach_id).await?;
         status_text = OutreachStatus::ThresholdMet.as_str().to_string();
     }
 
@@ -474,10 +481,10 @@ impl TaskPersistence for PostgresPersistence {
             r#"INSERT INTO task_outreaches (
                     id, task_id, company_id, outreach_key, status, required_threshold_percent,
                     expires_at, subject, body, created_by_principal_id,
-                    created_by_principal_kind
+                    created_by_principal_kind, ownership_version
                )
                SELECT $1, id, company_id, $2, 'waiting', $3, $4, $5, $6,
-                      owner_principal_id, owner_principal_kind
+                      owner_principal_id, owner_principal_kind, ownership_version
                FROM background_tasks
                WHERE id = $7 AND company_id = $8
                  AND status = 'processing' AND worker_id = $9
@@ -555,13 +562,23 @@ impl TaskPersistence for PostgresPersistence {
             .map_err(|error| AppError::Internal(error.to_string()))?;
         let suspended = status == OutreachStatus::Waiting;
         if suspended {
+            if let Some(reference) = request.invocation {
+                super::park_harness_outreach_on(
+                    &mut tx,
+                    request.company_id,
+                    request.lease,
+                    reference,
+                    outreach.id,
+                )
+                .await?;
+            }
             let attribution = TransitionAttribution::new(
                 TaskTransitionReason::OutreachStarted,
                 TransitionActor::Outreach(outreach.id),
             );
             let paused = sqlx::query(&format!(
                 r#"UPDATE background_tasks
-                   SET status = 'waiting_for_third_party_reply', wait_expires_at = $1,
+                   SET status = 'waiting_for_third_party_reply', wait_expires_at = $1, awaited_outreach_id = $8,
                        worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                        updated_at = CURRENT_TIMESTAMP, {attribution}
                    WHERE id = $2 AND company_id = $3
@@ -586,6 +603,7 @@ impl TaskPersistence for PostgresPersistence {
             .bind(i64::try_from(request.lease.ownership_version).map_err(|_| {
                 AppError::Conflict("Ownership version exhausted.".into())
             })?)
+            .bind(outreach.id)
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -605,15 +623,21 @@ impl TaskPersistence for PostgresPersistence {
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-
-        Ok(outreach_progress(
-            &outreach,
-            status,
-            target_count,
-            response_count,
-            suspended,
-        ))
+        let progress =
+            outreach_progress(&outreach, status, target_count, response_count, suspended);
+        if !suspended && let Some(reference) = request.invocation {
+            let output = crate::services::outreach_tool::outreach_output(&progress)?;
+            super::record_harness_result_on(
+                &mut tx,
+                request.company_id,
+                request.lease,
+                reference,
+                output,
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(progress)
     }
 
     async fn find_correlated_outreach_reply(
@@ -1445,6 +1469,21 @@ impl TaskPersistence for PostgresPersistence {
         if fenced.rows_affected() != 1 {
             return Ok(DispatchCommit::LeaseLost);
         }
+
+        super::harness_runs::validate_final_publication_on(
+            &mut tx,
+            commit.lease,
+            &commit.reply.message,
+        )
+        .await?;
+
+        // Consuming the saved generation belongs to the reply/review transaction. A failed
+        // delivery or candidate write must leave the final output reusable on the next claim.
+        sqlx::query(
+            "UPDATE task_harness_runs SET final_output_consumed_at = COALESCE(final_output_consumed_at, CURRENT_TIMESTAMP) WHERE task_id = $1 AND owner_principal_id = $2 AND ownership_version = $3 AND state = 'completed'",
+        ).bind(commit.lease.task_id)
+            .bind(commit.lease.claimed_owner.principal_id().map(|id| id.as_uuid()))
+            .bind(commit.lease.ownership_version as i64).execute(&mut *tx).await?;
 
         if !commit.deliveries.is_empty()
             && effective_review_required_on(

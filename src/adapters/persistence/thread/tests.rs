@@ -1006,6 +1006,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     let outreach = fixture
         .persistence
         .create_message(&MessageWrite {
+            structured: None,
             id: CanonicalMessageId::random(),
             thread_id: fixture.thread.id,
             author: observed("primary@example.com", IdentityProvenance::Agent),
@@ -1120,6 +1121,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     let answer = fixture
         .persistence
         .create_message(&MessageWrite {
+            structured: None,
             id: CanonicalMessageId::random(),
             thread_id: fixture.thread.id,
             author: observed("primary@example.com", IdentityProvenance::Agent),

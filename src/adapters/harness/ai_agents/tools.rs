@@ -112,7 +112,7 @@ impl Tool for NativeToolShim {
     async fn execute(&self, args: Value, ctx: ToolExecutionContext) -> ToolResult {
         match self
             .host
-            .invoke(&self.declaration.id, &ctx.call_id, args)
+            .invoke(&self.declaration.id, &ctx.call_id, args, None)
             .await
         {
             Ok(invocation) if invocation.success => {
@@ -212,6 +212,7 @@ mod tests {
             _id: &crate::entities::value_objects::ToolId,
             _call_id: &str,
             _args: Value,
+            _invocation: Option<crate::services::harness::runs::InvocationRef>,
         ) -> AppResult<crate::services::harness::ToolInvocation> {
             Ok(crate::services::harness::ToolInvocation::suspended(
                 serde_json::json!({ "status": "waiting" }),

@@ -13,9 +13,9 @@
 //! the real prompt assembly, the real `UntrustedFence`, the real compiled configuration and the
 //! real tool registry all run -- only the model is scripted.
 //!
-//! The wire shape is OpenAI's `POST {base_url}/chat/completions`, because the `llm` crate's OpenAI
-//! backend is what `ai-agents` reaches for and `mail_agents` permits only
-//! `google | openai | anthropic | groq | xai` (so `openai-compatible` is not an option).
+//! `scripted_llm` is the short OpenAI Chat Completions API. Request-checked scenarios use the
+//! same supervised listener; `provider` supplies native Gemini, Anthropic, xAI Responses, and
+//! OpenAI/Groq wire fixtures. Unsupported protocols fail explicitly.
 //!
 //! # Why not [`crate::adapters::memory::test_support`]
 //!
@@ -26,17 +26,12 @@
 //! request properly -- headers, then `Content-Length` bytes -- and bounds what it will accept.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Mutex, OnceLock},
 };
 
 use chrono::Utc;
 use serde_json::{Value, json};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
-    sync::mpsc,
-};
 use uuid::Uuid;
 
 use crate::app_error::AppResult;
@@ -53,8 +48,56 @@ use crate::services::harness::{
 
 static SCRIPTED_AGENT_BASE_URLS: OnceLock<Mutex<HashMap<Uuid, String>>> = OnceLock::new();
 
+static SCRIPTED_ORIGINS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+/// Registration belongs to the listener, so an arbitrary loopback URL is not enough.
+fn register_origin(base_url: &str) {
+    SCRIPTED_ORIGINS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .insert(
+            url::Url::parse(base_url)
+                .unwrap()
+                .origin()
+                .ascii_serialization(),
+        );
+}
+
+fn unregister_origin(base_url: &str) {
+    SCRIPTED_ORIGINS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .remove(
+            &url::Url::parse(base_url)
+                .unwrap()
+                .origin()
+                .ascii_serialization(),
+        );
+}
+
+/// Fail before DNS, authentication or any public connection in model-backed unit tests.
+pub(crate) fn require_scripted_endpoint(endpoint: Option<&str>) -> Result<(), &'static str> {
+    let url = endpoint
+        .and_then(|value| url::Url::parse(value).ok())
+        .ok_or("model fixture endpoint is not registered")?;
+    if url.scheme() != "http"
+        || url.host_str() != Some("127.0.0.1")
+        || !SCRIPTED_ORIGINS
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap()
+            .contains(&url.origin().ascii_serialization())
+    {
+        return Err("model fixture endpoint is not registered");
+    }
+    Ok(())
+}
+
 /// Register the trusted provider endpoint for one fixture agent.
 pub fn register_scripted_agent_base_url(agent_id: Uuid, base_url: &str) {
+    require_scripted_endpoint(Some(base_url)).expect("active fixture listener");
     SCRIPTED_AGENT_BASE_URLS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -140,138 +183,35 @@ pub const SCRIPTED_MODEL: &str = "gpt-4o-mini";
 /// The provider the fixture agent selects. Only the base URL makes it local.
 pub const SCRIPTED_PROVIDER: &str = "openai";
 
-/// What a scripted model server hands back to the test.
-pub struct ScriptedLlm {
-    /// Where the fixture agent should point. Always ends in `/`.
-    pub base_url: String,
-    /// Every request body that arrived, in order.
-    pub requests: mpsc::UnboundedReceiver<Value>,
-}
+pub(crate) mod provider;
+mod scenario;
+pub use scenario::{
+    ScriptedExchange, ScriptedLlm, ScriptedRequest, ScriptedResponse, scripted_scenario,
+};
 
-impl ScriptedLlm {
-    /// The requests that have arrived so far, drained.
-    ///
-    /// Tests assert on the count as well as the content: the server answers exactly as many
-    /// requests as it was given turns, so an unexpected extra model call -- a guardrail, a runtime
-    /// auto-configuration step -- shows up as a refused connection and a failing count rather than
-    /// as a hang.
-    pub fn observed(&mut self) -> Vec<Value> {
-        let mut requests = Vec::new();
-        while let Ok(request) = self.requests.try_recv() {
-            requests.push(request);
-        }
-        requests
-    }
-}
-
-/// Answer `turns.len()` chat completions in order, capturing each request body.
-///
-/// The base URL ends in `/` deliberately: `llm` builds its endpoint with
-/// `base_url.join("chat/completions")`, and `Url::join` replaces the last path segment of a URL
-/// that does not.
+/// Simple Chat Completions shorthand over the same supervised scenario server.
 pub async fn scripted_llm(turns: Vec<LlmTurn>) -> ScriptedLlm {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let (sender, requests) = mpsc::unbounded_channel();
-
-    tokio::spawn(async move {
-        for (index, turn) in turns.into_iter().enumerate() {
-            // One connection per turn: the responses below close the connection, so a client
-            // making N calls opens N sockets.
-            let Ok((mut stream, _)) = listener.accept().await else {
-                return;
-            };
-            match read_request_body(&mut stream).await {
-                Some(body) => {
-                    let _ = sender.send(body);
-                    let _ = stream
-                        .write_all(http_response(&turn.into_body(index)).as_bytes())
-                        .await;
-                }
-                // A framing failure is reported as a 400 rather than a dropped connection, so the
-                // agent's error names the double instead of a reset.
-                None => {
-                    let _ = stream
-                        .write_all(
-                            http_response(r#"{"error":{"message":"scripted llm could not frame the request"}}"#)
-                                .as_bytes(),
-                        )
-                        .await;
-                }
-            }
-        }
-    });
-
-    ScriptedLlm {
-        base_url: format!("http://{address}/"),
-        requests,
-    }
-}
-
-/// Read one HTTP request and return its JSON body.
-///
-/// Headers first, then exactly `Content-Length` more bytes. Returns `None` for anything this
-/// double will not stand behind: a peer that closed early, a body past [`MAX_REQUEST_BYTES`], a
-/// missing length, or a body that is not JSON.
-async fn read_request_body(stream: &mut TcpStream) -> Option<Value> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0u8; 16 * 1024];
-
-    let header_end = loop {
-        if let Some(position) = find(&buffer, b"\r\n\r\n") {
-            break position + 4;
-        }
-        if buffer.len() > MAX_REQUEST_BYTES {
-            return None;
-        }
-        let read = stream.read(&mut chunk).await.ok()?;
-        if read == 0 {
-            return None;
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-    };
-
-    let length = content_length(&buffer[..header_end])?;
-    if length > MAX_REQUEST_BYTES {
-        return None;
-    }
-    while buffer.len() < header_end + length {
-        let read = stream.read(&mut chunk).await.ok()?;
-        if read == 0 {
-            return None;
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-    }
-
-    serde_json::from_slice(&buffer[header_end..header_end + length]).ok()
-}
-
-/// The declared body length, from a case-insensitive `Content-Length` header.
-fn content_length(headers: &[u8]) -> Option<usize> {
-    std::str::from_utf8(headers)
-        .ok()?
-        .lines()
-        .find_map(|line| {
-            let (name, value) = line.split_once(':')?;
-            name.trim()
-                .eq_ignore_ascii_case("content-length")
-                .then(|| value.trim())
-        })?
-        .parse()
-        .ok()
-}
-
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
-}
-
-fn http_response(body: &str) -> String {
-    format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
+    scripted_scenario(
+        turns
+            .into_iter()
+            .enumerate()
+            .map(|(index, turn)| {
+                ScriptedExchange::new(
+                    |request| {
+                        if request.method != "POST" || request.path != "/chat/completions" {
+                            return Err("Chat Completions method/path");
+                        }
+                        if request.body["model"] != SCRIPTED_MODEL {
+                            return Err("scripted model");
+                        }
+                        Ok(())
+                    },
+                    ScriptedResponse::json_body(turn.into_body(index)),
+                )
+            })
+            .collect(),
     )
+    .await
 }
 
 // -------------------------------------------------------------------------------------------
@@ -428,6 +368,7 @@ impl AgentHarness for StubHarness {
             return Err(crate::app_error::AppError::Internal(failure.clone()));
         }
         Ok(AgentExecutionOutput {
+            structured: None,
             content: self.reply.clone(),
             token_usage: TokenUsage::default(),
             disposition: self.disposition,

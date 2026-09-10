@@ -63,6 +63,7 @@ struct OnboardingChannelForm {
     #[serde(default)]
     instructions: String,
     library_agent_ids: Option<String>,
+    harness_kind: Option<String>,
 }
 
 async fn start(
@@ -188,6 +189,7 @@ async fn channel_step(
         &mailbox_user,
         &company,
         &library_agents,
+        config.default_agent_harness.as_str(),
         None,
     ))
     .into_response())
@@ -213,6 +215,15 @@ async fn create_channel(
     let library_agents = agent_use_cases.list_library_agents().await?;
     let submitted_ids =
         super::channel::parse_agent_ids_form(form.library_agent_ids.clone()).unwrap_or_default();
+    let draft = pages::OnboardingAgentDraft {
+        harness: form
+            .harness_kind
+            .as_deref()
+            .unwrap_or(config.default_agent_harness.as_str()),
+        name: &form.name,
+        instructions: &form.instructions,
+        library_ids: &submitted_ids,
+    };
     let mut selected_ids = HashSet::new();
     let selected_library_agents = submitted_ids
         .iter()
@@ -220,13 +231,30 @@ async fn create_channel(
         .map(|id| library_agents.iter().find(|agent| agent.id == *id))
         .collect::<Option<Vec<_>>>();
     let Some(selected_library_agents) = selected_library_agents else {
-        return Ok(Html(pages::onboarding_channel_page(
+        return Ok(Html(pages::onboarding_channel_draft_page(
             &mailbox_user,
             &company,
             &library_agents,
+            &draft,
             Some("One or more selected library agents are no longer available."),
         ))
         .into_response());
+    };
+    let harness = match form.harness_kind.as_deref() {
+        None | Some("") => config.default_agent_harness,
+        Some(value) => match crate::entities::harness::HarnessKind::parse(value) {
+            Some(kind) => kind,
+            None => {
+                return Ok(Html(pages::onboarding_channel_draft_page(
+                    &mailbox_user,
+                    &company,
+                    &library_agents,
+                    &draft,
+                    Some("Unknown harness_kind: choose rig or ai_agents"),
+                ))
+                .into_response());
+            }
+        },
     };
     let custom_name = form.name.trim();
     let custom_instructions = form.instructions.trim();
@@ -234,19 +262,21 @@ async fn create_channel(
         && custom_name.is_empty()
         && custom_instructions.is_empty()
     {
-        return Ok(Html(pages::onboarding_channel_page(
+        return Ok(Html(pages::onboarding_channel_draft_page(
             &mailbox_user,
             &company,
             &library_agents,
+            &draft,
             Some("Select at least one library agent or fill in the custom agent form."),
         ))
         .into_response());
     }
     if custom_name.is_empty() != custom_instructions.is_empty() {
-        return Ok(Html(pages::onboarding_channel_page(
+        return Ok(Html(pages::onboarding_channel_draft_page(
             &mailbox_user,
             &company,
             &library_agents,
+            &draft,
             Some("A custom agent needs both a channel name and instructions."),
         ))
         .into_response());
@@ -260,6 +290,7 @@ async fn create_channel(
         match create_agent_from_instructions(
             &agent_use_cases,
             AgentInstructionRequest {
+                harness_kind: Some(harness),
                 user_id: user.id,
                 company_id,
                 name: custom_name,
@@ -277,10 +308,11 @@ async fn create_channel(
                 created_channels.push(provisioned.channel);
             }
             Err(err) => {
-                return Ok(Html(pages::onboarding_channel_page(
+                return Ok(Html(pages::onboarding_channel_draft_page(
                     &mailbox_user,
                     &company,
                     &library_agents,
+                    &draft,
                     Some(&err),
                 ))
                 .into_response());
@@ -303,10 +335,11 @@ async fn create_channel(
                         .delete_agent(user.id, company_id, agent_id)
                         .await;
                 }
-                return Ok(Html(pages::onboarding_channel_page(
+                return Ok(Html(pages::onboarding_channel_draft_page(
                     &mailbox_user,
                     &company,
                     &library_agents,
+                    &draft,
                     Some(&format!("Could not create agent from library: {err}")),
                 ))
                 .into_response());
@@ -380,6 +413,7 @@ mod tests {
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
+            response_contract: None,
             memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
@@ -452,9 +486,28 @@ mod tests {
             &user,
             &company,
             std::slice::from_ref(&library_agent),
+            "rig",
             None,
         );
         assert!(channel_page.contains("Step 2 of 3"));
+        for harness in crate::entities::harness::HarnessKind::ALL {
+            let page = pages::onboarding_channel_draft_page(
+                &user,
+                &company,
+                &[],
+                &pages::OnboardingAgentDraft {
+                    harness: harness.as_str(),
+                    name: "Retained name",
+                    instructions: "Retained <instructions>",
+                    library_ids: &[],
+                },
+                Some("Fix the selected configuration"),
+            );
+            assert!(page.contains(&format!("value=\"{}\" selected", harness.as_str())));
+            assert!(page.contains("value=\"Retained name\""));
+            assert!(page.contains("Retained &lt;instructions&gt;"));
+        }
+
         assert!(channel_page.contains(&format!(
             "action=\"/ui/onboarding/companies/{}/channel\"",
             company.id

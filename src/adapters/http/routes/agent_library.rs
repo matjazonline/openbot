@@ -26,8 +26,19 @@ use crate::{
 
 use super::{agent::AgentJsonPayload, ui::workspace_user};
 
+#[path = "agent_library_forms.rs"]
+mod forms;
+
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route(
+            "/ui/agent-library/create",
+            axum::routing::post(forms::create),
+        )
+        .route(
+            "/ui/agent-library/{agent_id}/save",
+            axum::routing::post(forms::update),
+        )
         .route("/api/agent-library", get(list_json).post(create_json))
         .route(
             "/api/agent-library/{id}",
@@ -53,6 +64,7 @@ struct LibraryAgentResponse {
     system_prompt: Option<String>,
     description: Option<String>,
     config_json: Option<serde_json::Value>,
+    response_contract: Option<crate::entities::response_contract::ResponseContract>,
     memory_enabled: bool,
     memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode,
     memory_recall_mode: crate::entities::memory::MemoryRecallMode,
@@ -80,6 +92,7 @@ impl LibraryAgentResponse {
             system_prompt: agent.system_prompt,
             description: agent.description,
             config_json: agent.config_json,
+            response_contract: agent.response_contract,
             memory_enabled: agent.memory_enabled,
             memory_persistence_mode: agent.memory_persistence_mode,
             memory_recall_mode: agent.memory_recall_mode,
@@ -115,6 +128,7 @@ pub(super) async fn require_operator(
 fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
     Ok(AgentWrite {
+        response_contract: payload.response_contract,
         name: payload.name,
         slug: payload.slug,
         provider: payload.provider,
@@ -123,10 +137,10 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         system_prompt: payload.system_prompt,
         description: payload.description,
         harness_kind: payload.harness_kind,
-        granted_tool_ids: payload.granted_tool_ids,
-        native_tool_policy: payload.native_tool_policy,
-        skill_ids: payload.skill_ids,
-        sub_agent_ids: payload.sub_agent_ids,
+        granted_tool_ids: payload.granted_tool_ids.unwrap_or_default(),
+        native_tool_policy: payload.native_tool_policy.unwrap_or_default(),
+        skill_ids: payload.skill_ids.unwrap_or_default(),
+        sub_agent_ids: payload.sub_agent_ids.unwrap_or_default(),
         config_json: payload.config_json,
         memory_enabled: payload.memory_enabled,
         memory_persistence_mode: payload.memory_persistence_mode,
@@ -215,9 +229,14 @@ async fn update_json(
     State(skills): State<Arc<SkillUseCases>>,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
-    Json(payload): Json<AgentJsonPayload>,
+    Json(mut payload): Json<AgentJsonPayload>,
 ) -> AppResult<Json<LibraryAgentResponse>> {
     require_operator(&user, &users, &config).await?;
+    let stored = skills
+        .library_agent_capabilities(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Library agent not found".into()))?;
+    payload.preserve_capabilities(&stored);
     let agent = agents.update_library_agent(id, write(payload)?).await?;
     let capabilities = skills
         .library_agent_capabilities(id)
@@ -343,7 +362,14 @@ async fn workspace(
             memory_recall_mode: agent.memory_recall_mode.as_str(),
             memory_max_results: agent.memory_max_results,
             config_json: &config_json,
-            harness_kind: agent.harness_kind,
+            response_format: if agent.response_contract.is_some() {
+                "json_schema"
+            } else {
+                "text"
+            },
+            response_schema: pages::agent_response_schema(&agent),
+            harness_kind_raw: None,
+            harness_kind: Some(agent.harness_kind),
             granted_tool_ids: agent.granted_tool_ids.clone(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
             sub_agent_ids: Vec::new(),
@@ -356,7 +382,7 @@ async fn workspace(
             advanced: true,
         };
         rows.push_str(&format!(
-                r#"<form class="card bg-base-200 p-4 space-y-4" data-submit="save-library-agent" data-agent-id="{id}">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" data-action="delete-library-agent" data-agent-id="{id}">Delete</button></div></form>"#,
+                r#"<form method="post" action="/ui/agent-library/{id}/save" class="card bg-base-200 p-4 space-y-4" data-submit="save-library-agent" data-agent-id="{id}">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" data-action="delete-library-agent" data-agent-id="{id}">Delete</button></div></form>"#,
                 id = agent.id,
                 fields = pages::library_agent_fields_with_capabilities(
                     &draft,
@@ -368,6 +394,7 @@ async fn workspace(
     let create_fields = pages::library_agent_fields_with_capabilities(
         &pages::AgentDraft {
             advanced: true,
+            harness_kind: Some(config.default_agent_harness),
             ..pages::AgentDraft::default()
         },
         None,
@@ -379,7 +406,7 @@ async fn workspace(
     let content = format!(
         r#"<main class="flex-1 overflow-auto p-8"><div class="mx-auto max-w-4xl"><h1 class="text-2xl font-bold">Agent library</h1><p class="mb-6 opacity-70">Live global definitions available to every company.</p>
     <div class="alert alert-warning mb-6 text-sm">A library agent assigned directly to a company channel can reach every sibling in that company. Prefer copy-on-pick when a restricted scope is needed.</div>
-    <form class="card mb-6 bg-base-200 p-4 space-y-2" data-submit="create-library-agent">
+    <form method="post" action="/ui/agent-library/create" class="card mb-6 bg-base-200 p-4 space-y-2" data-submit="create-library-agent">
       <h2 class="font-bold">New library agent</h2>
       {create_fields}
       <div><button class="btn btn-primary btn-sm">Create</button></div>
@@ -399,4 +426,19 @@ async fn workspace(
         section: pages::UiSection::Dashboard,
         content: &content,
     })))
+}
+
+#[cfg(test)]
+mod structured_contract_tests {
+    use super::*;
+    #[test]
+    fn library_api_preserves_the_response_contract_patch() {
+        let payload: AgentJsonPayload = serde_json::from_value(serde_json::json!({
+            "name":"Structured", "slug":"structured", "harness_kind":"rig",
+            "response_contract":{"version":1,"format":"json_schema","schema":{"type":"object"}}
+        }))
+        .unwrap();
+        let contract = payload.response_contract.0.clone();
+        assert_eq!(write(payload).unwrap().response_contract.0, contract);
+    }
 }

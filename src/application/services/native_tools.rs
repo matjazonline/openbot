@@ -18,13 +18,14 @@ use crate::app_error::{AppError, AppResult};
 use crate::entities::{
     tool_catalogue::{
         AGENT_DIRECTORY_TOOL_ID, CREATE_AGENT_CHANNEL_TOOL_ID, OUTREACH_TOOL_ID,
-        TASK_OWNERSHIP_TOOL_ID,
+        REQUEST_APPROVAL_TOOL_ID, TASK_OWNERSHIP_TOOL_ID,
     },
     value_objects::ToolId,
 };
 use crate::services::{
     agent_channel_tool::CreateAgentChannelTool,
     agent_directory_tool::ListCompanyAgentsTool,
+    approval_tool::RequestApprovalTool,
     harness::{HarnessToolHost, NativeToolDeclaration, ToolInvocation},
     outreach_tool::OutreachAndAwaitQuorumTool,
     task_ownership_tool::TaskOwnershipTool,
@@ -42,12 +43,18 @@ pub struct NativeToolHost {
     directory: Option<ListCompanyAgentsTool>,
     channels: Option<CreateAgentChannelTool>,
     ownership: Option<TaskOwnershipTool>,
+    approval: Option<RequestApprovalTool>,
     /// Built once at construction, in catalogue order, because a harness reads it per run and
     /// each entry carries a generated JSON schema.
     declarations: Vec<NativeToolDeclaration>,
 }
 
 impl NativeToolHost {
+    pub fn with_approval_checkpoint(mut self, tool: RequestApprovalTool) -> Self {
+        self.approval = Some(tool);
+        self.rebuild_declarations();
+        self
+    }
     pub fn new() -> Self {
         Self::default()
     }
@@ -98,6 +105,9 @@ impl NativeToolHost {
         if self.ownership.is_some() {
             declarations.push(TaskOwnershipTool::declaration());
         }
+        if self.approval.is_some() {
+            declarations.push(RequestApprovalTool::declaration());
+        }
         self.declarations = declarations;
     }
 }
@@ -108,7 +118,13 @@ impl HarnessToolHost for NativeToolHost {
         &self.declarations
     }
 
-    async fn invoke(&self, id: &ToolId, call_id: &str, args: Value) -> AppResult<ToolInvocation> {
+    async fn invoke(
+        &self,
+        id: &ToolId,
+        call_id: &str,
+        args: Value,
+        invocation: Option<super::harness::runs::InvocationRef>,
+    ) -> AppResult<ToolInvocation> {
         // An id this host never declared is a harness fault, not a model one: it means something
         // offered the model a tool nobody here can serve. It is an `Err` rather than a failed
         // invocation so it reads as the wiring bug it is instead of as advice to the model.
@@ -118,20 +134,24 @@ impl HarnessToolHost for NativeToolHost {
             ))
         };
         match id.as_str() {
+            REQUEST_APPROVAL_TOOL_ID => match self.approval.as_ref() {
+                Some(tool) => tool.call(call_id, args).await,
+                None => Err(unavailable()),
+            },
             OUTREACH_TOOL_ID => match self.outreach.as_ref() {
-                Some(tool) => Ok(tool.call(args).await),
+                Some(tool) => tool.call(args, invocation).await,
                 None => Err(unavailable()),
             },
             AGENT_DIRECTORY_TOOL_ID => match self.directory.as_ref() {
-                Some(tool) => Ok(tool.call(args).await),
+                Some(tool) => tool.call(args).await,
                 None => Err(unavailable()),
             },
             CREATE_AGENT_CHANNEL_TOOL_ID => match self.channels.as_ref() {
-                Some(tool) => Ok(tool.call(args).await),
+                Some(tool) => tool.call(args, invocation).await,
                 None => Err(unavailable()),
             },
             TASK_OWNERSHIP_TOOL_ID => match self.ownership.as_ref() {
-                Some(tool) => Ok(tool.call(call_id, args).await),
+                Some(tool) => tool.call(call_id, args, invocation).await,
                 None => Err(unavailable()),
             },
             _ => Err(unavailable()),
@@ -155,6 +175,7 @@ mod tests {
                 &ToolId::from(OUTREACH_TOOL_ID),
                 "call-1",
                 serde_json::json!({}),
+                None,
             )
             .await
             .expect_err("a tool this run cannot serve is a wiring fault");
@@ -166,7 +187,12 @@ mod tests {
         let host = NativeToolHost::new();
 
         let error = host
-            .invoke(&ToolId::from("command"), "call-1", serde_json::json!({}))
+            .invoke(
+                &ToolId::from("command"),
+                "call-1",
+                serde_json::json!({}),
+                None,
+            )
             .await
             .expect_err("nothing outside the catalogue is dispatchable");
         assert!(error.to_string().contains("command"));

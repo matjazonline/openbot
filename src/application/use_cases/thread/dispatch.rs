@@ -237,6 +237,12 @@ pub(crate) fn scheduled_run_anchor(payload: &ScheduledRunPayload) -> Conversatio
 }
 
 /// One agent's contribution to the reply.
+struct ScheduledAnswer<'a> {
+    id: CanonicalMessageId,
+    body: &'a str,
+    contract: Option<&'a crate::entities::response_contract::ResponseContract>,
+}
+
 struct AgentOutput<'a> {
     channel_match: &'a ChannelMatch,
     agent: Option<Agent>,
@@ -245,6 +251,7 @@ struct AgentOutput<'a> {
     subject_principal: Option<PrincipalId>,
     memory_user_context: String,
     content: String,
+    structured: Option<crate::services::response_contract::StructuredResponse>,
     metadata: Option<serde_json::Value>,
 }
 
@@ -447,14 +454,18 @@ impl ThreadUseCases {
                     &payload,
                     &company,
                     &channel,
-                    existing.canonical_id,
-                    &existing.clean_text_body,
+                    ScheduledAnswer {
+                        id: existing.canonical_id,
+                        body: &existing.clean_text_body,
+                        contract: existing.response_contract.as_ref(),
+                    },
                 )
                 .await?
             {
                 self.task_persistence.enqueue_delivery(delivery).await?;
             }
             return Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
+                response_contract: existing.response_contract,
                 reply_message_id: Some(existing.canonical_id),
                 agent_response: existing.clean_text_body,
                 email_sent: payload.wants_email(),
@@ -510,6 +521,7 @@ impl ThreadUseCases {
         }
 
         let mut runner = AgentRunner::new(&prompt, &params)
+            .run_store(self.harness_run_store.clone())
             .subject(Some(&payload.subject))
             .history(&history)
             .internal_notes(&instruction_notes)
@@ -548,7 +560,7 @@ impl ThreadUseCases {
                     source_agent_id: agent.id,
                     source_agent_name: agent.name.clone(),
                     source_channel_id: channel.id,
-                    task_id: task.id,
+                    lease,
                     app_domain_name: self.config.app_domain_name.clone(),
                     channel_defaults: company.channel_defaults.clone(),
                     spam_scanning: if self.config.is_spam_scan_enabled() {
@@ -561,6 +573,7 @@ impl ThreadUseCases {
         }
 
         let run_timeout = agent.run_timeout(self.agent_run_timeout);
+        runner = runner.deadline(tokio::time::Instant::now() + run_timeout);
         let output = match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
             Ok(result) => result?,
             Err(_) => {
@@ -588,6 +601,7 @@ impl ThreadUseCases {
             MessageRole::Agent,
             task.correlation_id,
         )
+        .with_structured(output.structured.clone())
         .with_entry_kind(crate::entities::message::ThreadEntryKind::Conversation);
         let mut reply = AgentReply {
             message: reply_message,
@@ -600,8 +614,15 @@ impl ThreadUseCases {
                 &payload,
                 &company,
                 &channel,
-                reply.message.id,
-                &output.content,
+                ScheduledAnswer {
+                    id: reply.message.id,
+                    body: &reply.message.clean_text_body,
+                    contract: reply
+                        .message
+                        .structured
+                        .as_ref()
+                        .map(|response| response.contract()),
+                },
             )
             .await?;
         let (deliveries, review_candidate) = match planned_delivery {
@@ -672,6 +693,10 @@ impl ThreadUseCases {
         }
 
         Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
+            response_contract: output
+                .structured
+                .as_ref()
+                .map(|response| response.contract().clone()),
             reply_message_id: Some(reply.message.id),
             agent_response: output.content,
             email_sent,
@@ -686,8 +711,7 @@ impl ThreadUseCases {
         payload: &ScheduledRunPayload,
         company: &Company,
         channel: &Channel,
-        message_id: CanonicalMessageId,
-        answer: &str,
+        answer: ScheduledAnswer<'_>,
     ) -> AppResult<Option<(NewDelivery, DraftRecipientSnapshot)>> {
         if !payload.wants_email() {
             return Ok(None);
@@ -716,7 +740,11 @@ impl ThreadUseCases {
             }),
         };
 
-        let body = super::agent_response_body(answer);
+        let body = if answer.contract.is_some() {
+            answer.body.to_string()
+        } else {
+            super::agent_response_body(answer.body)
+        };
         let content = CanonicalContent::parse(reply_subject(&payload.subject), body)
             .map_err(|error| AppError::Internal(error.to_string()))?;
 
@@ -725,7 +753,7 @@ impl ThreadUseCases {
             .compose(DeliveryRequest {
                 company_id: company.id,
                 channel_id: channel.id,
-                message_id,
+                message_id: answer.id,
                 task_id: Some(task.id),
                 correlation_id: task.correlation_id,
                 purpose: DeliveryPurpose::Notification,
@@ -800,6 +828,11 @@ impl ThreadUseCases {
             return Err(error);
         }
 
+        if run.outputs.len() != 1 && run.outputs.iter().any(|output| output.structured.is_some()) {
+            return Err(AppError::BadRequest(
+                "Structured responses require a single answering agent".into(),
+            ));
+        }
         let response = self.combine_responses(&run.outputs);
         let metadata = combine_metadata(&run.outputs);
         // The reply is built before its deliveries, not after: a delivery names the canonical
@@ -812,6 +845,10 @@ impl ThreadUseCases {
             &response,
             correlation_id,
         )?;
+        reply.message.structured = run
+            .outputs
+            .first()
+            .and_then(|output| output.structured.clone());
         let planned = self
             .plan_agent_deliveries(
                 AgentDelivery {
@@ -871,6 +908,12 @@ impl ThreadUseCases {
         self.persist_memories(ingest, &run).await;
 
         Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
+            response_contract: run.outputs.first().and_then(|output| {
+                output
+                    .structured
+                    .as_ref()
+                    .map(|response| response.contract().clone())
+            }),
             reply_message_id: Some(reply_message_id),
             agent_response: response,
             email_sent,
@@ -1002,6 +1045,7 @@ impl ThreadUseCases {
             let result = match params {
                 Ok(params) => {
                     let mut runner = AgentRunner::new(&agent_prompt, &params)
+                        .run_store(self.harness_run_store.clone())
                         .subject(Some(envelope.content.subject()))
                         .history(&history)
                         .internal_notes(if index == 0 { &instruction_notes } else { &[] })
@@ -1031,7 +1075,7 @@ impl ThreadUseCases {
                     if let Some((harnesses, classifier)) = self.agent_harnesses() {
                         runner = runner.harnesses(harnesses, classifier);
                     }
-                    if let Some(task_id) = ingest.task_id {
+                    if ingest.task_id.is_some() {
                         runner = runner.outreach_tool(
                             self.task_persistence.clone(),
                             self.channel_persistence.clone(),
@@ -1062,7 +1106,7 @@ impl ThreadUseCases {
                                     source_agent_id: agent.id,
                                     source_agent_name: agent.name.clone(),
                                     source_channel_id: channel_match.channel.id,
-                                    task_id,
+                                    lease,
                                     app_domain_name: self.config.app_domain_name.clone(),
                                     channel_defaults: channel_match
                                         .company
@@ -1082,6 +1126,7 @@ impl ThreadUseCases {
                         .map(|agent| agent.run_timeout(self.agent_run_timeout))
                         .unwrap_or(self.agent_run_timeout);
                     // Boxed, not detached: dropping the `Timeout` still drops the provider call.
+                    runner = runner.deadline(tokio::time::Instant::now() + run_timeout);
                     match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
                         Ok(result) => result,
                         Err(_) => Err(AppError::Timeout(format!(
@@ -1108,6 +1153,7 @@ impl ThreadUseCases {
                         subject_principal,
                         memory_user_context,
                         content: output.content,
+                        structured: output.structured,
                         metadata: output.metadata,
                     });
                 }
@@ -1433,7 +1479,7 @@ impl ThreadUseCases {
             }),
         };
 
-        let body = super::agent_response_body(response);
+        let body = response_body(&reply.message, response);
         let content = CanonicalContent::parse(reply.message.subject.clone(), body.clone())?;
         let composed = self
             .deliveries
@@ -1550,6 +1596,7 @@ impl ThreadUseCases {
         };
 
         let message = MessageWrite {
+            structured: None,
             id: CanonicalMessageId::random(),
             thread_id: primary.thread.id,
             author,
@@ -1802,6 +1849,8 @@ fn build_execution_parameters(
             let mut config = params.config();
             scrub_json_secrets(Some(&mut config));
             serde_json::json!({
+                "harness_kind": params.spec().harness,
+                "response_contract": params.spec().response_contract,
                 "provider": params.provider(),
                 "model": params.model(),
                 "agent_id": Some(params.agent_id),
@@ -2024,6 +2073,7 @@ mod agent_reply_tests {
 
     fn agent(id: Uuid) -> Agent {
         Agent {
+            response_contract: None,
             memory_enabled: false,
             id,
             company_id: Some(Uuid::new_v4()),
@@ -2170,5 +2220,13 @@ mod agent_reply_tests {
             )
             .is_err()
         );
+    }
+}
+
+fn response_body(message: &MessageWrite, text: &str) -> String {
+    if message.structured.is_some() {
+        text.to_string()
+    } else {
+        super::agent_response_body(text)
     }
 }

@@ -1,5 +1,5 @@
--- Squashed baseline for a newly created database.
--- Incremental upgrades and data backfills are intentionally unsupported.
+-- Squashed baseline for a newly created database (through 2026-09-10).
+-- Incremental upgrades and data backfills are intentionally unsupported; reset existing databases.
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -429,6 +429,70 @@ $$;
 
 
 --
+-- Name: guard_active_agent_harness_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.guard_active_agent_harness_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.harness_kind IS NOT DISTINCT FROM OLD.harness_kind
+       AND NEW.response_contract IS NOT DISTINCT FROM OLD.response_contract THEN
+        RETURN NEW;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM principals AS principal
+        JOIN background_tasks AS task
+          ON task.company_id = principal.company_id AND task.owner_principal_id = principal.id
+        WHERE principal.company_id = OLD.company_id AND principal.agent_id = OLD.id
+          AND task.status IN ('pending', 'processing', 'pending_approval',
+                              'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter')
+    ) OR EXISTS (
+        SELECT 1 FROM channel_agents AS assignment
+        JOIN background_tasks AS task
+          ON task.company_id = assignment.company_id AND task.channel_id = assignment.channel_id
+        WHERE assignment.agent_id = OLD.id
+          AND task.status IN ('pending', 'processing', 'pending_approval',
+                              'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter')
+    ) THEN
+        RAISE EXCEPTION USING ERRCODE = '23514',
+            CONSTRAINT = 'agent_harness_has_unsettled_tasks',
+            MESSAGE = 'Agent harness cannot change while tasks are active or suspended';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: guard_agent_mcp_harness(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.guard_agent_mcp_harness() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.harness_kind <> 'rig' AND NEW.company_id IS NOT NULL THEN
+        PERFORM id FROM companies WHERE id = NEW.company_id FOR SHARE;
+        IF EXISTS (
+            SELECT 1 FROM agent_mcp_selections AS selection
+            JOIN company_mcp_connections AS connection
+              ON connection.company_id = selection.company_id AND connection.id = selection.connection_id
+            JOIN company_mcp_tool_grants AS grant_row
+              ON grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id
+            WHERE selection.company_id = NEW.company_id AND selection.agent_id = NEW.id
+              AND connection.enabled AND connection.deleted_at IS NULL
+        ) THEN
+            RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'agent_mcp_requires_rig',
+                MESSAGE = 'Remove enabled MCP grants before changing harness to ai_agents';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: initialize_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -494,6 +558,32 @@ BEGIN
         RETURN OLD;
     END IF;
     RAISE EXCEPTION 'internal note audit rows are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: lock_task_agent_harnesses(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.lock_task_agent_harnesses() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.status IN ('pending', 'processing', 'pending_approval',
+                      'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter') THEN
+        PERFORM agent.id FROM agents AS agent
+        JOIN (
+            SELECT principal.agent_id AS id FROM principals AS principal
+            WHERE principal.id = NEW.owner_principal_id AND principal.company_id = NEW.company_id
+            UNION
+            SELECT assignment.agent_id AS id FROM channel_agents AS assignment
+            WHERE assignment.channel_id = NEW.channel_id AND assignment.company_id = NEW.company_id
+        ) AS affected ON affected.id = agent.id
+        -- Preserve stable lock order and shared/library agents selected by this channel.
+        ORDER BY agent.id FOR SHARE OF agent;
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -1656,6 +1746,29 @@ CREATE TABLE public.agent_channel_provisions (
 
 
 --
+-- Name: agent_mcp_selection_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_mcp_selection_revisions (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT agent_mcp_selection_revisions_revision_check CHECK ((revision > 0))
+);
+
+
+--
+-- Name: agent_mcp_selections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_mcp_selections (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    connection_id uuid NOT NULL
+);
+
+
+--
 -- Name: agent_skills; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1704,19 +1817,21 @@ CREATE TABLE public.agents (
     memory_max_results smallint DEFAULT 5 NOT NULL,
     memory_persistence_mode text DEFAULT 'audience_only'::text NOT NULL,
     memory_enabled boolean DEFAULT false NOT NULL,
-    harness_kind text DEFAULT 'ai_agents'::text NOT NULL,
+    harness_kind text DEFAULT 'rig'::text NOT NULL,
     granted_tool_ids text[] DEFAULT '{}'::text[] NOT NULL,
     native_tool_policy jsonb DEFAULT '{"version": 1}'::jsonb NOT NULL,
+    response_contract jsonb,
     CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
     CONSTRAINT agents_config_v1_shape_check CHECK (((config_json IS NULL) OR ((jsonb_typeof(config_json) = 'object'::text) AND ((config_json ->> 'version'::text) = '1'::text) AND (octet_length((config_json)::text) <= 65536)))),
     CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
     CONSTRAINT agents_granted_tool_ids_bounded CHECK (public.valid_tool_id_array(granted_tool_ids)),
-    CONSTRAINT agents_harness_kind_check CHECK ((harness_kind = 'ai_agents'::text)),
+    CONSTRAINT agents_harness_kind_check CHECK ((harness_kind = ANY (ARRAY['ai_agents'::text, 'rig'::text]))),
     CONSTRAINT agents_memory_max_results_check CHECK (((memory_max_results >= 1) AND (memory_max_results <= 20))),
     CONSTRAINT agents_memory_persistence_mode_check CHECK ((memory_persistence_mode = ANY (ARRAY['audience_only'::text, 'scope_specific_facts'::text]))),
     CONSTRAINT agents_memory_recall_mode_check CHECK ((memory_recall_mode = ANY (ARRAY['fast'::text, 'thinking'::text]))),
     CONSTRAINT agents_name_not_blank CHECK ((btrim(name) <> ''::text)),
     CONSTRAINT agents_native_tool_policy_shape CHECK (((jsonb_typeof(native_tool_policy) = 'object'::text) AND ((native_tool_policy ->> 'version'::text) = '1'::text) AND (octet_length((native_tool_policy)::text) <= 16384))),
+    CONSTRAINT agents_response_contract CHECK (((response_contract IS NULL) OR COALESCE(((harness_kind = 'rig'::text) AND (jsonb_typeof(response_contract) = 'object'::text) AND ((response_contract ->> 'version'::text) = '1'::text) AND ((response_contract ->> 'format'::text) = 'json_schema'::text) AND (response_contract ? 'schema'::text) AND ((response_contract - ARRAY['version'::text, 'format'::text, 'schema'::text]) = '{}'::jsonb) AND (octet_length((response_contract)::text) <= 131072)), false))),
     CONSTRAINT agents_run_timeout_secs_check CHECK (((run_timeout_secs >= 1) AND (run_timeout_secs <= 3600))),
     CONSTRAINT agents_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
 );
@@ -1788,6 +1903,7 @@ CREATE TABLE public.background_tasks (
     business_priority text DEFAULT 'normal'::text NOT NULL,
     business_due_at timestamp with time zone,
     attention_version bigint DEFAULT 1 NOT NULL,
+    awaited_outreach_id uuid,
     CONSTRAINT background_tasks_attention_version_check CHECK ((attention_version > 0)),
     CONSTRAINT background_tasks_business_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
     CONSTRAINT background_tasks_lease_check CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
@@ -1975,6 +2091,56 @@ CREATE TABLE public.company_invites (
 
 
 --
+-- Name: company_mcp_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_mcp_connections (
+    company_id uuid NOT NULL,
+    id uuid NOT NULL,
+    slug text NOT NULL,
+    endpoint_url text NOT NULL,
+    transport text DEFAULT 'streamable_http'::text NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    auth_type text NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    credential_revision bigint DEFAULT 1 NOT NULL,
+    discovery_json jsonb DEFAULT '[]'::jsonb NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT company_mcp_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['none'::text, 'bearer'::text]))),
+    CONSTRAINT company_mcp_connections_credential_revision_check CHECK ((credential_revision > 0)),
+    CONSTRAINT company_mcp_connections_discovery_json_check CHECK (((jsonb_typeof(discovery_json) = 'array'::text) AND (jsonb_array_length(discovery_json) <= 100) AND (octet_length((discovery_json)::text) <= 1048576))),
+    CONSTRAINT company_mcp_connections_endpoint_url_check CHECK (((octet_length(endpoint_url) >= 1) AND (octet_length(endpoint_url) <= 2048))),
+    CONSTRAINT company_mcp_connections_revision_check CHECK ((revision > 0)),
+    CONSTRAINT company_mcp_connections_slug_check CHECK (((length(slug) >= 1) AND (length(slug) <= 100))),
+    CONSTRAINT company_mcp_connections_transport_check CHECK ((transport = 'streamable_http'::text))
+);
+
+
+--
+-- Name: company_mcp_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_mcp_credentials (
+    company_id uuid NOT NULL,
+    connection_id uuid NOT NULL,
+    envelope text NOT NULL,
+    CONSTRAINT company_mcp_credentials_envelope_check CHECK (((envelope ~~ 'enc:v2:%'::text) AND (octet_length(envelope) <= 24000)))
+);
+
+
+--
+-- Name: company_mcp_tool_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_mcp_tool_grants (
+    company_id uuid NOT NULL,
+    connection_id uuid NOT NULL,
+    tool_name text NOT NULL,
+    CONSTRAINT company_mcp_tool_grants_tool_name_check CHECK (((octet_length(tool_name) >= 1) AND (octet_length(tool_name) <= 256)))
+);
+
+
+--
 -- Name: company_model_connections; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2119,6 +2285,8 @@ CREATE TABLE public.human_approvals (
     expires_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    approver_principal_id uuid,
+    expiry_retry_at timestamp with time zone,
     CONSTRAINT human_approvals_expiry_check CHECK ((expires_at > created_at)),
     CONSTRAINT human_approvals_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
     CONSTRAINT human_approvals_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
@@ -2514,11 +2682,13 @@ CREATE TABLE public.messages (
     content_hash bytea NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     audience text DEFAULT 'legacy_unclassified'::text NOT NULL,
+    structured_response jsonb,
     CONSTRAINT messages_attachments_check CHECK (((attachments IS NULL) OR ((jsonb_typeof(attachments) = 'object'::text) AND ((attachments -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachments -> 'items'::text)) = 'array'::text) AND (octet_length((attachments)::text) <= 262144)))),
     CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'legacy_unclassified'::text]))),
     CONSTRAINT messages_content_hash_check CHECK ((octet_length(content_hash) = 32)),
     CONSTRAINT messages_direction_check CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['human'::text, 'agent'::text, 'system'::text]))),
+    CONSTRAINT messages_structured_response_body CHECK (((structured_response IS NULL) OR COALESCE(((jsonb_typeof(structured_response) = 'object'::text) AND ((structured_response ->> 'body'::text) = clean_text_body) AND (((structured_response -> 'contract'::text) ->> 'version'::text) = '1'::text) AND (length((structured_response ->> 'fingerprint'::text)) = 64)), false))),
     CONSTRAINT messages_subject_check CHECK ((octet_length(subject) <= 2048))
 );
 
@@ -2716,11 +2886,13 @@ CREATE TABLE public.response_drafts (
     updated_by_principal_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    response_contract jsonb GENERATED ALWAYS AS ((((publication_snapshot -> 'message'::text) -> 'structured'::text) -> 'contract'::text)) STORED,
     CONSTRAINT response_drafts_attachment_snapshot_check CHECK (((jsonb_typeof(attachment_snapshot) = 'object'::text) AND ((attachment_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachment_snapshot -> 'items'::text)) = 'array'::text) AND (octet_length((attachment_snapshot)::text) <= 262144))),
     CONSTRAINT response_drafts_body_check CHECK (((btrim(body) <> ''::text) AND (octet_length(body) <= 262144))),
     CONSTRAINT response_drafts_publication_snapshot_check CHECK (((jsonb_typeof(publication_snapshot) = 'object'::text) AND ((publication_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((publication_snapshot)::text) <= 16777216))),
     CONSTRAINT response_drafts_recipient_snapshot_check CHECK (((jsonb_typeof(recipient_snapshot) = 'object'::text) AND ((recipient_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((recipient_snapshot -> 'to'::text)) = 'array'::text) AND (jsonb_typeof((recipient_snapshot -> 'cc'::text)) = 'array'::text) AND (octet_length((recipient_snapshot)::text) <= 32768))),
     CONSTRAINT response_drafts_status_check CHECK ((status = ANY (ARRAY['pending_review'::text, 'rejected'::text, 'expired'::text, 'superseded'::text, 'published'::text]))),
+    CONSTRAINT response_drafts_structured_body CHECK (((response_contract IS NULL) OR COALESCE((((((publication_snapshot -> 'message'::text) -> 'structured'::text) ->> 'body'::text) = ((publication_snapshot -> 'message'::text) ->> 'clean_text_body'::text)) AND ((response_contract ->> 'version'::text) = '1'::text) AND (length((((publication_snapshot -> 'message'::text) -> 'structured'::text) ->> 'fingerprint'::text)) = 64)), false))),
     CONSTRAINT response_drafts_subject_check CHECK ((octet_length(subject) <= 2048)),
     CONSTRAINT response_drafts_transport_snapshot_check CHECK (((jsonb_typeof(transport_snapshot) = 'object'::text) AND ((transport_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((transport_snapshot)::text) <= 8192))),
     CONSTRAINT response_drafts_version_check CHECK ((version > 0))
@@ -2921,6 +3093,27 @@ CREATE TABLE public.task_agent_instructions (
 
 
 --
+-- Name: task_approval_waits; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_approval_waits (
+    task_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    approval_id uuid NOT NULL,
+    cycle_id uuid NOT NULL,
+    owner_principal_id uuid,
+    ownership_version bigint NOT NULL,
+    state text NOT NULL,
+    run_id uuid,
+    invocation_id uuid,
+    checkpoint_revision bigint,
+    CONSTRAINT task_approval_waits_check CHECK ((((run_id IS NULL) AND (invocation_id IS NULL) AND (checkpoint_revision IS NULL)) OR ((run_id IS NOT NULL) AND (invocation_id IS NOT NULL) AND (checkpoint_revision >= 0)))),
+    CONSTRAINT task_approval_waits_ownership_version_check CHECK ((ownership_version >= 0)),
+    CONSTRAINT task_approval_waits_state_check CHECK ((state = ANY (ARRAY['waiting'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
+);
+
+
+--
 -- Name: task_attempts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2960,6 +3153,72 @@ CREATE TABLE public.task_channel_targets (
     "position" integer NOT NULL,
     CONSTRAINT task_channel_targets_position_check CHECK (("position" >= 0)),
     CONSTRAINT task_channel_targets_role_check CHECK ((recipient_role = ANY (ARRAY['to'::text, 'cc'::text])))
+);
+
+
+--
+-- Name: task_harness_invocations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_harness_invocations (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    model_turn smallint NOT NULL,
+    call_ordinal smallint NOT NULL,
+    state text NOT NULL,
+    invocation jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT task_harness_invocations_call_ordinal_check CHECK (((call_ordinal >= 0) AND (call_ordinal <= 63))),
+    CONSTRAINT task_harness_invocations_invocation_check CHECK (((jsonb_typeof(invocation) = 'object'::text) AND (octet_length((invocation)::text) <= 262144))),
+    CONSTRAINT task_harness_invocations_ledger_identity CHECK (COALESCE(((((invocation -> 'call'::text) ->> 'invocation_id'::text) = (id)::text) AND (((invocation ->> 'turn'::text))::integer = model_turn) AND (((invocation ->> 'ordinal'::text))::integer = call_ordinal) AND ((invocation ->> 'state'::text) = state) AND (invocation ? 'result'::text) AND ((state = 'completed'::text) = ((invocation -> 'result'::text) <> 'null'::jsonb))), false)),
+    CONSTRAINT task_harness_invocations_model_turn_check CHECK (((model_turn >= 0) AND (model_turn <= 15))),
+    CONSTRAINT task_harness_invocations_state_check CHECK ((state = ANY (ARRAY['prepared'::text, 'ready'::text, 'waiting'::text, 'completed'::text, 'failed'::text, 'indeterminate'::text])))
+);
+
+
+--
+-- Name: task_harness_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_harness_runs (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    owner_principal_id uuid NOT NULL,
+    ownership_version bigint NOT NULL,
+    schema_version smallint NOT NULL,
+    revision bigint NOT NULL,
+    state text NOT NULL,
+    checkpoint jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    final_output_consumed_at timestamp with time zone,
+    CONSTRAINT task_harness_runs_check CHECK ((((checkpoint ->> 'schema_version'::text))::integer = schema_version)),
+    CONSTRAINT task_harness_runs_check1 CHECK ((((checkpoint ->> 'revision'::text))::bigint = revision)),
+    CONSTRAINT task_harness_runs_check2 CHECK (((checkpoint ->> 'state'::text) = state)),
+    CONSTRAINT task_harness_runs_check3 CHECK ((((checkpoint ->> 'run_id'::text) = (id)::text) AND (((checkpoint -> 'identity'::text) ->> 'company_id'::text) = (company_id)::text) AND (((checkpoint -> 'identity'::text) ->> 'task_id'::text) = (task_id)::text) AND (((checkpoint -> 'identity'::text) ->> 'agent_id'::text) = (agent_id)::text))),
+    CONSTRAINT task_harness_runs_checkpoint_check CHECK (((jsonb_typeof(checkpoint) = 'object'::text) AND (octet_length((checkpoint)::text) <= 2097152))),
+    CONSTRAINT task_harness_runs_checkpoint_check1 CHECK ((jsonb_array_length((checkpoint -> 'reservations'::text)) <= 16)),
+    CONSTRAINT task_harness_runs_checkpoint_check2 CHECK ((jsonb_array_length((checkpoint -> 'invocations'::text)) <= 64)),
+    CONSTRAINT task_harness_runs_invalid_output CHECK (((state <> 'invalid_output'::text) OR COALESCE((((checkpoint -> 'final_output'::text) = 'null'::jsonb) AND (((checkpoint -> 'identity'::text) -> 'response_contract'::text) <> 'null'::jsonb) AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"[*]?(@."repair" != null)."repair"'::jsonpath)) = 2) AND ((((checkpoint -> 'turns'::text) -> '-1'::integer) ->> 'invalid_response'::text) = ANY (ARRAY['malformed_json'::text, 'schema_mismatch'::text, 'output_limit'::text, 'tool_call'::text]))), false))),
+    CONSTRAINT task_harness_runs_ownership_version_check CHECK ((ownership_version >= 0)),
+    CONSTRAINT task_harness_runs_required_checkpoint_fields CHECK (COALESCE(((checkpoint ?& ARRAY['schema_version'::text, 'run_id'::text, 'identity'::text, 'revision'::text, 'state'::text, 'policy'::text, 'messages'::text, 'reservations'::text, 'turns'::text, 'invocations'::text, 'executions'::text]) AND (((checkpoint -> 'identity'::text) ->> 'harness'::text) = 'rig'::text) AND (jsonb_typeof((checkpoint -> 'messages'::text)) = 'array'::text) AND ((jsonb_array_length((checkpoint -> 'messages'::text)) >= 1) AND (jsonb_array_length((checkpoint -> 'messages'::text)) <= 81)) AND (jsonb_typeof((checkpoint -> 'turns'::text)) = 'array'::text) AND (jsonb_array_length((checkpoint -> 'turns'::text)) <= 16) AND (jsonb_typeof((checkpoint -> 'executions'::text)) = 'array'::text) AND (jsonb_array_length((checkpoint -> 'executions'::text)) <= 64)), false)),
+    CONSTRAINT task_harness_runs_response_contract CHECK (COALESCE((((checkpoint -> 'identity'::text) ? 'response_contract'::text) AND (checkpoint ? 'contract_fingerprint'::text) AND
+CASE
+    WHEN (((checkpoint -> 'identity'::text) -> 'response_contract'::text) = 'null'::jsonb) THEN ((checkpoint -> 'contract_fingerprint'::text) = 'null'::jsonb)
+    ELSE (((((checkpoint -> 'identity'::text) -> 'response_contract'::text) ->> 'version'::text) = '1'::text) AND ((((checkpoint -> 'identity'::text) -> 'response_contract'::text) ->> 'format'::text) = 'json_schema'::text) AND (length((checkpoint ->> 'contract_fingerprint'::text)) = 64) AND
+    CASE
+        WHEN (state = 'completed'::text) THEN (((((checkpoint -> 'final_output'::text) -> 'structured'::text) -> 'contract'::text) = ((checkpoint -> 'identity'::text) -> 'response_contract'::text)) AND ((((checkpoint -> 'final_output'::text) -> 'structured'::text) ->> 'fingerprint'::text) = (checkpoint ->> 'contract_fingerprint'::text)) AND ((((checkpoint -> 'final_output'::text) -> 'structured'::text) ->> 'body'::text) = ((checkpoint -> 'final_output'::text) ->> 'content'::text)))
+        ELSE true
+    END)
+END AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"[*]?(@."repair" != null)."repair"'::jsonpath)) <= 2)), false)),
+    CONSTRAINT task_harness_runs_revision_check CHECK ((revision >= 0)),
+    CONSTRAINT task_harness_runs_schema_version_check CHECK ((schema_version = 1)),
+    CONSTRAINT task_harness_runs_state_check CHECK ((state = ANY (ARRAY['active'::text, 'waiting'::text, 'completed'::text, 'superseded'::text, 'invalid_output'::text])))
 );
 
 
@@ -3027,9 +3286,15 @@ CREATE TABLE public.task_outreaches (
     version bigint DEFAULT 1 NOT NULL,
     created_by_principal_id uuid,
     created_by_principal_kind text,
+    ownership_version bigint DEFAULT 1 NOT NULL,
+    harness_run_id uuid,
+    harness_invocation_id uuid,
+    checkpoint_revision bigint,
     CONSTRAINT task_outreaches_body_check CHECK ((length(btrim(body)) > 0)),
+    CONSTRAINT task_outreaches_check CHECK ((((harness_run_id IS NULL) AND (harness_invocation_id IS NULL) AND (checkpoint_revision IS NULL)) OR ((harness_run_id IS NOT NULL) AND (harness_invocation_id IS NOT NULL) AND (checkpoint_revision >= 0)))),
     CONSTRAINT task_outreaches_creator_shape_check CHECK ((((created_by_principal_id IS NULL) AND (created_by_principal_kind IS NULL)) OR ((created_by_principal_id IS NOT NULL) AND (created_by_principal_kind = 'agent'::text)))),
     CONSTRAINT task_outreaches_expiry_check CHECK ((expires_at > created_at)),
+    CONSTRAINT task_outreaches_ownership_version_check CHECK ((ownership_version >= 0)),
     CONSTRAINT task_outreaches_status_check CHECK ((status = ANY (ARRAY['waiting'::text, 'threshold_met'::text, 'timeout_pending_approval'::text, 'proceed_partial'::text, 'cancelled'::text, 'completed'::text]))),
     CONSTRAINT task_outreaches_subject_check CHECK ((length(btrim(subject)) > 0)),
     CONSTRAINT task_outreaches_threshold_check CHECK (((required_threshold_percent > (0)::numeric) AND (required_threshold_percent <= (100)::numeric))),
@@ -3203,6 +3468,22 @@ CREATE TABLE public.users (
 
 ALTER TABLE ONLY public.agent_channel_provisions
     ADD CONSTRAINT agent_channel_provisions_pkey PRIMARY KEY (task_id, request_hash);
+
+
+--
+-- Name: agent_mcp_selection_revisions agent_mcp_selection_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_mcp_selection_revisions
+    ADD CONSTRAINT agent_mcp_selection_revisions_pkey PRIMARY KEY (company_id, agent_id);
+
+
+--
+-- Name: agent_mcp_selections agent_mcp_selections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_mcp_selections
+    ADD CONSTRAINT agent_mcp_selections_pkey PRIMARY KEY (company_id, agent_id, connection_id);
 
 
 --
@@ -3446,6 +3727,38 @@ ALTER TABLE ONLY public.company_invites
 
 
 --
+-- Name: company_mcp_connections company_mcp_connections_company_id_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_connections
+    ADD CONSTRAINT company_mcp_connections_company_id_slug_key UNIQUE (company_id, slug);
+
+
+--
+-- Name: company_mcp_connections company_mcp_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_connections
+    ADD CONSTRAINT company_mcp_connections_pkey PRIMARY KEY (company_id, id);
+
+
+--
+-- Name: company_mcp_credentials company_mcp_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_credentials
+    ADD CONSTRAINT company_mcp_credentials_pkey PRIMARY KEY (company_id, connection_id);
+
+
+--
+-- Name: company_mcp_tool_grants company_mcp_tool_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_tool_grants
+    ADD CONSTRAINT company_mcp_tool_grants_pkey PRIMARY KEY (company_id, connection_id, tool_name);
+
+
+--
 -- Name: company_members company_members_company_user_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3558,11 +3871,27 @@ ALTER TABLE ONLY public.external_threads
 
 
 --
+-- Name: human_approvals human_approvals_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_company_id_id_key UNIQUE (company_id, id);
+
+
+--
 -- Name: human_approvals human_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.human_approvals
     ADD CONSTRAINT human_approvals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: human_approvals human_approvals_task_scope; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_task_scope UNIQUE (company_id, task_id, id);
 
 
 --
@@ -4189,6 +4518,14 @@ ALTER TABLE ONLY public.task_agent_instructions
 
 
 --
+-- Name: task_approval_waits task_approval_waits_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_pkey PRIMARY KEY (task_id);
+
+
+--
 -- Name: task_attempts task_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4218,6 +4555,46 @@ ALTER TABLE ONLY public.task_channel_targets
 
 ALTER TABLE ONLY public.task_channel_targets
     ADD CONSTRAINT task_channel_targets_pkey PRIMARY KEY (task_id, "position");
+
+
+--
+-- Name: task_harness_invocations task_harness_invocations_company_id_task_id_run_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_invocations
+    ADD CONSTRAINT task_harness_invocations_company_id_task_id_run_id_id_key UNIQUE (company_id, task_id, run_id, id);
+
+
+--
+-- Name: task_harness_invocations task_harness_invocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_invocations
+    ADD CONSTRAINT task_harness_invocations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_harness_invocations task_harness_invocations_run_id_model_turn_call_ordinal_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_invocations
+    ADD CONSTRAINT task_harness_invocations_run_id_model_turn_call_ordinal_key UNIQUE (run_id, model_turn, call_ordinal);
+
+
+--
+-- Name: task_harness_runs task_harness_runs_company_id_task_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_runs
+    ADD CONSTRAINT task_harness_runs_company_id_task_id_id_key UNIQUE (company_id, task_id, id);
+
+
+--
+-- Name: task_harness_runs task_harness_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_runs
+    ADD CONSTRAINT task_harness_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -4266,6 +4643,14 @@ ALTER TABLE ONLY public.task_outreach_targets
 
 ALTER TABLE ONLY public.task_outreaches
     ADD CONSTRAINT task_outreaches_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: task_outreaches task_outreaches_company_task_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_company_task_id_key UNIQUE (company_id, task_id, id);
 
 
 --
@@ -4528,6 +4913,20 @@ CREATE INDEX background_tasks_thread_idx ON public.background_tasks USING btree 
 
 
 --
+-- Name: background_tasks_unsettled_channel_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_unsettled_channel_idx ON public.background_tasks USING btree (company_id, channel_id) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'stopped'::text, 'failed'::text, 'dead_letter'::text]));
+
+
+--
+-- Name: background_tasks_unsettled_owner_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX background_tasks_unsettled_owner_idx ON public.background_tasks USING btree (company_id, owner_principal_id) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'stopped'::text, 'failed'::text, 'dead_letter'::text]));
+
+
+--
 -- Name: background_tasks_waiting_due_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4728,6 +5127,13 @@ CREATE INDEX external_threads_thread_idx ON public.external_threads USING btree 
 --
 
 CREATE INDEX human_approvals_channel_created_idx ON public.human_approvals USING btree (company_id, channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: human_approvals_expiry_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX human_approvals_expiry_due ON public.human_approvals USING btree (expires_at, id) WHERE (status = 'pending'::text);
 
 
 --
@@ -5064,6 +5470,20 @@ CREATE INDEX task_channel_targets_thread_idx ON public.task_channel_targets USIN
 
 
 --
+-- Name: task_harness_runs_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX task_harness_runs_scope ON public.task_harness_runs USING btree (task_id, agent_id, ownership_version);
+
+
+--
+-- Name: task_harness_runs_task; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_harness_runs_task ON public.task_harness_runs USING btree (company_id, task_id);
+
+
+--
 -- Name: task_outreach_replies_target_received_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5274,6 +5694,20 @@ CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check AFTER INSERT OR UPD
 
 
 --
+-- Name: agents guard_active_agent_harness_change; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER guard_active_agent_harness_change BEFORE UPDATE OF harness_kind, response_contract ON public.agents FOR EACH ROW EXECUTE FUNCTION public.guard_active_agent_harness_change();
+
+
+--
+-- Name: agents guard_agent_mcp_harness; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER guard_agent_mcp_harness BEFORE UPDATE OF harness_kind ON public.agents FOR EACH ROW EXECUTE FUNCTION public.guard_agent_mcp_harness();
+
+
+--
 -- Name: attention_source_events handoff_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -5285,6 +5719,13 @@ CREATE TRIGGER handoff_actionable_notification AFTER INSERT ON public.attention_
 --
 
 CREATE TRIGGER handoff_notification_delete AFTER DELETE ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_source('handoff');
+
+
+--
+-- Name: human_approvals human_approvals_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER human_approvals_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, approver_principal_id, expires_at ON public.human_approvals FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('approval');
 
 
 --
@@ -5341,6 +5782,13 @@ CREATE TRIGGER library_agent_delete_guard BEFORE DELETE ON public.agents FOR EAC
 --
 
 CREATE TRIGGER library_skill_delete_guard BEFORE DELETE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.prevent_assigned_library_skill_delete();
+
+
+--
+-- Name: background_tasks lock_task_agent_harnesses; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER lock_task_agent_harnesses BEFORE INSERT OR UPDATE OF status, owner_principal_id, channel_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.lock_task_agent_harnesses();
 
 
 --
@@ -5613,6 +6061,30 @@ ALTER TABLE ONLY public.agent_channel_provisions
 
 
 --
+-- Name: agent_mcp_selection_revisions agent_mcp_selection_revisions_company_id_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_mcp_selection_revisions
+    ADD CONSTRAINT agent_mcp_selection_revisions_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_mcp_selections agent_mcp_selections_company_id_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_mcp_selections
+    ADD CONSTRAINT agent_mcp_selections_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_mcp_selections agent_mcp_selections_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_mcp_selections
+    ADD CONSTRAINT agent_mcp_selections_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.company_mcp_connections(company_id, id) ON DELETE RESTRICT;
+
+
+--
 -- Name: agent_skills agent_skills_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5674,6 +6146,14 @@ ALTER TABLE ONLY public.agents
 
 ALTER TABLE ONLY public.attention_source_events
     ADD CONSTRAINT attention_source_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: background_tasks background_tasks_awaited_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.background_tasks
+    ADD CONSTRAINT background_tasks_awaited_outreach_fk FOREIGN KEY (company_id, id, awaited_outreach_id) REFERENCES public.task_outreaches(company_id, task_id, id) ON DELETE SET NULL (awaited_outreach_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -5861,6 +6341,30 @@ ALTER TABLE ONLY public.company_invites
 
 
 --
+-- Name: company_mcp_connections company_mcp_connections_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_connections
+    ADD CONSTRAINT company_mcp_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_mcp_credentials company_mcp_credentials_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_credentials
+    ADD CONSTRAINT company_mcp_credentials_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.company_mcp_connections(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: company_mcp_tool_grants company_mcp_tool_grants_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_mcp_tool_grants
+    ADD CONSTRAINT company_mcp_tool_grants_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.company_mcp_connections(company_id, id) ON DELETE CASCADE;
+
+
+--
 -- Name: company_members company_members_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5970,6 +6474,14 @@ ALTER TABLE ONLY public.external_threads
 
 ALTER TABLE ONLY public.external_threads
     ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, thread_id) REFERENCES public.threads(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: human_approvals human_approvals_approver_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.human_approvals
+    ADD CONSTRAINT human_approvals_approver_principal_fk FOREIGN KEY (company_id, approver_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (approver_principal_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -6629,6 +7141,46 @@ ALTER TABLE ONLY public.task_agent_instructions
 
 
 --
+-- Name: task_approval_waits task_approval_waits_approval_task; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_approval_task FOREIGN KEY (company_id, task_id, approval_id) REFERENCES public.human_approvals(company_id, task_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_approval_waits task_approval_waits_company_id_approval_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_company_id_approval_id_fkey FOREIGN KEY (company_id, approval_id) REFERENCES public.human_approvals(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_approval_waits task_approval_waits_company_id_owner_principal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_company_id_owner_principal_id_fkey FOREIGN KEY (company_id, owner_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: task_approval_waits task_approval_waits_company_id_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_company_id_task_id_fkey FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_approval_waits task_approval_waits_company_id_task_id_run_id_invocation_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_approval_waits
+    ADD CONSTRAINT task_approval_waits_company_id_task_id_run_id_invocation_i_fkey FOREIGN KEY (company_id, task_id, run_id, invocation_id) REFERENCES public.task_harness_invocations(company_id, task_id, run_id, id);
+
+
+--
 -- Name: task_attempts task_attempts_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6650,6 +7202,38 @@ ALTER TABLE ONLY public.task_channel_targets
 
 ALTER TABLE ONLY public.task_channel_targets
     ADD CONSTRAINT task_channel_targets_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_harness_invocations task_harness_invocations_company_id_task_id_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_invocations
+    ADD CONSTRAINT task_harness_invocations_company_id_task_id_run_id_fkey FOREIGN KEY (company_id, task_id, run_id) REFERENCES public.task_harness_runs(company_id, task_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_harness_runs task_harness_runs_company_id_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_runs
+    ADD CONSTRAINT task_harness_runs_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: task_harness_runs task_harness_runs_company_id_owner_principal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_runs
+    ADD CONSTRAINT task_harness_runs_company_id_owner_principal_id_fkey FOREIGN KEY (company_id, owner_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: task_harness_runs task_harness_runs_company_id_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_harness_runs
+    ADD CONSTRAINT task_harness_runs_company_id_task_id_fkey FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -6730,6 +7314,14 @@ ALTER TABLE ONLY public.task_outreach_targets
 
 ALTER TABLE ONLY public.task_outreaches
     ADD CONSTRAINT task_outreaches_creator_fk FOREIGN KEY (company_id, created_by_principal_id, created_by_principal_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
+
+
+--
+-- Name: task_outreaches task_outreaches_harness_invocation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_outreaches
+    ADD CONSTRAINT task_outreaches_harness_invocation_fk FOREIGN KEY (company_id, task_id, harness_run_id, harness_invocation_id) REFERENCES public.task_harness_invocations(company_id, task_id, run_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --

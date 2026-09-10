@@ -32,6 +32,7 @@ struct LockedTask {
     owner_principal_id: Option<Uuid>,
     owner_principal_kind: Option<String>,
     execution_generation: Option<Uuid>,
+    ownership_version: i64,
 }
 
 #[derive(sqlx::FromRow)]
@@ -299,6 +300,7 @@ async fn revoke_internal_child(
 async fn wake_task(
     tx: &mut Transaction<'_, Postgres>,
     task_id: Uuid,
+    outreach_id: Uuid,
     reason: TaskTransitionReason,
     actor: TransitionActor,
 ) -> AppResult<()> {
@@ -308,18 +310,24 @@ async fn wake_task(
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, wait_expires_at = NULL,
                worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-           WHERE id = $1 AND status IN ('waiting_for_third_party_reply', 'pending_approval')"#,
+           WHERE id = $1 AND status IN ('waiting_for_third_party_reply', 'pending_approval')
+             AND awaited_outreach_id = $2 AND EXISTS (SELECT 1 FROM task_outreaches outreach
+                 WHERE outreach.id = $2 AND outreach.company_id = background_tasks.company_id
+                 AND outreach.ownership_version = background_tasks.ownership_version
+                 AND outreach.created_by_principal_id IS NOT DISTINCT FROM background_tasks.owner_principal_id)"#,
         attribution = attribution.set_clause(),
     ))
     .bind(task_id)
+    .bind(outreach_id)
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
     sqlx::query(
         r#"UPDATE human_approvals SET status = 'expired', updated_at = CURRENT_TIMESTAMP
-           WHERE task_id = $1 AND action_type = 'quorum_timeout' AND status = 'pending'"#,
+           WHERE task_id = $1 AND action_type = 'quorum_timeout' AND payload->>'outreach_id' = $2 AND status = 'pending'"#,
     )
     .bind(task_id)
+    .bind(outreach_id.to_string())
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
@@ -404,10 +412,12 @@ async fn maybe_reach_quorum(
         wake_task(
             tx,
             command.task_id,
+            command.operation.outreach_id(),
             TaskTransitionReason::DelegationTargetCancelled,
             actor,
         )
         .await?;
+        super::resolve_harness_outreach_on(tx, command.operation.outreach_id()).await?;
     }
     Ok(())
 }
@@ -605,10 +615,12 @@ async fn apply_operation(
             wake_task(
                 tx,
                 command.task_id,
+                outreach_id,
                 TaskTransitionReason::DelegationCancelled,
                 actor,
             )
             .await?;
+            super::resolve_harness_outreach_on(tx, outreach_id).await?;
             Ok(MutationOutcome {
                 delivery_cancellation: delivery,
                 ..MutationOutcome::plain()
@@ -696,10 +708,12 @@ async fn apply_operation(
             wake_task(
                 tx,
                 command.task_id,
+                outreach_id,
                 TaskTransitionReason::DelegationPartial,
                 actor,
             )
             .await?;
+            super::resolve_harness_outreach_on(tx, outreach_id).await?;
             Ok(MutationOutcome {
                 response_association_ids: snapshot,
                 delivery_cancellation: delivery,
@@ -751,6 +765,16 @@ async fn apply_operation(
                 .await
                 .map_err(AppError::from)?;
             }
+            super::supersede_harness_runs_on(
+                tx,
+                command.company_id,
+                command.task_id,
+                task.ownership_version as u64,
+            )
+            .await?;
+            sqlx::query("UPDATE task_approval_waits SET state = 'expired' WHERE company_id = $1 AND task_id = $2 AND state = 'waiting'")
+                .bind(command.company_id).bind(command.task_id).execute(&mut **tx).await?;
+            super::resolve_harness_outreach_on(tx, outreach_id).await?;
             Ok(MutationOutcome {
                 delivery_cancellation: delivery,
                 ..MutationOutcome::plain()
@@ -787,7 +811,7 @@ pub(crate) async fn execute_delegation_command_on(
     .map_err(AppError::from)?
     .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
     let task = sqlx::query_as::<_, LockedTask>(
-        r#"SELECT status, owner_principal_id, owner_principal_kind, execution_generation
+        r#"SELECT status, owner_principal_id, owner_principal_kind, execution_generation, ownership_version
            FROM background_tasks WHERE company_id = $1 AND id = $2 FOR UPDATE"#,
     )
     .bind(command.company_id)

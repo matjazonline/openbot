@@ -600,7 +600,6 @@ pub(crate) struct MessageTaskContext<'a> {
     channel: Option<&'a Channel>,
     provider: &'a str,
     model: &'a str,
-    resolved_config: serde_json::Value,
     /// Prompt to report for agent messages with no task; `None` reuses the message body.
     agent_prompt: Option<&'a str>,
 }
@@ -626,7 +625,6 @@ pub(crate) fn message_task_payload(
                 "provider": ctx.provider,
                 "model": ctx.model,
                 "prompt": ctx.agent_prompt.unwrap_or(msg.body.as_str()),
-                "config": ctx.resolved_config.clone(),
                 "executed_at": created_at_fmt
             },
             "execution_result": {
@@ -668,7 +666,14 @@ pub(crate) fn message_bubble(msg: &ThreadMessageView, ctx: &MessageTaskContext<'
     ));
 
     if is_agent {
-        let body = render_markdown(&msg.body);
+        let body = if msg.response_contract.is_some() {
+            format!(
+                "<p>Validated JSON</p><pre class=\"whitespace-pre-wrap\">{}</pre>",
+                super::escape_html_text(&msg.body)
+            )
+        } else {
+            render_markdown(&msg.body)
+        };
         format!(
             r##"
                     <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
@@ -891,13 +896,6 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 }
 
 /// The channel configuration an agent reply would have used, for messages with no recorded task.
-pub(crate) fn resolved_agent_config(
-    _company: Option<&Company>,
-    _channel: Option<&Channel>,
-) -> serde_json::Value {
-    crate::adapters::harness::ai_agents::base_agent_config()
-}
-
 /// Wrap a simulated thread view in its own live connection.
 ///
 /// A simulation is queued for the worker like any other message, so this view starts out showing
@@ -984,7 +982,6 @@ pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>
             channel: Some(channel),
             provider: provider_str,
             model: model_str,
-            resolved_config: resolved_agent_config(Some(company), Some(channel)),
             agent_prompt: None,
         },
     );

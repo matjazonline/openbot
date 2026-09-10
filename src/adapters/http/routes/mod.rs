@@ -9,6 +9,7 @@ pub mod company;
 pub mod company_invite;
 pub mod health;
 mod live_updates;
+pub mod mcp;
 pub mod monitoring;
 pub mod notifications;
 pub mod onboarding;
@@ -24,6 +25,7 @@ pub mod ui_dashboard;
 pub mod ui_deliveries;
 mod ui_internal_notes;
 pub mod ui_invites;
+pub mod ui_mcp;
 pub mod ui_message_diagnostics;
 pub mod ui_profile;
 mod ui_response_reviews;
@@ -71,6 +73,8 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(user::protected_router())
         .merge(apple_auth::protected_router())
         .merge(company::router())
+        .merge(mcp::router())
+        .merge(ui_mcp::router())
         .merge(company_invite::router())
         .merge(task::router())
         .merge(channel::router())

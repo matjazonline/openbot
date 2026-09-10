@@ -17,6 +17,7 @@ pub const OUTREACH_TOOL_ID: &str = "outreach_and_await_quorum";
 pub const CREATE_AGENT_CHANNEL_TOOL_ID: &str = "create_agent_channel";
 pub const AGENT_DIRECTORY_TOOL_ID: &str = "list_company_agents";
 pub const TASK_OWNERSHIP_TOOL_ID: &str = "transfer_or_release_task";
+pub const REQUEST_APPROVAL_TOOL_ID: &str = "request_approval";
 
 /// Every `ai-agents` built-in this platform will ever put in a `tools:` list.
 ///
@@ -173,9 +174,33 @@ pub const TOOL_CATALOGUE: &[CatalogueTool] = &[
         description: "Transfer owned work with a private handoff, or release it unassigned and end the current run.",
         source: ToolSource::Native,
     },
+    CatalogueTool {
+        id: REQUEST_APPROVAL_TOOL_ID,
+        label: "Request human approval",
+        description: "Present a concrete proposal and wait for an explicit human checkpoint decision.",
+        source: ToolSource::Native,
+    },
 ];
 
 impl CatalogueTool {
+    /// Capability support is independent of per-run context. Checkpoints remain unavailable in
+    /// ai-agents until that adapter proves stable invocation replay and full-context suspension.
+    pub fn supports_harness(&self, harness: super::harness::HarnessKind) -> bool {
+        match harness {
+            super::harness::HarnessKind::AiAgents => self.id != REQUEST_APPROVAL_TOOL_ID,
+            super::harness::HarnessKind::Rig => {
+                ALLOWED_BUILTIN_TOOL_IDS.contains(&self.id)
+                    || matches!(
+                        self.id,
+                        OUTREACH_TOOL_ID
+                            | AGENT_DIRECTORY_TOOL_ID
+                            | CREATE_AGENT_CHANNEL_TOOL_ID
+                            | TASK_OWNERSHIP_TOOL_ID
+                            | REQUEST_APPROVAL_TOOL_ID
+                    )
+            }
+        }
+    }
     /// The catalogue entry for `id`, or `None` when nothing by that name may be granted.
     ///
     /// This is the only validity check a [`ToolId`] has, which is why the type has no `parse`.
@@ -344,7 +369,7 @@ mod tests {
             );
             seen.push(tool.id);
         }
-        assert_eq!(seen.len(), ALLOWED_BUILTIN_TOOL_IDS.len() + 4);
+        assert_eq!(seen.len(), ALLOWED_BUILTIN_TOOL_IDS.len() + 5);
     }
 
     #[test]
@@ -365,6 +390,7 @@ mod tests {
             AGENT_DIRECTORY_TOOL_ID,
             CREATE_AGENT_CHANNEL_TOOL_ID,
             TASK_OWNERSHIP_TOOL_ID,
+            REQUEST_APPROVAL_TOOL_ID,
         ] {
             assert!(
                 CatalogueTool::get(&ToolId::from(id)).is_some(),

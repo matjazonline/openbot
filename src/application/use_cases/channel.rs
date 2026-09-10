@@ -276,6 +276,7 @@ impl ChannelUseCases {
         let provenance = CreationProvenance::user(user_id);
         agent.created_by = Some(provenance.clone());
         channel.created_by = Some(provenance);
+        agent.resolve_harness(self.config.default_agent_harness);
         agent.normalize()?;
 
         channel.normalize_with(ActiveAgent::SuppliedByCaller)?;
@@ -1028,6 +1029,7 @@ mod tests {
 
     fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
         Arc::new(AppConfig {
+            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),

@@ -169,6 +169,7 @@ pub enum OutreachTargetIdentity {
 /// One outreach to create, with every target already composed.
 #[derive(Debug, Clone)]
 pub struct CreateOutreachRequest {
+    pub invocation: Option<crate::entities::harness_run::InvocationRef>,
     pub id: Uuid,
     pub lease: TaskLeaseRef,
     pub company_id: Uuid,

@@ -31,32 +31,19 @@ fn registering_two_harnesses_for_one_kind_is_refused() {
     );
 }
 
-/// The mismatch arm cannot fire while [`HarnessKind`] has one variant: the declared slot and the
-/// registered kind are always equal. What is pinned here is that the check exists and that its
-/// error names both sides -- and the count assertion is what makes this test demand a real case
-/// the day a second harness arrives, rather than quietly staying vacuous.
 #[test]
 fn a_harness_whose_kind_disagrees_with_its_slot_is_refused() {
-    assert_eq!(
-        HarnessKind::ALL.len(),
-        1,
-        "a second harness kind exists: register one into the other's slot and assert Mismatched"
+    let result = HarnessRegistry::new().register(
+        HarnessKind::Rig,
+        Arc::new(StubHarness::new(HarnessKind::AiAgents)),
     );
-
-    let kind = HarnessKind::AiAgents;
-    assert!(
-        registry_with(kind).get(kind).is_some(),
-        "a harness that agrees with its slot installs"
-    );
-
-    let mismatch = HarnessRegistrationError::Mismatched {
-        declared: kind,
-        registered: kind,
-    };
-    assert!(
-        mismatch.to_string().contains(kind.as_str()),
-        "the message names what was registered and what was expected: {mismatch}"
-    );
+    assert!(matches!(
+        result,
+        Err(HarnessRegistrationError::Mismatched {
+            declared: HarnessKind::Rig,
+            registered: HarnessKind::AiAgents
+        })
+    ));
 }
 
 #[test]
@@ -192,6 +179,7 @@ fn every_trace_label_is_distinct_and_bounded() {
         ToolTraceOutcome::Success,
         ToolTraceOutcome::Failed,
         ToolTraceOutcome::NotExecuted,
+        ToolTraceOutcome::Suspended,
         ToolTraceOutcome::TimedOut,
         ToolTraceOutcome::Cancelled,
     ];

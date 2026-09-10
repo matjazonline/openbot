@@ -102,6 +102,10 @@ mod tests {
     #[test]
     fn agent_builder_definition_is_valid_and_can_create_agents() {
         let mut definition = agent_builder_definition();
+        assert!(definition.write.harness_kind.is_none());
+        definition
+            .write
+            .resolve_harness(crate::entities::harness::HarnessKind::Rig);
         definition.write.normalize().unwrap();
 
         assert_eq!(definition.id, AGENT_BUILDER_ID);

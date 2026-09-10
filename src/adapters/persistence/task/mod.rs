@@ -13,7 +13,9 @@ use crate::{
 mod board;
 mod collaboration;
 mod controls;
+mod harness_runs;
 mod instructions;
+mod mcp_journal;
 mod operations;
 mod outreach;
 mod ownership;
@@ -22,6 +24,11 @@ mod rows;
 
 pub(crate) use board::*;
 pub(crate) use collaboration::*;
+pub(crate) use harness_runs::{
+    lock_task_execution_on, park_harness_approval_on, park_harness_outreach_on,
+    record_harness_result_on, resolve_harness_approval_on, resolve_harness_outreach_on,
+    supersede_harness_runs_on,
+};
 pub(crate) use operations::{cancel_unsent_outreach_questions, record_outreach_reply_on};
 pub(crate) use outreach::*;
 pub(crate) use ownership::*;

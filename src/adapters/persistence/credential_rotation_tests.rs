@@ -21,6 +21,12 @@ async fn isolated_connection() -> Option<PgConnection> {
     // tables by design, so a real-table fixture would rotate rows belonging to a test running
     // beside it.
     for statement in [
+        r#"CREATE TEMPORARY TABLE company_mcp_credentials (
+               company_id UUID NOT NULL,
+               connection_id UUID NOT NULL,
+               envelope TEXT NOT NULL,
+               PRIMARY KEY (company_id, connection_id)
+           ) ON COMMIT PRESERVE ROWS"#,
         r#"CREATE TEMPORARY TABLE company_model_connections (
                company_id UUID NOT NULL,
                provider TEXT NOT NULL,
@@ -538,4 +544,61 @@ async fn the_resend_api_keyset_walks_both_columns_of_every_row() {
     assert!(report.complete);
     assert_eq!(report.rotated, 120);
     assert_eq!(report.final_status.active_rows, 120);
+}
+
+#[tokio::test]
+async fn rotation_covers_company_mcp_credentials_with_tenant_bound_envelopes() {
+    let Some(mut connection) = isolated_connection().await else {
+        return;
+    };
+    let (old_writer, rotator) = rotation_ciphers();
+    let company = Uuid::new_v4();
+    let id = Uuid::new_v4();
+    let context = CredentialContext::company_mcp_credential(company, id);
+    let sealed = old_writer
+        .seal_envelope(&context, &SecretString::from("mcp-token"))
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_mcp_credentials(company_id,connection_id,envelope) VALUES($1,$2,$3)",
+    )
+    .bind(company)
+    .bind(id)
+    .bind(&sealed)
+    .execute(&mut connection)
+    .await
+    .unwrap();
+    let report = rotate_locked(&mut connection, &rotator).await.unwrap();
+    assert!(report.complete);
+    assert_eq!(report.rotated, 1);
+    let stored: String = sqlx::query_scalar(
+        "SELECT envelope FROM company_mcp_credentials WHERE company_id=$1 AND connection_id=$2",
+    )
+    .bind(company)
+    .bind(id)
+    .fetch_one(&mut connection)
+    .await
+    .unwrap();
+    assert_ne!(sealed, stored);
+    assert_eq!(
+        rotator
+            .open_envelope(&context, &stored)
+            .unwrap()
+            .expose_secret(),
+        "mcp-token"
+    );
+    assert!(
+        rotator
+            .open_envelope(
+                &CredentialContext::company_mcp_credential(company, Uuid::new_v4()),
+                &stored
+            )
+            .is_err()
+    );
+    assert_eq!(
+        rotate_locked(&mut connection, &rotator)
+            .await
+            .unwrap()
+            .rotated,
+        0
+    );
 }

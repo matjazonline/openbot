@@ -547,6 +547,7 @@ pub(super) async fn simple_channel_agent_write(
     agent_write_from_instructions(
         agent_use_cases,
         AgentInstructionRequest {
+            harness_kind: None,
             user_id,
             company_id,
             name: &form.name,

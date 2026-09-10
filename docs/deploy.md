@@ -79,7 +79,7 @@ Do **not** allocate a public IP for this app.
 The database build derives from the pinned official PostgreSQL image only to install a checked
 entrypoint. It always starts with `pg_stat_statements` preloaded, query IDs enabled, top-level
 statement tracking, utility tracking disabled, and both bind-parameter log limits set to zero. The
-additive migration creates the extension.
+baseline migration creates the extension.
 After the database deploy and application migration, verify activation rather than inferring it
 from the image configuration:
 
@@ -145,6 +145,106 @@ explicit operational commands below to inspect or rotate rows. After the first e
 rotate the credentials themselves with each model provider and save the replacement values through
 the application; database encryption limits storage exposure but cannot invalidate provider keys
 that may already have been copied from an older dump.
+
+### Rig rollout on a fresh database
+
+This release assumes a database reset. It does not require a staged conversion of existing agents.
+Use one coordinated deployment and the squashed baseline migration, including company MCP
+credentials/connections, durable continuations, structured responses and their constraints. Keep
+the production image's non-root user and existing proxy/port configuration; Rig needs no additional
+runtime privileges. This procedure describes the operator's reset; it is not a startup feature.
+
+1. Stop external ingress and agent/configuration writes at the existing routing/deployment layer,
+   stop schedules/workers, and wait for shutdown to settle before the operator resets the database.
+   Keep the deployment closed while provisioning the fresh database and credentials. Do not leave
+   a previous process attached to it.
+2. Build/deploy the same release to every web/worker instance. Startup applies migrations under
+   the existing advisory lock; verify completion before allowing company setup. The fresh database
+   must have the baseline applied before response-contract or MCP configuration is saved.
+   Configure the existing encryption key ring and active version for company model and MCP secrets.
+3. Leave `DEFAULT_AGENT_HARNESS` unset to select Rig by default. Verify startup's resolved default
+   and successful registry construction. Startup checks local configuration and coverage, not
+   company credentials or remote models. Recreate a controlled company, its model connection and
+   enabled model, and an agent using the [tested request](rig.md#select-a-runtime).
+4. Keep access restricted to the pilot operators. Run the pilot below against controlled recipients,
+   a captured delivery target and a controlled MCP endpoint. Capture release/model/task/run IDs and
+   pass/fail evidence without secrets or candidate/schema contents in operational logs.
+5. Open ordinary ingress and configuration access only after the release gates and pilot pass on
+   the deployed release. There is no dedicated Rig, response-contract or MCP admission feature flag:
+   use the coordinated access restriction above. The default-harness property does not disable
+   explicit runtime choices, contract writes or MCP settings.
+
+| Pilot | Required evidence before opening access |
+| --- | --- |
+| Default selection | Omitted creation uses Rig when the property is absent; explicit selection survives changes to the property; the `ai_agents` override affects only omitted new selections |
+| Ordinary execution | Text completion and one safe native-tool result; usage and elapsed duration visible; controlled timeout terminates within budget |
+| Durable wait | Protected call or `request_approval` parks; restart the worker while parked, approve, and observe the saved batch resume without duplicate effect/delivery |
+| Skill | Attached skill loads through `read_resource`, uses an authorized tool, and retains its saved context/results across continuation |
+| Structured response | Valid JSON; one/two repairs; exhausted repair terminal failure with no answer delivery; invalid review edit rejected; valid edit delivered as exact JSON without footer |
+| MCP | Save separate credentials, refresh/test, review grants, select connection; successful receipt; schema/revision change rejection; controlled disconnect produces an indeterminate effect without replay |
+
+Use the deterministic scenarios in the [release verification matrix](rig-verification.md) for
+invalid outputs, timeout and disconnect cases; live model prompts alone cannot reliably force them.
+The deployed company/model authentication and controlled MCP checks are additional pilot evidence.
+The recorded local fixture run is not a claim that this deployment's pilot has already passed.
+
+Relevant deployment settings:
+
+| Setting | Behavior |
+| --- | --- |
+| `DEFAULT_AGENT_HARNESS` | Unset = `rig`; trimmed `rig` or `ai_agents` accepted; empty/invalid fails startup; saved selections take precedence |
+| `MCP_INTERNAL_ENDPOINTS` | Optional comma-separated exact IP-literal URL exceptions to public HTTPS; startup validates syntax, not endpoint readiness |
+| `AGENT_RUN_TIMEOUT_SECS` | Run fallback, default 300 seconds (1–3,600); Rig additionally caps each active claim at 300 seconds |
+| `TASK_WORKER_CONCURRENCY` | Default 4, range 1–64 per process |
+| `RUNTIME_THREAD_STACK_BYTES` | Runtime threads, default 16 MiB; separate from libtest's `RUST_MIN_STACK` |
+
+Model keys and enabled models belong in company model connections. Upstream Rig SDK example
+environment keys do not configure this application's agent credentials. MCP bearer tokens are
+company-owned encrypted credentials, using the existing key ring; agents store connection IDs only.
+See [Rig configuration](rig.md) for supported providers, endpoint restrictions and exact limits.
+
+#### Monitor and recover
+
+Compare completion, suspension, retry, terminal failure, timeout, latency and usage by
+harness/provider/model on representative workloads. Task details expose run/wait IDs, reserved
+budgets, replay counts and indeterminate effects. Track structured validation outcomes,
+`repair_call_count`, `terminal_invalid_output_reason` and aggregate token usage (which includes
+repairs); there is no separate repair-only token total. Estimated/mixed usage is not a bill.
+Use safe diagnostics, not prompts, schemas, candidates or tool payloads, for alerts.
+
+- **Approval/outreach wait:** inspect the task's linked wait and use its normal decision flow.
+  Restart uses saved call IDs, arguments and results. Do not switch runtime/configuration mid-run
+  or delete receipts. Rejection/expiry stops the run; ordinary task recovery preserves its budgets.
+- **Provider timeout/crash:** let the existing task retry/lease path recover the checkpoint.
+  Unknown model requests remain charged. Diagnostics failures must not trigger manual paid-call
+  replay. An exhausted budget is not repaired by clearing its ledger.
+- **Indeterminate MCP effect:** stop the affected task through task controls and retain its run,
+  invocation and connection IDs. Inspect the controlled remote service's audit trail to determine
+  whether the effect committed. Keep it stopped while uncertain. If committed, reconcile the
+  business result without issuing the call again; if confirmed absent, an operator may authorize
+  fresh work after checking that doing so is safe. There is no automated journal reset or
+  reconciliation endpoint. Never clear an invocation receipt to force redispatch; cancellation
+  cannot undo an accepted remote request.
+- **Invalid structured output:** inspect the bounded failure reason and repair count; no completed
+  answer was published. Correct the task instructions/model/schema through validated configuration
+  writes once the fence permits, then create fresh work if appropriate. Do not reset repair counters
+  or publish the rejected candidate. Existing review drafts keep their original contract.
+
+#### Roll back after new work exists
+
+Keep access restricted while rolling back. Prefer a compatible release that still reads the current
+Rig checkpoints, MCP receipts and response snapshots and enforces their contracts. Stop new
+configuration/task admission through the routing/deployment controls, inventory active/queued and
+parked tasks plus review drafts in the task workspace, and drain or explicitly reconcile them.
+Retain applied migrations and receipts. A default-harness change does not move these runs or stop
+explicit choices.
+
+For structured-response rollback, keep enforcement for saved runs and review snapshots until they
+finish or are reconciled. Clear an agent's contract only with a validated `response_contract: null`
+write after the active-run fence allows it; clearing the agent cannot change an existing draft's
+contract. Do not deploy workers that ignore snapshots or reset repair reservations. If no compatible
+rollback artifact exists, keep affected work stopped and fix forward; this runbook does not promise
+an incompatible binary can safely consume the new database.
 
 ### Stored credential formats
 

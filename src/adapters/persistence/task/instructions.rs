@@ -14,9 +14,7 @@ use crate::{
         internal_note::{AgentInstructionNote, AskOwnerOutcome, AskOwnerToAct, StartAgentTask},
         message::{CanonicalMessageId, MessageDirection, MessageRole, ThreadEntryKind},
         task::{BackgroundTask, NewTask, TaskLeaseRef, TaskSource},
-        transport::{
-            IdentityNamespace, IdentitySubject, PrincipalId, QualifiedIdentity, TransportKind,
-        },
+        transport::PrincipalId,
     },
     transport::{BoundedVec, InboundTaskPayload, InboundTaskPayloadV1, ReplyDelivery},
     use_cases::thread::{MessageAuthorWrite, MessageWrite},
@@ -377,24 +375,10 @@ async fn create_selected_note_task(
     tx: &mut Transaction<'_, Postgres>,
     command: &StartAgentTask,
 ) -> AppResult<BackgroundTask> {
-    let identity = QualifiedIdentity::new(
-        TransportKind::Email,
-        IdentityNamespace::parse("email").expect("fixed namespace is valid"),
-        IdentitySubject::parse(format!(
-            "internal-note-request+{}@system.invalid",
-            command.thread_id
-        ))
-        .map_err(|error| AppError::Internal(error.to_string()))?,
-    );
     let correlation_id = CorrelationId::new();
     let source = MessageWrite::internal(
         command.thread_id,
-        MessageAuthorWrite::Observed(crate::use_cases::participant::IdentityObservation {
-            identity,
-            display_label: Some("Internal note request".into()),
-            claim_metadata: crate::entities::participant::IdentityClaimMetadata::observation(),
-            provenance: crate::entities::participant::IdentityProvenance::System,
-        }),
+        MessageAuthorWrite::Platform,
         "Internal note request",
         "Use the selected private notes to continue this thread.",
         MessageDirection::Inbound,

@@ -120,6 +120,7 @@ impl ThreadUseCases {
 
         let correlation = outbound_email_correlation(&composed, &threading, body.to_string());
         let message = MessageWrite {
+            structured: None,
             id: message_id,
             thread_id: draft.thread.id,
             author: MessageAuthorWrite::Principal(draft.owner_principal_id),
@@ -172,6 +173,33 @@ impl ThreadUseCases {
                 "Subject, response, and primary recipient are required.".into(),
             ));
         }
+        let structured = match &edit.current_publication.message().structured {
+            Some(original) => {
+                let validator = self
+                    .response_validator
+                    .as_ref()
+                    .ok_or_else(|| AppError::Internal("Response validator unavailable".into()))?;
+                Some(
+                    crate::services::response_contract::StructuredResponse::validate(
+                        original.contract(),
+                        body,
+                        None,
+                        validator.as_ref(),
+                    )?
+                    .map_err(|_| {
+                        AppError::BadRequest(
+                            "response: content does not satisfy the saved response contract".into(),
+                        )
+                    })?,
+                )
+            }
+            None => None,
+        };
+        let canonical_body = structured
+            .as_ref()
+            .map_or(body, |response| response.body())
+            .to_string();
+        let body = canonical_body.as_str();
         let company = self
             .company_persistence
             .get_by_id(edit.company_id)
@@ -220,6 +248,7 @@ impl ThreadUseCases {
             .await?;
         let current_message = edit.current_publication.message();
         let message = MessageWrite {
+            structured,
             id: message_id,
             thread_id: edit.thread_id,
             author: MessageAuthorWrite::Principal(edit.actor_principal_id),
