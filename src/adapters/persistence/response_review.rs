@@ -6,9 +6,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{
-        PostgresPersistence, delivery::enqueue::insert_delivery_on, thread::insert_message_on,
-    },
+    adapters::persistence::{PostgresPersistence, delivery::enqueue::insert_delivery_on},
     app_error::{AppError, AppResult},
     entities::{
         message::{CanonicalMessageId, MessageAttachments},

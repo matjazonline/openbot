@@ -98,7 +98,7 @@ impl ThreadUseCases {
             company: Some(channel_matches[0].company.clone()),
             channel: Some(channel_matches[0].channel.clone()),
             envelope: Some(Arc::new(envelope)),
-            task_id: None,
+            task_ids: Vec::new(),
             reply_delivery: payload.reply_delivery,
             channel_matches,
         })

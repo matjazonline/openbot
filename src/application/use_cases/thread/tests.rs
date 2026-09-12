@@ -1606,7 +1606,7 @@ async fn test_channel_in_cc_resolves_properly() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_id.is_none());
+    assert!(result.task_ids.is_empty());
     assert!(!result.answers());
     assert_eq!(result.channel_matches.len(), 1);
     assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
@@ -2763,7 +2763,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         })
         .await
         .unwrap();
-    let parent_task_id = initial.task_id.unwrap();
+    let parent_task_id = initial.task_ids[0];
     let thread_a = initial.thread.unwrap();
     // The frozen hop agent A sends to agent B. The sender chooses the `Message-ID` before it
     // relays, which is exactly what lets the calling thread record the question it asked.
@@ -3382,7 +3382,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         config,
     );
 
-    // 1. Ingest email with .quiet suffix in address -> accepted, task_id is None (agent execution skipped)
+    // 1. Ingest email with .quiet suffix in address -> accepted, task_ids is empty (agent execution skipped)
     let res_quiet_addr = thread_use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-quiet-1@acme.com>\n".to_string()),
@@ -3396,10 +3396,10 @@ async fn test_context_only_quiet_mode_ingestion() {
         .unwrap();
 
     assert!(res_quiet_addr.accepted);
-    assert!(res_quiet_addr.task_id.is_none());
+    assert!(res_quiet_addr.task_ids.is_empty());
     assert!(!res_quiet_addr.answers());
 
-    // 2. Ingest email with [[quiet]] body tag -> accepted, task_id is None, tag stripped from text
+    // 2. Ingest email with [[quiet]] body tag -> accepted, task_ids is empty, tag stripped from text
     let res_quiet_body = thread_use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some(
@@ -3416,7 +3416,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         .unwrap();
 
     assert!(res_quiet_body.accepted);
-    assert!(res_quiet_body.task_id.is_none());
+    assert!(res_quiet_body.task_ids.is_empty());
     assert!(!res_quiet_body.answers());
     assert_eq!(
         res_quiet_body
@@ -3847,6 +3847,9 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
         .collect()
 }
 
+#[path = "address_grouping_tests.rs"]
+mod address_grouping;
+
 fn cc_message(message_id: &str, body: &str, cc: &str) -> RawInboundPayload {
     RawInboundPayload {
         headers: Some(format!("Message-ID: <{message_id}@acme.com>\n")),
@@ -3873,7 +3876,7 @@ async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_id.is_some());
+    assert!(!result.task_ids.is_empty());
     assert!(result.answers());
 }
 
@@ -3890,7 +3893,10 @@ async fn a_cc_d_channel_runs_for_a_plain_channel_or_alias_mention() {
             .unwrap();
 
         assert!(result.accepted);
-        assert!(result.task_id.is_some(), "body did not activate CC: {body}");
+        assert!(
+            !result.task_ids.is_empty(),
+            "body did not activate CC: {body}"
+        );
     }
 }
 
@@ -3940,7 +3946,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_id.is_some());
+    assert!(!result.task_ids.is_empty());
 }
 
 #[tokio::test]
@@ -3957,7 +3963,7 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
         })
         .await
         .unwrap();
-    assert!(first.task_id.is_some());
+    assert!(!first.task_ids.is_empty());
 
     let result = thread_use_cases
         .ingest_test_email(RawInboundPayload {
@@ -3979,7 +3985,7 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_id.is_none());
+    assert!(result.task_ids.is_empty());
     assert!(!result.answers());
 }
 
@@ -3997,7 +4003,7 @@ async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_id.is_none());
+    assert!(result.task_ids.is_empty());
     assert!(!result.answers());
 }
 
@@ -4710,7 +4716,7 @@ async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
         Some(IngestRejection::SystemAddressAnswered.as_str())
     );
     assert!(result.thread.is_none(), "a help request opens no thread");
-    assert!(result.task_id.is_none(), "and runs no agent");
+    assert!(result.task_ids.is_empty(), "and runs no agent");
     assert!(
         result.bounce_info().is_none(),
         "a reserved address is answered, not bounced"
@@ -4749,7 +4755,7 @@ async fn help_discloses_nothing_to_someone_outside_the_company() {
          fuzzy suggestions on it could name a real channel to a stranger"
     );
     assert!(result.thread.is_none());
-    assert!(result.task_id.is_none());
+    assert!(result.task_ids.is_empty());
 }
 
 #[tokio::test]
@@ -4955,7 +4961,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
             &ingest,
             ReplyDelivery::Send,
             TaskLeaseRef {
-                task_id: ingest.task_id.unwrap_or_else(Uuid::new_v4),
+                task_id: ingest.task_ids[0],
                 worker_id: Uuid::new_v4(),
                 execution_generation: Uuid::new_v4(),
                 claimed_owner: Default::default(),
@@ -5342,7 +5348,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
         .unwrap();
     assert!(quiet_result.accepted);
     assert!(
-        quiet_result.task_id.is_none(),
+        quiet_result.task_ids.is_empty(),
         "FileOnly must not create an agent task"
     );
 }

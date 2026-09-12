@@ -1430,13 +1430,14 @@ impl TaskPersistence for PostgresPersistence {
         // The fence goes first. If this run no longer owns the task the transaction rolls back
         // having written nothing, rather than queueing an email for work someone else has taken
         // over. Every other write below is unguarded precisely because this one guards them all.
-        let fenced = sqlx::query(
+        let company_id: Option<Uuid> = sqlx::query_scalar(
             r#"UPDATE background_tasks
                SET payload = $1, updated_at = CURRENT_TIMESTAMP
                WHERE id = $2 AND status = 'processing' AND worker_id = $3
                   AND execution_generation = $4
                   AND owner_principal_id = $5 AND ownership_version = $6
-                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
+                  AND lock_expires_at > CURRENT_TIMESTAMP
+               RETURNING company_id"#,
         )
         .bind(commit.payload)
         .bind(commit.lease.task_id)
@@ -1453,12 +1454,12 @@ impl TaskPersistence for PostgresPersistence {
             i64::try_from(commit.lease.ownership_version)
                 .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
         )
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?;
-        if fenced.rows_affected() != 1 {
+        let Some(company_id) = company_id else {
             return Ok(DispatchCommit::LeaseLost);
-        }
+        };
 
         super::harness_runs::validate_final_publication_on(
             &mut tx,
@@ -1576,21 +1577,16 @@ impl TaskPersistence for PostgresPersistence {
             });
         }
 
-        // One canonical row, then one association per further thread the reply answered. Writing
-        // the message again per thread is what used to make "the answer" several different rows
-        // that had to be kept identical to still read as one.
-        let stored =
-            crate::adapters::persistence::thread::insert_message_on(&mut tx, &commit.reply.message)
-                .await?;
-        for &thread_id in &commit.reply.also_in_threads {
-            crate::adapters::persistence::thread::associate_message_on(
-                &mut tx,
-                thread_id,
-                stored.canonical_id,
-                commit.reply.message.entry_kind,
-            )
-            .await?;
-        }
+        crate::adapters::persistence::thread::publish_task_reply_on(
+            &mut tx,
+            crate::adapters::persistence::thread::TaskReplyPublication {
+                company_id,
+                task_id: Some(commit.lease.task_id),
+                message: &commit.reply.message,
+                also_in_threads: &commit.reply.also_in_threads,
+            },
+        )
+        .await?;
 
         // The reply's deliveries, in the same transaction as the reply itself. The unique index
         // on `(destination_binding_id, idempotency_key)` is the lock: a superseded run of this

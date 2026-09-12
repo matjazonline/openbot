@@ -1029,20 +1029,16 @@ impl TaskWorker {
             return Ok(TaskExecutionOutcome::Replied);
         }
 
-        // Execute Agent and Dispatch Outbound Email
-        let mut ingest_exec = ingest.clone();
-        ingest_exec.task_id = Some(task.id);
-
         // Whether the reply is really sent was decided when the message came in, not here: a
         // mailbox send can ask to stay in-app, and this worker is a different process from the one
         // that took the request.
-        let reply_delivery = ingest_exec.reply_delivery;
+        let reply_delivery = ingest.reply_delivery;
         // Boxed for the same reason as the scheduled branch above: both descend into the agent, and
         // both would otherwise be stored inline in this frame.
         let dispatch = Box::pin(
             self.thread_use_cases
                 .execute_claimed_agent_task_and_dispatch(
-                    &ingest_exec,
+                    &ingest,
                     reply_delivery,
                     lease,
                     task.correlation_id,

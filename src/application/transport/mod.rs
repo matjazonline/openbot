@@ -51,6 +51,7 @@ pub use inbox::{
     MAX_INBOUND_EVENT_PAYLOAD_BYTES, MonitoredInboundEventInbox, SafeHeaderFacts,
     SafeHeaderFactsError,
 };
+pub(crate) use ingress::each_channel_in_one_task;
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
     EmailIngressFacts, InboundCommitOutcome, InboundCommitRequest, InboundDraft, InboundEnvelope,

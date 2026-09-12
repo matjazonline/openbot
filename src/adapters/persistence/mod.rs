@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod thread_lock_test_support;
+
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -270,7 +273,7 @@ mod tests {
                 ORDER BY conname"#,
         )
         .bind([
-            "background_tasks_company_source_message_key",
+            "background_tasks_company_source_message_channel_key",
             "background_tasks_single_source_check",
             "background_tasks_source_message_fk",
             "thread_messages_message_fk",
@@ -281,7 +284,7 @@ mod tests {
         assert_eq!(
             required_constraints,
             vec![
-                "background_tasks_company_source_message_key".to_owned(),
+                "background_tasks_company_source_message_channel_key".to_owned(),
                 "background_tasks_single_source_check".to_owned(),
                 "background_tasks_source_message_fk".to_owned(),
                 "thread_messages_message_fk".to_owned(),

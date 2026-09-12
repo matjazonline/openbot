@@ -1521,6 +1521,7 @@ impl InboundMessageCommitter for InMemoryIngress {
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome> {
+        crate::transport::each_channel_in_one_task(&request.tasks)?;
         let mut thread_ids = Vec::with_capacity(request.associations.len());
         for association in &request.associations {
             let emails: Vec<EmailAddress> = association
@@ -1608,14 +1609,14 @@ impl InboundMessageCommitter for InMemoryIngress {
             }
         }
 
-        let mut task_id = None;
-        if let Some(task) = request.task.as_ref() {
-            let thread_of: std::collections::HashMap<Uuid, Uuid> = request
-                .associations
-                .iter()
-                .map(|association| association.channel_id)
-                .zip(thread_ids.iter().copied())
-                .collect();
+        let thread_of: std::collections::HashMap<Uuid, Uuid> = request
+            .associations
+            .iter()
+            .map(|association| association.channel_id)
+            .zip(thread_ids.iter().copied())
+            .collect();
+        let mut task_ids = Vec::with_capacity(request.tasks.len());
+        for task in &request.tasks {
             let targets: Vec<TaskTarget> = task
                 .targets
                 .iter()
@@ -1657,7 +1658,7 @@ impl InboundMessageCommitter for InMemoryIngress {
                     correlation_id: envelope.correlation_id,
                 })
                 .await?;
-            task_id = Some(created.id);
+            task_ids.push(created.id);
         }
 
         Ok(InboundCommitOutcome {
@@ -1668,7 +1669,7 @@ impl InboundMessageCommitter for InMemoryIngress {
             },
             message_id: stored.canonical_id,
             thread_ids,
-            task_id,
+            task_ids,
             delivery_ids: Vec::new(),
         })
     }

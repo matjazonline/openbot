@@ -544,7 +544,11 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         .expect("the inbound message is ingested");
     assert!(m0.accepted, "M0 rejected: {:?}", m0.reason());
     let thread_a = m0.thread.expect("M0 opens a thread on A");
-    let task_a = m0.task_id.expect("M0 enqueues a dispatch task for A");
+    let task_a = m0
+        .task_ids
+        .first()
+        .copied()
+        .expect("M0 enqueues a dispatch task for A");
 
     // A's agent calls the outreach tool with B as its single target. Everything below this line is
     // production code.
@@ -793,7 +797,11 @@ async fn an_agent_cannot_disable_internal_outreach_approval() {
         .await
         .expect("the inbound message is ingested");
     assert!(m0.accepted, "M0 rejected: {:?}", m0.reason());
-    let task_a = m0.task_id.expect("M0 enqueues a dispatch task for A");
+    let task_a = m0
+        .task_ids
+        .first()
+        .copied()
+        .expect("M0 enqueues a dispatch task for A");
 
     // A's agent runs and chooses to delegate. Everything from the tool call onward is production.
     let lease = fx.claim(task_a).await;

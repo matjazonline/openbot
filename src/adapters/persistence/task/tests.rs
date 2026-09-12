@@ -1,3 +1,9 @@
+#[path = "reply_publication_tests.rs"]
+mod reply_publication_tests;
+
+#[path = "child_source_tests.rs"]
+mod child_source_tests;
+
 use super::*;
 use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
 use chrono::{DateTime, Utc};
@@ -6804,9 +6810,10 @@ async fn extending_an_expired_outreach_serializes_with_the_timeout_sweep() {
 
 #[tokio::test]
 async fn internal_cancel_serializes_with_child_completion_and_revokes_old_execution() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture =
         delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
@@ -6876,6 +6883,13 @@ async fn internal_cancel_serializes_with_child_completion_and_revokes_old_execut
     .execute(&pool)
     .await
     .unwrap();
+    // An earlier sibling with the same source must not win the internal target lookup.
+    let sibling = child_source_tests::create_sibling_source_task(
+        &persistence,
+        &fixture,
+        child_message.canonical_id,
+    )
+    .await;
     let child = persistence
         .enqueue_task(NewTask {
             targets: Vec::new(),
@@ -6889,6 +6903,13 @@ async fn internal_cancel_serializes_with_child_completion_and_revokes_old_execut
         })
         .await
         .unwrap();
+    child_source_tests::assert_internal_child_projection(
+        &persistence,
+        &fixture,
+        child.id,
+        &sibling,
+    )
+    .await;
     let child_lease = claim(&persistence, child.id).await;
     let request = delegation_command(
         &fixture,
@@ -6934,9 +6955,16 @@ async fn internal_cancel_serializes_with_child_completion_and_revokes_old_execut
         ),
         other => panic!("race must have exactly one winner, got {other:?}"),
     }
-    CompanyPersistence::delete(&persistence, fixture.company.id)
-        .await
-        .unwrap();
+    assert_eq!(
+        persistence
+            .get_task_by_id(sibling.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        sibling.status,
+        "cancelling the internal delegate leaves the sibling pipeline untouched"
+    );
 }
 
 #[tokio::test]

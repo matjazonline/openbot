@@ -514,11 +514,14 @@ pub(crate) async fn insert_message_on(
         .map_err(AppError::from)?;
     }
 
-    sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
-        .bind(write.thread_id)
-        .execute(&mut *connection)
-        .await
-        .map_err(AppError::from)?;
+    sqlx::query(
+        "UPDATE threads SET updated_at = GREATEST(updated_at, clock_timestamp()) WHERE id = $1 AND company_id = $2",
+    )
+    .bind(write.thread_id)
+    .bind(scope.company_id)
+    .execute(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
     Ok(InsertedMessage {
         canonical_id,
         association_id,
@@ -586,11 +589,14 @@ pub(crate) async fn associate_message_on(
         entry_kind,
     };
     let association_id = insert_thread_association(connection, scope, write, message_id).await?;
-    sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
-        .bind(thread_id)
-        .execute(&mut *connection)
-        .await
-        .map_err(AppError::from)?;
+    sqlx::query(
+        "UPDATE threads SET updated_at = GREATEST(updated_at, clock_timestamp()) WHERE id = $1 AND company_id = $2",
+    )
+    .bind(thread_id)
+    .bind(scope.company_id)
+    .execute(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
     Ok(association_id)
 }
 

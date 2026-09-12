@@ -554,6 +554,7 @@ async fn load_collaboration_tasks(
                JOIN background_tasks AS child
                  ON child.company_id = target.company_id
                 AND child.source_message_uuid = inbound_source.message_id
+                AND child.channel_id = target.internal_channel_id
                WHERE parent.depth < $5
                  AND NOT child.id = ANY(parent.path)
            )
@@ -638,6 +639,7 @@ async fn load_collaboration_targets(
                JOIN background_tasks AS child
                  ON child.company_id = inbound_source.company_id
                 AND child.source_message_uuid = inbound_source.message_id
+                AND child.channel_id = target.internal_channel_id
                WHERE request_part.company_id = target.company_id
                  AND request_part.delivery_id = target.delivery_id
                  AND request_part.provider_message_key IS NOT NULL

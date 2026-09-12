@@ -123,7 +123,7 @@ async fn rig_resumes_a_saved_batch_after_approval_and_atomically_dispatches_once
         .await
         .unwrap();
     assert!(ingest.accepted);
-    let task_id = ingest.task_id.unwrap();
+    let task_id = ingest.task_ids[0];
     let first_lease = fx.claim(task_id).await;
     let outcome = fx
         .threads
@@ -330,7 +330,7 @@ async fn explicit_approval_does_not_approve_later_outreach_and_partial_results_r
         ))
         .await
         .unwrap();
-    let task_id = ingest.task_id.unwrap();
+    let task_id = ingest.task_ids[0];
     for expected_receipts in [1, 2] {
         let lease = fx.claim(task_id).await;
         assert!(matches!(
@@ -444,7 +444,7 @@ async fn provider_deadline_cancels_the_claim_and_recovery_keeps_the_unknown_rese
         ))
         .await
         .unwrap();
-    let task_id = ingest.task_id.unwrap();
+    let task_id = ingest.task_ids[0];
     let lease = fx.claim(task_id).await;
     let execute = fx.threads.execute_claimed_agent_task_and_dispatch(
         &ingest,

@@ -50,7 +50,6 @@ use crate::{
         DeliveryRequest, EmailDeliveryContext, EmailRelayTrace, EmailThreading, InboundEnvelope,
         NewDelivery,
     },
-    use_cases::response_review::{AgentReviewSubmission, DraftPublicationSnapshot},
 };
 
 use super::{
@@ -92,49 +91,25 @@ fn append_private_review_feedback(prompt: &mut String, feedback: Option<&str>) -
     Ok(())
 }
 
-/// How this dispatch's reply reaches the outside world.
-///
-/// Replaces a `send_email: bool` crossed with `ingest.task_id: Option<Uuid>`. That matrix had two
-/// combinations nothing could mean -- a durable send with no task to key it on, and a simulated
-/// send that still queued a delivery -- and both compiled. Here the task id lives inside the one
-/// variant that has one, so a durable send cannot be requested without it.
+/// A leased task either records its answer in-app or queues a durable reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReplyDeliveryMode {
-    /// The agents run and their answer is recorded, but nothing is handed to a transport: a
-    /// mailbox send the user marked as a test, or a simulation.
     Simulated,
-    /// No task row to key an idempotent send on: a direct ingest. The delivery is still durable
-    /// and still queued -- what it lacks is a stable key across re-runs, because there is no
-    /// re-run to survive.
-    Direct,
-    /// Queued in the same transaction as the reply and drained by the delivery worker, under a key
-    /// derived from the task so two workers racing the same task queue one send.
     Durable { task_id: Uuid },
 }
 
 impl ReplyDeliveryMode {
-    /// What the message asked for at ingest, crossed with whether this run owns a durable task.
-    ///
-    /// One place, so no call site re-derives it: the ingest decision alone cannot tell direct from
-    /// durable, and the task id alone cannot tell either from simulated.
-    const fn resolve(delivery: ReplyDelivery, task_id: Option<Uuid>) -> Self {
-        match (delivery, task_id) {
-            (ReplyDelivery::InAppOnly, _) => Self::Simulated,
-            (ReplyDelivery::Send, Some(task_id)) => Self::Durable { task_id },
-            (ReplyDelivery::Send, None) => Self::Direct,
+    const fn resolve(delivery: ReplyDelivery, task_id: Uuid) -> Self {
+        match delivery {
+            ReplyDelivery::InAppOnly => Self::Simulated,
+            ReplyDelivery::Send => Self::Durable { task_id },
         }
     }
 
-    /// What makes this reply's delivery unique across retries of the same work.
-    ///
-    /// The *task*, not the message, for durable work: a superseded run re-executing the task mints
-    /// a fresh canonical message id, so a message-derived key would let the replacement run queue
-    /// a second copy of the same answer. A direct ingest is never re-run, so its own message is as
-    /// stable as anything it has.
-    fn source_key(self, message_id: CanonicalMessageId) -> Option<String> {
+    /// Stable across retries even when a replacement run creates a new canonical reply.
+    fn source_key(self) -> Option<String> {
         match self {
             Self::Simulated => None,
-            Self::Direct => Some(format!("message:{message_id}")),
             Self::Durable { task_id } => Some(format!("task:{task_id}:reply")),
         }
     }
@@ -332,7 +307,6 @@ struct OutboundDelivery {
 struct AgentDelivery<'a> {
     matches: &'a [ChannelMatch],
     envelope: &'a InboundEnvelope,
-    ingest: &'a InboundIngestResult,
     lease: TaskLeaseRef,
     response: &'a str,
     mode: ReplyDeliveryMode,
@@ -380,7 +354,7 @@ impl ThreadUseCases {
             info!("Skipping agent execution for context-only message ID {message_id}");
             return Ok(DispatchOutcome::Skipped);
         }
-        let mode = ReplyDeliveryMode::resolve(delivery, ingest.task_id);
+        let mode = ReplyDeliveryMode::resolve(delivery, lease.task_id);
         // The guard above is the whole reason this function exists, so the dispatch it delegates to
         // is boxed rather than stored inline -- an `async fn` that only forwards still pays its
         // child future's size in stack. See `scripts/stack-frames.sh`.
@@ -814,8 +788,7 @@ impl ThreadUseCases {
         }
 
         // The fattest of this function's children by a wide margin: it runs the agents.
-        let Some(run) =
-            Box::pin(self.run_agents(matches, envelope, ingest, lease, correlation_id)).await?
+        let Some(run) = Box::pin(self.run_agents(matches, envelope, lease, correlation_id)).await?
         else {
             info!("Agent execution suspended for task approval or outreach");
             return Ok(DispatchOutcome::Suspended);
@@ -854,7 +827,6 @@ impl ThreadUseCases {
                 AgentDelivery {
                     matches,
                     envelope,
-                    ingest,
                     lease,
                     response: &response,
                     mode,
@@ -902,10 +874,10 @@ impl ThreadUseCases {
             })
             .await?;
         if pending_review {
-            self.persist_memories(ingest, &run).await;
+            self.persist_memories(lease.task_id, &run).await;
             return Ok(DispatchOutcome::Suspended);
         }
-        self.persist_memories(ingest, &run).await;
+        self.persist_memories(lease.task_id, &run).await;
 
         Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
             response_contract: run.outputs.first().and_then(|output| {
@@ -928,7 +900,6 @@ impl ThreadUseCases {
         &self,
         matches: &'a [ChannelMatch],
         envelope: &InboundEnvelope,
-        ingest: &InboundIngestResult,
         lease: TaskLeaseRef,
         run_correlation_id: CorrelationId,
     ) -> AppResult<Option<AgentRun<'a>>> {
@@ -999,7 +970,7 @@ impl ThreadUseCases {
             let access = channel_match.channel.participant_access(context);
 
             let upstream_context = self
-                .upstream_context_for(&run.outputs, ingest.task_id)
+                .upstream_context_for(&run.outputs, lease.task_id)
                 .await?;
 
             let memory_user_context = match upstream_context.as_deref() {
@@ -1017,11 +988,8 @@ impl ThreadUseCases {
                     ownership.review_feedback.as_deref(),
                 )?;
             }
-            if let Some(memory) = self.memory.as_ref() {
-                let task_id = ingest.task_id.ok_or_else(|| {
-                    AppError::Internal("Memory recall requires a durable task id.".into())
-                })?;
-                if let Some(context) = memory
+            if let Some(memory) = self.memory.as_ref()
+                && let Some(context) = memory
                     .recall(MemoryRecallInput {
                         company: &channel_match.company,
                         channel: &channel_match.channel,
@@ -1032,14 +1000,13 @@ impl ThreadUseCases {
                         } else {
                             MemoryRecallAudience::External
                         },
-                        task_id,
+                        task_id: lease.task_id,
                         latest_prompt: &prompt_text,
                     })
                     .await?
-                {
-                    agent_prompt.push_str("\n\n");
-                    agent_prompt.push_str(&context);
-                }
+            {
+                agent_prompt.push_str("\n\n");
+                agent_prompt.push_str(&context);
             }
 
             let result = match params {
@@ -1051,13 +1018,8 @@ impl ThreadUseCases {
                         .internal_notes(if index == 0 { &instruction_notes } else { &[] })
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
-                            self.approval_context_for(
-                                channel_match,
-                                ingest,
-                                lease,
-                                run_correlation_id,
-                            )
-                            .await,
+                            self.approval_context_for(channel_match, lease, run_correlation_id)
+                                .await,
                         ))
                         .monitoring(self.monitoring.clone())
                         .config(Some(self.config.clone()))
@@ -1071,56 +1033,22 @@ impl ThreadUseCases {
                             Some(params.agent_id),
                         )
                         // After `ids`, which is where the hook context reads them from.
-                        .trace(run_correlation_id, ingest.task_id);
+                        .trace(run_correlation_id, Some(lease.task_id));
                     if let Some((harnesses, classifier)) = self.agent_harnesses() {
                         runner = runner.harnesses(harnesses, classifier);
                     }
-                    if ingest.task_id.is_some() {
-                        runner = runner.outreach_tool(
-                            self.task_persistence.clone(),
-                            self.channel_persistence.clone(),
-                            self.deliveries.clone(),
-                            self.outreach_context_for(
-                                channel_match,
-                                envelope,
-                                lease,
-                                run_correlation_id,
-                                params.spec().sub_agents.clone(),
-                            ),
-                        );
-                        // The address book only makes sense alongside the tool that uses it.
-                        if let Some(agent_persistence) = self.agent_persistence() {
-                            runner = runner.agent_directory(
-                                agent_persistence.clone(),
-                                self.binding_persistence.clone(),
-                            );
-                        }
-                        if let (Some(provisioning), Some(agent)) =
-                            (self.agent_channel_provisioning.clone(), agent.as_ref())
-                        {
-                            runner = runner.agent_channel_tool(
-                                provisioning,
-                                AgentChannelToolContext {
-                                    company_id: channel_match.company.id,
-                                    company_slug: channel_match.company.slug.clone(),
-                                    source_agent_id: agent.id,
-                                    source_agent_name: agent.name.clone(),
-                                    source_channel_id: channel_match.channel.id,
-                                    lease,
-                                    app_domain_name: self.config.app_domain_name.clone(),
-                                    channel_defaults: channel_match
-                                        .company
-                                        .channel_defaults
-                                        .clone(),
-                                    spam_scanning: if self.config.is_spam_scan_enabled() {
-                                        crate::use_cases::agent::SpamScanning::Available
-                                    } else {
-                                        crate::use_cases::agent::SpamScanning::Unavailable
-                                    },
-                                },
-                            );
-                        }
-                    }
+                    runner = self.with_task_tools(
+                        runner,
+                        channel_match,
+                        agent.as_ref(),
+                        self.outreach_context_for(
+                            channel_match,
+                            envelope,
+                            lease,
+                            run_correlation_id,
+                            params.spec().sub_agents.clone(),
+                        ),
+                    );
                     let run_timeout = agent
                         .as_ref()
                         .map(|agent| agent.run_timeout(self.agent_run_timeout))
@@ -1171,11 +1099,52 @@ impl ThreadUseCases {
         Ok(Some(run))
     }
 
-    async fn persist_memories(&self, ingest: &InboundIngestResult, run: &AgentRun<'_>) {
+    /// Configure tools synchronously so the agent dispatch chain gains no async stack frame.
+    fn with_task_tools<'a>(
+        &self,
+        mut runner: AgentRunner<'a>,
+        channel_match: &ChannelMatch,
+        agent: Option<&Agent>,
+        outreach: OutreachToolContext,
+    ) -> AgentRunner<'a> {
+        if let (Some(provisioning), Some(agent)) = (self.agent_channel_provisioning.clone(), agent)
+        {
+            runner = runner.agent_channel_tool(
+                provisioning,
+                AgentChannelToolContext {
+                    company_id: outreach.company_id,
+                    company_slug: outreach.company_slug.clone(),
+                    source_agent_id: agent.id,
+                    source_agent_name: agent.name.clone(),
+                    source_channel_id: channel_match.channel.id,
+                    lease: outreach.lease,
+                    app_domain_name: self.config.app_domain_name.clone(),
+                    channel_defaults: channel_match.company.channel_defaults.clone(),
+                    spam_scanning: if self.config.is_spam_scan_enabled() {
+                        crate::use_cases::agent::SpamScanning::Available
+                    } else {
+                        crate::use_cases::agent::SpamScanning::Unavailable
+                    },
+                },
+            );
+        }
+        if let Some(agent_persistence) = self.agent_persistence() {
+            runner =
+                runner.agent_directory(agent_persistence.clone(), self.binding_persistence.clone());
+        }
+        runner.outreach_tool(
+            self.task_persistence.clone(),
+            self.channel_persistence.clone(),
+            self.deliveries.clone(),
+            outreach,
+        )
+    }
+
+    async fn persist_memories(&self, task_id: Uuid, run: &AgentRun<'_>) {
         if run.failure.is_some() {
             return;
         }
-        let (Some(memory), Some(task_id)) = (self.memory.as_ref(), ingest.task_id) else {
+        let Some(memory) = self.memory.as_ref() else {
             return;
         };
         for output in &run.outputs {
@@ -1281,7 +1250,6 @@ impl ThreadUseCases {
     async fn approval_context_for(
         &self,
         channel_match: &ChannelMatch,
-        ingest: &InboundIngestResult,
         lease: TaskLeaseRef,
         correlation_id: CorrelationId,
     ) -> ApprovalSubject {
@@ -1290,7 +1258,7 @@ impl ThreadUseCases {
                 &channel_match.company,
                 &channel_match.channel,
                 channel_match.thread.id,
-                ingest.task_id,
+                Some(lease.task_id),
                 lease,
                 correlation_id,
             )
@@ -1329,7 +1297,7 @@ impl ThreadUseCases {
     async fn upstream_context_for(
         &self,
         previous: &[AgentOutput<'_>],
-        task_id: Option<Uuid>,
+        task_id: Uuid,
     ) -> AppResult<Option<String>> {
         let mut context = String::new();
         let mut truncated = false;
@@ -1349,7 +1317,6 @@ impl ThreadUseCases {
             }
         }
         if !truncated
-            && let Some(task_id) = task_id
             && let Some(outreach_context) =
                 self.task_persistence.get_outreach_context(task_id).await?
         {
@@ -1414,14 +1381,13 @@ impl ThreadUseCases {
         let AgentDelivery {
             matches,
             envelope,
-            ingest,
             lease,
             response,
             mode,
             correlation_id,
         } = delivery;
         let primary = &matches[0];
-        let Some(source_key) = mode.source_key(reply.message.id) else {
+        let Some(source_key) = mode.source_key() else {
             info!(
                 channel = %primary.channel.slug,
                 "Simulation test mode (Run_Test): the answer is recorded and nothing is delivered"
@@ -1435,19 +1401,17 @@ impl ThreadUseCases {
 
         // The lease must still be ours at the moment the answer is frozen, or two workers could
         // both reply.
-        if ingest.task_id.is_some() {
-            let renewed = self
-                .task_persistence
-                .renew_task_lease(
-                    lease,
-                    chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                )
-                .await?;
-            if !renewed {
-                return Err(AppError::Internal(
-                    "Task lease was lost before outbound dispatch".into(),
-                ));
-            }
+        let renewed = self
+            .task_persistence
+            .renew_task_lease(
+                lease,
+                chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+            )
+            .await?;
+        if !renewed {
+            return Err(AppError::Internal(
+                "Task lease was lost before outbound dispatch".into(),
+            ));
         }
 
         let recipients_cc = self.outbound_cc_for(primary, envelope).await?;
@@ -1487,7 +1451,7 @@ impl ThreadUseCases {
                 company_id: primary.company.id,
                 channel_id: primary.channel.id,
                 message_id: reply.message.id,
-                task_id: ingest.task_id,
+                task_id: Some(lease.task_id),
                 correlation_id,
                 purpose: DeliveryPurpose::Reply,
                 source_key,
@@ -1647,56 +1611,7 @@ impl ThreadUseCases {
             review_candidate,
         } = commit;
 
-        // A task-less caller (direct ingest) has no lease to fence on and no payload to write, but
-        // its reply and its delivery still have to land together -- the shape this replaces sent
-        // inline here, so a crash after the provider call left an answer nobody could see.
-        let Some(task_id) = ingest.task_id else {
-            if let (Some(reviews), Some(candidate), [delivery]) = (
-                self.response_review_use_cases.as_ref(),
-                review_candidate,
-                deliveries.as_slice(),
-            ) {
-                let agent_id = match &reply.message.author {
-                    MessageAuthorWrite::Agent(author) => author.agent_id,
-                    _ => {
-                        return Err(AppError::Conflict(
-                            "A reviewable direct response must have an agent author.".into(),
-                        ));
-                    }
-                };
-                let publication =
-                    DraftPublicationSnapshot::new(reply.message.clone(), delivery.clone())?
-                        .with_also_in_threads(reply.also_in_threads.clone())?;
-                let draft_id = crate::entities::response_draft::ResponseDraftId::new(
-                    reply.message.id.as_uuid(),
-                );
-                if reviews
-                    .submit_agent_if_required(AgentReviewSubmission {
-                        id: draft_id,
-                        company_id: delivery.company_id,
-                        channel_id: delivery.channel_id,
-                        thread_id: reply.message.thread_id,
-                        agent_id,
-                        recipients: candidate.recipients,
-                        evidence: candidate.evidence,
-                        publication,
-                    })
-                    .await?
-                {
-                    return Ok(true);
-                }
-            }
-            let (stored, _) = self
-                .thread_persistence
-                .create_message_with_deliveries(&reply.message, &deliveries)
-                .await?;
-            for thread_id in &reply.also_in_threads {
-                self.thread_persistence
-                    .associate_message(*thread_id, stored.canonical_id, reply.message.entry_kind)
-                    .await?;
-            }
-            return Ok(false);
-        };
+        let task_id = lease.task_id;
 
         let payload = self.dispatch_audit_payload(DispatchAudit {
             ingest,

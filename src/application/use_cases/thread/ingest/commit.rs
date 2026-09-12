@@ -51,7 +51,7 @@ pub(crate) struct CommitPlan {
     company_id: Uuid,
     envelope: InboundEnvelope,
     associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
-    task: Option<InboundTaskRequest>,
+    tasks: BoundedVec<InboundTaskRequest, MAX_THREAD_ASSOCIATIONS>,
     outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
     deliveries: Vec<NewDelivery>,
     prepared: PreparedChannels,
@@ -98,17 +98,6 @@ impl CommitPlan {
             })
             .collect();
 
-        // Passive matches have their copy filed on their history; keeping them out of the task is
-        // what stops the worker treating a channel that was merely copied as one that must answer.
-        let targets: Vec<_> = prepared
-            .channels
-            .iter()
-            .filter(|channel| channel.answers && channel.outreach.is_none())
-            .map(|channel| InboundTaskTarget {
-                channel_id: channel.candidate.channel.id,
-                role: channel.candidate.role,
-            })
-            .collect();
         let outreach_transitions = BoundedVec::parse(
             "outreach transitions",
             prepared
@@ -130,10 +119,20 @@ impl CommitPlan {
             company_id: resolved.company.id,
             envelope,
             associations: BoundedVec::parse("thread associations", associations)?,
-            task: (disposition.answers() && !targets.is_empty()).then(|| InboundTaskRequest {
-                task_type: AGENT_DISPATCH_TASK.to_string(),
-                targets,
-            }),
+            tasks: BoundedVec::parse(
+                "inbound tasks",
+                if disposition.answers() {
+                    pipelines(&prepared.channels)
+                        .into_iter()
+                        .map(|targets| InboundTaskRequest {
+                            task_type: AGENT_DISPATCH_TASK.to_string(),
+                            targets,
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                },
+            )?,
             outreach_transitions,
             // Inbound fan-out onto a channel's *other* interfaces has a durable queue now, but
             // nothing to fan out to: email is the only transport a channel speaks, and delivering
@@ -154,7 +153,7 @@ impl CommitPlan {
             // is held open until this commit returns.
             claimed_event: None,
             associations: self.associations.clone(),
-            task: self.task.clone(),
+            tasks: self.tasks.clone(),
             outreach_transitions: self.outreach_transitions.clone(),
             deliveries: self.deliveries.clone(),
             reply_delivery: self.reply_delivery,
@@ -193,5 +192,132 @@ impl CommitPlan {
 
     pub(crate) fn into_prepared(self) -> PreparedChannels {
         self.prepared
+    }
+}
+
+/// Keep each addressed pipeline independent after routing has dropped repeated/passive channels.
+fn pipelines(channels: &[PreparedChannel]) -> Vec<Vec<InboundTaskTarget>> {
+    let mut groups: Vec<Vec<InboundTaskTarget>> = Vec::new();
+    let mut previous_handle = None;
+    for channel in channels
+        .iter()
+        .filter(|channel| channel.answers && channel.outreach.is_none())
+    {
+        let target = InboundTaskTarget {
+            channel_id: channel.candidate.channel.id,
+            role: channel.candidate.role,
+        };
+        let handle = &channel.candidate.handle;
+        if previous_handle == Some(handle) {
+            groups
+                .last_mut()
+                .expect("a previous handle has a group")
+                .push(target);
+        } else {
+            groups.push(vec![target]);
+        }
+        previous_handle = Some(handle);
+    }
+    groups
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        entities::{
+            channel::{Channel, ChannelAccessMode, ParticipantAccess},
+            company::Company,
+            creation::CreationProvenance,
+            transport::{ChannelBindingId, RecipientRole},
+        },
+        transport::{PipelineStep, test_support::email_identity},
+    };
+
+    fn prepared(handle: &str, step: PipelineStep) -> PreparedChannel {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme".into(),
+            slug: "acme".into(),
+            channel_defaults: Default::default(),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
+        };
+        let channel = Channel {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            owner_agent_id: None,
+            name: "Support".into(),
+            description: None,
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
+            agent_ids: None,
+            enabled: true,
+            add_3rd_party: false,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        };
+        PreparedChannel {
+            candidate: ChannelCandidate {
+                company,
+                channel,
+                binding_id: ChannelBindingId::random(),
+                matched_slug: "support".into(),
+                handle: email_identity(handle),
+                role: RecipientRole::To,
+                step,
+                access: ParticipantAccess {
+                    authorized: true,
+                    trusted: true,
+                },
+            },
+            target: ThreadTarget::Create {
+                subject: "Question".into(),
+            },
+            answers: true,
+            outreach: None,
+            principals: BoundedVec::parse("principals", Vec::new()).unwrap(),
+        }
+    }
+
+    #[test]
+    fn a_pipeline_with_its_first_step_dropped_keeps_its_address_boundary() {
+        let first = prepared("support@acme.example", PipelineStep::only());
+        let second = prepared(
+            "support+sales+legal@acme.example",
+            PipelineStep { index: 1, total: 3 },
+        );
+        let third = prepared(
+            "support+sales+legal@acme.example",
+            PipelineStep { index: 2, total: 3 },
+        );
+        let ids = [
+            first.candidate.channel.id,
+            second.candidate.channel.id,
+            third.candidate.channel.id,
+        ];
+        let groups = pipelines(&[first, second, third]);
+        assert_eq!(
+            groups
+                .iter()
+                .map(|targets| targets
+                    .iter()
+                    .map(|target| target.channel_id)
+                    .collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            vec![vec![ids[0]], vec![ids[1], ids[2]]]
+        );
     }
 }

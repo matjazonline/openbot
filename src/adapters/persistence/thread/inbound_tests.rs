@@ -34,6 +34,9 @@ use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
 /// The one task type inbound mail produces.
 const AGENT_DISPATCH: &str = "email_agent_dispatch";
 
+#[path = "inbound_multi_task_tests.rs"]
+mod multi_task_tests;
+
 fn identity(address: &str) -> QualifiedIdentity {
     QualifiedIdentity::new(
         TransportKind::Email,
@@ -116,13 +119,17 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
             }],
         )
         .unwrap(),
-        task: Some(InboundTaskRequest {
-            task_type: AGENT_DISPATCH.to_string(),
-            targets: vec![InboundTaskTarget {
-                channel_id: fixture.channel_id,
-                role: RecipientRole::To,
+        tasks: BoundedVec::parse(
+            "inbound tasks",
+            vec![InboundTaskRequest {
+                task_type: AGENT_DISPATCH.to_string(),
+                targets: vec![InboundTaskTarget {
+                    channel_id: fixture.channel_id,
+                    role: RecipientRole::To,
+                }],
             }],
-        }),
+        )
+        .unwrap(),
         outreach_transitions: BoundedVec::empty(),
         deliveries: Vec::new(),
         reply_delivery: ReplyDelivery::Send,
@@ -155,13 +162,17 @@ async fn request_on(
         }],
     )
     .unwrap();
-    request.task = Some(InboundTaskRequest {
-        task_type: AGENT_DISPATCH.to_string(),
-        targets: vec![InboundTaskTarget {
-            channel_id,
-            role: RecipientRole::To,
+    request.tasks = BoundedVec::parse(
+        "inbound tasks",
+        vec![InboundTaskRequest {
+            task_type: AGENT_DISPATCH.to_string(),
+            targets: vec![InboundTaskTarget {
+                channel_id,
+                role: RecipientRole::To,
+            }],
         }],
-    });
+    )
+    .unwrap();
     request
 }
 
@@ -339,9 +350,8 @@ async fn an_accepted_message_lands_with_its_mapping_thread_and_task_at_once() {
 
     assert_eq!(outcome.disposition, CommitDisposition::Created);
     assert_eq!(outcome.thread_ids.len(), 1);
-    let task_id = outcome
-        .task_id
-        .expect("an answerable message enqueues a run");
+    assert_eq!(outcome.task_ids.len(), 1);
+    let task_id = outcome.task_ids[0];
 
     // No accepted message needs a post-commit mapping or task insert: every row is already there.
     assert_eq!(message_count(&fixture).await, 1);
@@ -410,7 +420,7 @@ async fn a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further() 
     assert_eq!(first.disposition, CommitDisposition::Created);
     assert_eq!(second.disposition, CommitDisposition::Duplicate);
     assert_eq!(second.message_id, first.message_id);
-    assert_eq!(second.task_id, first.task_id);
+    assert_eq!(second.task_ids, first.task_ids);
     assert_eq!(message_count(&fixture).await, 1);
     assert_eq!(task_count(&fixture).await, 1);
     // Two commits, but the second joined the thread the first opened rather than a second one.
@@ -470,15 +480,15 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
     };
     let rfc = format!("<concurrent-{}@example.com>", fixture.suffix);
 
-    let first = request(&fixture, &rfc, "Anyone there?").await;
-    let second = request(&fixture, &rfc, "Anyone there?").await;
+    let first = multi_task_tests::two_pipeline_request(&fixture, &rfc).await;
+    let second = first.clone();
     let one = PostgresPersistence::new(fixture.pool.clone());
     let two = PostgresPersistence::new(fixture.pool.clone());
     let (left, right) = tokio::join!(one.commit_inbound(first), two.commit_inbound(second));
 
     let outcomes: Vec<InboundCommitOutcome> = vec![left.unwrap(), right.unwrap()];
     assert_eq!(outcomes[0].message_id, outcomes[1].message_id);
-    assert_eq!(outcomes[0].task_id, outcomes[1].task_id);
+    assert_eq!(outcomes[0].task_ids, outcomes[1].task_ids);
     assert_eq!(
         outcomes
             .iter()
@@ -488,14 +498,15 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
         "exactly one of the two deliveries stored the message"
     );
     assert_eq!(message_count(&fixture).await, 1);
-    assert_eq!(task_count(&fixture).await, 1);
+    assert_eq!(task_count(&fixture).await, 2);
+    assert_eq!(outcomes[0].task_ids.len(), 2);
     assert_eq!(
         count(
             &fixture,
             "SELECT count(*) FROM external_messages WHERE company_id = $1"
         )
         .await,
-        1
+        2
     );
 
     fixture.cleanup().await;
@@ -893,13 +904,17 @@ async fn a_commit_that_fails_at_the_task_leaves_no_thread_message_or_mapping() {
     let mut request = request(&fixture, &rfc, "Anyone there?").await;
     // A task naming a channel this commit has no association for: refused at the last statement
     // group, after the thread, the message and both mappings have been written.
-    request.task = Some(InboundTaskRequest {
-        task_type: AGENT_DISPATCH.to_string(),
-        targets: vec![InboundTaskTarget {
-            channel_id: Uuid::new_v4(),
-            role: RecipientRole::To,
+    request.tasks = BoundedVec::parse(
+        "inbound tasks",
+        vec![InboundTaskRequest {
+            task_type: AGENT_DISPATCH.to_string(),
+            targets: vec![InboundTaskTarget {
+                channel_id: Uuid::new_v4(),
+                role: RecipientRole::To,
+            }],
         }],
-    });
+    )
+    .unwrap();
 
     let refused = fixture.persistence.commit_inbound(request).await;
     assert!(refused.is_err(), "a task with no association is refused");
@@ -1062,7 +1077,7 @@ async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message()
         }],
     )
     .unwrap();
-    request.task = None;
+    request.tasks = BoundedVec::empty();
     request.outreach_transitions = BoundedVec::parse(
         "outreach transitions",
         vec![InboundOutreachTransition {

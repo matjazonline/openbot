@@ -3,8 +3,8 @@
 //! Every row an accepted message produces is written here, in one transaction, in dependency
 //! order: the threads it lands in, the provider conversation mappings that reach them, the
 //! canonical payload, its participants and email extension, one association per thread, one
-//! binding-qualified message mapping per association, the agent-dispatch task keyed on the message,
-//! and the delivery fan-out. They become visible together or not at all.
+//! binding-qualified message mapping per association, the agent-dispatch tasks keyed on the message
+//! and first channel, and the delivery fan-out. They become visible together or not at all.
 //!
 //! That property is the point. The shape this replaces created the thread in one statement, the
 //! message in a second transaction and the task in a third, so a crash between them left a stored
@@ -43,7 +43,7 @@ use crate::{
     transport::{
         CommitDisposition, InboundCommitOutcome, InboundCommitRequest, InboundEnvelope,
         InboundMessageCommitter, InboundTaskPayload, InboundTaskPayloadV1, InboundTaskRequest,
-        ProtocolExtension, ThreadAssociation, ThreadTarget,
+        ProtocolExtension, ThreadAssociation, ThreadTarget, each_channel_in_one_task,
     },
     use_cases::{
         participant::IdentityObservation,
@@ -87,6 +87,7 @@ async fn commit_on(
             "An inbound commit must name at least one thread association".into(),
         ));
     }
+    each_channel_in_one_task(&request.tasks)?;
     let binding_ids = verify_association_bindings(tx, request).await?;
     lock_provider_keys(tx, request, &binding_ids).await?;
 
@@ -108,7 +109,7 @@ async fn commit_on(
     map_provider_message(tx, request, &threads, &stored).await?;
     apply_outreach_transitions(tx, request, stored.id).await?;
 
-    let task_id = create_task(tx, request, &threads, stored.id).await?;
+    let task_ids = create_tasks(tx, request, &threads, stored.id).await?;
     let delivery_ids = create_deliveries(tx, request).await?;
     complete_claimed_event(tx, request).await?;
 
@@ -116,7 +117,7 @@ async fn commit_on(
         disposition: CommitDisposition::Created,
         message_id: stored.id,
         thread_ids: threads.iter().map(|thread| thread.thread_id).collect(),
-        task_id,
+        task_ids,
         delivery_ids,
     })
 }
@@ -165,12 +166,13 @@ async fn recognise_redelivery(
         )?;
     }
 
+    let task_ids = tasks_for_message(tx, request.company_id, message_id, &thread_ids).await?;
     complete_claimed_event(tx, request).await?;
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Duplicate,
         message_id,
         thread_ids,
-        task_id: task_for_message(tx, request.company_id, message_id).await?,
+        task_ids,
         // A redelivery fans out nothing: the first delivery's intents are already durable.
         delivery_ids: Vec::new(),
     })
@@ -195,18 +197,22 @@ async fn threads_holding(
     .map_err(AppError::from)
 }
 
-/// The run this message already caused, if it caused one.
-async fn task_for_message(
+/// The runs this message already caused, ordered by their original thread associations.
+async fn tasks_for_message(
     tx: &mut Transaction<'_, Postgres>,
     company_id: Uuid,
     message_id: CanonicalMessageId,
-) -> AppResult<Option<Uuid>> {
+    thread_ids: &[Uuid],
+) -> AppResult<Vec<Uuid>> {
     sqlx::query_scalar(
-        "SELECT id FROM background_tasks WHERE company_id = $1 AND source_message_uuid = $2",
+        r#"SELECT id FROM background_tasks
+           WHERE company_id = $1 AND source_message_uuid = $2
+           ORDER BY array_position($3::uuid[], thread_id), id"#,
     )
     .bind(company_id)
     .bind(message_id.as_uuid())
-    .fetch_optional(&mut **tx)
+    .bind(thread_ids)
+    .fetch_all(&mut **tx)
     .await
     .map_err(AppError::from)
 }
@@ -330,36 +336,33 @@ async fn existing_message_mappings(
 ///
 /// Creation happens before the message exists on purpose: a thread with no message is an empty
 /// conversation a later delivery joins, whereas a message with no thread is unreachable.
+struct ThreadResolution<'a> {
+    association: &'a ThreadAssociation,
+    target: ThreadTarget,
+}
+
+#[derive(sqlx::FromRow)]
+struct LockedThread {
+    id: Uuid,
+    channel_id: Uuid,
+}
+
 async fn resolve_threads(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<Vec<ResolvedThread>> {
-    let mut threads = Vec::with_capacity(request.associations.len());
+    let resolutions = plan_thread_resolution(tx, request).await?;
+    lock_existing_threads(tx, request.company_id, &resolutions).await?;
+    let mut threads = Vec::with_capacity(resolutions.len());
     let mut resolved_by_binding = HashMap::new();
-    for association in &request.associations {
-        let mapped = match resolved_by_binding.get(&association.binding_id) {
-            Some(thread_id) => Some(*thread_id),
-            None => {
-                external::find_external_thread(
-                    tx,
-                    association.binding_id,
-                    &request.envelope.source.thread_key,
-                )
-                .await?
-            }
-        };
-        let thread_id = match mapped {
-            Some(thread_id) => {
-                verify_thread_scope(tx, request.company_id, association, thread_id).await?;
-                thread_id
-            }
-            None => match &association.target {
-                ThreadTarget::Existing(thread_id) => {
-                    verify_thread_scope(tx, request.company_id, association, *thread_id).await?;
-                    *thread_id
-                }
+    for resolution in resolutions {
+        let association = resolution.association;
+        let thread_id = match resolved_by_binding.get(&association.binding_id) {
+            Some(thread_id) => *thread_id,
+            None => match resolution.target {
+                ThreadTarget::Existing(thread_id) => thread_id,
                 ThreadTarget::Create { subject } => {
-                    open_thread(tx, request.company_id, association.channel_id, subject).await?
+                    open_thread(tx, request.company_id, association.channel_id, &subject).await?
                 }
             },
         };
@@ -374,32 +377,74 @@ async fn resolve_threads(
     Ok(threads)
 }
 
-async fn verify_thread_scope(
+async fn plan_thread_resolution<'a>(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &'a InboundCommitRequest,
+) -> AppResult<Vec<ThreadResolution<'a>>> {
+    let mut planned_by_binding: HashMap<ChannelBindingId, ThreadTarget> = HashMap::new();
+    let mut resolutions = Vec::with_capacity(request.associations.len());
+    for association in &request.associations {
+        let target = match planned_by_binding.get(&association.binding_id) {
+            Some(target) => target.clone(),
+            None => {
+                let target = external::find_external_thread(
+                    tx,
+                    association.binding_id,
+                    &request.envelope.source.thread_key,
+                )
+                .await?
+                .map(ThreadTarget::Existing)
+                .unwrap_or_else(|| association.target.clone());
+                planned_by_binding.insert(association.binding_id, target.clone());
+                target
+            }
+        };
+        resolutions.push(ThreadResolution {
+            association,
+            target,
+        });
+    }
+    Ok(resolutions)
+}
+
+async fn lock_existing_threads(
     tx: &mut Transaction<'_, Postgres>,
     company_id: Uuid,
-    association: &ThreadAssociation,
-    thread_id: Uuid,
+    resolutions: &[ThreadResolution<'_>],
 ) -> AppResult<()> {
-    let scope: Option<(Uuid, Uuid)> =
-        sqlx::query_as("SELECT company_id, channel_id FROM threads WHERE id = $1 FOR UPDATE")
-            .bind(thread_id)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(AppError::from)?;
-    match scope {
-        Some((thread_company, thread_channel))
-            if thread_company == company_id && thread_channel == association.channel_id =>
+    let ids: Vec<Uuid> = resolutions
+        .iter()
+        .filter_map(|resolution| match resolution.target {
+            ThreadTarget::Existing(id) => Some(id),
+            ThreadTarget::Create { .. } => None,
+        })
+        .collect();
+    // Publications lock this same set in UUID order. Address order remains the presentation
+    // order, but cannot determine the lock order when a follow-up races a sibling reply.
+    let locked: Vec<LockedThread> = sqlx::query_as(
+        "SELECT id, channel_id FROM threads WHERE company_id = $1 AND id = ANY($2) \
+         ORDER BY id FOR UPDATE",
+    )
+    .bind(company_id)
+    .bind(ids)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    for resolution in resolutions {
+        let ThreadTarget::Existing(id) = resolution.target else {
+            continue;
+        };
+        if !locked
+            .iter()
+            .any(|thread| thread.id == id && thread.channel_id == resolution.association.channel_id)
         {
-            Ok(())
+            return Err(AppError::Internal(format!(
+                "Thread {id} does not belong to channel {} of company {company_id}",
+                resolution.association.channel_id,
+            )));
         }
-        Some(_) => Err(AppError::Internal(format!(
-            "Thread {thread_id} does not belong to channel {}",
-            association.channel_id
-        ))),
-        None => Err(AppError::NotFound(format!(
-            "Thread {thread_id} was not found"
-        ))),
     }
+    Ok(())
 }
 
 async fn open_thread(
@@ -449,11 +494,14 @@ async fn add_thread_principals(
         &association.principals,
     )
     .await?;
-    sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
-        .bind(thread_id)
-        .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
+    sqlx::query(
+        "UPDATE threads SET updated_at = GREATEST(updated_at, clock_timestamp()) WHERE id = $1 AND company_id = $2",
+    )
+    .bind(thread_id)
+    .bind(request.company_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
     Ok(())
 }
 
@@ -615,26 +663,40 @@ async fn apply_outreach_transitions(
     Ok(())
 }
 
-/// Create the agent-dispatch task, or return the one this message already has.
+/// Create the agent-dispatch tasks, preserving the addressed pipeline order.
 ///
-/// Keyed on the canonical message through `TaskSource::Message`, whose unique index absorbs a
-/// redelivery: the second delivery of a message resolves to the first delivery's run rather than
-/// starting a second one on the same turn.
-async fn create_task(
+/// Keyed on the canonical message and first channel through `TaskSource::Message`, so
+/// redelivery resolves each pipeline to its original run.
+async fn create_tasks(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
     threads: &[ResolvedThread],
     message_id: CanonicalMessageId,
-) -> AppResult<Option<Uuid>> {
-    let Some(task) = request.task.as_ref() else {
-        return Ok(None);
-    };
+) -> AppResult<Vec<Uuid>> {
     let thread_of: HashMap<Uuid, Uuid> = threads
         .iter()
         .map(|thread| (thread.channel_id, thread.thread_id))
         .collect();
+    // Resolve every target before inserting any task; the transaction owns all remaining writes.
+    let tasks = request
+        .tasks
+        .iter()
+        .map(|task| new_inbound_task(request, task, &thread_of, message_id))
+        .collect::<AppResult<Vec<_>>>()?;
+    let mut task_ids = Vec::with_capacity(tasks.len());
+    for task in tasks {
+        task_ids.push(insert_task(tx, task).await?.id);
+    }
+    Ok(task_ids)
+}
 
-    let targets = task_targets(task, &thread_of)?;
+fn new_inbound_task(
+    request: &InboundCommitRequest,
+    task: &InboundTaskRequest,
+    thread_of: &HashMap<Uuid, Uuid>,
+    message_id: CanonicalMessageId,
+) -> AppResult<NewTask> {
+    let targets = task_targets(task, thread_of)?;
     let primary = *targets
         .first()
         .ok_or_else(|| AppError::Internal("An inbound task names no channel".into()))?;
@@ -652,23 +714,17 @@ async fn create_task(
     })
     .encode()?;
 
-    let created = insert_task(
-        tx,
-        NewTask {
-            company_id: request.company_id,
-            channel_id: primary.channel_id,
-            thread_id: Some(primary.thread_id),
-            task_type: task.task_type.clone(),
-            payload,
-            source: TaskSource::Message(message_id),
-            // The chain starts at the message, not here: a relayed reply carrying a correlation id
-            // stays on the chain its sender was already on.
-            correlation_id: request.envelope.correlation_id,
-            targets,
-        },
-    )
-    .await?;
-    Ok(Some(created.id))
+    Ok(NewTask {
+        company_id: request.company_id,
+        channel_id: primary.channel_id,
+        thread_id: Some(primary.thread_id),
+        task_type: task.task_type.clone(),
+        payload,
+        source: TaskSource::Message(message_id),
+        // Relayed messages stay on the chain their sender was already on.
+        correlation_id: request.envelope.correlation_id,
+        targets,
+    })
 }
 
 /// Pair every task target with the thread this commit put the message in.
