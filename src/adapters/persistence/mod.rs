@@ -11,6 +11,8 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod company_resend_api;
+#[cfg(test)]
+mod constraint_tests;
 pub mod credential_rotation;
 pub mod credentials;
 pub mod dashboard;

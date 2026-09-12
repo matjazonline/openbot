@@ -13,6 +13,9 @@ use crate::entities::{
 };
 use crate::use_cases::thread::{AgentAuthor, MessageAuthorWrite, MessageWrite};
 
+#[path = "task_lookup_tests.rs"]
+mod task_lookup;
+
 /// The shape every projection has to work for: no headers, no recipients, no address.
 fn internal_message(thread_id: Uuid, body: &str, author: MessageAuthorWrite) -> MessageWrite {
     MessageWrite::internal(

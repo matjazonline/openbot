@@ -13,6 +13,7 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -165,91 +166,68 @@ impl ThreadMessageDb {
 
 #[derive(sqlx::FromRow, Debug)]
 struct ThreadTaskLookupDb {
-    id: Uuid,
-    source_message_uuid: Option<Uuid>,
-    correlation_id: Uuid,
-    task_type: String,
-    created_at: DateTime<Utc>,
+    canonical_id: Uuid,
+    task_id: Option<Uuid>,
 }
 
-/// The ceiling on the task lookup behind one page of messages.
-///
-/// A rendered row is answered by at most one task matched on its canonical id; the correlation
-/// fallback below can match a handful more -- the dispatch, its outreach follow-ups, a retry. Four
-/// per row covers that fan-out for a full `THREAD_HISTORY_LIMIT` page, and bounds a thread a
-/// scheduled agent has been running against for months.
-const THREAD_TASK_LOOKUP_LIMIT: usize = THREAD_HISTORY_LIMIT * 4;
+/// One best task per displayed message. The exact lookup uses the company/source-message unique
+/// key, and the fallback's scope and order support a first-match index probe using
+/// `background_tasks_thread_correlation_match_idx`. Keep its expression and tie-breakers aligned
+/// with the index. The ascending UUID preserves the old stable sort's winner for equal timestamps.
+pub(super) const THREAD_TASK_LOOKUP_SQL: &str = r#"
+    SELECT rendered.canonical_id, COALESCE(direct.id, fallback.id) AS task_id
+    FROM unnest($3::uuid[], $4::uuid[]) AS rendered (canonical_id, correlation_id)
+    LEFT JOIN LATERAL (
+        SELECT task.id
+        FROM background_tasks AS task
+        WHERE task.company_id = $1 AND task.thread_id = $2
+          AND task.source_message_uuid = rendered.canonical_id
+        LIMIT 1
+    ) AS direct ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT task.id
+        FROM background_tasks AS task
+        WHERE direct.id IS NULL
+          AND task.company_id = $1 AND task.thread_id = $2
+          AND task.correlation_id = rendered.correlation_id
+        ORDER BY (task.task_type IN ('email_agent_dispatch', 'scheduled_agent_run')) DESC,
+                 task.created_at DESC, task.id ASC
+        LIMIT 1
+    ) AS fallback ON TRUE
+"#;
 
-/// The tasks that can answer `rendered`, oldest first.
-///
-/// Scoped to the rendered window rather than to the whole thread: [`match_task_id`] only ever looks
-/// a row up by its canonical id or its correlation, so every other task the thread has ever run is
-/// read for nothing. The `LIMIT` is the backstop for a correlation that fans out further than the
-/// page does -- the query orders newest-first so a truncation drops the tasks least likely to be
-/// the answer, then the result is reversed into the oldest-first order `match_task_id` reads.
+/// Match the already-bounded rendered page in one round trip, returning at most one task per row.
+/// The former global candidate limit could discard an old exact match or main run before matching.
 async fn fetch_thread_tasks(
     pool: &PgPool,
     company_id: Uuid,
     thread_id: Uuid,
     rendered: &[ThreadMessageDb],
-) -> AppResult<Vec<ThreadTaskLookupDb>> {
-    let canonical_ids = distinct_ids(rendered.iter().map(|row| row.canonical_id));
-    let correlation_ids = distinct_ids(rendered.iter().map(|row| row.correlation_id));
-
-    let mut tasks = sqlx::query_as::<_, ThreadTaskLookupDb>(
-        r#"SELECT id, source_message_uuid, correlation_id, task_type, created_at
-             FROM background_tasks
-            WHERE company_id = $1 AND thread_id = $2
-              AND (source_message_uuid = ANY($3) OR correlation_id = ANY($4))
-            ORDER BY created_at DESC, id DESC
-            LIMIT $5"#,
-    )
-    .bind(company_id)
-    .bind(thread_id)
-    .bind(&canonical_ids)
-    .bind(&correlation_ids)
-    .bind(THREAD_TASK_LOOKUP_LIMIT as i64)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
-    tasks.reverse();
-    Ok(tasks)
-}
-
-fn distinct_ids(ids: impl Iterator<Item = Uuid>) -> Vec<Uuid> {
-    let mut collected: Vec<Uuid> = ids.collect();
-    collected.sort_unstable();
-    collected.dedup();
-    collected
-}
-
-fn match_task_id(
-    canonical_id: Uuid,
-    correlation_id: Uuid,
-    tasks: &[ThreadTaskLookupDb],
-) -> Option<Uuid> {
-    if let Some(task) = tasks
-        .iter()
-        .find(|t| t.source_message_uuid == Some(canonical_id))
-    {
-        return Some(task.id);
+) -> AppResult<HashMap<Uuid, Uuid>> {
+    if rendered.len() > THREAD_HISTORY_LIMIT {
+        return Err(AppError::Internal(
+            "Thread task lookup exceeds the message page limit".into(),
+        ));
     }
-
-    let mut candidates: Vec<&ThreadTaskLookupDb> = tasks
-        .iter()
-        .filter(|t| t.correlation_id == correlation_id)
-        .collect();
-
-    if candidates.is_empty() {
-        return None;
+    if rendered.is_empty() {
+        return Ok(HashMap::new());
     }
-
-    candidates.sort_by_key(|t| {
-        let is_main = t.task_type == "email_agent_dispatch" || t.task_type == "scheduled_agent_run";
-        (!is_main, std::cmp::Reverse(t.created_at))
-    });
-
-    candidates.first().map(|t| t.id)
+    // Projections of the same rows, in the same order: unnest must pair each message with its own
+    // correlation. Independently sorting or deduplicating these arrays would mix their identities.
+    let canonical_ids: Vec<Uuid> = rendered.iter().map(|row| row.canonical_id).collect();
+    let correlation_ids: Vec<Uuid> = rendered.iter().map(|row| row.correlation_id).collect();
+    let tasks = sqlx::query_as::<_, ThreadTaskLookupDb>(THREAD_TASK_LOOKUP_SQL)
+        .bind(company_id)
+        .bind(thread_id)
+        .bind(&canonical_ids)
+        .bind(&correlation_ids)
+        .fetch_all(pool)
+        .await
+        .map_err(AppError::from)?;
+    Ok(tasks
+        .into_iter()
+        .filter_map(|row| row.task_id.map(|id| (row.canonical_id, id)))
+        .collect())
 }
 
 fn thread_message_select() -> String {
@@ -320,7 +298,7 @@ pub(super) async fn list_thread_messages(
     let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
-            let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+            let task_id = tasks.get(&row.canonical_id).copied();
             row.into_view(task_id)
         })
         .collect()
@@ -365,7 +343,7 @@ pub(super) async fn list_thread_messages_after(
     let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
-            let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+            let task_id = tasks.get(&row.canonical_id).copied();
             row.into_view(task_id)
         })
         .collect()
@@ -393,7 +371,7 @@ pub(super) async fn get_thread_message(
 
     let tasks =
         fetch_thread_tasks(pool, row.company_id, thread_id, std::slice::from_ref(&row)).await?;
-    let task_id = match_task_id(row.canonical_id, row.correlation_id, &tasks);
+    let task_id = tasks.get(&row.canonical_id).copied();
     Ok(Some(row.into_view(task_id)?))
 }
 

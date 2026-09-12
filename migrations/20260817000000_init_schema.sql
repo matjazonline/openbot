@@ -1485,62 +1485,81 @@ $$;
 CREATE FUNCTION public.release_tasks_for_removed_principal() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE
-    owned RECORD;
 BEGIN
-    FOR owned IN
-        SELECT task.*, OLD.display_label AS old_label
+    -- One statement per affected relation, not one per owned task. `owned` locks the row set and
+    -- carries the values the other two arms need from *before* the release: `task_attempts` is
+    -- fenced on the generation the task is about to lose, and the ownership event's `sequence` is
+    -- the version the task is about to leave behind, per task rather than a running count. Row
+    -- triggers still fire once per row -- that is PostgreSQL, not the statement shape -- but the
+    -- row set is planned, locked and computed once instead of once per task.
+    --
+    -- The `task_attempts` arm is never read by the final `INSERT`, and does not need to be: a
+    -- data-modifying `WITH` clause always runs to completion whether or not the primary query
+    -- selects from it.
+    WITH owned AS (
+        SELECT task.id, task.company_id, task.status, task.ownership_version,
+               task.execution_generation
           FROM background_tasks AS task
          WHERE task.company_id = OLD.company_id AND task.owner_principal_id = OLD.id
          FOR UPDATE
-    LOOP
-        UPDATE background_tasks
+    ),
+    released AS (
+        UPDATE background_tasks AS task
            SET owner_principal_id = NULL,
                owner_principal_kind = NULL,
-               ownership_version = ownership_version + 1,
-               status = CASE WHEN status = 'processing' THEN 'pending' ELSE status END,
+               ownership_version = owned.ownership_version + 1,
+               status = CASE WHEN owned.status = 'processing' THEN 'pending' ELSE owned.status END,
                worker_id = NULL,
                execution_generation = NULL,
                locked_at = NULL,
                lock_expires_at = NULL,
-               run_at = CASE WHEN status = 'processing' THEN CURRENT_TIMESTAMP ELSE run_at END,
+               run_at = CASE
+                   WHEN owned.status = 'processing' THEN CURRENT_TIMESTAMP
+                   ELSE task.run_at
+               END,
                transition_reason = CASE
-                   WHEN status = 'processing' THEN 'ownership_transferred'
-                   ELSE transition_reason
+                   WHEN owned.status = 'processing' THEN 'ownership_transferred'
+                   ELSE task.transition_reason
                END,
                transition_actor_kind = CASE
-                   WHEN status = 'processing' THEN 'system'
-                   ELSE transition_actor_kind
+                   WHEN owned.status = 'processing' THEN 'system'
+                   ELSE task.transition_actor_kind
                END,
                transition_actor_id = CASE
-                   WHEN status = 'processing' THEN NULL
-                   ELSE transition_actor_id
+                   WHEN owned.status = 'processing' THEN NULL
+                   ELSE task.transition_actor_id
                END,
                updated_at = CURRENT_TIMESTAMP
-         WHERE id = owned.id;
+          FROM owned
+         WHERE task.company_id = owned.company_id AND task.id = owned.id
+        RETURNING task.id, task.company_id, owned.status AS released_status,
+                  owned.ownership_version AS released_version,
+                  owned.execution_generation AS released_generation
+    ),
+    fenced AS (
+        UPDATE task_attempts AS attempt
+           SET status = 'failed', stop_reason = 'ownership_transferred',
+               error = 'Task ownership was removed', finished_at = CURRENT_TIMESTAMP
+          FROM released
+         WHERE attempt.task_id = released.id
+           AND released.released_status = 'processing'
+           AND attempt.execution_generation = released.released_generation
+           AND attempt.status = 'processing'
+        RETURNING attempt.id
+    )
+    INSERT INTO task_ownership_events (
+        task_id, company_id, sequence, from_version, to_version, command_id,
+        command_fingerprint, operation, actor_kind, previous_owner_principal_id,
+        previous_owner_kind, previous_owner_label, new_owner_kind, reason
+    )
+    SELECT released.id, released.company_id, released.released_version + 1,
+           released.released_version, released.released_version + 1, gen_random_uuid(),
+           'owner-removed:' || OLD.id::text || ':' || released.released_version::text,
+           'owner_removed', 'system', OLD.id,
+           CASE OLD.kind WHEN 'person' THEN 'human' ELSE 'agent' END,
+           OLD.display_label, 'unassigned', 'owner_removed'
+      FROM released;
 
-        IF owned.status = 'processing' THEN
-            UPDATE task_attempts
-               SET status = 'failed', stop_reason = 'ownership_transferred',
-                   error = 'Task ownership was removed', finished_at = CURRENT_TIMESTAMP
-             WHERE task_id = owned.id
-               AND execution_generation = owned.execution_generation
-               AND status = 'processing';
-        END IF;
-
-        INSERT INTO task_ownership_events (
-            task_id, company_id, sequence, from_version, to_version, command_id,
-            command_fingerprint, operation, actor_kind, previous_owner_principal_id,
-            previous_owner_kind, previous_owner_label, new_owner_kind, reason
-        ) VALUES (
-            owned.id, owned.company_id, owned.ownership_version + 1,
-            owned.ownership_version, owned.ownership_version + 1, gen_random_uuid(),
-            'owner-removed:' || OLD.id::text || ':' || owned.ownership_version::text,
-            'owner_removed', 'system', OLD.id,
-            CASE OLD.kind WHEN 'person' THEN 'human' ELSE 'agent' END,
-            owned.old_label, 'unassigned', 'owner_removed'
-        );
-    END LOOP;
     -- Two triggers share this body. An agent's principal is deleted outright, cascaded from the
     -- agent row; a person's principal is demoted to 'external' by team removal, which is an
     -- UPDATE whose row must be returned as NEW -- returning OLD there would quietly write the

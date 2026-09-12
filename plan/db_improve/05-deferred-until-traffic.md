@@ -115,6 +115,12 @@ index unnecessary.
 If the cache is implemented, it needs a test that company-scoped and operator-wide views stay
 isolated: a cached snapshot must never leak one company's rollup into another's view.
 
+**The cache landed** (`plan/db_audit/phase3.md`): `DashboardSnapshotService`
+(`src/application/services/dashboard_snapshot.rs`) answers one reading per view per
+`DASHBOARD_TICK`, and the isolation test above exists. No index was added. What that did and did not
+settle is recorded in §4a — it weakened the `task_attempts (started_at)` case rather than closing
+it, and left the `background_tasks` shapes listed above exactly as they were.
+
 **Sensitive to:** the write rate on `background_tasks`, and the number of simultaneous dashboard
 viewers — measure both, not just the read plan.
 
@@ -168,6 +174,42 @@ scope/window matrix, and record them in this file.
 
 **Sensitive to:** `email_messages` and `task_attempts` cardinality and the selectivity of a single
 `thread_index` value or `started_at` window — both are indistinguishable from noise at current size.
+
+### 4a. `task_attempts (started_at)`: what Phase 3 changed, and the retention gap beside it
+
+Recorded 2026-09-12 from `plan/db_audit/phase6.md` §6.3. The audit found nothing that changes this
+candidate's *status*, but Phase 3 changed its **urgency**, and that belongs in the record.
+
+Before Phase 3, three statements scanned `task_attempts` on every five-second tick of every
+connected dashboard tab: `ATTEMPT_STATS_SQL`, `LATENCY_BODY` and `RETRY_RATE_BODY`
+(`src/adapters/persistence/dashboard.rs`). After it, `DashboardSnapshotService`
+(`src/application/services/dashboard_snapshot.rs`) answers one reading per *view* per
+`DASHBOARD_TICK`, so those three run once per tick for the whole fleet of tabs watching that view.
+
+That is exactly the outcome §2 predicted when it said to "evaluate the cache first — it scales with
+operator count rather than data size and may make the index unnecessary". The read pressure is now
+proportional to tick rate and to the number of distinct views (companies being watched × windows
+picked, plus the operator rollup), not to viewer count. **So the index's case is weaker than it was,
+not stronger.** The remaining question is narrower than the one this section was opened with:
+whether a single scan per tick of an unpruned, ever-growing table is acceptable at real cardinality.
+
+**The retention gap is the other half of the same decision.** No statement in `src/` deletes from
+`task_attempts` — `grep -rn "DELETE FROM task_attempts" src/` returns nothing. Rows leave only by
+cascade from `background_tasks` (`task_attempts_task_id_fkey ... ON DELETE CASCADE`), and
+`background_tasks` is never pruned by design: the dashboard's queue-depth reconstruction depends on
+that, as its own comment records (`src/domain/entities/dashboard.rs:217`). So the table only grows,
+and every dashboard window query pays for the whole accumulated history regardless of the window it
+asks for.
+
+A retention sweep modelled on `delete_retained` (`src/adapters/persistence/inbound_event/mod.rs:515`
+— batched, ordered by `(processed_at, id)`, backed by a matching partial index) may be a better
+answer than an index. The two interact in both directions: a table with retention needs a smaller
+index, and a table with an index prunes faster. **Neither should be decided without the other on the
+table.**
+
+**What would close this:** the three dashboard statements timed at real `task_attempts`
+cardinality, with and without a retention horizon in place, plus the table's write rate — one
+`task_attempts` row per claim, so it is written at queue rate, not at human rate.
 
 ## 5. Task Claim: Per-Company Slices (landed, `plan/db_audit/phase5.md`)
 
@@ -353,6 +395,337 @@ from each. The number to watch once there is traffic is how many companies have 
 at once; if it reaches the thousands, `claim_pending_tasks` should rank in `pg_stat_statements` and
 this record is where the comparison starts.
 
+## 6. Principal Removal: A Set-Based Trigger (landed) and 23 Unindexed Foreign Keys
+
+Recorded 2026-09-12 from `plan/db_audit/phase6.md`. One change landed; three decisions are held
+here. Nothing in `src/` runs `DELETE FROM principals` — principals go away by cascade from two
+interactive, user-initiated operations:
+
+- **Removing a company member.** `remove_member` (`src/adapters/persistence/company_invite.rs`)
+  demotes the principal to `external` and then deletes the `company_members` row, so the release
+  runs from `principals_release_owned_tasks_on_demotion` (`BEFORE UPDATE OF kind`).
+- **Deleting an agent.** `DELETE FROM agents WHERE id = $1` (`src/adapters/persistence/agent.rs`)
+  → `principals_company_agent_fk … ON DELETE CASCADE`, so the release runs from
+  `principals_release_owned_tasks` (`BEFORE DELETE`).
+
+Neither can commit unless the release has cleared every task the principal owned:
+`background_tasks_owner_principal_fk` is `(company_id, owner_principal_id, owner_principal_kind)
+→ principals(company_id, id, kind) ON DELETE RESTRICT`, with no `ON UPDATE CASCADE`, so the
+demotion violates it just as the delete does.
+
+**Environment for every capture in this section.** Local Homebrew PostgreSQL 16.14; CI and
+production run 18.6 (see "Verification Gaps"). `mail_agents_schema_audit`, built from
+`migrations/20260817000000_init_schema.sql` — never from the development database, which has
+drifted. `COSTS OFF`; no timing was taken anywhere. Captured 2026-09-12. **These are shape checks,
+not measurements.**
+
+### 6.1 Landed: the release trigger is set-based
+
+`release_tasks_for_removed_principal()` used to open a `FOR UPDATE` cursor over every task the
+principal had ever owned — **no status predicate, so every task, including ones completed months
+ago** — and loop. Per row it issued an `UPDATE background_tasks`, conditionally an `UPDATE
+task_attempts`, and an `INSERT INTO task_ownership_events`. `background_tasks` carries eight row
+triggers and `task_ownership_events` three, so a principal with 5,000 lifetime tasks generated on
+the order of fifteen thousand statements and their trigger cascades inside one transaction, holding
+`FOR UPDATE` on all of them.
+
+It is now one `WITH` statement: a locking `owned` CTE, a set `UPDATE background_tasks` that returns
+each task's pre-release status, ownership version and execution generation, a set `UPDATE
+task_attempts` fed from that, and one `INSERT … SELECT` of the ownership events. Row triggers still
+fire once per row — that is PostgreSQL, not the statement shape — but the plpgsql loop, the per-row
+planning and the cursor are gone, and the row set is computed, planned and locked once.
+
+**Class A: strictly fewer statements for the same result. No index was added.** The three values the
+loop read off each row are carried forward rather than re-read, which is what keeps the result
+identical: `task_attempts` is fenced on the generation the task is *losing*, and each ownership
+event's `sequence` is that task's own `ownership_version + 1`, not a running counter over the
+released set.
+
+`removing_a_member_releases_every_task_they_owned_in_every_status`,
+`deleting_an_agent_releases_every_task_its_principal_owned` and
+`a_principal_owning_no_tasks_is_removed_without_an_ownership_event`
+(`src/adapters/persistence/task/release_tests.rs`) were written against the loop and pass unchanged
+against the set form. They own a task in each of the eight statuses, each at a *different*
+ownership version, so a running-counter mistake in the event sequence fails; and they leave one
+attempt row on a superseded generation and one on a task that is not running, so a rewrite that
+fences too widely fails too.
+
+#### The row set has no access path, before or after
+
+The trigger's selection is the finding, and the rewrite does not change it. Empty scratch database:
+
+    LockRows
+      ->  Index Scan using background_tasks_company_updated_idx on background_tasks task
+            Index Cond: (company_id = '…'::uuid)
+            Filter: (owner_principal_id = '…'::uuid)
+
+— a scan of the whole tenant's tasks, filtered.
+`background_tasks_unsettled_owner_idx (company_id, owner_principal_id) WHERE status IN (…unsettled…)`
+looks like it covers this and cannot: the selection carries no status predicate, so the planner
+cannot prove the partial index applies. This is the same fact as §6.2 below, one table over.
+
+#### The statement shape, seeded
+
+`mail_agents_schema_audit`, seeded with triggers and foreign keys off
+(`session_replication_role = replica`) and then `ANALYZE`d: 20,000 `background_tasks` rows in one
+company, 5,000 `task_attempts`. **Not representative of production** — it exists to show which join
+shapes the planner reaches for at two selectivities, nothing more.
+
+A principal owning ~1,818 of the 20,000 (9%):
+
+    Insert on task_ownership_events
+      CTE owned
+        ->  LockRows
+              ->  Seq Scan on background_tasks task
+                    Filter: ((company_id = '…'::uuid) AND (owner_principal_id = '…'::uuid))
+      CTE released
+        ->  Update on background_tasks task_1
+              ->  Hash Join
+                    Hash Cond: ((owned.company_id = task_1.company_id) AND (owned.id = task_1.id))
+                    ->  CTE Scan on owned
+                    ->  Hash
+                          ->  Seq Scan on background_tasks task_1
+      CTE fenced
+        ->  Update on task_attempts attempt
+              ->  Nested Loop
+                    ->  CTE Scan on released released_1
+                          Filter: (released_status = 'processing'::text)
+                    ->  Index Scan using task_attempts_task_attempt_key on task_attempts attempt
+                          Index Cond: (task_id = released_1.id)
+                          Filter: ((status = 'processing'::text)
+                                   AND (released_1.released_generation = execution_generation))
+      ->  Subquery Scan on "*SELECT*"
+            ->  CTE Scan on released
+
+A principal owning 5 rows — the same statement, same statistics, only the parameter changed:
+
+      CTE released
+        ->  Update on background_tasks task_1
+              ->  Nested Loop
+                    ->  CTE Scan on owned
+                    ->  Index Scan using background_tasks_pkey on background_tasks task_1
+                          Index Cond: (id = owned.id)
+                          Filter: (owned.company_id = company_id)
+
+What the shapes show: the write-back to `background_tasks` is a primary-key probe per released task
+when the set is small and one hash join when it is large, and the attempt fencing is one index
+probe per *released* task rather than a statement per *owned* task. The loop had no choice about
+either — it planned a fresh `UPDATE … WHERE id = $1` per row. Nothing here is a timing claim; what
+changed is the statement count, which is `3 × N` before and `3` after.
+
+### 6.2 Deferred: 23 inbound foreign keys with no index, and why partial indexes cannot help them
+
+After the release trigger runs, PostgreSQL enforces every inbound reference to the principal row
+being deleted. `principals` has **27 inbound foreign keys. Four have an index that can serve the
+referential check; 23 do not**, and each of those is a full scan of the child table. Counted from
+the migration on 2026-09-12 with this catalog query — keep it, it is the expensive part of this
+record:
+
+    -- An index serves a referential check when it is total (see below) and its leading key
+    -- columns cover every column of the foreign key.
+    WITH inbound AS (
+        SELECT child.relname AS child_table, reference.conname AS constraint_name,
+               reference.conrelid AS child_oid, reference.conkey AS fk_columns,
+               array_length(reference.conkey, 1) AS fk_width
+          FROM pg_constraint AS reference
+          JOIN pg_class AS child ON child.oid = reference.conrelid
+         WHERE reference.contype = 'f'
+           AND reference.confrelid = 'public.principals'::regclass
+    ), served AS (
+        SELECT inbound.*,
+               (SELECT string_agg(pg_get_indexdef(candidate.indexrelid), ' | ')
+                  FROM pg_index AS candidate
+                 WHERE candidate.indrelid = inbound.child_oid
+                   AND candidate.indpred IS NULL
+                   AND (candidate.indkey::int2[])[0:inbound.fk_width - 1] @> inbound.fk_columns
+               ) AS serving_index
+          FROM inbound
+    )
+    SELECT child_table, constraint_name,
+           (SELECT string_agg(attribute.attname, ', ' ORDER BY ordinality)
+              FROM unnest(fk_columns) WITH ORDINALITY AS fk(attnum, ordinality)
+              JOIN pg_attribute AS attribute
+                ON attribute.attrelid = child_oid AND attribute.attnum = fk.attnum) AS fk_columns
+      FROM served
+     WHERE serving_index IS NULL
+     ORDER BY child_table, constraint_name;
+
+(`indkey::int2[]` is zero-based; slicing it `[1:width]` silently drops the leading column and
+reports four served constraints as unserved. The four that *are* served —
+`channel_principal_grants`, `messages`, `participant_identities`, `thread_principals` — are the
+check that the query is slicing correctly.)
+
+The 23 unserved constraints, as the query returns them:
+
+| Child table | Foreign key | Columns |
+|---|---|---|
+| `background_tasks` | `background_tasks_owner_principal_fk` | `company_id, owner_principal_id, owner_principal_kind` |
+| `channels` | `channels_preferred_reviewer_fk` | `company_id, preferred_reviewer_principal_id` |
+| `delegation_control_commands` | `delegation_control_commands_actor_fk` | `company_id, actor_principal_id, actor_kind` |
+| `human_approvals` | `human_approvals_approver_principal_fk` | `company_id, approver_principal_id` |
+| `internal_note_tombstones` | `internal_note_tombstones_actor_fk` | `company_id, actor_principal_id` |
+| `internal_notes` | `internal_notes_author_fk` | `company_id, author_principal_id` |
+| `manual_handoffs` | `manual_handoffs_creator_fk` | `company_id, created_by_principal_id` |
+| `manual_handoffs` | `manual_handoffs_resolver_fk` | `company_id, resolved_by_principal_id` |
+| `manual_handoffs` | `manual_handoffs_responsible_fk` | `company_id, responsible_principal_id` |
+| `notification_events` | `notification_events_actor_fk` | `company_id, actor_principal_id` |
+| `notifications` | `notifications_recipient_fk` | `company_id, recipient_principal_id` |
+| `response_draft_publications` | `response_draft_publications_publisher_fk` | `company_id, published_by_principal_id` |
+| `response_drafts` | `response_drafts_author_fk` | `company_id, author_principal_id` |
+| `response_drafts` | `response_drafts_created_by_fk` | `company_id, created_by_principal_id` |
+| `response_drafts` | `response_drafts_reviewer_fk` | `company_id, reviewer_principal_id` |
+| `response_drafts` | `response_drafts_updated_by_fk` | `company_id, updated_by_principal_id` |
+| `response_reviews` | `response_reviews_decider_fk` | `company_id, decided_by_principal_id` |
+| `response_reviews` | `response_reviews_notification_actor_fk` | `company_id, notification_actor_principal_id` |
+| `response_reviews` | `response_reviews_reviewer_fk` | `company_id, reviewer_principal_id` |
+| `task_agent_instructions` | `task_agent_instructions_actor_fk` | `company_id, requested_by_principal_id` |
+| `task_approval_waits` | `task_approval_waits_company_id_owner_principal_id_fkey` | `company_id, owner_principal_id` |
+| `task_harness_runs` | `task_harness_runs_company_id_owner_principal_id_fkey` | `company_id, owner_principal_id` |
+| `task_outreaches` | `task_outreaches_creator_fk` | `company_id, created_by_principal_id, created_by_principal_kind` |
+
+(`plan/db_audit/phase6.md` calls this "twenty-one" and then lists twenty-two names. The query says
+23, of which `background_tasks_owner_principal_fk` is the one the release trigger has already
+emptied by the time the check runs — so 22 scans that find nothing plus one that scans what the
+trigger just cleared. Trust the query, not the prose.)
+
+#### Partial indexes never satisfy foreign-key enforcement
+
+Write this on the wall. It is the single most load-bearing fact in this record and it is not
+obvious from reading the migration. A referential check issues, in effect,
+`SELECT 1 FROM child AS x WHERE $1 = x.company_id AND $2 = x.<principal_column> FOR KEY SHARE OF x`
+— **it carries no status predicate**, so the planner cannot prove any partial index's predicate
+holds, and will not use one.
+
+`response_drafts.reviewer_principal_id` is the instructive case: it *has* an index that looks like
+a perfect fit, and that index is useless here. Captured on the empty scratch database with
+`enable_seqscan = off`, so the planner had every incentive to reach for an index:
+
+    -- the check the foreign key actually runs
+    LockRows
+      ->  Index Scan using response_drafts_scope_idx on response_drafts x
+            Index Cond: (company_id = '…'::uuid)
+            Filter: ('…'::uuid = reviewer_principal_id)
+
+    -- the same query with AND x.status = 'pending_review' added
+    LockRows
+      ->  Index Scan using response_drafts_reviewer_pending_idx on response_drafts x
+            Index Cond: ((company_id = '…'::uuid) AND (reviewer_principal_id = '…'::uuid))
+            Filter: (status = 'pending_review'::text)
+
+`response_drafts_reviewer_pending_idx (company_id, reviewer_principal_id, created_at, id) WHERE
+status = 'pending_review'` serves the second form exactly and cannot be considered for the first.
+The check falls back to `response_drafts_scope_idx`, leading on `company_id` with the reviewer as a
+filter — a scan of the tenant's drafts. The same reasoning disqualifies
+`background_tasks_unsettled_owner_idx` in §6.1 and `response_drafts_one_pending_version_idx`.
+
+#### Why no index is added here, and what would change that
+
+Twenty-three indexes on tables that take writes on every note, draft, review, notification and
+outreach is a large permanent cost for a path that runs when somebody removes a teammate or deletes
+an agent. The write-rate arithmetic also has to include what "Understood, no change proposed" in
+`plan/db_audit/general_plan_instructions.md` records: `background_tasks` already carries eight row
+triggers and sixteen indexes, so anything added there is maintained on every claim, lease renewal
+and completion.
+
+The method, in order:
+
+1. Land the set-based trigger. **Done** — §6.1.
+2. Time the two delete paths against a database with a realistic principal history, which is
+   exactly what the skewed seeder under "Evidence Tooling Still To Build" is for. The seeder's
+   distribution needs one addition for this: lifetime tasks per principal, with skew, and a long
+   tail of principals who own nothing.
+3. Add indexes **only** for the tables the timing shows dominate, and only after capturing the
+   plan. Expect that to be a handful, not 23 — the child tables differ by orders of magnitude in
+   size, and a scan of an empty `internal_note_tombstones` costs nothing.
+
+**Sensitive to:** rows per child table, not to how many foreign keys there are. Twenty-three scans
+of small tables is cheaper than one scan of a large one.
+
+### 6.3 Open question for whoever owns the ownership model
+
+The release has no status predicate, so it walks every task the principal ever owned rather than
+the open ones. Adding `AND status <> 'completed'` — or restricting to the unsettled set
+`background_tasks_unsettled_owner_idx` already names, which would make that partial index usable and
+change the cost from lifetime tasks to open tasks — is **not a free predicate**. It changes what the
+system records: a completed task would keep pointing at a principal row that no longer exists, which
+`background_tasks_owner_principal_fk` forbids. So the predicate implies a decision about whether
+historical ownership is retained on the live row, and therefore whether that foreign key becomes
+`ON DELETE SET NULL` with a denormalised label beside it.
+
+The argument for narrowing: `task_ownership_events` already preserves the whole ownership history
+independently, including `previous_owner_label`, so the live column need not. The argument against:
+every board, dashboard and attention query that groups by owner would stop seeing the history it
+sees today, and the demotion path (a person leaving the team) is exactly where "who used to own
+this" is most likely to be asked.
+
+**Do not decide this in review.** It is recorded here because the set-based rewrite helps under
+either answer, so nothing was blocked on it. What would settle it: the product decision about
+historical ownership, and — if the answer is "narrow it" — a capture showing
+`background_tasks_unsettled_owner_idx` serving the narrowed selection.
+
+## 7. `manual_handoffs` Has No Query-Supporting Index
+
+Recorded 2026-09-12 from `plan/db_audit/phase6.md` §6.2. Same environment as §6.
+
+`manual_handoffs` carries exactly two indexes, both identity keys — `manual_handoffs_pkey (id)` and
+`manual_handoffs_company_id_id_key (company_id, id)`. The attention feed's handoff branch
+(`src/adapters/persistence/attention.rs`) reads it by
+`company_id + channel_id = ANY($2) + status = 'open'`, plus the responsibility filter Phase 4 pushed
+into the branch. Captured on the empty scratch database:
+
+    Index Scan using manual_handoffs_company_id_id_key on manual_handoffs handoff
+      Index Cond: (company_id = '…'::uuid)
+      Filter: ((channel_id = ANY ('{…}'::uuid[])) AND (status = 'open'::text))
+
+Every read walks every handoff row the tenant has ever created, open or resolved, and filters.
+
+**The candidate, and the case for it, made in advance so it can be decided quickly.**
+
+    CREATE INDEX manual_handoffs_open_channel_idx ON public.manual_handoffs
+        USING btree (company_id, channel_id) WHERE (status = 'open'::text);
+
+The partial form is probably better than the plain `(company_id, channel_id, status)`: the feed only
+ever reads open handoffs, and an open handoff is by definition a small and roughly constant
+fraction of accumulated history, so the index stays the size of the working set rather than the
+size of the table.
+
+The usual objection to a new index — write amplification — is **weak here, and that is what makes
+this the strongest of this section's candidates**. A handoff row is written when a human escalation
+happens and updated when it resolves. That is a human-rate event, not a queue-rate one, unlike
+`background_tasks` (written on every claim, lease renewal and completion) or `task_attempts` (one
+row per claim). So the write cost is close to nothing and the read benefit grows with accumulated
+handoff history.
+
+The other readers a candidate has to be checked against, all of them found by grep on 2026-09-12:
+
+- `src/adapters/persistence/attention.rs`, the handoff branch of the feed and the
+  responsibility-census `UNION ALL` arm — both `company_id + channel_id = ANY + status = 'open'`.
+  These are what the candidate is for.
+- the two priority/reassignment reads in the same file —
+  `company_id + id + channel_id = ANY + status = 'open' FOR UPDATE`. Served by
+  `manual_handoffs_company_id_id_key` already; the candidate neither helps nor hurts them.
+- `notification_from_attention_source` (`src/adapters/persistence/notification.rs`) —
+  `company_id + id FOR SHARE`. Same: already an identity probe.
+
+So the candidate serves two shapes and leaves three alone, which is the cleanest case in this file.
+
+**It is still Class C and still does not ship.** "Handoffs are rare" is an assumption about a
+product that has no users yet, and this gate exists precisely to stop assumptions like that from
+becoming permanent schema. **What would close it:** the count and growth rate of `manual_handoffs`
+rows, the open-to-resolved ratio, and a before/after plan of the feed's handoff branch at that
+cardinality. If handoffs turn out to be created by automation rather than by people, the write-rate
+argument above collapses and this reverts to an ordinary trade-off.
+
+## Message-to-task correctness fix (2026-09-12)
+
+The explicitly authorized replacement for the global 800-candidate task lookup ships with a
+matching scope-and-order index. This fixes incorrect task links when newer follow-ups evict the
+preferred task, while retaining the 200-message page bound. The
+[before/after evidence](../../docs/query-evidence/2026-09-12-message-task-lookup.md) records synthetic
+custom and generic plans, table/index sizes, and regression coverage. These are correctness and
+query-shape checks, not production performance evidence; the traffic-dependent decisions above
+remain deferred.
+
 ## Evidence Tooling Still To Build
 
 `pg_stat_statements` ranks normalized statements, but it cannot distinguish a shallow offset from a
@@ -372,8 +745,11 @@ required parent row plus:
 
 - `email_messages` and `thread_messages`, including a few very long threads and a long tail;
 - `background_tasks` with uneven company, status, schedule, creation, and update distributions;
-- `task_attempts` with realistic attempts-per-task and recent/old `started_at` windows; and
-- scheduled runs and list-page histories deep enough to exercise §1 and §3.
+- `task_attempts` with realistic attempts-per-task and recent/old `started_at` windows;
+- scheduled runs and list-page histories deep enough to exercise §1 and §3; and
+- lifetime owned tasks per principal, with skew and a long tail of principals owning nothing, plus
+  child rows on the tables §6.2 lists — without those, the two principal-removal paths cannot be
+  timed at all.
 
 Document the mathematical distribution rather than only the final row count. Load atomically, run
 `ANALYZE` after the bulk insert, and print verification queries for largest, median, and long-tail
