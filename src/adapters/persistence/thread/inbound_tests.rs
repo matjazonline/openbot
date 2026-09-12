@@ -6,7 +6,6 @@
 
 use super::test_support::*;
 use super::*;
-use crate::adapters::persistence::test_support::UNSCOPED_CLAIM;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
@@ -1175,6 +1174,52 @@ async fn a_commit_that_fails_at_the_threads_writes_nothing_either() {
     fixture.cleanup().await;
 }
 
+/// Every association's binding is checked in one statement, and a refusal reads as it did when each
+/// was checked on its own: the first bad pair in the order stated, named exactly.
+#[tokio::test]
+async fn an_association_through_another_channels_binding_names_the_first_bad_pair() {
+    let Some(fixture) = Fixture::new("inbound_unbound_association").await else {
+        return;
+    };
+    let billing = fixture.extra_channel("billing").await;
+    let sales = fixture.extra_channel("sales").await;
+    let primary_binding = fixture.email_binding_of(fixture.channel_id).await;
+    let billing_binding = fixture.email_binding_of(billing).await;
+    let rfc = format!("<unbound-{}@example.com>", fixture.suffix);
+    // A real, active binding -- of some other channel than the one it is paired with.
+    let misbound =
+        |channel_id: Uuid, binding_id: ChannelBindingId, index: usize| ThreadAssociation {
+            channel_id,
+            binding_id,
+            target: ThreadTarget::Create {
+                subject: "Quick question".to_string(),
+            },
+            role: RecipientRole::Cc,
+            step: PipelineStep { index, total: 3 },
+            principals: sender_principals(),
+        };
+
+    let mut request = request(&fixture, &rfc, "Anyone there?").await;
+    let mut associations = request.associations.into_inner();
+    associations.push(misbound(billing, primary_binding, 1));
+    associations.push(misbound(sales, billing_binding, 2));
+    request.associations = BoundedVec::parse("thread associations", associations).unwrap();
+
+    let error = fixture
+        .persistence
+        .commit_inbound(request)
+        .await
+        .expect_err("a binding cannot carry another channel's thread");
+    let expected = format!("Active binding {primary_binding} does not belong to channel {billing}");
+    assert!(
+        matches!(&error, AppError::NotFound(message) if *message == expected),
+        "{error:?}"
+    );
+    assert_eq!(message_count(&fixture).await, 0);
+
+    fixture.cleanup().await;
+}
+
 /// One mail addressed to two channels: one payload, one mapping per interface, one thread each.
 #[tokio::test]
 async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding() {
@@ -1238,8 +1283,7 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
 
 #[tokio::test]
 async fn canonical_rows_and_inbox_completion_commit_together() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(fixture) = Fixture::new("inbound_unsupported").await else {
+    let Some(fixture) = Fixture::isolated("inbound_unsupported").await else {
         return;
     };
     let rfc = format!("<event-{}@example.com>", fixture.suffix);
@@ -1256,8 +1300,7 @@ async fn canonical_rows_and_inbox_completion_commit_together() {
 
 #[tokio::test]
 async fn a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(fixture) = Fixture::new("inbound_crash").await else {
+    let Some(fixture) = Fixture::isolated("inbound_crash").await else {
         return;
     };
     let rfc = format!("<crash-{}@example.com>", fixture.suffix);
@@ -1352,8 +1395,7 @@ async fn a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_messa
 
 #[tokio::test]
 async fn lease_loss_at_final_commit_rolls_back_every_canonical_effect() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(fixture) = Fixture::new("inbound_lost_fence").await else {
+    let Some(fixture) = Fixture::isolated("inbound_lost_fence").await else {
         return;
     };
     let rfc = format!("<lost-{}@example.com>", fixture.suffix);

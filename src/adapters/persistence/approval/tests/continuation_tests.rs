@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::entities::{
     company::Company,
     task::{TaskLeaseRef, TaskStatus},
@@ -218,12 +219,10 @@ fn applied(outcome: WriteOutcome<RunCheckpoint>) -> RunCheckpoint {
 
 #[tokio::test]
 async fn approval_restores_the_exact_checkpoint_and_only_one_decision_wins() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool.clone()).await;
     let run = fixture.prepared().await;
     let approval = fixture.park(&run).await;
@@ -316,12 +315,10 @@ async fn approval_restores_the_exact_checkpoint_and_only_one_decision_wins() {
 
 #[tokio::test]
 async fn expiry_closes_the_wait_and_stops_the_task_without_charging_an_attempt() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool).await;
     let run = fixture.prepared().await;
     let approval = fixture.park(&run).await;
@@ -358,12 +355,10 @@ async fn expiry_closes_the_wait_and_stops_the_task_without_charging_an_attempt()
 
 #[tokio::test]
 async fn decision_rolls_back_when_the_linked_checkpoint_cannot_commit() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool.clone()).await;
     let run = fixture.prepared().await;
     let approval = fixture.park(&run).await;
@@ -407,12 +402,10 @@ async fn decision_rolls_back_when_the_linked_checkpoint_cannot_commit() {
 
 #[tokio::test]
 async fn expiry_sweep_backs_off_poison_and_settles_other_work_on_two_iterations() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let poison = Fixture::new(pool.clone()).await;
     let broken = poison.prepared().await;
     let poisoned_approval = poison.park(&broken).await;

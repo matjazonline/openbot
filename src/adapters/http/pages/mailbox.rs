@@ -2255,6 +2255,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             </div>
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
             {owner_panel}
+            {delegation_panel}
             {human_completion}
             {note_actions}
             {note_composer}
@@ -2279,6 +2280,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             )),
         activity_strip = thread_collaboration_strip(pane.activity, pane.collaboration),
         owner_panel = task_owner_panel(pane),
+        delegation_panel = delegation_panel(pane),
         human_completion = human_completion_composer(pane),
         note_actions = internal_note_actions(pane),
         note_composer = internal_note_composer(pane),
@@ -2360,6 +2362,59 @@ fn task_owner_panel(pane: &MessagePane<'_>) -> String {
             <div class="flex items-center justify-between gap-3"><span class="badge badge-outline">{label}</span>{action}</div>
             {handoff}</section>"#
     )
+}
+
+/// Whether this reader may act on the thread's delegation, and so be shown the controls for it.
+///
+/// The owner of a task is entitled to recover their own delegated work whether or not they
+/// administer the company: that is what [`DelegationAuthority::HumanOwner`] exists for, and until
+/// this panel existed the only route submitting these commands admitted managers alone. A reader
+/// with no principal in the company is shown nothing — there would be no actor to submit as.
+///
+/// [`DelegationAuthority::HumanOwner`]: crate::entities::delegation::DelegationAuthority::HumanOwner
+fn may_control_delegation(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> bool {
+    if pane.viewer_principal_id.is_none() {
+        return false;
+    }
+    let owns_task = matches!(work.ownership.owner, TaskOwner::Human(owner)
+        if Some(owner) == pane.viewer_principal_id);
+    owns_task || pane.viewer_manages_tasks
+}
+
+/// The delegation controls as the mailbox offers them, posting to `/ui/task-delegation` so the
+/// route resolves the reader's authority instead of assuming a manager.
+///
+/// A reassignment is deliberately absent: choosing a replacement channel needs the company's
+/// channel list, which this pane does not load, and the Tasks workspace is where that lives.
+fn delegation_panel(pane: &MessagePane<'_>) -> String {
+    let Some(work) = pane.work.as_ref() else {
+        return String::new();
+    };
+    let Some(summary) = pane.collaboration else {
+        return String::new();
+    };
+    if !may_control_delegation(pane, work) {
+        return String::new();
+    }
+    let body = delegation_control_forms(
+        summary,
+        &DelegationSurface {
+            action_prefix: &format!("/ui/task-delegation/{}", work.task_id),
+            action_suffix: "",
+            target: "#detail-pane",
+            scope_fields: &format!(
+                r#"<input type="hidden" name="company_id" value="{company_id}"><input type="hidden" name="channel_id" value="{channel_id}"><input type="hidden" name="thread_id" value="{thread_id}">"#,
+                company_id = pane.company_id,
+                channel_id = pane.channel.id,
+                thread_id = pane.thread.id,
+            ),
+            reassign_channels: &[],
+        },
+    );
+    if body.is_empty() {
+        return String::new();
+    }
+    format!(r#"<div class="border-t border-base-300 px-4 py-3 sm:px-6">{body}</div>"#)
 }
 
 fn ownership_transfer_form(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> String {

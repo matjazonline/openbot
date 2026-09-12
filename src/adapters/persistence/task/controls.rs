@@ -18,6 +18,7 @@ use crate::{
         },
         outreach::OutreachStatus,
         task::{TaskStatus, TaskTransitionReason, TransitionActor},
+        transport::{PrincipalId, QualifiedIdentity},
     },
     task_queue::{DelegationCommandRequest, OutreachTargetIdentity, OutreachTargetRequest},
 };
@@ -127,12 +128,16 @@ async fn authorize(
     if !authority_matches {
         return Err(AppError::NotFound("Delegated work not found.".into()));
     }
+    // Re-addressing a person's question is a people decision, not a run's: an owning agent may
+    // cancel or reassign what it asked *inside* the company, but never hand a named person's ask
+    // to a different named person. Only a manager does that, and today only a member removal asks.
     if command.actor.authority == DelegationAuthority::OwningAgent
         && matches!(
             command.operation,
             DelegationOperation::CancelOutreach { .. }
                 | DelegationOperation::ProceedWithPartial { .. }
                 | DelegationOperation::StopTask { .. }
+                | DelegationOperation::ReassignPersonTarget { .. }
         )
     {
         return Err(AppError::NotFound("Delegated work not found.".into()));
@@ -419,27 +424,93 @@ async fn maybe_reach_quorum(
     Ok(())
 }
 
+/// Whether this company principal is a **person** who actually holds that identity.
+///
+/// The fence for a person redirect: the command names a principal, the caller prepares an
+/// addressed request, and this is where the two are proved to be the same recipient rather than
+/// the adapter taking the composed address on trust. `kind = 'person'` is checked here too, so an
+/// agent principal — which has no `participant_identities` row at all — can never be a target even
+/// if a caller invented one.
+async fn holds_identity(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    principal_id: PrincipalId,
+    identity: &QualifiedIdentity,
+) -> AppResult<bool> {
+    sqlx::query_scalar::<_, bool>(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM participant_identities AS identity
+               JOIN principals AS principal
+                 ON (principal.company_id, principal.id) =
+                    (identity.company_id, identity.principal_id)
+               WHERE identity.company_id = $1 AND identity.principal_id = $2
+                 AND principal.kind = 'person' AND identity.status <> 'disabled'
+                 AND identity.transport = $3 AND identity.namespace = $4
+                 AND identity.subject = $5
+           )"#,
+    )
+    .bind(company_id)
+    .bind(principal_id.as_uuid())
+    .bind(identity.transport().as_str())
+    .bind(identity.namespace().as_str())
+    .bind(identity.subject().as_str())
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)
+}
+
+/// That the prepared replacement is addressed where the *command* said, not merely somewhere.
+///
+/// One arm per reassignment: the internal one names a channel outright, the person one names a
+/// principal whose addresses are rows this transaction reads.
+async fn authorize_replacement(
+    tx: &mut Transaction<'_, Postgres>,
+    command: &DelegationCommand,
+    replacement: &OutreachTargetRequest,
+) -> AppResult<()> {
+    match command.operation {
+        DelegationOperation::ReassignInternalTarget { new_channel_id, .. } => {
+            if replacement.target
+                != (OutreachTargetIdentity::InternalChannel {
+                    channel_id: new_channel_id,
+                })
+            {
+                return Err(AppError::BadRequest(
+                    "Replacement target does not match the requested internal channel.".into(),
+                ));
+            }
+            Ok(())
+        }
+        DelegationOperation::ReassignPersonTarget {
+            new_principal_id, ..
+        } => {
+            let OutreachTargetIdentity::External { identity } = &replacement.target else {
+                return Err(AppError::BadRequest(
+                    "A redirected ask must be re-addressed to the new owner, not to a channel."
+                        .into(),
+                ));
+            };
+            if !holds_identity(tx, command.company_id, new_principal_id, identity).await? {
+                return Err(AppError::BadRequest(
+                    "The new owner does not hold the address this question was re-addressed to."
+                        .into(),
+                ));
+            }
+            Ok(())
+        }
+        _ => Err(AppError::Internal(
+            "Replacement supplied for another operation.".into(),
+        )),
+    }
+}
+
 async fn insert_replacement(
     tx: &mut Transaction<'_, Postgres>,
     command: &DelegationCommand,
     old_target_id: Uuid,
     replacement: &OutreachTargetRequest,
 ) -> AppResult<Uuid> {
-    let DelegationOperation::ReassignInternalTarget { new_channel_id, .. } = command.operation
-    else {
-        return Err(AppError::Internal(
-            "Replacement supplied for another operation.".into(),
-        ));
-    };
-    if replacement.target
-        != (OutreachTargetIdentity::InternalChannel {
-            channel_id: new_channel_id,
-        })
-    {
-        return Err(AppError::BadRequest(
-            "Replacement target does not match the requested internal channel.".into(),
-        ));
-    }
+    authorize_replacement(tx, command, replacement).await?;
     if replacement.delivery.company_id != command.company_id
         || replacement.delivery.task_id != Some(command.task_id)
         || replacement.delivery.message_id != replacement.request.id
@@ -452,28 +523,117 @@ async fn insert_replacement(
     }
     insert_message_on(tx, &replacement.request).await?;
     insert_delivery_on(tx, &replacement.delivery).await?;
-    let address = replacement
-        .delivery
-        .external_destination
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("Replacement delivery has no destination.".into()))?;
+    // The same derivation the original targets were written with, so a replacement row and a
+    // first-time row of the same kind can never disagree about which columns describe it.
+    let columns = super::operations::outreach_target_columns(replacement)?;
     sqlx::query_scalar(
         r#"INSERT INTO task_outreach_targets
                (outreach_id, company_id, email, target_kind, internal_channel_id,
+                external_transport, external_namespace, external_subject,
                 delivery_id, request_message_id, status, replaces_target_id)
-           VALUES ($1, $2, $3, 'internal_channel', $4, $5, $6, 'active', $7)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11)
            RETURNING id"#,
     )
     .bind(command.operation.outreach_id())
     .bind(command.company_id)
-    .bind(address.as_str())
-    .bind(new_channel_id)
+    .bind(columns.delivery_address)
+    .bind(columns.kind)
+    .bind(columns.internal_channel_id)
+    .bind(columns.external_transport)
+    .bind(columns.external_namespace)
+    .bind(columns.external_subject)
     .bind(replacement.delivery.id.as_uuid())
     .bind(replacement.request.id.as_uuid())
     .bind(old_target_id)
     .fetch_one(&mut **tx)
     .await
     .map_err(AppError::from)
+}
+
+/// Re-address one person's open ask at another person, preserving both sides of the record.
+///
+/// The mirror of the internal-channel arm below, and deliberately the same five steps: refuse
+/// unless the outreach is still waiting, lock the old target, supersede it, cancel whatever of its
+/// mail has not left, and correlate a fresh active target to it. What differs is only what the
+/// two ends *are* — an external identity rather than a channel — so a superseded person target
+/// stops counting toward quorum (`tally_outreach_targets` counts `active` and `responded` only)
+/// while its request, its delivery and any late reply it still draws stay exactly as they were.
+///
+/// No `revoke_internal_child`: an externally addressed question spawned no child task in this
+/// company, so there is nothing of ours to stop — only mail that may already have gone out, which
+/// `cancel_delivery` reports honestly rather than pretending to recall.
+async fn reassign_person_target(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &DelegationCommandRequest,
+    outreach_status: OutreachStatus,
+) -> AppResult<MutationOutcome> {
+    let command = &request.command;
+    let DelegationOperation::ReassignPersonTarget { target_id, .. } = command.operation else {
+        return Err(AppError::Internal(
+            "Person reassignment applied to another operation.".into(),
+        ));
+    };
+    if !matches!(
+        outreach_status,
+        OutreachStatus::Waiting | OutreachStatus::TimeoutPendingApproval
+    ) {
+        return Err(AppError::Conflict(
+            "This outreach is no longer accepting reassignment.".into(),
+        ));
+    }
+    let old = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>)>(
+        r#"SELECT target_kind, external_transport, external_namespace, external_subject
+           FROM task_outreach_targets
+           WHERE company_id = $1 AND outreach_id = $2 AND id = $3 AND status = 'active'
+           FOR UPDATE"#,
+    )
+    .bind(command.company_id)
+    .bind(command.operation.outreach_id())
+    .bind(target_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?
+    .ok_or_else(|| AppError::Conflict("This ask can no longer be redirected.".into()))?;
+    let (kind, transport, namespace, subject) = old;
+    if kind != "external" {
+        return Err(AppError::BadRequest(
+            "Only an ask addressed to a person can be redirected; reassign an internal one to a \
+             channel instead."
+                .into(),
+        ));
+    }
+    let replacement = request.replacement.as_ref().ok_or_else(|| {
+        AppError::BadRequest("Redirecting an ask requires a prepared replacement request.".into())
+    })?;
+    if let OutreachTargetIdentity::External { identity } = &replacement.target
+        && (
+            transport.as_deref(),
+            namespace.as_deref(),
+            subject.as_deref(),
+        ) == (
+            Some(identity.transport().as_str()),
+            Some(identity.namespace().as_str()),
+            Some(identity.subject().as_str()),
+        )
+    {
+        return Err(AppError::BadRequest(
+            "Choose somebody other than the person already being asked.".into(),
+        ));
+    }
+
+    let delivery = cancel_delivery(tx, target_id, "This ask was redirected to a new owner").await?;
+    sqlx::query("UPDATE task_outreach_targets SET status = 'superseded' WHERE id = $1")
+        .bind(target_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(AppError::from)?;
+    let replacement_target_id = insert_replacement(tx, command, target_id, replacement).await?;
+    Ok(MutationOutcome {
+        target_id: Some(target_id),
+        replacement_target_id: Some(replacement_target_id),
+        delivery_cancellation: delivery,
+        ..MutationOutcome::plain()
+    })
 }
 
 async fn apply_operation(
@@ -678,6 +838,9 @@ async fn apply_operation(
                 delivery_cancellation: delivery,
                 ..MutationOutcome::plain()
             })
+        }
+        DelegationOperation::ReassignPersonTarget { .. } => {
+            reassign_person_target(tx, request, outreach_status).await
         }
         DelegationOperation::ProceedWithPartial { outreach_id } => {
             if !matches!(

@@ -903,6 +903,72 @@ async fn a_message_records_its_author_as_a_principal_and_projects_its_recipients
     fixture.cleanup().await;
 }
 
+/// Participant rows are written by one statement. They still come out one per handle per role, in
+/// the order each role stated them: a handle repeated in `To:` lands once, the same handle in `Cc:`
+/// lands there as well, and a message with no participants writes none.
+#[tokio::test]
+async fn participants_keep_their_order_within_each_role_and_a_repeated_handle_lands_once() {
+    let Some(fixture) = Fixture::new("participant_rows").await else {
+        return;
+    };
+    let rows = |message_id: CanonicalMessageId| {
+        sqlx::query_scalar::<_, String>(
+            r#"SELECT participant.kind || ':' || participant.position || ':' || identity.subject
+               FROM message_participants AS participant
+               JOIN participant_identities AS identity
+                 ON identity.company_id = participant.company_id
+                AND identity.id = participant.participant_identity_id
+               WHERE participant.company_id = $1 AND participant.message_id = $2
+               ORDER BY participant.kind, participant.position"#,
+        )
+        .bind(fixture.company_id)
+        .bind(message_id.as_uuid())
+        .fetch_all(&fixture.pool)
+    };
+
+    let mut write = inbound_email(
+        fixture.thread.id,
+        email_metadata(&format!("<participants-{}@partner.test>", fixture.suffix)),
+        "Body",
+    );
+    write.participants = vec![
+        participant(MessageParticipantKind::Sender, "sender@partner.test"),
+        participant(MessageParticipantKind::To, "first@example.com"),
+        participant(MessageParticipantKind::To, "second@example.com"),
+        participant(MessageParticipantKind::To, "first@example.com"),
+        participant(MessageParticipantKind::To, "third@example.com"),
+        participant(MessageParticipantKind::Cc, "first@example.com"),
+    ];
+    let stored = fixture.persistence.create_message(&write).await.unwrap();
+    assert_eq!(
+        rows(stored.canonical_id).await.unwrap(),
+        vec![
+            "cc:0:first@example.com",
+            "sender:0:sender@partner.test",
+            "to:0:first@example.com",
+            "to:1:second@example.com",
+            "to:2:third@example.com",
+        ]
+    );
+
+    let note = fixture
+        .persistence
+        .create_message(&MessageWrite::internal(
+            fixture.thread.id,
+            MessageAuthorWrite::Platform,
+            "Note",
+            "No one is addressed.",
+            MessageDirection::Inbound,
+            MessageRole::System,
+            CorrelationId::new(),
+        ))
+        .await
+        .expect("a message with no participants is stored");
+    assert!(rows(note.canonical_id).await.unwrap().is_empty());
+
+    fixture.cleanup().await;
+}
+
 /// A schedule prompt, an approval note and an agent's answer are complete messages with no mail
 /// behind them at all -- no address, no Message-ID, no recipients.
 #[tokio::test]

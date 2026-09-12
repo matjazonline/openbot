@@ -7,7 +7,8 @@
 //!
 //! The stream is a ticker rather than an event subscription. These are sampled gauges — a queue
 //! depth has no "changed" moment to subscribe to — so re-reading on an interval is both simpler and
-//! a more honest description of what the page shows.
+//! a more honest description of what the page shows. Tabs on the same view share one reading per
+//! tick through [`DashboardSnapshotService`].
 
 use std::{
     convert::Infallible,
@@ -15,7 +16,6 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
 };
 
 use axum::{
@@ -33,13 +33,10 @@ use tracing::{instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::{
-        http::{
-            app_state::AppState,
-            auth::{AuthError, AuthenticatedUser},
-            pages,
-        },
-        persistence::dashboard::DashboardPersistence,
+    adapters::http::{
+        app_state::AppState,
+        auth::{AuthError, AuthenticatedUser},
+        pages,
     },
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
@@ -51,6 +48,7 @@ use crate::{
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
+    services::dashboard_snapshot::{DASHBOARD_TICK, DashboardSnapshotService},
     services::database_query_health::{DatabaseQueryHealth, DatabaseQueryHealthService},
     services::runtime_metrics::RuntimeMetricPersistence,
     use_cases::{company::CompanyUseCases, user::UserUseCases},
@@ -58,9 +56,6 @@ use crate::{
 
 use super::ui::{load_account, load_managed_company, workspace_user};
 
-/// How often a connected dashboard re-reads. Slow enough that a room full of open tabs is not a
-/// load generator, fast enough that a queue draining is visibly a queue draining.
-const TICK: Duration = Duration::from_secs(5);
 const PRIVATE_NO_STORE: &str = "private, no-store";
 
 pub fn router() -> Router<AppState> {
@@ -110,7 +105,7 @@ impl DashboardQuery {
 struct Dashboard {
     company_use_cases: Arc<CompanyUseCases>,
     user_use_cases: Arc<UserUseCases>,
-    dashboard_persistence: Arc<dyn DashboardPersistence>,
+    dashboard_snapshots: Arc<DashboardSnapshotService>,
     database_query_health: Arc<DatabaseQueryHealthService>,
     dashboard_sse_connections: Arc<AtomicU64>,
     runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
@@ -132,7 +127,7 @@ impl FromRequestParts<AppState> for Dashboard {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
-            dashboard_persistence: state.dashboard_persistence.clone(),
+            dashboard_snapshots: state.dashboard_snapshots.clone(),
             database_query_health: state.database_query_health.clone(),
             dashboard_sse_connections: state.dashboard_sse_connections.clone(),
             runtime_metrics: state.runtime_metrics.clone(),
@@ -254,10 +249,7 @@ impl Dashboard {
         operator: bool,
     ) -> AppResult<Reading> {
         Ok(Reading {
-            snapshot: self
-                .dashboard_persistence
-                .dashboard_snapshot(company, window)
-                .await?,
+            snapshot: self.dashboard_snapshots.snapshot(company, window).await?,
             process: operator
                 .then(|| ProcessGauges::from_stats_json(&self.monitoring.get_stats_json())),
             runtime: load_runtime_snapshot(
@@ -400,7 +392,7 @@ async fn dashboard_stream(
             dashboard.monitoring.clone(),
         );
         let user = workspace_user(&account, &account_email, &dashboard.config);
-        let mut ticker = tokio::time::interval(TICK);
+        let mut ticker = tokio::time::interval(DASHBOARD_TICK);
         // The first tick is immediate. Spend it: a reader that just connected wants the current
         // numbers, not the ones from five seconds hence.
         loop {

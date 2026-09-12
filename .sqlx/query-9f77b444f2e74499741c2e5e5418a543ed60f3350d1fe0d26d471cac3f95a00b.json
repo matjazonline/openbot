@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT actor_principal_id, actor_kind, authority, operation, reason, from_version,\n                      to_version, result, occurred_at\n                 FROM delegation_control_commands WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "actor_principal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "actor_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "authority",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "operation",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "from_version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "to_version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "result",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9f77b444f2e74499741c2e5e5418a543ed60f3350d1fe0d26d471cac3f95a00b"
+}

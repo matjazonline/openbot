@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO delegation_control_commands (\n                   id, company_id, task_id, outreach_id, target_id, command_id,\n                   command_fingerprint, operation, actor_principal_id, actor_kind, authority,\n                   reason, from_version, to_version, result\n               ) VALUES ($1, $2, $3, $4, $5, $6, 'fingerprint', 'cancel_target', $7, 'person',\n                         'company_manager', 'target_unavailable', 1, 2,\n                         '{\"version\": \"1\"}'::jsonb)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "585f27a83d081122dce556378ca909f1cdad9a74311eec972ab58f2e5fa88dfe"
+}

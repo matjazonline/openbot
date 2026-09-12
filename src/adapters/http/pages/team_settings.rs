@@ -61,6 +61,9 @@ pub struct MemberPane<'a> {
     /// What the user last typed in the avatar field, when a save was rejected; `None` shows the
     /// stored URL.
     pub avatar_draft: Option<&'a str>,
+    /// The live work removing this person would move, for a viewer who may act on it. `None` for a
+    /// pane with no authority to remove anybody, which is why a colleague's pane is unchanged.
+    pub work_at_stake: Option<&'a MemberWorkAtStake>,
     pub error: Option<&'a str>,
 }
 
@@ -79,6 +82,15 @@ impl MemberPane<'_> {
     /// so their pane shows no button rather than one that always fails.
     fn removable(&self) -> bool {
         self.role.manages() && self.member.user_id != self.company.user_id
+    }
+
+    /// The live work this removal would move, for a pane that could actually remove somebody.
+    ///
+    /// `None` for a viewer with no authority and for a member holding nothing: both render the
+    /// plain removal, with no decision attached to it.
+    fn at_stake(&self) -> Option<&MemberWorkAtStake> {
+        self.work_at_stake
+            .filter(|at_stake| self.removable() && !at_stake.is_empty())
     }
 }
 
@@ -374,24 +386,10 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
     let member = pane.member;
     let is_owner = member.user_id == pane.company.user_id;
 
-    let remove_button = if pane.removable() {
-        format!(
-            r##"<button type="button" class="btn btn-error btn-outline"
-                            hx-delete="{endpoint}"
-                            hx-target="#team-pane" hx-swap="outerHTML"
-                            hx-confirm="Remove {username} from the {company_name} team? They lose access to its channels and threads."
-                            hx-push-url="{cleared_url}">Remove from Team</button>"##,
-            endpoint = team_endpoint(pane.company.id, &format!("/members/{}", member.user_id)),
-            cleared_url = team_url(pane.company.id, TeamSelection::None),
-            username = escape_html_text(member_name(member)),
-            company_name = escape_html_text(&pane.company.name),
-        )
-    } else {
-        String::new()
-    };
-
     let footnote = if is_owner {
         "The company owner cannot be removed from their own team."
+    } else if pane.at_stake().is_some() {
+        "One choice, applied to all of it. Nothing is unassigned behind your back."
     } else if pane.role.manages() {
         ""
     } else {
@@ -426,14 +424,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
                     </div>
                 </dl>
                 <p class="mb-4 text-xs opacity-70">A team member is trusted by every channel in this company that has no participant list of its own.</p>
-                <div class="flex items-center gap-3 border-t border-base-300 pt-4">
-                    <button type="button" class="btn btn-ghost"
-                        hx-get="{close_endpoint}"
-                        hx-target="#team-pane" hx-swap="outerHTML"
-                        hx-sync="#team-pane:replace"
-                        hx-push-url="{cleared_url}">Close</button>
-                    <div class="ml-auto">{remove_button}</div>
-                </div>
+                {removal}
                 <p class="mt-3 text-[11px] opacity-60">{footnote}</p>
             </div>
         </section>
@@ -453,10 +444,244 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         avatar_form = avatar_form(pane),
         access_role_form = member_access_role_form(pane),
+        removal = removal_block(pane),
         joined = super::format_date(member.created_at),
         company_name = escape_html_text(&pane.company.name),
+    )
+}
+
+/// The removal, with whatever decision it carries, as one submission.
+///
+/// The work section and the Remove button live inside the same `<form>` so the pane presents
+/// exactly one decision point and one action: there is no state in which the admin has resolved
+/// some items and is waiting for a button to unlock. A viewer who cannot remove anybody gets the
+/// footer alone.
+///
+/// No `hx-push-url` on the form: a refused removal answers with this same pane, and the address bar
+/// must not claim nobody is selected. The successful response sends its own `HX-Push-Url` instead.
+fn removal_block(pane: &MemberPane<'_>) -> String {
+    let footer = format!(
+        r##"
+                <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                    <button type="button" class="btn btn-ghost"
+                        hx-get="{close_endpoint}"
+                        hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-sync="#team-pane:replace"
+                        hx-push-url="{cleared_url}">Close</button>
+                    <div class="ml-auto">{remove_button}</div>
+                </div>
+        "##,
         close_endpoint = team_endpoint(pane.company.id, "/close"),
         cleared_url = team_url(pane.company.id, TeamSelection::None),
+        remove_button = if pane.removable() {
+            r##"<button type="submit" class="btn btn-error btn-outline">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Remove from Team</span>
+                            <span class="hidden [.htmx-request_&]:inline">Removing...</span>
+                        </button>"##
+        } else {
+            ""
+        },
+    );
+
+    if !pane.removable() {
+        return footer;
+    }
+
+    format!(
+        r##"
+                <form hx-post="{endpoint}" hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-confirm="{confirm}"
+                    hx-disabled-elt="find button[type='submit']">
+                    {work_at_stake}
+                    {footer}
+                </form>
+        "##,
+        endpoint = team_endpoint(
+            pane.company.id,
+            &format!("/members/{}/removal", pane.member.user_id),
+        ),
+        confirm = escape_html_text(&removal_confirmation(pane)),
+        work_at_stake = work_at_stake_section(pane),
+    )
+}
+
+/// What the confirm dialog says, which is what the one click actually does.
+fn removal_confirmation(pane: &MemberPane<'_>) -> String {
+    let username = member_name(pane.member);
+    let company_name = &pane.company.name;
+    match pane.at_stake() {
+        None => format!(
+            "Remove {username} from the {company_name} team? They lose access to its channels and \
+             threads."
+        ),
+        Some(at_stake) => format!(
+            "Remove {username} from the {company_name} team? {tasks} active task(s) and {asks} \
+             pending ask(s) to them move to your chosen owner.",
+            tasks = at_stake.owned_tasks.len(),
+            asks = at_stake.delegated_asks.len(),
+        ),
+    }
+}
+
+/// The one decision a removal with live work asks for, above the button that applies it.
+///
+/// One owner picker and one handoff field for everything: the tasks are transferred to the chosen
+/// owner and the open asks are re-asked at them, so there is exactly one thing to choose. The
+/// items themselves are listed for reading rather than decided one by one.
+fn work_at_stake_section(pane: &MemberPane<'_>) -> String {
+    let Some(at_stake) = pane.at_stake() else {
+        return String::new();
+    };
+
+    let truncated = if at_stake.truncated {
+        format!(
+            r#"<p class="mt-3 text-[11px] opacity-60">Showing the first {limit} of each kind; this removal resolves those, and removing again picks up the rest.</p>"#,
+            limit = MemberWorkAtStake::MAX_PER_KIND,
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        r##"
+                <section class="mb-6 rounded-box border border-warning/50 bg-warning/10 px-4 py-3">
+                    <h3 class="text-sm font-semibold">Live work to hand over ({count})</h3>
+                    <p class="mt-1 text-xs opacity-70">{username} still holds work other people are waiting on. One choice covers all of it, and removing them applies it.</p>
+                    {owner_choice}
+                    {task_list}
+                    {ask_list}
+                    {truncated}
+                </section>
+        "##,
+        count = at_stake.len(),
+        username = escape_html_text(member_name(pane.member)),
+        owner_choice = owner_choice(pane, at_stake),
+        task_list = owned_task_list(pane, at_stake),
+        ask_list = delegated_ask_list(pane, at_stake),
+    )
+}
+
+/// The single owner picker and the single handoff instruction, for every item at once.
+///
+/// Every option names a person or an agent: there is no "leave it to nobody", because that is the
+/// silent unassignment this flow exists to prevent. Asks count towards the choice too — they are
+/// re-asked at whoever is picked — so the picker appears for a member holding only asks as well.
+///
+/// With no candidate every affected channel accepts there is nothing to offer, so this says so
+/// instead of rendering an empty control. Clicking Remove then gets the same answer from the use
+/// case, which refuses rather than falling back.
+fn owner_choice(pane: &MemberPane<'_>, at_stake: &MemberWorkAtStake) -> String {
+    let options: String = at_stake
+        .owner_candidates
+        .iter()
+        .filter_map(|candidate| {
+            let id = candidate.owner.principal_id()?;
+            Some(format!(
+                r#"<option value="{kind}:{id}">{label}</option>"#,
+                kind = candidate.owner.as_str(),
+                id = id.as_uuid(),
+                label = escape_html_text(&candidate.label),
+            ))
+        })
+        .collect();
+    if options.is_empty() {
+        return r##"
+                    <p class="mt-3 rounded-box bg-base-100 px-3 py-3 text-xs opacity-70">Nobody is eligible to take this work over on every channel it runs on, so this person cannot be removed yet. Give a teammate or an agent access to those channels, or finish the work, then remove them.</p>
+        "##
+        .to_string();
+    }
+
+    format!(
+        r##"
+                    <div class="mt-3 flex flex-col gap-2 rounded-box bg-base-100 px-3 py-3">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">New owner for all {count} of {username}'s live item(s)</span></div>
+                            <select name="owner" class="select select-sm w-full" required aria-label="New owner for every item">
+                                <option value="" selected disabled>Choose who takes this work…</option>
+                                {options}
+                            </select>
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Handoff instruction</span></div>
+                            <textarea name="handoff_instruction" class="textarea textarea-sm w-full" rows="2"
+                                placeholder="What the new owner needs to know — required"></textarea>
+                        </label>
+                    </div>
+        "##,
+        count = at_stake.len(),
+        username = escape_html_text(member_name(pane.member)),
+    )
+}
+
+/// The tasks the choice above will be applied to, for reading rather than deciding.
+fn owned_task_list(pane: &MemberPane<'_>, at_stake: &MemberWorkAtStake) -> String {
+    if at_stake.owned_tasks.is_empty() {
+        return String::new();
+    }
+
+    let rows: String = at_stake
+        .owned_tasks
+        .iter()
+        .map(|task| {
+            format!(
+                r##"
+                        <li class="flex flex-wrap items-center gap-2 px-3 py-2">
+                            <span class="badge badge-sm badge-outline">{status}</span>
+                            <span class="text-sm font-medium">{task_type}</span>
+                            <a class="link link-hover ml-auto text-xs" href="/ui/tasks?company_id={company_id}&view=board&correlation_id={correlation_id}">Open the task</a>
+                        </li>
+                "##,
+                status = escape_html_text(task.status.as_str()),
+                task_type = escape_html_text(&task.task_type),
+                company_id = pane.company.id,
+                correlation_id = task.correlation_id,
+            )
+        })
+        .collect();
+
+    format!(r##"<ul class="mt-3 divide-y divide-base-300 rounded-box bg-base-100">{rows}</ul>"##)
+}
+
+/// The asks the same submission re-asks at the chosen owner, listed for reading.
+///
+/// Nothing to choose here: the one selection above already named who answers them, so what the
+/// pane owes the reader is which questions that covers.
+fn delegated_ask_list(pane: &MemberPane<'_>, at_stake: &MemberWorkAtStake) -> String {
+    if at_stake.delegated_asks.is_empty() {
+        return String::new();
+    }
+
+    let rows: String = at_stake
+        .delegated_asks
+        .iter()
+        .map(|ask| {
+            format!(
+                r##"
+                        <li class="px-3 py-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="badge badge-sm badge-outline">waiting on a reply</span>
+                                <span class="text-sm font-medium">{subject}</span>
+                                <a class="link link-hover ml-auto text-xs" href="/ui/tasks?company_id={company_id}&view=board&task_id={task_id}">Open the task</a>
+                            </div>
+                            <p class="mt-1 font-mono text-[11px] opacity-60">asked {address} · due {due}</p>
+                        </li>
+                "##,
+                subject = escape_html_text(&ask.subject),
+                address = escape_html_text(&ask.asked_address),
+                due = super::format_date(ask.expires_at),
+                company_id = pane.company.id,
+                task_id = ask.task_id,
+            )
+        })
+        .collect();
+
+    format!(
+        r##"
+                    <p class="mt-3 text-xs opacity-70">{count} pending ask(s) to this person will be redirected to the chosen owner.</p>
+                    <ul class="mt-1 divide-y divide-base-300 rounded-box bg-base-100">{rows}</ul>
+        "##,
+        count = at_stake.delegated_asks.len(),
     )
 }
 

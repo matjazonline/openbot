@@ -17,6 +17,7 @@ pub mod delivery;
 pub mod email_message;
 pub mod harness;
 pub mod internal_note;
+pub mod member_removal;
 pub mod memory;
 pub mod message;
 pub mod message_view;

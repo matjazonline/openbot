@@ -1541,7 +1541,14 @@ BEGIN
             owned.old_label, 'unassigned', 'owner_removed'
         );
     END LOOP;
-    RETURN OLD;
+    -- Two triggers share this body. An agent's principal is deleted outright, cascaded from the
+    -- agent row; a person's principal is demoted to 'external' by team removal, which is an
+    -- UPDATE whose row must be returned as NEW -- returning OLD there would quietly write the
+    -- pre-demotion row back, and returning NULL would skip the update this clears the way for.
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -2182,6 +2189,12 @@ CREATE TABLE public.company_resend_api_integrations (
 --
 -- Name: delegation_control_commands; Type: TABLE; Schema: public; Owner: -
 --
+-- Append-only: who issued which delegation recovery command, and what it returned. There is no
+-- "reassign who issued a historical command", so `actor_kind` allows 'external' even though
+-- nothing ever inserts it -- it is arrived at only by
+-- `delegation_control_commands_actor_fk`'s ON UPDATE CASCADE, when the principal named here is
+-- later demoted out of the team. The row and its `actor_principal_id` stay exactly as written.
+--
 
 CREATE TABLE public.delegation_control_commands (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -2201,9 +2214,9 @@ CREATE TABLE public.delegation_control_commands (
     to_version bigint NOT NULL,
     result jsonb NOT NULL,
     occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT delegation_control_commands_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['person'::text, 'agent'::text]))),
+    CONSTRAINT delegation_control_commands_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['person'::text, 'agent'::text, 'external'::text]))),
     CONSTRAINT delegation_control_commands_authority_check CHECK ((authority = ANY (ARRAY['human_owner'::text, 'company_manager'::text, 'owning_agent'::text]))),
-    CONSTRAINT delegation_control_commands_operation_check CHECK ((operation = ANY (ARRAY['extend_outreach'::text, 'cancel_target'::text, 'cancel_outreach'::text, 'reassign_internal_target'::text, 'proceed_with_partial'::text, 'stop_task'::text]))),
+    CONSTRAINT delegation_control_commands_operation_check CHECK ((operation = ANY (ARRAY['extend_outreach'::text, 'cancel_target'::text, 'cancel_outreach'::text, 'reassign_internal_target'::text, 'reassign_person_target'::text, 'proceed_with_partial'::text, 'stop_task'::text]))),
     CONSTRAINT delegation_control_commands_reason_check CHECK ((reason = ANY (ARRAY['deadline_changed'::text, 'no_longer_needed'::text, 'target_unavailable'::text, 'incorrect_target'::text, 'partial_results_accepted'::text, 'task_stopped'::text, 'other'::text]))),
     CONSTRAINT delegation_control_commands_reason_detail_check CHECK (((reason_detail IS NULL) OR (octet_length(reason_detail) <= 512))),
     CONSTRAINT delegation_control_commands_result_version_check CHECK (((result ->> 'version'::text) = '1'::text)),
@@ -4887,8 +4900,14 @@ CREATE INDEX background_tasks_correlation_idx ON public.background_tasks USING b
 --
 -- Name: background_tasks_pending_ready_idx; Type: INDEX; Schema: public; Owner: -
 --
+-- The task claim's access path. It leads with company_id because the claim walks the companies
+-- that have pending agent work, one descent each, and takes a bounded oldest-first slice from
+-- each (see claim_pending_tasks). Only agent-owned rows are indexed: a pending task owned by a
+-- person, or by nobody, is never claimed, and because such tasks linger they would otherwise sit
+-- at the old end of the index, where every claim starts reading.
+--
 
-CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks USING btree (run_at, created_at, id) WHERE (status = 'pending'::text);
+CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks USING btree (company_id, run_at, created_at, id) WHERE ((status = 'pending'::text) AND (owner_principal_kind = 'agent'::text));
 
 
 --
@@ -5904,6 +5923,22 @@ CREATE TRIGGER principals_release_owned_tasks BEFORE DELETE ON public.principals
 
 
 --
+-- Name: principals principals_release_owned_tasks_on_demotion; Type: TRIGGER; Schema: public; Owner: -
+--
+-- A safety net, not the mechanism. Removing a team member is a guided flow now
+-- (`CompanyInviteUseCases::member_work_at_stake` -> an explicit Transfer/Release per owned task ->
+-- `remove_company_team_member`), so by the time a demotion reaches this trigger there should be no
+-- owned task left for it to release. It stays because `background_tasks_owner_principal_fk`
+-- carries `kind`: a caller that demotes without running the pre-check first -- a direct
+-- `remove_member`, a future code path -- would otherwise fail the whole removal transaction on a
+-- foreign key mid-write. Silently releasing to Unassigned is the fallback, and reaching it means a
+-- caller skipped the flow.
+--
+
+CREATE TRIGGER principals_release_owned_tasks_on_demotion BEFORE UPDATE OF kind ON public.principals FOR EACH ROW WHEN (((old.kind = ANY (ARRAY['person'::text, 'agent'::text])) AND (new.kind = 'external'::text))) EXECUTE FUNCTION public.release_tasks_for_removed_principal();
+
+
+--
 -- Name: response_draft_evidence response_draft_evidence_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -6394,7 +6429,7 @@ ALTER TABLE ONLY public.company_resend_api_integrations
 --
 
 ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_actor_fk FOREIGN KEY (company_id, actor_principal_id, actor_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
+    ADD CONSTRAINT delegation_control_commands_actor_fk FOREIGN KEY (company_id, actor_principal_id, actor_kind) REFERENCES public.principals(company_id, id, kind) ON UPDATE CASCADE ON DELETE RESTRICT;
 
 
 --

@@ -36,10 +36,11 @@ use crate::{
         collaboration::CollaborationSummary,
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
+        delegation::{DelegationActor, DelegationAuthority, DelegationCommand, DelegationReason},
         message::CanonicalMessageId,
         task::{
-            TaskOwner, TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
-            TaskOwnershipOperation, TaskOwnershipReason, ThreadActivity,
+            BackgroundTask, TaskOwner, TaskOwnershipActor, TaskOwnershipAuthority,
+            TaskOwnershipCommand, TaskOwnershipOperation, TaskOwnershipReason, ThreadActivity,
         },
         thread::Thread,
         user::{User, Viewer},
@@ -85,6 +86,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/ui/task-ownership/{task_id}/{operation}",
             axum::routing::post(change_visible_task_ownership),
+        )
+        .route(
+            "/ui/task-delegation/{task_id}/{operation}",
+            axum::routing::post(control_visible_task_delegation),
         )
 }
 
@@ -166,6 +171,28 @@ pub struct VisibleOwnershipForm {
     pub owner: Option<String>,
     pub reason_detail: Option<String>,
     pub handoff_instruction: Option<String>,
+}
+
+/// A delegation control submitted from a thread the reader can see, rather than from the
+/// manager-only Tasks workspace. The scope fields say which thread it was drawn on; the rest is the
+/// same command envelope `/ui/tasks/{task_id}/delegation/{operation}` takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VisibleDelegationForm {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub command_id: Uuid,
+    pub expected_version: u64,
+    pub outreach_id: Uuid,
+    #[serde(default)]
+    pub target_id: Option<Uuid>,
+    #[serde(default)]
+    pub new_channel_id: Option<Uuid>,
+    #[serde(default)]
+    pub deadline_hours: Option<i64>,
+    pub reason: DelegationReason,
+    #[serde(default)]
+    pub reason_detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1334,7 +1361,7 @@ async fn complete_human_task(
     let outcome = match outcome {
         Ok(outcome) => outcome,
         Err(error) => {
-            return render_mailbox_ownership_error(
+            return render_mailbox_pane_error(
                 &thread_use_cases,
                 &agent_use_cases,
                 &viewer,
@@ -1380,28 +1407,24 @@ async fn change_visible_task_ownership(
     Path((task_id, operation)): Path<(Uuid, String)>,
     Form(form): Form<VisibleOwnershipForm>,
 ) -> AppResult<Response> {
-    let (company, channel) = load_viewable_channel(
+    let VisibleTask {
+        company,
+        channel,
+        thread,
+        task: _,
+    } = load_visible_task(
         &company_use_cases,
         &channel_use_cases,
+        &thread_use_cases,
         &viewer,
-        form.company_id,
-        form.channel_id,
+        task_id,
+        &VisibleThreadScope {
+            company_id: form.company_id,
+            channel_id: form.channel_id,
+            thread_id: form.thread_id,
+        },
     )
     .await?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
-    thread_use_cases
-        .get_task_persistence()
-        .await
-        .get_task_by_id(task_id)
-        .await?
-        .filter(|task| {
-            task.company_id == company.id
-                && task.channel_id == channel.id
-                && task.thread_id == Some(thread.id)
-        })
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
     let access = thread_use_cases
         .principal_access_for_user(company.id, viewer.user_id)
         .await?;
@@ -1474,7 +1497,7 @@ async fn change_visible_task_ownership(
         })
         .await;
     if let Err(error) = outcome {
-        return render_mailbox_ownership_error(
+        return render_mailbox_pane_error(
             &thread_use_cases,
             &agent_use_cases,
             &viewer,
@@ -1498,7 +1521,177 @@ async fn change_visible_task_ownership(
     .await
 }
 
-async fn render_mailbox_ownership_error(
+/// Where a mailbox recovery command was drawn, as the form's hidden fields name it.
+struct VisibleThreadScope {
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+}
+
+/// One thread's task, with everything the pane is re-rendered from.
+struct VisibleTask {
+    company: Company,
+    channel: Channel,
+    thread: Thread,
+    task: BackgroundTask,
+}
+
+/// The task a mailbox recovery command names, loaded through the scope that authorizes reading it.
+///
+/// Each step is scoped by the one above: the channel comes from the reader's own readable channels,
+/// the thread must belong to that channel, and the task must belong to that company, channel *and*
+/// thread together. A guessed id in any single field therefore finds nothing rather than reaching
+/// another team's work — which is the whole guard on both mailbox recovery routes, since the
+/// commands themselves are authorized on the task's owner rather than on the channel.
+async fn load_visible_task(
+    company_use_cases: &CompanyUseCases,
+    channel_use_cases: &ChannelUseCases,
+    thread_use_cases: &ThreadUseCases,
+    viewer: &Viewer,
+    task_id: Uuid,
+    scope: &VisibleThreadScope,
+) -> AppResult<VisibleTask> {
+    let (company, channel) = load_viewable_channel(
+        company_use_cases,
+        channel_use_cases,
+        viewer,
+        scope.company_id,
+        scope.channel_id,
+    )
+    .await?;
+    let thread = load_channel_thread(thread_use_cases, channel.id, scope.thread_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+    let task = thread_use_cases
+        .get_task_persistence()
+        .await
+        .get_task_by_id(task_id)
+        .await?
+        .filter(|task| {
+            task.company_id == company.id
+                && task.channel_id == channel.id
+                && task.thread_id == Some(thread.id)
+        })
+        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+    Ok(VisibleTask {
+        company,
+        channel,
+        thread,
+        task,
+    })
+}
+
+/// POST /ui/task-delegation/{task_id}/{operation} — recover delegated work from the thread it was
+/// delegated on (Protected).
+///
+/// The twin of [`change_visible_task_ownership`], and it exists for the same reason: the only other
+/// route submitting these commands lives under the manager-only Tasks workspace and hardcodes
+/// [`DelegationAuthority::CompanyManager`], so a teammate who owns a task but administers nothing
+/// had no way to extend, cancel or stop the delegation on their own task — even though
+/// [`DelegationAuthority::HumanOwner`] was built to let them.
+///
+/// Like its twin, this does not itself check that the reader really is the current owner: it
+/// resolves the authority optimistically and the version-fenced transaction behind
+/// [`ThreadUseCases::execute_delegation_command`] is what enforces it, rejecting a `HumanOwner`
+/// claim from anyone who is not the task's owner at the moment the command lands. Deciding it here
+/// as well would be a second copy of an authorization rule, and the copy that ran first would be
+/// the one reading a stale owner.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
+async fn control_visible_task_delegation(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    viewer: Viewer,
+    Path((task_id, operation)): Path<(Uuid, String)>,
+    Form(form): Form<VisibleDelegationForm>,
+) -> AppResult<Response> {
+    let visible = load_visible_task(
+        &company_use_cases,
+        &channel_use_cases,
+        &thread_use_cases,
+        &viewer,
+        task_id,
+        &VisibleThreadScope {
+            company_id: form.company_id,
+            channel_id: form.channel_id,
+            thread_id: form.thread_id,
+        },
+    )
+    .await?;
+    let access = thread_use_cases
+        .principal_access_for_user(visible.company.id, viewer.user_id)
+        .await?;
+    let actor = access
+        .and_then(|access| access.principal_id)
+        .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
+    let authority = if access.is_some_and(|access| access.membership.manages_company_operations()) {
+        DelegationAuthority::CompanyManager
+    } else {
+        DelegationAuthority::HumanOwner
+    };
+    let operation = super::ui_tasks::delegation_operation(
+        &operation,
+        &super::ui_tasks::DelegationOperationRequest {
+            outreach_id: form.outreach_id,
+            target_id: form.target_id,
+            new_channel_id: form.new_channel_id,
+            deadline_hours: form.deadline_hours,
+        },
+    )?;
+    let outcome = thread_use_cases
+        .execute_delegation_command(
+            &visible.company,
+            &visible.task,
+            DelegationCommand {
+                company_id: visible.company.id,
+                task_id,
+                command_id: form.command_id,
+                expected_version: form.expected_version,
+                actor: DelegationActor {
+                    principal_id: actor,
+                    authority,
+                },
+                reason: form.reason,
+                reason_detail: form.reason_detail,
+                operation,
+            },
+        )
+        .await;
+    if let Err(error) = outcome {
+        let message = match error {
+            AppError::Conflict(message) => format!("Delegation changed: {message}"),
+            other => format!("Could not apply delegation control: {other}"),
+        };
+        return render_mailbox_pane_error(
+            &thread_use_cases,
+            &agent_use_cases,
+            &viewer,
+            &visible.company,
+            &visible.channel,
+            &visible.thread,
+            &message,
+        )
+        .await;
+    }
+    let agent = channel_agent(&agent_use_cases, &viewer, &visible.channel).await?;
+    sent_message_response(
+        &thread_use_cases,
+        visible.company.id,
+        &visible.channel,
+        &config.app_domain_name,
+        &visible.thread,
+        agent.as_ref(),
+        &viewer,
+    )
+    .await
+}
+
+async fn render_mailbox_pane_error(
     thread_use_cases: &ThreadUseCases,
     agent_use_cases: &AgentUseCases,
     viewer: &Viewer,

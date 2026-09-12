@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    adapters::persistence::test_support::test_pool,
+    adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture, test_pool},
     application::task_queue::TaskPersistence,
     entities::{
         attention::{AttentionView, BusinessPriority},
@@ -157,36 +157,7 @@ async fn pending_approvals_belong_to_the_approver_without_duplicating_the_task()
     };
     let persistence = PostgresPersistence::new(pool);
     let (company_id, channel_id, task_owner) = fixture(&persistence).await;
-    let suffix = Uuid::new_v4().simple().to_string();
-    let reviewer_email = format!("attention-reviewer-{suffix}@example.com");
-    let reviewer = persistence
-        .create_user(
-            &format!("attention-reviewer-{suffix}"),
-            &reviewer_email,
-            "hash",
-        )
-        .await
-        .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
-    )
-    .bind(Uuid::new_v4())
-    .bind(company_id)
-    .bind(reviewer.id)
-    .execute(persistence.pool())
-    .await
-    .unwrap();
-    let reviewer_principal = PrincipalId::random();
-    sqlx::query(
-        r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
-           VALUES ($1, $2, 'person', $3, 'Approval Reviewer')"#,
-    )
-    .bind(reviewer_principal.as_uuid())
-    .bind(company_id)
-    .bind(reviewer.id)
-    .execute(persistence.pool())
-    .await
-    .unwrap();
+    let reviewer_principal = add_teammate(&persistence, company_id, "Approval Reviewer").await;
 
     let thread = persistence
         .create_thread(channel_id, "Approval responsibility", &[])
@@ -361,6 +332,45 @@ async fn approval_assignee_cannot_cross_the_company_boundary() {
     );
 }
 
+/// A second person in `company_id`, a member rather than the owner.
+async fn add_teammate(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    display_label: &str,
+) -> PrincipalId {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let user = persistence
+        .create_user(
+            &format!("attention-teammate-{suffix}"),
+            &format!("attention-teammate-{suffix}@example.com"),
+            "hash",
+        )
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(user.id)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    let principal = PrincipalId::random();
+    sqlx::query(
+        r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
+           VALUES ($1, $2, 'person', $3, $4)"#,
+    )
+    .bind(principal.as_uuid())
+    .bind(company_id)
+    .bind(user.id)
+    .bind(display_label)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    principal
+}
+
 async fn insert_approval_task(
     persistence: &PostgresPersistence,
     company_id: Uuid,
@@ -368,19 +378,46 @@ async fn insert_approval_task(
     thread_id: Uuid,
     owner: PrincipalId,
 ) -> Uuid {
+    let scope = FeedScope {
+        company_id,
+        channel_id,
+        thread_id,
+    };
+    insert_task(persistence, scope, Some(owner), "pending_approval").await
+}
+
+/// Where a fixture item lives: its company, the channel it is visible through, and a thread to
+/// hang messages, approvals and drafts on.
+#[derive(Clone, Copy)]
+struct FeedScope {
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+}
+
+/// A task in `status`, owned by `owner` — or, given `None`, by whatever the ownership trigger
+/// assigns, which on the fixture channel is its agent.
+async fn insert_task(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    owner: Option<PrincipalId>,
+    status: &str,
+) -> Uuid {
     let task_id = Uuid::new_v4();
     sqlx::query(
         r#"INSERT INTO background_tasks (
                id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                owner_principal_id, owner_principal_kind
-           ) VALUES ($1, $2, $3, $4, $5, 'approval-test', 'pending_approval', '{}', $6, 'person')"#,
+           ) VALUES ($1, $2, $3, $4, $5, 'attention-test', $6, '{}', $7, $8)"#,
     )
     .bind(task_id)
-    .bind(company_id)
-    .bind(channel_id)
-    .bind(thread_id)
+    .bind(scope.company_id)
+    .bind(scope.channel_id)
+    .bind(scope.thread_id)
     .bind(Uuid::new_v4())
-    .bind(owner.as_uuid())
+    .bind(status)
+    .bind(owner.map(PrincipalId::as_uuid))
+    .bind(owner.map(|_| "person"))
     .execute(persistence.pool())
     .await
     .unwrap();
@@ -758,3 +795,671 @@ async fn agent_work_stays_out_until_a_human_decision_is_required() {
         AttentionResponsibility::ChannelTeam
     ));
 }
+
+/// Each union branch filters on the responsibility its own columns imply, ahead of `ranked`.
+/// That may change how much work a narrowed view does, never a row it returns.
+///
+/// Agreement alone would also be satisfied by both statements being wrong;
+/// `every_spread_item_lands_with_the_holder_it_was_built_for` pins what they agree on.
+#[tokio::test]
+async fn branch_responsibility_filters_return_what_filtering_after_the_union_returned() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let spread = spread(&persistence).await;
+    let visible = [spread.scope.channel_id];
+    let request = |principal, view, all_owned| AttentionQuery {
+        all_owned,
+        ..query(spread.scope.company_id, &visible, principal, view)
+    };
+    for request in [
+        request(spread.viewer, AttentionView::MyWork, false),
+        request(spread.viewer, AttentionView::MyWork, true),
+        request(spread.teammate, AttentionView::MyWork, false),
+        request(PrincipalId::random(), AttentionView::MyWork, false),
+        request(spread.viewer, AttentionView::Unassigned, false),
+        request(spread.viewer, AttentionView::TeamWork, false),
+    ] {
+        assert_eq!(
+            feed(&persistence, ATTENTION_SQL, request).await,
+            feed(&persistence, ATTENTION_SQL_BEFORE_PUSHDOWN, request).await,
+            "{:?} for {:?} (all_owned: {}) must return what it did before the push-down",
+            request.view,
+            request.principal_id,
+            request.all_owned,
+        );
+    }
+}
+
+#[tokio::test]
+async fn every_spread_item_lands_with_the_holder_it_was_built_for() {
+    use AttentionView::{MyWork, TeamWork, Unassigned};
+
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let spread = spread(&persistence).await;
+    let (viewer, teammate) = (spread.viewer, spread.teammate);
+    let visible = [spread.scope.channel_id];
+    let request = |principal, view| query(spread.scope.company_id, &visible, principal, view);
+
+    let viewer_work = listed(&persistence, request(viewer, MyWork)).await;
+    assert_eq!(viewer_work, sorted(spread.viewer_items.clone()));
+    assert_eq!(
+        listed(&persistence, request(teammate, MyWork)).await,
+        sorted(spread.teammate_items.clone())
+    );
+    assert!(
+        listed(&persistence, request(PrincipalId::random(), MyWork))
+            .await
+            .is_empty()
+    );
+    assert_eq!(
+        listed(&persistence, request(viewer, Unassigned)).await,
+        sorted(spread.team_items.clone())
+    );
+    let mut everything = [
+        spread.viewer_items.clone(),
+        spread.teammate_items.clone(),
+        spread.team_items.clone(),
+    ]
+    .concat();
+    everything.push((AttentionSourceKind::Approval, spread.external_approval));
+    assert_eq!(
+        listed(&persistence, request(viewer, TeamWork)).await,
+        sorted(everything)
+    );
+
+    // `all_owned` adds the viewer's finished tasks, and only the viewer's.
+    let owned = AttentionQuery {
+        all_owned: true,
+        ..request(viewer, MyWork)
+    };
+    let owned = listed(&persistence, owned).await;
+    assert!(owned.contains(&(AttentionSourceKind::Task, spread.viewer_completed_task)));
+    assert!(!owned.contains(&(AttentionSourceKind::Task, spread.teammate_completed_task)));
+    assert!(viewer_work.iter().all(|item| owned.contains(item)));
+}
+
+/// `ranked` cannot put back a row a branch never produced, so a branch filter narrower than
+/// `ranked`'s would hide work without failing anything. Every narrowed view must therefore be
+/// exactly the team view's rows with that responsibility — whatever the branches emit.
+#[tokio::test]
+async fn narrowed_views_are_the_team_view_split_by_responsibility() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let spread = spread(&persistence).await;
+    let visible = [spread.scope.channel_id];
+    let request = |principal, view| query(spread.scope.company_id, &visible, principal, view);
+    let team = persistence
+        .list_attention(request(spread.viewer, AttentionView::TeamWork))
+        .await
+        .unwrap()
+        .items;
+    let held_by = |holder: AttentionResponsibility| {
+        sorted(identities(
+            team.iter().filter(|item| item.responsibility == holder),
+        ))
+    };
+
+    assert_eq!(
+        listed(&persistence, request(spread.viewer, AttentionView::MyWork)).await,
+        held_by(AttentionResponsibility::Principal(spread.viewer))
+    );
+    assert_eq!(
+        listed(
+            &persistence,
+            request(spread.teammate, AttentionView::MyWork)
+        )
+        .await,
+        held_by(AttentionResponsibility::Principal(spread.teammate))
+    );
+    assert_eq!(
+        listed(
+            &persistence,
+            request(spread.viewer, AttentionView::Unassigned)
+        )
+        .await,
+        held_by(AttentionResponsibility::ChannelTeam)
+    );
+    assert_eq!(
+        held_by(AttentionResponsibility::External),
+        vec![(AttentionSourceKind::Approval, spread.external_approval)],
+        "an email-only approver's item is nobody's work here and nobody's team work"
+    );
+}
+
+type Identity = (AttentionSourceKind, Uuid);
+
+/// The rows two feed statements must agree on: every column a page is built from except
+/// `as_of`, which is each statement's own clock.
+type FeedRow = (String, Uuid, String, Option<Uuid>, String, i64, i64);
+
+async fn feed(
+    persistence: &PostgresPersistence,
+    sql: &str,
+    request: AttentionQuery<'_>,
+) -> Vec<FeedRow> {
+    bind_attention(sql, request)
+        .fetch_all(persistence.pool())
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| {
+            (
+                row.source_kind,
+                row.source_id,
+                row.responsibility_kind,
+                row.responsible_principal_id,
+                row.state,
+                row.version,
+                row.bounded_count,
+            )
+        })
+        .collect()
+}
+
+/// The set of items a view lists.
+async fn listed(persistence: &PostgresPersistence, request: AttentionQuery<'_>) -> Vec<Identity> {
+    sorted(identities(
+        &persistence.list_attention(request).await.unwrap().items,
+    ))
+}
+
+fn identities<'a>(items: impl IntoIterator<Item = &'a AttentionItem>) -> Vec<Identity> {
+    items
+        .into_iter()
+        .map(|item| (item.source_kind, item.source_id))
+        .collect()
+}
+
+fn sorted(mut items: Vec<Identity>) -> Vec<Identity> {
+    items.sort();
+    items
+}
+
+/// Every source kind the feed has, spread across two people and the channel team.
+struct Spread {
+    scope: FeedScope,
+    viewer: PrincipalId,
+    teammate: PrincipalId,
+    viewer_items: Vec<Identity>,
+    teammate_items: Vec<Identity>,
+    team_items: Vec<Identity>,
+    external_approval: Uuid,
+    viewer_completed_task: Uuid,
+    teammate_completed_task: Uuid,
+}
+
+async fn spread(persistence: &PostgresPersistence) -> Spread {
+    let (company_id, channel_id, viewer) = fixture(persistence).await;
+    let teammate = add_teammate(persistence, company_id, "Teammate").await;
+    let thread = persistence
+        .create_thread(channel_id, "Responsibility spread", &[])
+        .await
+        .unwrap();
+    let scope = FeedScope {
+        company_id,
+        channel_id,
+        thread_id: thread.id,
+    };
+    let externally_approved =
+        insert_task(persistence, scope, Some(viewer), "pending_approval").await;
+    let external_approval = insert_pending_approval(
+        persistence,
+        company_id,
+        channel_id,
+        thread.id,
+        externally_approved,
+        "external@example.net",
+        None,
+    )
+    .await;
+    // Agent work in progress, which no view shows.
+    insert_task(persistence, scope, None, "pending").await;
+    Spread {
+        scope,
+        viewer,
+        teammate,
+        viewer_items: person_items(persistence, scope, viewer, teammate).await,
+        teammate_items: person_items(persistence, scope, teammate, viewer).await,
+        team_items: team_items(persistence, scope).await,
+        external_approval,
+        viewer_completed_task: insert_task(persistence, scope, Some(viewer), "completed").await,
+        teammate_completed_task: insert_task(persistence, scope, Some(teammate), "completed").await,
+    }
+}
+
+/// One item of every kind a person can be responsible for, all of them `person`'s.
+///
+/// Approvals and reviews belong to whoever decides them, so each hangs on `colleague`'s task: the
+/// task drops out of the feed and the decision still lands with `person`. Delegation decisions and
+/// delivery failures inherit their task's owner, so those tasks are `person`'s own.
+async fn person_items(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    person: PrincipalId,
+    colleague: PrincipalId,
+) -> Vec<Identity> {
+    let approved = insert_task(persistence, scope, Some(colleague), "pending_approval").await;
+    let reviewed = insert_task(persistence, scope, Some(colleague), "pending").await;
+    let delegated = insert_task(
+        persistence,
+        scope,
+        Some(person),
+        "waiting_for_third_party_reply",
+    )
+    .await;
+    let undelivered = insert_task(persistence, scope, Some(person), "failed").await;
+    vec![
+        (
+            AttentionSourceKind::Task,
+            insert_task(persistence, scope, Some(person), "pending").await,
+        ),
+        (
+            AttentionSourceKind::Handoff,
+            insert_handoff(persistence, scope, Some(person)).await,
+        ),
+        (
+            AttentionSourceKind::Approval,
+            insert_pending_approval(
+                persistence,
+                scope.company_id,
+                scope.channel_id,
+                scope.thread_id,
+                approved,
+                "approver@example.com",
+                Some(person),
+            )
+            .await,
+        ),
+        (
+            AttentionSourceKind::ResponseReview,
+            insert_pending_review(persistence, scope, reviewed, person).await,
+        ),
+        (
+            AttentionSourceKind::DelegationDecision,
+            insert_delegation_decision(persistence, scope, delegated).await,
+        ),
+        (
+            AttentionSourceKind::DeliveryFailure,
+            insert_delivery_failure(persistence, scope, Some(undelivered), "dead_letter").await,
+        ),
+    ]
+}
+
+/// Channel-team work: every kind that can be unassigned, by each route there is to it.
+async fn team_items(persistence: &PostgresPersistence, scope: FeedScope) -> Vec<Identity> {
+    let ownerless = insert_task(persistence, scope, None, "pending").await;
+    sqlx::query(
+        r#"UPDATE background_tasks SET owner_principal_id = NULL, owner_principal_kind = NULL
+           WHERE company_id = $1 AND id = $2"#,
+    )
+    .bind(scope.company_id)
+    .bind(ownerless)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    let delegated = insert_task(persistence, scope, None, "waiting_for_third_party_reply").await;
+    let undelivered = insert_task(persistence, scope, None, "failed").await;
+    vec![
+        // An agent's task surfaces once a human has to decide; an ownerless one surfaces at once.
+        (
+            AttentionSourceKind::Task,
+            insert_task(persistence, scope, None, "dead_letter").await,
+        ),
+        (AttentionSourceKind::Task, ownerless),
+        (
+            AttentionSourceKind::Handoff,
+            insert_handoff(persistence, scope, None).await,
+        ),
+        (
+            AttentionSourceKind::DelegationDecision,
+            insert_delegation_decision(persistence, scope, delegated).await,
+        ),
+        (
+            AttentionSourceKind::DeliveryFailure,
+            insert_delivery_failure(persistence, scope, Some(undelivered), "outcome_unknown").await,
+        ),
+        // No task at all leaves the owner columns NULL, which is still channel-team work.
+        (
+            AttentionSourceKind::DeliveryFailure,
+            insert_delivery_failure(persistence, scope, None, "dead_letter").await,
+        ),
+    ]
+}
+
+async fn insert_handoff(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    responsible: Option<PrincipalId>,
+) -> Uuid {
+    let handoff_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO manual_handoffs (
+               id, company_id, channel_id, thread_id, title, next_action, responsible_principal_id
+           ) VALUES ($1, $2, $3, $4, 'Call the customer', 'Confirm the address', $5)"#,
+    )
+    .bind(handoff_id)
+    .bind(scope.company_id)
+    .bind(scope.channel_id)
+    .bind(scope.thread_id)
+    .bind(responsible.map(PrincipalId::as_uuid))
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    handoff_id
+}
+
+/// A draft for `task_id` waiting on `reviewer`, which is what the feed lists by draft id.
+async fn insert_pending_review(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    task_id: Uuid,
+    reviewer: PrincipalId,
+) -> Uuid {
+    let draft_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO response_drafts (
+               id, version, company_id, channel_id, thread_id, task_id, author_principal_id,
+               reviewer_principal_id, proposed_message_id, subject, body, attachment_snapshot,
+               recipient_snapshot, transport_snapshot, publication_snapshot,
+               created_by_principal_id, updated_by_principal_id
+           ) VALUES ($1, 1, $2, $3, $4, $5, $6, $6, $7, 'Proposed reply', 'Proposed body',
+                     '{"version": "1", "items": []}', '{"version": "1", "to": [], "cc": []}',
+                     '{"version": "1"}', '{"version": "1"}', $6, $6)"#,
+    )
+    .bind(draft_id)
+    .bind(scope.company_id)
+    .bind(scope.channel_id)
+    .bind(scope.thread_id)
+    .bind(task_id)
+    .bind(reviewer.as_uuid())
+    .bind(Uuid::new_v4())
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"INSERT INTO response_reviews (
+               company_id, draft_id, draft_version, reviewer_principal_id, expires_at
+           ) VALUES ($1, $2, 1, $3, CURRENT_TIMESTAMP + interval '1 hour')"#,
+    )
+    .bind(scope.company_id)
+    .bind(draft_id)
+    .bind(reviewer.as_uuid())
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    draft_id
+}
+
+/// A delegation on `task_id` that timed out and now waits for a human to decide.
+async fn insert_delegation_decision(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    task_id: Uuid,
+) -> Uuid {
+    let outreach_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO task_outreaches (
+               id, company_id, task_id, status, required_threshold_percent, expires_at,
+               outreach_key, subject, body
+           ) VALUES ($1, $2, $3, 'timeout_pending_approval', 100,
+                     CURRENT_TIMESTAMP + interval '2 hours', $4, 'Need input', 'Body')"#,
+    )
+    .bind(outreach_id)
+    .bind(scope.company_id)
+    .bind(task_id)
+    .bind(Uuid::new_v4().to_string())
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    outreach_id
+}
+
+/// A delivery for `task_id` that ended in `status`, one of the two the feed treats as failed.
+async fn insert_delivery_failure(
+    persistence: &PostgresPersistence,
+    scope: FeedScope,
+    task_id: Option<Uuid>,
+    status: &str,
+) -> Uuid {
+    let queued = delivery_fixture(
+        persistence,
+        DeliveryFixtureRequest {
+            task_id,
+            ..DeliveryFixtureRequest::new(
+                scope.company_id,
+                scope.channel_id,
+                scope.thread_id,
+                &format!("attention-{}", Uuid::new_v4()),
+            )
+        },
+    )
+    .await;
+    let delivery_id = queued.delivery.id.as_uuid();
+    persistence.enqueue_delivery(queued.delivery).await.unwrap();
+    sqlx::query("UPDATE message_deliveries SET status = $3 WHERE company_id = $1 AND id = $2")
+        .bind(scope.company_id)
+        .bind(delivery_id)
+        .bind(status)
+        .execute(persistence.pool())
+        .await
+        .unwrap();
+    delivery_id
+}
+
+/// `ATTENTION_SQL` exactly as it stood before the responsibility filter was pushed into the union
+/// branches: `raw` builds the rows of every responsibility and `ranked` alone discards them.
+///
+/// Frozen as the oracle for that push-down, which had to change how much work a narrowed view
+/// does without changing a row it returns. It is not a second specification of the feed: when
+/// the feed changes what it returns on purpose, retire the comparison that reads this rather
+/// than editing it to match. `narrowed_views_are_the_team_view_split_by_responsibility` is the
+/// guard that outlives it.
+const ATTENTION_SQL_BEFORE_PUSHDOWN: &str = r#"
+WITH params AS (
+    SELECT COALESCE($5::timestamptz, CURRENT_TIMESTAMP) AS as_of
+), raw AS (
+    SELECT 'task'::text AS source_kind, task.id AS source_id, task.company_id,
+           task.channel_id, task.thread_id, task.id AS task_id, task.correlation_id,
+           task.status AS state,
+           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END
+               AS responsible_principal_id,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END AS responsibility_kind,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END
+               AS responsibility_label,
+           task.task_type AS title,
+           CASE task.status
+             WHEN 'completed' THEN 'View the completed task'
+             WHEN 'stopped' THEN 'View the stopped task'
+             WHEN 'pending_approval' THEN 'Review the pending approval'
+             WHEN 'dead_letter' THEN 'Decide how to recover the failed task'
+             WHEN 'failed' THEN 'Decide how to recover the failed task'
+             ELSE 'Complete or reassign the task'
+           END AS next_action,
+           task.business_priority, task.business_due_at AS due_at,
+           task.wait_expires_at AS expires_at,
+           task.attention_version AS version,
+           task.created_at, task.updated_at
+    FROM background_tasks AS task
+    LEFT JOIN principals AS owner
+      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
+    WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+      AND (
+        ($14 AND $4 = 'my_work' AND task.owner_principal_id = $3
+         AND task.owner_principal_kind = 'person')
+        OR (task.status IN ('pending', 'processing', 'pending_approval',
+                          'waiting_for_third_party_reply', 'failed', 'dead_letter')
+        AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
+           OR task.status IN ('pending_approval', 'failed', 'dead_letter'))
+        AND NOT EXISTS (
+          SELECT 1 FROM human_approvals AS approval
+          WHERE approval.company_id = task.company_id AND approval.task_id = task.id
+            AND approval.status = 'pending'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM response_reviews AS review
+          WHERE review.company_id = task.company_id AND review.status = 'pending'
+            AND EXISTS (
+                SELECT 1 FROM response_drafts AS draft
+                WHERE draft.company_id = task.company_id AND draft.id = review.draft_id
+                  AND draft.version = review.draft_version AND draft.task_id = task.id
+                  AND draft.status = 'pending_review'
+            )
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM task_outreaches AS outreach
+          WHERE outreach.company_id = task.company_id AND outreach.task_id = task.id
+            AND outreach.status = 'timeout_pending_approval'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM message_deliveries AS delivery
+          WHERE delivery.company_id = task.company_id AND delivery.task_id = task.id
+            AND delivery.status IN ('outcome_unknown', 'dead_letter')
+            AND delivery.last_error_class IS DISTINCT FROM 'superseded'
+        )
+        )
+      )
+
+    UNION ALL
+
+    SELECT 'handoff', handoff.id, handoff.company_id, handoff.channel_id, handoff.thread_id,
+           NULL::uuid, handoff.correlation_id, handoff.status,
+           handoff.responsible_principal_id,
+           CASE WHEN handoff.responsible_principal_id IS NULL
+                THEN 'channel_team' ELSE 'principal' END,
+           COALESCE(responsible.display_label, 'Channel team'), handoff.title,
+           handoff.next_action, handoff.business_priority, handoff.business_due_at,
+           NULL::timestamptz, handoff.version, handoff.created_at, handoff.updated_at
+    FROM manual_handoffs AS handoff
+    LEFT JOIN principals AS responsible
+      ON responsible.company_id = handoff.company_id
+     AND responsible.id = handoff.responsible_principal_id
+    WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
+      AND handoff.status = 'open'
+
+    UNION ALL
+
+    SELECT 'approval', approval.id, approval.company_id, approval.channel_id,
+           approval.thread_id, approval.task_id, task.correlation_id, approval.status,
+           approval.approver_principal_id,
+           CASE WHEN approval.approver_principal_id IS NULL
+                THEN 'external' ELSE 'principal' END,
+           CASE WHEN approval.approver_principal_id IS NULL
+                THEN 'External approver'
+                ELSE COALESCE(approver.display_label, 'Assigned approver') END,
+           approval.action_title, 'Approve or reject the requested action',
+           COALESCE(task.business_priority, 'normal'),
+           COALESCE(task.business_due_at, approval.expires_at), approval.expires_at,
+           1::bigint, approval.created_at, approval.updated_at
+    FROM human_approvals AS approval
+    LEFT JOIN background_tasks AS task
+      ON task.company_id = approval.company_id AND task.id = approval.task_id
+    LEFT JOIN principals AS approver
+      ON approver.company_id = approval.company_id
+     AND approver.id = approval.approver_principal_id
+    WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
+      AND approval.status = 'pending'
+
+    UNION ALL
+
+    SELECT 'response_review', review.draft_id, review.company_id, draft.channel_id,
+           draft.thread_id, draft.task_id, task.correlation_id, review.status,
+           review.reviewer_principal_id, 'principal', reviewer.display_label,
+           draft.subject, 'Review the proposed external response',
+           COALESCE(task.business_priority, 'normal'), task.business_due_at,
+           review.expires_at, draft.version::bigint, review.created_at, review.updated_at
+    FROM response_reviews AS review
+    JOIN response_drafts AS draft
+      ON draft.company_id = review.company_id AND draft.id = review.draft_id
+     AND draft.version = review.draft_version AND draft.status = 'pending_review'
+    JOIN principals AS reviewer
+      ON reviewer.company_id = review.company_id AND reviewer.id = review.reviewer_principal_id
+    LEFT JOIN background_tasks AS task
+      ON task.company_id = draft.company_id AND task.id = draft.task_id
+    WHERE review.company_id = $1 AND draft.channel_id = ANY($2) AND review.status = 'pending'
+
+    UNION ALL
+
+    SELECT 'delegation_decision', outreach.id, task.company_id, task.channel_id,
+           task.thread_id, task.id, task.correlation_id, outreach.status,
+           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
+           outreach.subject, 'Review the delegation timeout', task.business_priority,
+           CASE WHEN task.business_due_at IS NULL THEN outreach.expires_at
+                ELSE LEAST(task.business_due_at, outreach.expires_at) END,
+           outreach.expires_at, outreach.version, outreach.created_at, outreach.updated_at
+    FROM task_outreaches AS outreach
+    JOIN background_tasks AS task
+      ON task.company_id = outreach.company_id AND task.id = outreach.task_id
+    LEFT JOIN principals AS owner
+      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
+    WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+      AND outreach.status = 'timeout_pending_approval'
+
+    UNION ALL
+
+    SELECT 'delivery_failure', delivery.id, delivery.company_id, delivery.channel_id,
+           task.thread_id, delivery.task_id, delivery.correlation_id, delivery.status,
+           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN 'principal' ELSE 'channel_team' END,
+           CASE WHEN task.owner_principal_kind = 'person'
+                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
+           message.subject,
+           CASE delivery.status WHEN 'outcome_unknown' THEN 'Resolve the unknown delivery outcome'
+                ELSE 'Repair or dismiss the permanent delivery failure' END,
+           COALESCE(task.business_priority, 'normal'), task.business_due_at,
+           NULL::timestamptz, GREATEST(delivery.attempt_count, 1)::bigint,
+           delivery.created_at, delivery.updated_at
+    FROM message_deliveries AS delivery
+    JOIN messages AS message
+      ON message.company_id = delivery.company_id AND message.id = delivery.message_id
+    LEFT JOIN background_tasks AS task
+      ON task.company_id = delivery.company_id AND task.id = delivery.task_id
+    LEFT JOIN principals AS owner
+      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
+    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+      AND delivery.status IN ('outcome_unknown', 'dead_letter')
+      AND delivery.last_error_class IS DISTINCT FROM 'superseded'
+      AND NOT EXISTS (
+          SELECT 1 FROM task_outreach_targets AS target
+          JOIN task_outreaches AS outreach
+            ON outreach.company_id = target.company_id AND outreach.id = target.outreach_id
+          WHERE target.company_id = delivery.company_id AND target.delivery_id = delivery.id
+            AND outreach.status = 'timeout_pending_approval'
+      )
+), ranked AS (
+    SELECT raw.*, params.as_of,
+           CASE WHEN raw.due_at < params.as_of THEN 0
+                WHEN raw.due_at <= params.as_of + interval '24 hours' THEN 1 ELSE 2 END AS due_rank,
+           CASE raw.business_priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END
+               AS priority_rank
+    FROM raw CROSS JOIN params
+    WHERE ($4 = 'team_work'
+           OR ($4 = 'my_work' AND raw.responsibility_kind = 'principal'
+                                  AND raw.responsible_principal_id = $3)
+           OR ($4 = 'unassigned' AND raw.responsibility_kind = 'channel_team'))
+), after_cursor AS (
+    SELECT * FROM ranked
+    WHERE NOT $6 OR (due_rank, priority_rank, created_at, source_kind, source_id)
+          > ($7, $8, $9, $10, $11)
+    ORDER BY due_rank, priority_rank, created_at, source_kind, source_id
+    LIMIT $12
+), counted AS (
+    SELECT after_cursor.*, COUNT(*) OVER () AS bounded_count FROM after_cursor
+)
+SELECT * FROM counted
+ORDER BY due_rank, priority_rank, created_at, source_kind, source_id
+LIMIT $13
+"#;

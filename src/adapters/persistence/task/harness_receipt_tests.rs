@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 
 async fn receipt_versions(fixture: &Fixture, run: &RunCheckpoint) -> Vec<(Uuid, String)> {
     sqlx::query_as("SELECT id, xmin::text FROM task_harness_invocations WHERE run_id = $1 ORDER BY call_ordinal")
@@ -7,12 +8,10 @@ async fn receipt_versions(fixture: &Fixture, run: &RunCheckpoint) -> Vec<(Uuid, 
 
 #[tokio::test]
 async fn checkpoint_writes_batch_receipts_and_leave_unchanged_rows_untouched() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool).await;
     let original = applied(
         fixture

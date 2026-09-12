@@ -216,27 +216,13 @@ async fn verify_association_bindings(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<Vec<ChannelBindingId>> {
+    if let Some((binding_id, channel_id)) = first_unbound_association(tx, request).await? {
+        return Err(AppError::NotFound(format!(
+            "Active binding {binding_id} does not belong to channel {channel_id}"
+        )));
+    }
     let mut bindings = Vec::with_capacity(request.associations.len());
     for association in &request.associations {
-        let valid: bool = sqlx::query_scalar(
-            r#"SELECT EXISTS(
-                   SELECT 1 FROM channel_bindings AS binding
-                   WHERE binding.id = $1 AND binding.company_id = $2
-                     AND binding.channel_id = $3 AND binding.status = 'active'
-               )"#,
-        )
-        .bind(association.binding_id.as_uuid())
-        .bind(request.company_id)
-        .bind(association.channel_id)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
-        if !valid {
-            return Err(AppError::NotFound(format!(
-                "Active binding {} does not belong to channel {}",
-                association.binding_id, association.channel_id
-            )));
-        }
         if !bindings.contains(&association.binding_id) {
             bindings.push(association.binding_id);
         }
@@ -248,6 +234,46 @@ async fn verify_association_bindings(
     }
     bindings.sort_unstable();
     Ok(bindings)
+}
+
+/// The first association whose binding is not an active binding of its channel in this company,
+/// asked once for the whole list rather than once per recipient channel.
+///
+/// "First" is the request's own order, as it was when each association was its own round trip, so
+/// a commit naming several bad pairs is refused naming the same one it always was.
+async fn first_unbound_association(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+) -> AppResult<Option<(ChannelBindingId, Uuid)>> {
+    let binding_ids: Vec<Uuid> = request
+        .associations
+        .iter()
+        .map(|association| association.binding_id.as_uuid())
+        .collect();
+    let channel_ids: Vec<Uuid> = request
+        .associations
+        .iter()
+        .map(|association| association.channel_id)
+        .collect();
+    let unbound: Option<(Uuid, Uuid)> = sqlx::query_as(
+        r#"SELECT association.binding_id, association.channel_id
+           FROM unnest($1::uuid[], $2::uuid[]) WITH ORDINALITY
+                AS association (binding_id, channel_id, ordinal)
+           WHERE NOT EXISTS (
+               SELECT 1 FROM channel_bindings AS binding
+               WHERE binding.id = association.binding_id AND binding.company_id = $3
+                 AND binding.channel_id = association.channel_id AND binding.status = 'active'
+           )
+           ORDER BY association.ordinal
+           LIMIT 1"#,
+    )
+    .bind(&binding_ids)
+    .bind(&channel_ids)
+    .bind(request.company_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(unbound.map(|(binding_id, channel_id)| (ChannelBindingId::new(binding_id), channel_id)))
 }
 
 /// Serialize every provider mapping this transaction may read or create.

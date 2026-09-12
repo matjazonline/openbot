@@ -564,6 +564,21 @@ struct DelegationControlForm {
     reason_detail: Option<String>,
 }
 
+impl DelegationControlForm {
+    fn operation_request(&self) -> DelegationOperationRequest {
+        DelegationOperationRequest {
+            outreach_id: self.outreach_id,
+            target_id: self.target_id,
+            new_channel_id: self.new_channel_id,
+            deadline_hours: self.deadline_hours,
+        }
+    }
+}
+
+/// The manager-only entry point for a delegation command. Every caller who reaches here is a
+/// company owner or admin — [`Workspace::scoped_company`] loads only managed companies — so the
+/// authority is settled before the command is built. A task's own human owner submits the same
+/// commands from the mailbox thread pane instead: see `super::ui::control_visible_task_delegation`.
 async fn control_delegation(
     workspace: Workspace,
     Path((task_id, operation)): Path<(Uuid, String)>,
@@ -579,7 +594,7 @@ async fn control_delegation(
         .await?
         .and_then(|access| access.principal_id)
         .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
-    let operation = delegation_operation(&operation, &form)?;
+    let operation = delegation_operation(&operation, &form.operation_request())?;
     let outcome = workspace
         .thread_use_cases
         .execute_delegation_command(
@@ -611,17 +626,33 @@ async fn control_delegation(
     .await
 }
 
-fn delegation_operation(
+/// The parameters a delegation control submission carries about the *operation*, apart from which
+/// surface it came from and who submitted it.
+///
+/// Both surfaces that offer these controls — this workspace and the mailbox thread pane — post the
+/// same four fields under the same names, so the path segment is read into a
+/// [`DelegationOperation`] in one place. Splitting it would let the two surfaces disagree about
+/// what `extend` means or how long a response window may be.
+pub(super) struct DelegationOperationRequest {
+    pub outreach_id: Uuid,
+    pub target_id: Option<Uuid>,
+    pub new_channel_id: Option<Uuid>,
+    pub deadline_hours: Option<i64>,
+}
+
+pub(super) fn delegation_operation(
     operation: &str,
-    form: &DelegationControlForm,
+    request: &DelegationOperationRequest,
 ) -> AppResult<DelegationOperation> {
     let target_id = || {
-        form.target_id
+        request
+            .target_id
             .ok_or_else(|| AppError::BadRequest("A delegation target is required.".into()))
     };
+    let outreach_id = request.outreach_id;
     Ok(match operation {
         "extend" => {
-            let hours = form.deadline_hours.ok_or_else(|| {
+            let hours = request.deadline_hours.ok_or_else(|| {
                 AppError::BadRequest("Choose a new response window in hours.".into())
             })?;
             if !(1..=720).contains(&hours) {
@@ -630,30 +661,24 @@ fn delegation_operation(
                 ));
             }
             DelegationOperation::ExtendOutreach {
-                outreach_id: form.outreach_id,
+                outreach_id,
                 expires_at: chrono::Utc::now() + chrono::Duration::hours(hours),
             }
         }
         "cancel-target" => DelegationOperation::CancelTarget {
-            outreach_id: form.outreach_id,
+            outreach_id,
             target_id: target_id()?,
         },
-        "cancel-outreach" => DelegationOperation::CancelOutreach {
-            outreach_id: form.outreach_id,
-        },
+        "cancel-outreach" => DelegationOperation::CancelOutreach { outreach_id },
         "reassign" => DelegationOperation::ReassignInternalTarget {
-            outreach_id: form.outreach_id,
+            outreach_id,
             target_id: target_id()?,
-            new_channel_id: form.new_channel_id.ok_or_else(|| {
+            new_channel_id: request.new_channel_id.ok_or_else(|| {
                 AppError::BadRequest("Choose a replacement internal channel.".into())
             })?,
         },
-        "proceed-partial" => DelegationOperation::ProceedWithPartial {
-            outreach_id: form.outreach_id,
-        },
-        "stop-task" => DelegationOperation::StopTask {
-            outreach_id: form.outreach_id,
-        },
+        "proceed-partial" => DelegationOperation::ProceedWithPartial { outreach_id },
+        "stop-task" => DelegationOperation::StopTask { outreach_id },
         _ => return Err(AppError::NotFound("Delegation control not found.".into())),
     })
 }

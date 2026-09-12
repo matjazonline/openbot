@@ -644,7 +644,7 @@ impl SchedulePersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
+    use crate::adapters::persistence::test_support::own_database;
     use crate::entities::task::{NewTask, TaskSource};
     use crate::task_queue::TaskPersistence;
     use crate::use_cases::{
@@ -658,13 +658,12 @@ mod tests {
     /// a backlog after downtime collapses into the next slot instead of replaying.
     #[tokio::test]
     async fn claiming_anchors_the_next_run_on_the_slot_not_the_clock() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        // Held for the whole test: `claim_and_advance_due_schedules` is unscoped, and the sibling
-        // test below queues a due row of its own. See [`UNSCOPED_CLAIM`].
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
-
+        let pool = database.pool.clone();
+        // A database of this test's own: `claim_and_advance_due_schedules` is unscoped, and the
+        // sibling test below queues a due row of its own. See [`own_database`].
         let persistence = PostgresPersistence::new(pool.clone());
 
         let owner_username = format!("anchor_owner_{}", Uuid::new_v4().simple());
@@ -806,13 +805,12 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_schedule_persistence_crud_and_claim_works() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        // Held for the whole test: `claim_and_advance_due_schedules` is unscoped, and the sibling
-        // test above queues a due row of its own. See [`UNSCOPED_CLAIM`].
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
-
+        let pool = database.pool.clone();
+        // A database of this test's own: `claim_and_advance_due_schedules` is unscoped, and the
+        // sibling test above queues a due row of its own. See [`own_database`].
         let persistence = PostgresPersistence::new(pool);
 
         let owner_username = format!("sched_owner_{}", Uuid::new_v4().simple());

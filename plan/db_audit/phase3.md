@@ -151,6 +151,54 @@ in opposite directions.
 
 ---
 
+## Implementation notes (2026-09-11)
+
+What landed differs from the text above in these places. The reasons are recorded so the next
+reader does not "fix" the code back to match the plan.
+
+- **The company is always the last parameter.** The global form then simply binds one parameter
+  fewer. That renumbered the templates: `SLOTS_CTE` now uses `$1` (bucket width) and `$2`
+  (window span), `ATTEMPT_STATS_SQL` takes its window as `$1`, and `OUTSTANDING_SQL` its limit as
+  `$1`. Each template marks one `{scope}` slot, and `ScopedSql::new` builds both forms from it. A
+  unit test asserts the company form adds exactly one parameter, numbered last.
+- **"No statement contains `IS NULL OR`" is read as "no statement tests a *parameter* for NULL".**
+  `lock_expires_at IS NULL OR …` and the delivery lease checks are column null tests. The
+  persistence `AGENTS.md` requires them, so that legacy in-flight rows count as stalled. The guard
+  test matches `$n [::type] IS [NOT] NULL`.
+- **The isolation tests are two table-driven tests rather than twenty.**
+  `every_company_form_reads_only_its_own_company` and `every_global_form_reads_both_companies`
+  measure all ten statements against the same fixture. Company B holds twice what company A holds.
+  Every failing aggregate is reported, not just the first. Every fixture row is out of reach of the
+  unscoped claims and sweeps: tasks on a channel with no agent, finished tasks set to `failed` so
+  no notification is enqueued, and due deliveries blocked behind a parked root. As a check, three
+  company predicates were broken by hand, and the test named exactly those three.
+- **`DashboardPersistence` moved into `services::dashboard_snapshot`.** The service consumes the
+  port, and `src/application/AGENTS.md` puts ports where they are consumed. `AppState` now carries
+  `dashboard_snapshots: Arc<DashboardSnapshotService>` in place of the persistence handle, and the
+  `FromRef` for the trait is gone, so no handler can bypass the cache.
+- **One mutex per view, not one for the service.** The check-and-refresh-under-one-lock reasoning is
+  copied, but the lock is per `(company, window)` slot. A single lock would put every company's
+  refresh in one queue, and one slow operator rollup would stall every company's page.
+- **Freshness runs from when a reading's queries were issued, not from when they finished.** The
+  query-health service measures from completion, which is harmless with a 60-second TTL. With a
+  TTL of one tick, the SSE interval's fixed schedule puts each tick inside the previous reading's
+  TTL by however long that reading took. A lone tab would then refresh only every other tick.
+  `a_lone_tab_gets_a_fresh_reading_on_every_tick` fails if this is changed. Measuring from the
+  issue time alone would break single-flight when a reading takes longer than a tick. So a stale
+  reading still answers any caller who was already waiting when it came back
+  (`callers_queued_behind_a_slow_reading_reuse_it`).
+- **Failures are cached for one tick, the same as successes.** Query health uses 15 s against 60 s.
+  One tick is already brief, and a shorter TTL would allow more than one failing read per view per
+  tick. `AppError` now derives `Clone`, so every caller served from a cached failure gets the same
+  error the refresher got.
+- **Idle slots are swept when a new view is first read.** Otherwise the map would keep one stale
+  snapshot for every company and window read since boot. The sweep drops any slot that nobody
+  holds and whose reading is no longer fresh. Such a slot can never be served again.
+- **3.3 was not done**, because the cache landed. The comment in the adapter's
+  `dashboard_snapshot` now says why the reads stay sequential.
+- **Out of scope, noted:** in the operator view, `load_runtime_snapshot` still reads
+  `runtime_metric_samples` once per tick per tab. This phase covered only the eight aggregates.
+
 ## Acceptance criteria
 
 - No statement in `dashboard.rs` contains `IS NULL OR`; scope is chosen in Rust and each form is

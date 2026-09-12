@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO task_outreach_targets (\n                       id, outreach_id, company_id, email, target_kind, external_transport,\n                       external_namespace, external_subject, status\n                   ) VALUES ($1, $2, $3, $4, 'external', $5, $6, $7, 'active')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aa2f20737228fdb2d64ab73223ce40777e37dba268a1e525481501bba311889d"
+}

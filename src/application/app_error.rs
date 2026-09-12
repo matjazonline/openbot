@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+/// `Clone` so a cache can hand one failed reading to every caller it serves, the way it hands
+/// out a successful one. See `services::dashboard_snapshot`.
+#[derive(Error, Debug, Clone)]
 pub enum AppError {
     #[error("Execution stopped: {0}")]
     Execution(ExecutionFailure),

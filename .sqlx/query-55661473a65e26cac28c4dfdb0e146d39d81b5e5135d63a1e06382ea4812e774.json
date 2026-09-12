@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO task_outreaches (\n                       id, task_id, company_id, status, required_threshold_percent, expires_at,\n                       outreach_key, subject, body\n                   ) VALUES ($1, $2, $3, 'waiting', 100, CURRENT_TIMESTAMP + INTERVAL '2 days',\n                             $4, 'Can you confirm the invoice?', 'Please answer')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55661473a65e26cac28c4dfdb0e146d39d81b5e5135d63a1e06382ea4812e774"
+}

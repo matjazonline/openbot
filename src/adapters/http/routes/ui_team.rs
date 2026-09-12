@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::{
     Form, Router,
     extract::{FromRequestParts, Path, Query},
@@ -32,11 +33,26 @@ use crate::{
         company::Company,
         company_invite::CompanyInvite,
         company_member::{CompanyAccessRole, CompanyMember},
+        delegation::{
+            DelegationActor, DelegationAuthority, DelegationCommand, DelegationOperation,
+            DelegationReason,
+        },
+        member_removal::{
+            DelegatedAskAtStake, MemberWorkAtStake, OwnedTaskAtStake, OwnedWorkHandover,
+        },
+        task::{
+            TaskOwner, TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
+            TaskOwnershipReason,
+        },
+        transport::PrincipalId,
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
     use_cases::{
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
+        company::CompanyUseCases,
+        company_invite::{CompanyInviteUseCases, MemberWorkCommands},
+        thread::ThreadUseCases,
+        user::UserUseCases,
     },
 };
 
@@ -57,13 +73,19 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/ui/companies/{company_id}/team/members/{user_id}",
-            get(member_pane)
-                .put(update_member_role)
-                .delete(remove_member),
+            get(member_pane).put(update_member_role),
         )
         .route(
             "/ui/companies/{company_id}/team/members/{user_id}/avatar",
             put(set_member_avatar),
+        )
+        // The whole removal, decision included: one submission resolves everything at stake and
+        // then demotes. A POST rather than the DELETE it used to be because it carries a body —
+        // who takes the work over — and there is no second endpoint that removes somebody without
+        // saying that.
+        .route(
+            "/ui/companies/{company_id}/team/members/{user_id}/removal",
+            post(remove_member),
         )
 }
 
@@ -105,6 +127,20 @@ pub struct AvatarForm {
     pub avatar_url: String,
 }
 
+/// The one decision a removal carries, as the pane's single form submits it.
+///
+/// Both fields are absent when there is nothing to decide — a member who holds nothing live is
+/// removed by the button alone — which is why neither is required here. What the fields have to be
+/// *when they arrive* is [`OwnedWorkHandover::check`]'s rule, stated once in the domain rather
+/// than again in this extractor.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MemberRemovalForm {
+    #[serde(default)]
+    pub owner: Option<String>,
+    #[serde(default)]
+    pub handoff_instruction: Option<String>,
+}
+
 const NO_SELECTION: &str = "Select someone to see their access, or invite a new person.";
 
 /// The use cases and the caller every Team handler starts from.
@@ -115,6 +151,9 @@ struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     invite_use_cases: Arc<CompanyInviteUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    /// The ownership and delegation commands, so the Team tab submits the identical command the
+    /// Tasks workspace and the mailbox do rather than a second implementation of a handover.
+    thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -132,6 +171,7 @@ impl FromRequestParts<AppState> for Workspace {
             company_use_cases: state.company_use_cases.clone(),
             invite_use_cases: state.company_invite_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            thread_use_cases: state.thread_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -153,6 +193,16 @@ impl Workspace {
             user_id: self.user_id,
             company,
         }
+    }
+
+    /// The caller's own principal in this company, which an ownership or delegation command is
+    /// submitted as. Propagated rather than defaulted: this is who the audit trail records.
+    async fn acting_principal(&self, company_id: Uuid) -> AppResult<PrincipalId> {
+        self.thread_use_cases
+            .principal_access_for_user(company_id, self.user_id)
+            .await?
+            .and_then(|context| context.principal_id)
+            .ok_or_else(|| AppError::NotFound("Team member not found".into()))
     }
 }
 
@@ -186,7 +236,7 @@ pub(super) async fn team_tab_body(
     let pane_html = if creating {
         view.invite_create_pane("", CompanyAccessRole::Member, None)
     } else {
-        view.selected_pane(&members, &invites, selected)
+        view.selected_pane(&members, &invites, selected).await?
     };
 
     Ok(pages::team_tab(
@@ -245,7 +295,7 @@ async fn member_pane(
     let view = workspace.view(&company);
     let member = view.member(user_id).await?;
 
-    Ok(Html(view.member_pane(&member, None)))
+    Ok(Html(view.member_pane(&member, None).await?))
 }
 
 /// PUT /ui/companies/{company_id}/team/members/{user_id}/avatar - Save your own picture (Protected).
@@ -271,11 +321,10 @@ async fn set_member_avatar(
         Ok(avatar_url) => avatar_url,
         Err(message) => {
             let member = view.member(user_id).await?;
-            return Ok(Html(view.member_pane_with_draft(
-                &member,
-                Some(&form.avatar_url),
-                Some(&message),
-            ))
+            return Ok(Html(
+                view.member_pane_with_draft(&member, Some(&form.avatar_url), Some(&message))
+                    .await?,
+            )
             .into_response());
         }
     };
@@ -288,11 +337,14 @@ async fn set_member_avatar(
         Ok(saved) => saved,
         Err(err) => {
             let member = view.member(user_id).await?;
-            return Ok(Html(view.member_pane_with_draft(
-                &member,
-                Some(&form.avatar_url),
-                Some(&format!("Failed to save avatar: {err}")),
-            ))
+            return Ok(Html(
+                view.member_pane_with_draft(
+                    &member,
+                    Some(&form.avatar_url),
+                    Some(&format!("Failed to save avatar: {err}")),
+                )
+                .await?,
+            )
             .into_response());
         }
     };
@@ -303,7 +355,7 @@ async fn set_member_avatar(
     let saved_email = EmailAddress::from(saved.email.as_str());
     let pane = format!(
         "{}{}",
-        view.member_pane(&member, None),
+        view.member_pane(&member, None).await?,
         pages::account_chip(
             &workspace_user(&saved, &saved_email, &workspace.config),
             pages::FragmentSwap::OutOfBand,
@@ -425,45 +477,196 @@ async fn update_member_role(
         .await
     {
         Ok(member) => {
-            let pane = view.member_pane(&member, None);
+            let pane = view.member_pane(&member, None).await?;
             view.saved_response(TeamSelection::Member(user_id), pane)
                 .await
         }
         Err(err) => {
             let member = view.member(user_id).await?;
-            Ok(Html(view.member_pane(
-                &member,
-                Some(&format!("Failed to change access role: {err}")),
-            ))
+            Ok(Html(
+                view.member_pane(
+                    &member,
+                    Some(&format!("Failed to change access role: {err}")),
+                )
+                .await?,
+            )
             .into_response())
         }
     }
 }
 
-/// DELETE /ui/companies/{company_id}/team/members/{user_id} - Remove someone (Protected).
-#[instrument(skip(workspace))]
+/// POST /ui/companies/{company_id}/team/members/{user_id}/removal - Remove someone, and hand over
+/// whatever they still hold, in one submission (Protected).
+///
+/// The admin's one decision arrives with the click; the use case applies it to every item and only
+/// then demotes the member. Nothing is resolved here, so a failed submission has moved nothing the
+/// re-rendered pane does not show.
+#[instrument(skip(workspace, form))]
 async fn remove_member(
     workspace: Workspace,
     Path((company_id, user_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<MemberRemovalForm>,
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
 
-    // A refused removal is the pane's own error, not a 500: the owner row is the case that hits
-    // it, and the pane is what explains why.
-    if let Err(err) = view
-        .invite_use_cases
-        .remove_company_team_member(view.user_id, company.id, user_id)
-        .await
-    {
+    // A refused removal is the pane's own error, not a 500: the owner row, an unusable decision and
+    // an item somebody else moved are the cases that hit it, and the pane is what explains why —
+    // it re-reads the pre-check, so the reader sees exactly what is still outstanding.
+    let removal = match parse_handover(&form) {
+        Ok(handover) => {
+            // Resolved before the batch rather than per item: only the company owner reaches
+            // here, and creating a company creates their person principal, so this is a lookup
+            // that either holds for the whole submission or is a wiring fault worth surfacing.
+            let commands = TeamWorkCommands {
+                thread_use_cases: &workspace.thread_use_cases,
+                company: &company,
+                actor: workspace.acting_principal(company.id).await?,
+            };
+            view.invite_use_cases
+                .remove_company_team_member_with_handover(
+                    &commands,
+                    view.user_id,
+                    company.id,
+                    user_id,
+                    handover,
+                )
+                .await
+        }
+        Err(err) => Err(err),
+    };
+
+    if let Err(err) = removal {
         let member = view.member(user_id).await?;
         return Ok(Html(
-            view.member_pane(&member, Some(&format!("Failed to remove member: {err}"))),
+            view.member_pane(&member, Some(&format!("Failed to remove member: {err}")))
+                .await?,
         )
         .into_response());
     }
 
     view.cleared_response().await
+}
+
+/// The pane's owner `<select>`, as one decision about all of the work.
+///
+/// `None` means the submission carried no decision at all, which is what a member with nothing
+/// live submits; the use case is what decides whether that is acceptable, because only it knows
+/// whether there was anything to decide. There is no "nobody" value to parse — the selection
+/// always names a person or an agent.
+fn parse_handover(form: &MemberRemovalForm) -> AppResult<Option<OwnedWorkHandover>> {
+    let Some(owner) = form
+        .owner
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(None);
+    };
+
+    Ok(Some(OwnedWorkHandover {
+        new_owner: parse_owner(owner)?,
+        handoff_instruction: form.handoff_instruction.clone().unwrap_or_default(),
+    }))
+}
+
+/// One `human:<uuid>` or `agent:<uuid>` selection, as the pane's owner `<select>` submits it.
+fn parse_owner(owner: &str) -> AppResult<TaskOwner> {
+    let (kind, id) = owner
+        .split_once(':')
+        .ok_or_else(|| AppError::BadRequest("Choose a valid task owner.".into()))?;
+    let id = Uuid::parse_str(id)
+        .map_err(|_| AppError::BadRequest("Choose a valid task owner.".into()))?;
+    match kind {
+        "human" => Ok(TaskOwner::Human(id.into())),
+        "agent" => Ok(TaskOwner::Agent(id.into())),
+        _ => Err(AppError::BadRequest(
+            "Owner kind must be human or agent.".into(),
+        )),
+    }
+}
+
+/// The guided removal's commands, over the use case that already owns both of them.
+///
+/// The Team tab submits the identical `TaskOwnershipCommand` the Tasks workspace does and a
+/// `ReassignPersonTarget` built the same way the delegation controls build their own operations —
+/// one command per item, each with its own idempotency key, each fenced on the version the
+/// pre-check read moments earlier, each audited. Only the decision behind them is shared.
+struct TeamWorkCommands<'a> {
+    thread_use_cases: &'a ThreadUseCases,
+    company: &'a Company,
+    /// Who the audit trail records: the admin who clicked Remove, in this company's own principal.
+    actor: PrincipalId,
+}
+
+#[async_trait]
+impl MemberWorkCommands for TeamWorkCommands<'_> {
+    async fn hand_over_owned_task(
+        &self,
+        task: &OwnedTaskAtStake,
+        handover: &OwnedWorkHandover,
+    ) -> AppResult<()> {
+        let change = handover.ownership_change();
+        self.thread_use_cases
+            .change_task_ownership(TaskOwnershipCommand {
+                execution: None,
+                invocation: None,
+                task_id: task.task_id,
+                company_id: self.company.id,
+                command_id: Uuid::new_v4(),
+                expected_version: task.ownership_version,
+                actor: TaskOwnershipActor {
+                    principal_id: self.actor,
+                    authority: TaskOwnershipAuthority::Manager,
+                },
+                operation: change.operation,
+                new_owner: change.new_owner,
+                reason: TaskOwnershipReason::OwnerUnavailable,
+                reason_detail: None,
+                handoff_instruction: Some(change.handoff_instruction),
+            })
+            .await?;
+        Ok(())
+    }
+
+    async fn redirect_delegated_ask(
+        &self,
+        ask: &DelegatedAskAtStake,
+        new_owner: PrincipalId,
+    ) -> AppResult<()> {
+        let task = self
+            .thread_use_cases
+            .get_task_persistence()
+            .await
+            .get_task_by_id(ask.task_id)
+            .await?
+            .filter(|task| task.company_id == self.company.id)
+            .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
+        self.thread_use_cases
+            .execute_delegation_command(
+                self.company,
+                &task,
+                DelegationCommand {
+                    company_id: self.company.id,
+                    task_id: ask.task_id,
+                    command_id: Uuid::new_v4(),
+                    expected_version: ask.outreach_version,
+                    actor: DelegationActor {
+                        principal_id: self.actor,
+                        authority: DelegationAuthority::CompanyManager,
+                    },
+                    reason: DelegationReason::TargetUnavailable,
+                    reason_detail: None,
+                    operation: DelegationOperation::ReassignPersonTarget {
+                        outreach_id: ask.outreach_id,
+                        target_id: ask.target_id,
+                        new_principal_id: new_owner,
+                    },
+                },
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 /// Everything the tab renders from, so each handler names its data once.
@@ -552,17 +755,19 @@ impl TeamView<'_> {
     }
 
     /// The pane one selection opens, or the placeholder when it opens nothing.
-    fn selected_pane(
+    async fn selected_pane(
         &self,
         members: &[CompanyMember],
         invites: &[CompanyInvite],
         selected: TeamSelection,
-    ) -> String {
+    ) -> AppResult<String> {
         let pane = match selected {
-            TeamSelection::Member(user_id) => members
-                .iter()
-                .find(|member| member.user_id == user_id)
-                .map(|member| self.member_pane(member, None)),
+            TeamSelection::Member(user_id) => {
+                match members.iter().find(|member| member.user_id == user_id) {
+                    Some(member) => Some(self.member_pane(member, None).await?),
+                    None => None,
+                }
+            }
             TeamSelection::Invite(invite_id) => invites
                 .iter()
                 .find(|invite| invite.id == invite_id)
@@ -570,9 +775,9 @@ impl TeamView<'_> {
             TeamSelection::None => None,
         };
 
-        pane.unwrap_or_else(|| {
+        Ok(pane.unwrap_or_else(|| {
             pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
-        })
+        }))
     }
 
     fn list<'l>(
@@ -590,25 +795,44 @@ impl TeamView<'_> {
         }
     }
 
-    fn member_pane(&self, member: &CompanyMember, error: Option<&str>) -> String {
-        self.member_pane_with_draft(member, None, error)
+    async fn member_pane(&self, member: &CompanyMember, error: Option<&str>) -> AppResult<String> {
+        self.member_pane_with_draft(member, None, error).await
     }
 
     /// The same pane with the avatar field kept as typed, for a save that was rejected.
-    fn member_pane_with_draft(
+    ///
+    /// The pre-check runs here because every route that draws this pane has to draw the same
+    /// answer: a member with live work never gets a Remove button, whichever write re-rendered it.
+    async fn member_pane_with_draft(
         &self,
         member: &CompanyMember,
         avatar_draft: Option<&str>,
         error: Option<&str>,
-    ) -> String {
-        pages::member_pane(&pages::MemberPane {
+    ) -> AppResult<String> {
+        let at_stake = self.work_at_stake(member).await?;
+        Ok(pages::member_pane(&pages::MemberPane {
             company: self.company,
             member,
             role: self.role(),
             viewer_id: self.user_id,
             avatar_draft,
+            work_at_stake: at_stake.as_ref(),
             error,
-        })
+        }))
+    }
+
+    /// What removing this person would move, for a viewer who could remove them.
+    ///
+    /// `None` for anyone else: a member looking at a colleague has no decision to take, and asking
+    /// the use case would only be refused.
+    async fn work_at_stake(&self, member: &CompanyMember) -> AppResult<Option<MemberWorkAtStake>> {
+        if !self.role().manages() || member.user_id == self.company.user_id {
+            return Ok(None);
+        }
+        self.invite_use_cases
+            .member_work_at_stake(self.user_id, self.company.id, member.user_id)
+            .await
+            .map(Some)
     }
 
     fn invite_pane(

@@ -9,6 +9,11 @@ use crate::{
     entities::{
         company_invite::CompanyInvite,
         company_member::{CompanyAccessRole, CompanyMember},
+        member_removal::{
+            DelegatedAskAtStake, MemberWorkAtStake, OwnedTaskAtStake, OwnedWorkHandover,
+            UnresolvedWork,
+        },
+        transport::PrincipalId,
         user::User,
     },
     use_cases::company::{CompanyPersistence, company_not_found, owned_company},
@@ -18,6 +23,86 @@ use crate::{
 /// cannot tell a foreign invite from a nonexistent one. See [`owned_company`].
 fn invite_not_found() -> AppError {
     AppError::NotFound("Invite not found in this company.".into())
+}
+
+/// Why a bare removal was refused, in the words a caller without the pane can act on.
+fn unresolved_work_message(at_stake: &MemberWorkAtStake) -> String {
+    let tasks = at_stake.owned_tasks.len();
+    let asks = at_stake.delegated_asks.len();
+    format!(
+        "This person still has live work: {tasks} task(s) they own and {asks} ask(s) waiting on \
+         their reply. Remove them from the Team pane, which asks who takes all of it over and \
+         re-asks the open asks at them."
+    )
+}
+
+/// The one decision, checked against everything it is about to be applied to.
+///
+/// Named rather than returned as a pair because the second field is the *consequence* of the
+/// first: who each ask is re-asked at, resolved once for the batch, and absent exactly when there
+/// are no asks to re-ask.
+struct CheckedHandover {
+    handover: OwnedWorkHandover,
+    ask_recipient: Option<PrincipalId>,
+}
+
+/// Every reason a submission is unusable, answered before a single command goes out.
+///
+/// All of these are `BadRequest`s about the submission, and none of them has moved anything — as
+/// opposed to the `Conflict` a command that actually refused produces.
+fn checked_handover(
+    at_stake: &MemberWorkAtStake,
+    handover: Option<OwnedWorkHandover>,
+) -> AppResult<CheckedHandover> {
+    // `None` is "the submission carried no decision", which is a refusal for a member who holds
+    // anything at all rather than a silent unassignment.
+    let handover = handover.ok_or_else(|| {
+        AppError::BadRequest("Choose who takes this person's live work over.".into())
+    })?;
+    handover
+        .check()
+        .map_err(|message| AppError::BadRequest(message.into()))?;
+    let ask_recipient = if at_stake.delegated_asks.is_empty() {
+        None
+    } else {
+        Some(
+            handover
+                .ask_recipient()
+                .map_err(|message| AppError::BadRequest(message.into()))?,
+        )
+    };
+    Ok(CheckedHandover {
+        handover,
+        ask_recipient,
+    })
+}
+
+/// The commands a guided removal issues on the work it is clearing.
+///
+/// Ownership and delegation commands are owned by `ThreadUseCases`; naming them as a port here
+/// keeps this use case out of how they are executed, and lets a test drive a single item's failure
+/// — which is the only way to exercise the policy that a partial batch is never a partial removal.
+///
+/// No default methods: an implementation that silently succeeded would turn a refused handover into
+/// a removal.
+#[async_trait]
+pub trait MemberWorkCommands: Send + Sync {
+    /// Apply the batch's one decision to one task, fenced on the version the pre-check just read.
+    async fn hand_over_owned_task(
+        &self,
+        task: &OwnedTaskAtStake,
+        handover: &OwnedWorkHandover,
+    ) -> AppResult<()>;
+    /// Re-ask one question addressed to the departing member at the taker the batch chose,
+    /// fenced on the outreach version the pre-check just read.
+    ///
+    /// The same decision as the tasks, applied to an ask: nobody is left waiting on an answer
+    /// that stopped being anybody's job, and nobody's question is dropped either.
+    async fn redirect_delegated_ask(
+        &self,
+        ask: &DelegatedAskAtStake,
+        new_owner: PrincipalId,
+    ) -> AppResult<()>;
 }
 
 #[async_trait]
@@ -57,6 +142,14 @@ pub trait CompanyInvitePersistence: Send + Sync {
         role: CompanyAccessRole,
     ) -> AppResult<Option<CompanyMember>>;
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()>;
+    /// The live work removing this member would move: tasks they own, and asks still waiting on
+    /// their reply. A read; resolving any of it goes through the ownership and delegation commands
+    /// that already own those transitions.
+    async fn member_work_at_stake(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<MemberWorkAtStake>;
 }
 
 #[derive(Clone)]
@@ -305,6 +398,113 @@ impl CompanyInviteUseCases {
             .await
     }
 
+    /// What removing this member would move, so the caller can present it and ask for the one
+    /// decision the removal needs — who takes the tasks over — before asking for the removal.
+    ///
+    /// Same authority as the removal it precedes, and the same refusal for the owner's own row:
+    /// asking "what would removing the owner move" is asking about something that never happens.
+    #[instrument(skip(self))]
+    pub async fn member_work_at_stake(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        member_user_id: Uuid,
+    ) -> AppResult<MemberWorkAtStake> {
+        self.verify_company_owner(user_id, company_id).await?;
+
+        if user_id == member_user_id {
+            return Err(AppError::Internal(
+                "Cannot remove company owner from the team.".into(),
+            ));
+        }
+
+        self.invite_persistence
+            .member_work_at_stake(company_id, member_user_id)
+            .await
+    }
+
+    /// Remove a member, applying one decision to everything they still hold.
+    ///
+    /// The admin's decision is single; the mechanism is not. Every owned task is still its own
+    /// version-fenced, idempotent, audited `TaskOwnershipCommand` and every ask its own
+    /// `ReassignPersonTarget`, each built from the versions this method reads *now* rather than
+    /// from whatever the pane was rendered with.
+    ///
+    /// **A partial batch is never a partial removal.** Every item is attempted, failures are
+    /// collected, and if anything failed the member stays on the team and the refusal names what
+    /// is still theirs. The alternative — removing them with some work unresolved — is the silent
+    /// unassignment this whole flow exists to prevent.
+    #[instrument(skip(self, commands))]
+    pub async fn remove_company_team_member_with_handover(
+        &self,
+        commands: &dyn MemberWorkCommands,
+        user_id: Uuid,
+        company_id: Uuid,
+        member_user_id: Uuid,
+        handover: Option<OwnedWorkHandover>,
+    ) -> AppResult<()> {
+        // Authorization, the owner-row refusal, and the fresh versions every command fences on,
+        // in one read.
+        let at_stake = self
+            .member_work_at_stake(user_id, company_id, member_user_id)
+            .await?;
+        if at_stake.is_empty() {
+            // Nothing to decide, so nothing to submit: the ordinary removal, which runs the
+            // pre-check itself.
+            return self
+                .remove_company_team_member(user_id, company_id, member_user_id)
+                .await;
+        }
+        // No taker every affected channel accepts. Refused rather than resolved somehow: the one
+        // selection names a person or an agent, and there is nothing else it can say.
+        if at_stake.owner_candidates.is_empty() {
+            info!(
+                company_id = %company_id,
+                member_user_id = %member_user_id,
+                at_stake = at_stake.len(),
+                "Guided removal refused: no eligible owner for this member's work"
+            );
+            return Err(AppError::Conflict(
+                MemberWorkAtStake::NO_ELIGIBLE_OWNER.into(),
+            ));
+        }
+        let checked = checked_handover(&at_stake, handover)?;
+
+        let mut unresolved = UnresolvedWork::default();
+        for task in &at_stake.owned_tasks {
+            if let Err(error) = commands.hand_over_owned_task(task, &checked.handover).await {
+                unresolved.push(task.summary(), error.to_string());
+            }
+        }
+        if let Some(recipient) = checked.ask_recipient {
+            for ask in &at_stake.delegated_asks {
+                if let Err(error) = commands.redirect_delegated_ask(ask, recipient).await {
+                    unresolved.push(ask.summary(), error.to_string());
+                }
+            }
+        }
+        if !unresolved.is_empty() {
+            info!(
+                company_id = %company_id,
+                member_user_id = %member_user_id,
+                unresolved = unresolved.items.len(),
+                "Guided removal refused: work is still at stake"
+            );
+            return Err(AppError::Conflict(unresolved.message()));
+        }
+
+        // The guard runs again inside: what this cleared is what it just read, so work that
+        // arrived in between refuses the removal rather than being demoted out from under.
+        self.remove_company_team_member(user_id, company_id, member_user_id)
+            .await
+    }
+
+    /// Remove a member, once nothing of theirs is still live.
+    ///
+    /// The pre-check is run here rather than left to the UI so no caller — a JSON route, a script,
+    /// a future flow — can demote somebody out from under work that is still running. What the
+    /// caller is expected to do with the refusal is take the one decision
+    /// [`Self::remove_company_team_member_with_handover`] asks for and go through that instead.
     #[instrument(skip(self))]
     pub async fn remove_company_team_member(
         &self,
@@ -318,6 +518,15 @@ impl CompanyInviteUseCases {
             return Err(AppError::Internal(
                 "Cannot remove company owner from the team.".into(),
             ));
+        }
+
+        // Propagated, never defaulted: a failed pre-check must not read as "nothing at stake".
+        let at_stake = self
+            .invite_persistence
+            .member_work_at_stake(company_id, member_user_id)
+            .await?;
+        if !at_stake.is_empty() {
+            return Err(AppError::Conflict(unresolved_work_message(&at_stake)));
         }
 
         info!(
@@ -357,506 +566,5 @@ impl CompanyInviteUseCases {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::entities::company::Company;
-    use crate::use_cases::company::CompanyWrite;
-    use chrono::Utc;
-    use std::sync::Mutex;
-
-    struct MockCompanyPersistence {
-        companies: Mutex<Vec<Company>>,
-    }
-
-    #[async_trait]
-    impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-
-        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.id == id)
-                .cloned())
-        }
-
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.slug.eq_ignore_ascii_case(slug))
-                .cloned())
-        }
-
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-            unimplemented!()
-        }
-
-        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-
-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
-            unimplemented!()
-        }
-
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
-            Ok(vec![])
-        }
-
-        async fn list_company_team_accounts(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-            unimplemented!("this double is not exercised on the team-account path")
-        }
-
-        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
-        /// rather than a state worth simulating.
-        async fn list_model_connections(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn model_api_key(
-            &self,
-            _company_id: Uuid,
-            _provider: &crate::entities::value_objects::ModelProvider,
-        ) -> AppResult<Option<String>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn replace_model_connections_for_user(
-            &self,
-            _user_id: Uuid,
-            _company_id: Uuid,
-            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-        ) -> AppResult<()> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-    }
-
-    struct MockCompanyInvitePersistence {
-        invites: Mutex<Vec<CompanyInvite>>,
-        members: Mutex<Vec<CompanyMember>>,
-    }
-
-    #[async_trait]
-    impl CompanyInvitePersistence for MockCompanyInvitePersistence {
-        async fn create_invite(
-            &self,
-            company_id: Uuid,
-            email: &str,
-            role: CompanyAccessRole,
-        ) -> AppResult<CompanyInvite> {
-            let invite = CompanyInvite {
-                id: Uuid::new_v4(),
-                company_id,
-                company_name: Some("Acme".to_string()),
-                email: email.to_string(),
-                role,
-                status: "pending".to_string(),
-                created_at: Utc::now(),
-            };
-            self.invites.lock().unwrap().push(invite.clone());
-            Ok(invite)
-        }
-
-        async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>> {
-            Ok(self
-                .invites
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|i| i.id == id)
-                .cloned())
-        }
-
-        async fn list_invites_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyInvite>> {
-            Ok(self
-                .invites
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|i| i.company_id == company_id)
-                .cloned()
-                .collect())
-        }
-
-        async fn update_invite(
-            &self,
-            id: Uuid,
-            new_email: &str,
-            role: CompanyAccessRole,
-        ) -> AppResult<CompanyInvite> {
-            let mut list = self.invites.lock().unwrap();
-            let invite = list
-                .iter_mut()
-                .find(|i| i.id == id)
-                .ok_or_else(|| AppError::Internal("Not found".into()))?;
-            invite.email = new_email.to_string();
-            invite.role = role;
-            Ok(invite.clone())
-        }
-
-        async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
-            self.invites.lock().unwrap().retain(|i| i.id != id);
-            Ok(())
-        }
-
-        async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>> {
-            Ok(self
-                .invites
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|i| i.email.eq_ignore_ascii_case(email))
-                .cloned()
-                .collect())
-        }
-
-        async fn accept_pending_invite(
-            &self,
-            invite_id: Uuid,
-            user_id: Uuid,
-            user_email: &str,
-        ) -> AppResult<Option<CompanyInvite>> {
-            let mut invites = self.invites.lock().unwrap();
-            let Some(invite) = invites.iter_mut().find(|i| {
-                i.id == invite_id
-                    && i.status == "pending"
-                    && i.email.eq_ignore_ascii_case(user_email)
-            }) else {
-                return Ok(None);
-            };
-
-            let mut members = self.members.lock().unwrap();
-            if let Some(member) = members
-                .iter_mut()
-                .find(|m| m.company_id == invite.company_id && m.user_id == user_id)
-            {
-                member.role = invite.role;
-            } else {
-                members.push(CompanyMember {
-                    id: Uuid::new_v4(),
-                    company_id: invite.company_id,
-                    user_id,
-                    username: Some("inviteduser".to_string()),
-                    email: Some(user_email.to_string()),
-                    avatar_url: None,
-                    role: invite.role,
-                    created_at: Utc::now(),
-                });
-            }
-            invite.status = "accepted".to_string();
-            Ok(Some(invite.clone()))
-        }
-
-        async fn decline_pending_invite(
-            &self,
-            invite_id: Uuid,
-            user_email: &str,
-        ) -> AppResult<Option<CompanyInvite>> {
-            let mut invites = self.invites.lock().unwrap();
-            let Some(invite) = invites.iter_mut().find(|i| {
-                i.id == invite_id
-                    && i.status == "pending"
-                    && i.email.eq_ignore_ascii_case(user_email)
-            }) else {
-                return Ok(None);
-            };
-            invite.status = "declined".to_string();
-            Ok(Some(invite.clone()))
-        }
-
-        async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
-            Ok(self
-                .members
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.company_id == company_id)
-                .cloned()
-                .collect())
-        }
-
-        async fn update_member_role(
-            &self,
-            company_id: Uuid,
-            user_id: Uuid,
-            role: CompanyAccessRole,
-        ) -> AppResult<Option<CompanyMember>> {
-            let mut members = self.members.lock().unwrap();
-            let Some(member) = members
-                .iter_mut()
-                .find(|member| member.company_id == company_id && member.user_id == user_id)
-            else {
-                return Ok(None);
-            };
-            member.role = role;
-            Ok(Some(member.clone()))
-        }
-
-        async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
-            self.members
-                .lock()
-                .unwrap()
-                .retain(|m| !(m.company_id == company_id && m.user_id == user_id));
-            Ok(())
-        }
-    }
-
-    /// Team-member listing is the one place a non-owner has legitimate access, so it needs its own
-    /// coverage: a member gets in, and anyone else is refused in the same words a stranger hears
-    /// about a company that does not exist.
-    #[tokio::test]
-    async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
-        let owner_id = Uuid::new_v4();
-        let member_id = Uuid::new_v4();
-        let stranger_id = Uuid::new_v4();
-        let company_id = Uuid::new_v4();
-
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
-                channel_defaults: Default::default(),
-                id: company_id,
-                user_id: owner_id,
-                name: "Acme Corp".to_string(),
-                slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
-                avatar_url: None,
-                memory_provider: None,
-                created_at: Utc::now(),
-            }]),
-        });
-        let invite_persistence = Arc::new(MockCompanyInvitePersistence {
-            invites: Mutex::new(Vec::new()),
-            members: Mutex::new(vec![CompanyMember {
-                id: Uuid::new_v4(),
-                company_id,
-                user_id: member_id,
-                username: Some("member".into()),
-                email: Some("member@example.com".into()),
-                avatar_url: None,
-                role: CompanyAccessRole::Member,
-                created_at: Utc::now(),
-            }]),
-        });
-        let use_cases = CompanyInviteUseCases::new(company_persistence, invite_persistence);
-
-        assert_eq!(
-            use_cases
-                .list_company_team_members(owner_id, company_id)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "the owner still sees the team"
-        );
-        assert_eq!(
-            use_cases
-                .list_company_team_members(member_id, company_id)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "a member is not the owner but may still read the team"
-        );
-
-        let stranger_err = use_cases
-            .list_company_team_members(stranger_id, company_id)
-            .await
-            .unwrap_err();
-        let missing_err = use_cases
-            .list_company_team_members(stranger_id, Uuid::new_v4())
-            .await
-            .unwrap_err();
-
-        assert!(
-            matches!(stranger_err, AppError::NotFound(_)),
-            "{stranger_err:?}"
-        );
-        assert_eq!(
-            stranger_err.to_string(),
-            missing_err.to_string(),
-            "telling the two apart would confirm the company exists"
-        );
-    }
-
-    #[tokio::test]
-    async fn company_invites_crud_and_accept_flow() {
-        let owner_id = Uuid::new_v4();
-        let company_id = Uuid::new_v4();
-
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
-                channel_defaults: Default::default(),
-                id: company_id,
-                user_id: owner_id,
-                name: "Acme Corp".to_string(),
-                slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
-                avatar_url: None,
-                memory_provider: None,
-                created_at: Utc::now(),
-            }]),
-        });
-
-        let invite_persistence = Arc::new(MockCompanyInvitePersistence {
-            invites: Mutex::new(Vec::new()),
-            members: Mutex::new(Vec::new()),
-        });
-
-        let use_cases = CompanyInviteUseCases::new(company_persistence, invite_persistence);
-
-        // Owner creates invite
-        let invite = use_cases
-            .create_company_invite(
-                owner_id,
-                company_id,
-                "user@example.com",
-                CompanyAccessRole::Admin,
-            )
-            .await
-            .unwrap();
-        assert_eq!(invite.email, "user@example.com");
-        assert_eq!(invite.role, CompanyAccessRole::Admin);
-
-        // Non-owner cannot create invite
-        let err = use_cases
-            .create_company_invite(
-                Uuid::new_v4(),
-                company_id,
-                "other@example.com",
-                CompanyAccessRole::Member,
-            )
-            .await;
-        assert!(err.is_err());
-
-        // Update invite email
-        let updated = use_cases
-            .update_company_invite(
-                owner_id,
-                company_id,
-                invite.id,
-                "newuser@example.com",
-                Some(CompanyAccessRole::Admin),
-            )
-            .await
-            .unwrap();
-        assert_eq!(updated.email, "newuser@example.com");
-
-        let backwards_compatible_update = use_cases
-            .update_company_invite(owner_id, company_id, invite.id, "newuser@example.com", None)
-            .await
-            .unwrap();
-        assert_eq!(backwards_compatible_update.role, CompanyAccessRole::Admin);
-
-        // List invites for user
-        let user_invites = use_cases
-            .list_user_invites("newuser@example.com")
-            .await
-            .unwrap();
-        assert_eq!(user_invites.len(), 1);
-        assert!(
-            use_cases
-                .has_pending_user_invites("newuser@example.com")
-                .await
-                .unwrap()
-        );
-
-        // User accepts invite
-        let user = User {
-            id: Uuid::new_v4(),
-            username: "newuser".to_string(),
-            email: "newuser@example.com".to_string(),
-            password_hash: "hash".to_string(),
-            avatar_url: None,
-            created_at: Utc::now(),
-        };
-
-        let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();
-        assert_eq!(accepted.status, "accepted");
-        assert!(
-            !use_cases
-                .has_pending_user_invites("newuser@example.com")
-                .await
-                .unwrap()
-        );
-        assert_eq!(
-            use_cases
-                .accept_invite(&user, invite.id)
-                .await
-                .unwrap()
-                .status,
-            "accepted"
-        );
-        assert!(use_cases.decline_invite(&user, invite.id).await.is_err());
-        assert!(
-            use_cases
-                .update_company_invite(
-                    owner_id,
-                    company_id,
-                    invite.id,
-                    "another@example.com",
-                    Some(CompanyAccessRole::Member),
-                )
-                .await
-                .is_err(),
-            "an accepted invitation cannot drift away from the membership it created"
-        );
-
-        // Verify member was added to team
-        let members = use_cases
-            .list_company_team_members(owner_id, company_id)
-            .await
-            .unwrap();
-        assert_eq!(members.len(), 1);
-        assert_eq!(members[0].user_id, user.id);
-        assert_eq!(members[0].role, CompanyAccessRole::Admin);
-
-        let changed_member = use_cases
-            .update_company_team_member_role(
-                owner_id,
-                company_id,
-                user.id,
-                CompanyAccessRole::Member,
-            )
-            .await
-            .unwrap();
-        assert_eq!(changed_member.role, CompanyAccessRole::Member);
-
-        // Verify member (non-owner) can also list company team members
-        let member_list = use_cases
-            .list_company_team_members(user.id, company_id)
-            .await
-            .unwrap();
-        assert_eq!(member_list.len(), 1);
-        assert_eq!(member_list[0].user_id, user.id);
-
-        // Verify random user cannot list company team members
-        let random_user_err = use_cases
-            .list_company_team_members(Uuid::new_v4(), company_id)
-            .await;
-        assert!(random_user_err.is_err());
-
-        // Owner removes member from team
-        use_cases
-            .remove_company_team_member(owner_id, company_id, user.id)
-            .await
-            .unwrap();
-        let members_after = use_cases
-            .list_company_team_members(owner_id, company_id)
-            .await
-            .unwrap();
-        assert_eq!(members_after.len(), 0);
-    }
-}
+#[path = "company_invite_tests.rs"]
+mod tests;

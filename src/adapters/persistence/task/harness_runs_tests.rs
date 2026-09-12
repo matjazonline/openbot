@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    adapters::persistence::test_support::test_pool,
+    adapters::persistence::test_support::own_database,
     entities::{
         harness::HarnessKind,
         task::{NewTask, TaskLeaseRef},
@@ -159,12 +159,10 @@ fn reservation() -> ModelReservation {
 
 #[tokio::test]
 async fn competing_checkpoint_writers_and_stale_generations_are_fenced() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool).await;
     let (left, right) = tokio::join!(
         fixture.persistence.open_run(fixture.request()),
@@ -235,12 +233,10 @@ async fn competing_checkpoint_writers_and_stale_generations_are_fenced() {
 
 #[tokio::test]
 async fn committed_calls_and_final_output_survive_a_new_adapter() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let fixture = Fixture::new(pool.clone()).await;
     let mut run = applied(
         fixture
@@ -342,12 +338,10 @@ async fn committed_calls_and_final_output_survive_a_new_adapter() {
 #[tokio::test]
 async fn competing_repairs_replay_committed_slots_and_fence_stale_final_output() {
     use crate::services::response_contract::{InvalidResponse, StructuredResponse};
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let contract = serde_json::from_value(
         json!({"version":1,"format":"json_schema","schema":{"type":"object"}}),
     )

@@ -87,6 +87,8 @@ settle it instead.
 | 11 | Identical outreach-tally SQL in three places | A | 1 |
 | 12 | Row-at-a-time statements for caller-supplied collections | A | 2 |
 | 13 | `release_tasks_for_removed_principal()` walks every task a principal ever owned, one row at a time, on an interactive delete | A | 6 |
+| 14 | `claim_pending_tasks` could re-claim a task another worker claimed and committed after its snapshot (found during phase 5) | A | 5 |
+| 15 | Under load the worker claims one slot at a time, so the per-batch company round-robin degenerates to first-in-first-out across companies (found during phase 5) | Behaviour change, owner-approved | 5, follow-up |
 
 ## Understood, no change proposed
 

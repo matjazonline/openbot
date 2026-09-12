@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT outreach.task_id, task.channel_id, outreach.id AS outreach_id,\n                      target.id AS target_id, outreach.version, outreach.subject,\n                      target.email::text AS \"email!\", outreach.expires_at\n               FROM task_outreach_targets AS target\n               JOIN task_outreaches AS outreach\n                 ON outreach.company_id = target.company_id AND outreach.id = target.outreach_id\n               JOIN background_tasks AS task\n                 ON task.company_id = outreach.company_id AND task.id = outreach.task_id\n               JOIN participant_identities AS identity\n                 ON identity.company_id = target.company_id\n                AND identity.principal_id = $2\n                AND identity.transport = target.external_transport\n                AND identity.namespace = target.external_namespace\n                AND identity.subject = target.external_subject\n               WHERE target.company_id = $1\n                 AND target.status = 'active'\n                 AND outreach.status IN ('waiting', 'timeout_pending_approval')\n                 AND task.status NOT IN ('completed', 'stopped')\n               ORDER BY outreach.expires_at, target.id\n               LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "channel_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "outreach_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "target_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "email!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "9bb699f999bccc402e5e108abaf4dff6282b4cd971b16aa9bcd7b31f11a4df7b"
+}

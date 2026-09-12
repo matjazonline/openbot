@@ -21,6 +21,7 @@ use crate::entities::{
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
     correlation::CorrelationId,
     delivery::{DeliveryEntry, DeliveryFilter},
+    member_removal::MemberWorkAtStake,
     memory::{
         MEMORY_READINESS_TIMEOUT_ERROR, MemoryConnection, MemoryConnectionReadiness,
         MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
@@ -71,6 +72,7 @@ mod company_skills;
 mod dashboard;
 mod dashboard_query_health;
 mod dashboard_runtime;
+mod delegation;
 mod deliveries;
 mod fragment;
 mod harness_diagnostics;
@@ -106,6 +108,7 @@ pub use company_resend_api::*;
 pub use company_settings::*;
 pub use company_skills::*;
 pub use dashboard::*;
+pub(crate) use delegation::*;
 pub use deliveries::*;
 pub use fragment::*;
 pub use icon::*;

@@ -5,7 +5,7 @@ use uuid::Uuid;
 use super::*;
 use crate::{
     adapters::{
-        persistence::test_support::{UNSCOPED_CLAIM, test_pool},
+        persistence::test_support::{own_database, test_pool},
         protocols::email::EmailRenderer,
     },
     application::notification::{
@@ -304,10 +304,10 @@ async fn notification_census_executes_against_postgres() {
 
 #[tokio::test]
 async fn assignment_projection_is_fenced_idempotent_and_never_owns_task_state() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture = make_fixture(&persistence).await;
     assign(
@@ -508,10 +508,10 @@ async fn assignment_projection_is_fenced_idempotent_and_never_owns_task_state() 
 
 #[tokio::test]
 async fn preferences_and_self_actions_suppress_email_without_hiding_in_app_work() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture = make_fixture(&persistence).await;
     UserPersistence::set_notification_preferences(
@@ -630,10 +630,10 @@ async fn preferences_and_self_actions_suppress_email_without_hiding_in_app_work(
 
 #[tokio::test]
 async fn projection_resolution_serializes_with_an_owner_transfer() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture = make_fixture(&persistence).await;
     assign(
@@ -717,10 +717,10 @@ async fn projection_resolution_serializes_with_an_owner_transfer() {
 
 #[tokio::test]
 async fn a_failed_projection_batch_backs_off_before_it_can_be_claimed_again() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture = make_fixture(&persistence).await;
     let source_ids = (0..NOTIFICATION_EVENT_CLAIM_BATCH)

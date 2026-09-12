@@ -1,5 +1,6 @@
 //! Structured answers through production PostgreSQL dispatch and frozen email publication.
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::{
     entities::harness::HarnessKind,
     services::{
@@ -18,12 +19,10 @@ async fn configure(fx: &Fixture) {
 }
 #[tokio::test]
 async fn structured_dispatch_preserves_json_and_exhaustion_has_no_publication() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     for (valid, delivery_mode) in [
         (true, ReplyDelivery::Send),
         (false, ReplyDelivery::Send),
@@ -159,12 +158,10 @@ async fn structured_review_rejects_invalid_edits_and_serializes_edit_against_app
         },
         use_cases::response_review::{ResponseReviewPersistence, ReviewAction, ReviewCommand},
     };
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let llm = scripted_scenario(vec![ScriptedExchange::new(
         |_| Ok(()),
         ScriptedResponse::turn(LlmTurn::text(r#"{"status":"done"}"#), 1),
@@ -304,12 +301,10 @@ async fn structured_review_rejects_invalid_edits_and_serializes_edit_against_app
 #[tokio::test]
 async fn structured_scheduled_dispatch_delivers_the_validated_json_body() {
     use crate::entities::schedule::{ScheduleDeliveryMode, ScheduledRunPayload};
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let llm = scripted_scenario(vec![ScriptedExchange::new(
         |_| Ok(()),
         ScriptedResponse::turn(LlmTurn::text(r#"{"status":"done"}"#), 1),

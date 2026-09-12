@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::{
     entities::{
         harness_run::*,
@@ -160,12 +161,10 @@ fn applied(outcome: WriteOutcome<RunCheckpoint>) -> RunCheckpoint {
 
 #[tokio::test]
 async fn remote_receipt_commits_with_fence_and_replays_without_network() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let server = scripted_scenario(exchanges("secret")).await;
     let fixture = DurableFixture::new(pool, &server.base_url).await;
     let client = Arc::new(HttpMcpClient::new(
@@ -233,12 +232,10 @@ async fn remote_receipt_commits_with_fence_and_replays_without_network() {
 
 #[tokio::test]
 async fn competing_remote_claims_and_stale_completion_leave_an_indeterminate_receipt() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let server = scripted_scenario(discovery("secret")).await;
     let fixture = DurableFixture::new(pool, &server.base_url).await;
     let client = Arc::new(HttpMcpClient::new(

@@ -1,5 +1,6 @@
 //! The product simulation ingress, durable dispatch, real Rig tools, and escaped HTML.
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::{
     adapters::http::{pages, routes::channel::compose_and_ingest},
     entities::harness::HarnessKind,
@@ -16,12 +17,10 @@ fn echo_call() -> Value {
 
 #[tokio::test]
 async fn queued_simulation_continues_after_a_tool_and_renders_validated_json() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let expected = r#"{"status":"<script>**done**</script>"}"#;
     let llm = scripted_scenario(vec![
         ScriptedExchange::new(|_| Ok(()), ScriptedResponse::json(echo_call())),

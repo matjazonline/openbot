@@ -304,6 +304,11 @@ pub(crate) async fn replace_agent_capabilities_on(
         .await
         .map_err(AppError::from)?;
 
+    // A statement per row, deliberately. These lists come from a person editing the agent form --
+    // a handful of skills, a handful of sub-agents -- as do the three channel-agent loops in
+    // `channel.rs`, so an `unnest` rewrite would buy nothing measurable. The collections that
+    // arrive from outside (task channel targets, message participants, inbound associations) are
+    // the ones written as one statement; `plan/db_audit/phase2.md` has the reasoning.
     for (position, skill_id) in write.skill_ids.iter().enumerate() {
         sqlx::query(
             "INSERT INTO agent_skills (company_id, agent_id, skill_id, position) \

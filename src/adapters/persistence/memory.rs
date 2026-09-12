@@ -982,7 +982,7 @@ async fn renew_job_lease(
 mod tests {
     use super::*;
     use crate::{
-        adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool},
+        adapters::persistence::test_support::{own_database, test_pool},
         use_cases::{
             company::{CompanyPersistence, CompanyWrite},
             user::UserPersistence,
@@ -1015,10 +1015,10 @@ mod tests {
 
     #[tokio::test]
     async fn provider_selection_is_idempotent_and_competing_claimants_claim_once() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
 
@@ -1055,10 +1055,10 @@ mod tests {
 
     #[tokio::test]
     async fn readiness_claim_is_exclusive_and_timeout_retry_resets_the_same_job() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         persistence
@@ -1224,10 +1224,10 @@ mod tests {
 
     #[tokio::test]
     async fn deletion_fences_a_leased_provision_and_cleanup_waits_for_quiescence() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         let connection = persistence
@@ -1327,10 +1327,10 @@ mod tests {
 
     #[tokio::test]
     async fn expired_operation_is_reclaimed_with_a_new_generation() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         let connection = persistence
@@ -1426,10 +1426,10 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_connection_writes_are_dual_written_during_rollout() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         let remote_database_id = remote_memory_database_id(company_id);
@@ -1509,10 +1509,10 @@ mod tests {
 
     #[tokio::test]
     async fn disabling_preserves_the_connection_and_deletion_preserves_cleanup_work() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         let connection = persistence
@@ -1564,10 +1564,10 @@ mod tests {
     /// down. Only reachable now that a second provider exists.
     #[tokio::test]
     async fn switching_providers_retires_the_previous_connection_and_enqueues_its_cleanup() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
 
@@ -1646,10 +1646,10 @@ mod tests {
 
     #[tokio::test]
     async fn retry_is_refused_against_a_retained_connection_once_memory_is_disabled() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         persistence
@@ -1715,10 +1715,10 @@ mod tests {
 
     #[tokio::test]
     async fn reenable_reuses_ready_connection_and_queues_only_readiness_reconciliation() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool.clone());
         let company_id = memory_company(&persistence).await;
         let original = persistence

@@ -1,7 +1,7 @@
 //! Database-backed inbox protocol tests.
 //!
-//! The queue is intentionally global, so every test holds `UNSCOPED_CLAIM` from before it stores
-//! a row through cleanup. Competing claims are the behavior under test, not interference between
+//! The queue is intentionally global, so a test that claims from it runs on a database of its own
+//! (`own_database`). Competing claims are the behavior under test, not interference between
 //! otherwise unrelated test cases.
 
 use std::time::Duration;
@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use super::*;
 use crate::{
-    adapters::persistence::{PostgresPersistence, test_support::UNSCOPED_CLAIM},
+    adapters::persistence::PostgresPersistence,
     entities::{
         correlation::CorrelationId,
         transport::{ExternalEventKey, InboundEventErrorClass, InboundEventIgnoreReason},
@@ -111,10 +111,10 @@ async fn claim_one(
 
 #[tokio::test]
 async fn simultaneous_authenticated_stores_create_one_row_and_both_succeed() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
     let key = format!("event-{}", Uuid::new_v4());
@@ -144,10 +144,10 @@ async fn simultaneous_authenticated_stores_create_one_row_and_both_succeed() {
 
 #[tokio::test]
 async fn simultaneous_claimants_receive_disjoint_events() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
     let first = persistence
@@ -198,10 +198,10 @@ async fn simultaneous_claimants_receive_disjoint_events() {
 
 #[tokio::test]
 async fn every_transition_rejects_a_stale_execution_fence() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
     let stored = persistence
@@ -271,10 +271,10 @@ async fn every_transition_rejects_a_stale_execution_fence() {
 
 #[tokio::test]
 async fn retry_backoff_prevents_hot_reclaim_and_poison_becomes_a_dead_letter() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
     let stored = persistence
@@ -344,10 +344,10 @@ async fn retry_backoff_prevents_hot_reclaim_and_poison_becomes_a_dead_letter() {
 
 #[tokio::test]
 async fn installed_transports_require_the_matching_company_installation() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
     let result = sqlx::query(
@@ -372,10 +372,10 @@ async fn installed_transports_require_the_matching_company_installation() {
 /// nobody notices the wake-up went missing.
 #[tokio::test]
 async fn storing_an_event_announces_it_on_the_channel_the_listener_subscribes_to() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let scope = scope(&persistence).await;
 

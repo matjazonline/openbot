@@ -153,6 +153,39 @@ is pruning only the first machine, and a single-machine test would not catch it.
 
 ---
 
+## Implementation notes (2026-09-11)
+
+What landed differs from the text above in four places. The reasons are recorded here so the next
+reader does not "fix" the code back to match the plan.
+
+- **`task_channel_targets.thread_id` is `NOT NULL`**, and so is `TaskTarget::thread_id`. The
+  nullable-array concern in 2.1 does not apply. The arrays bind as plain `Vec<Uuid>`.
+- **Array lengths are equal by construction, with no assert.** Each array is a `map` over the same
+  deduplicated slice with no filter, so no two can differ in length. A duplicate channel is dropped
+  in Rust, keeping its first occurrence and the position it was stated at. That makes the rows
+  identical to what the loop wrote: positions `0, 1, 3` for `[A, B, A, C]`. `message_participants`
+  needed no new dedup, because `resolve_participants` already drops a handle repeated within a role.
+  Both helpers return early on an empty input, so the empty case costs zero round trips, as it did
+  under the loop.
+- **2.1b orders by `WITH ORDINALITY` unconditionally.** It is cheap, and it keeps the error naming
+  the same association the loop named.
+- **2.2 does not use the `SELECT DISTINCT machine_id` form.** A seeded shape check on local
+  PostgreSQL 16.14 (a temp table, 4 machines × 7 days of 10-second samples) ruled it out. The
+  `DISTINCT` subquery planned as `HashAggregate` over a heap `Seq Scan`. So the statement did the
+  original's full heap scan *plus* the per-machine index scans. Under a generic plan it became a
+  hash join over two heap scans. The claim above that PG18 skip scan serves the `DISTINCT` is also
+  wrong. Per the PG18 docs (§11.3), skip scan needs a constraint on a later index column, which a
+  bare `DISTINCT` does not have. The same docs imply that on PG18 the *original*
+  `WHERE sampled_at < $1` is itself eligible for a skip scan on the key. What shipped enumerates
+  machines with a recursive loose index scan (`min(machine_id)`, then the next key greater than
+  it: one index descent per machine) and deletes `WHERE machine_id = ANY(ARRAY(…)) AND
+  sampled_at < $1`. That planned as an `Index Scan using runtime_metric_samples_pkey` under a custom
+  plan and as a `Bitmap Index Scan` on the same key under a generic plan. It never read the heap to
+  find the rows. These are shape claims from a synthetic seed, not measurements.
+- **The per-caller alternative in 2.2 was rejected.** `MachineId` is boot-local off Fly, so
+  deleting only the caller's machine would never prune any earlier boot's samples, or any retired
+  machine's.
+
 ## Acceptance criteria
 
 - The two externally-driven insert loops and the association validation loop issue one statement

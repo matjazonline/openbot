@@ -397,15 +397,39 @@ impl RuntimeMetricPersistence for PostgresPersistence {
         })
     }
 
+    /// Retention, deleted through the primary key.
+    ///
+    /// `sampled_at` alone cannot lead on the `(machine_id, sampled_at)` key, so the plain
+    /// `WHERE sampled_at < $1` this replaces read the whole heap unless the planner found a skip
+    /// scan, which only PostgreSQL 18 has. Naming every machine first turns it into one key range
+    /// per machine on any version. The machines are found by stepping through the
+    /// key, one descent each, because `SELECT DISTINCT machine_id` plans as a heap scan of its
+    /// own -- the very cost being removed.
+    ///
+    /// Every machine is swept, not only the caller's: a retired machine has no sampler left to
+    /// prune its own samples, and off Fly a machine id lasts only one boot.
     async fn prune_before(&self, cutoff: DateTime<Utc>) -> AppResult<u64> {
-        Ok(
-            sqlx::query("DELETE FROM runtime_metric_samples WHERE sampled_at < $1")
-                .bind(cutoff)
-                .execute(&self.pool)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected(),
+        Ok(sqlx::query(
+            r#"DELETE FROM runtime_metric_samples AS sample
+               WHERE sample.machine_id = ANY (ARRAY(
+                   WITH RECURSIVE machine (machine_id) AS (
+                       SELECT min(machine_id) FROM runtime_metric_samples
+                       UNION ALL
+                       SELECT (SELECT min(later.machine_id)
+                               FROM runtime_metric_samples AS later
+                               WHERE later.machine_id > machine.machine_id)
+                       FROM machine
+                       WHERE machine.machine_id IS NOT NULL
+                   )
+                   SELECT machine_id FROM machine WHERE machine_id IS NOT NULL
+               ))
+                 AND sample.sampled_at < $1"#,
         )
+        .bind(cutoff)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?
+        .rows_affected())
     }
 }
 
@@ -570,6 +594,71 @@ mod tests {
 
         sqlx::query("DELETE FROM runtime_metric_samples WHERE machine_id = $1")
             .bind(machine_id.as_str())
+            .execute(persistence.pool())
+            .await
+            .unwrap();
+    }
+
+    /// Retention enumerates machines before deleting, so the failure it could have is stopping
+    /// after the first one. Two machines, each with samples on both sides of the cutoff.
+    #[tokio::test]
+    async fn pruning_takes_every_machines_old_samples_and_keeps_their_recent_ones() {
+        use chrono::SubsecRound;
+
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let machines = [
+            MachineId::new(format!("prune-a-{}", Uuid::new_v4())),
+            MachineId::new(format!("prune-b-{}", Uuid::new_v4())),
+        ];
+        // A year back, where no other test's samples are: the prune is table-wide and the suite
+        // shares one database. Whole seconds, so the timestamps survive the round trip exactly.
+        let cutoff = (Utc::now() - chrono::Duration::days(365)).trunc_subsecs(0);
+        let old = [
+            cutoff - chrono::Duration::days(2),
+            cutoff - chrono::Duration::seconds(1),
+        ];
+        let recent = vec![cutoff, cutoff + chrono::Duration::days(1)];
+        for machine in &machines {
+            sqlx::query(
+                r#"INSERT INTO runtime_metric_samples
+                       (machine_id, sampled_at, database_acquire_duration_ms,
+                        database_acquire_succeeded, pool_size, pool_idle, pool_active)
+                   SELECT $1, sample.sampled_at, 1.0, TRUE, 1, 1, 0
+                   FROM unnest($2::timestamptz[]) AS sample (sampled_at)"#,
+            )
+            .bind(machine.as_str())
+            .bind(old.iter().chain(&recent).copied().collect::<Vec<_>>())
+            .execute(persistence.pool())
+            .await
+            .expect("samples on both sides of the cutoff are inserted");
+        }
+
+        let deleted = persistence
+            .prune_before(cutoff)
+            .await
+            .expect("retention runs");
+
+        assert!(deleted >= 4, "both machines' old samples are counted");
+        for machine in &machines {
+            let kept: Vec<DateTime<Utc>> = sqlx::query_scalar(
+                "SELECT sampled_at FROM runtime_metric_samples \
+                 WHERE machine_id = $1 ORDER BY sampled_at",
+            )
+            .bind(machine.as_str())
+            .fetch_all(persistence.pool())
+            .await
+            .unwrap();
+            assert_eq!(
+                kept, recent,
+                "{machine} loses exactly its old samples, and a sample at the cutoff is kept"
+            );
+        }
+
+        sqlx::query("DELETE FROM runtime_metric_samples WHERE machine_id = ANY($1)")
+            .bind(machines.iter().map(MachineId::as_str).collect::<Vec<_>>())
             .execute(persistence.pool())
             .await
             .unwrap();

@@ -727,27 +727,49 @@ pub(super) async fn insert_canonical_message(
     Ok(id)
 }
 
+/// Every participant row for one message, as one statement however long its recipient lists are.
+///
+/// The list arrives from `resolve_participants`, which has already dropped a handle repeated within
+/// a role, so no two rows here collide.
 pub(super) async fn insert_participants(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     message_id: CanonicalMessageId,
     participants: &[ResolvedParticipant],
 ) -> AppResult<()> {
-    for participant in participants {
-        sqlx::query(
-            r#"INSERT INTO message_participants (
-                    company_id, message_id, participant_identity_id, kind, position
-               ) VALUES ($1, $2, $3, $4, $5)"#,
-        )
-        .bind(company_id)
-        .bind(message_id.as_uuid())
-        .bind(participant.identity_id.as_uuid())
-        .bind(participant.kind.as_str())
-        .bind(i32::from(participant.position))
-        .execute(&mut *connection)
-        .await
-        .map_err(AppError::from)?;
+    if participants.is_empty() {
+        return Ok(());
     }
+    // Projections of one slice, so the arrays `unnest` zips together cannot differ in length -- a
+    // short array would be padded with NULLs rather than rejected.
+    let identity_ids: Vec<Uuid> = participants
+        .iter()
+        .map(|participant| participant.identity_id.as_uuid())
+        .collect();
+    let kinds: Vec<&str> = participants
+        .iter()
+        .map(|participant| participant.kind.as_str())
+        .collect();
+    let positions: Vec<i32> = participants
+        .iter()
+        .map(|participant| i32::from(participant.position))
+        .collect();
+    sqlx::query(
+        r#"INSERT INTO message_participants (
+                company_id, message_id, participant_identity_id, kind, position
+           )
+           SELECT $1, $2, participant.identity_id, participant.kind, participant.position
+           FROM unnest($3::uuid[], $4::text[], $5::int4[])
+                AS participant (identity_id, kind, position)"#,
+    )
+    .bind(company_id)
+    .bind(message_id.as_uuid())
+    .bind(&identity_ids)
+    .bind(&kinds)
+    .bind(&positions)
+    .execute(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
     Ok(())
 }
 

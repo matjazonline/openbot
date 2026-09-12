@@ -20,6 +20,7 @@ use crate::{
         postgres_persistence,
     },
     services::{
+        dashboard_snapshot::DashboardSnapshotService,
         database_query_health::DatabaseQueryHealthService,
         harness::TextClassifier,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
@@ -83,6 +84,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     );
     install_builtin_agent_library(postgres_arc.as_ref()).await?;
     let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
+    let dashboard_snapshots = Arc::new(DashboardSnapshotService::new(postgres_arc.clone()));
     let memory_provider_activity = MemoryProviderActivity::default();
     // One registry entry and one configured-set entry per provider this deployment carries
     // credentials for. The activity handle is shared: the runtime panel is a machine-level
@@ -352,7 +354,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         inbound_event_inbox,
         inbound_event_wakeups,
         task_wakeups,
-        dashboard_persistence: postgres_arc.clone(),
+        dashboard_snapshots,
         attention: postgres_arc.clone(),
         notifications: postgres_arc.clone(),
         notification_worker,

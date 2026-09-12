@@ -3,6 +3,7 @@ pub mod agent_directory_tool;
 pub mod agent_runner;
 pub mod agent_trace_hooks;
 pub mod approval_tool;
+pub mod dashboard_snapshot;
 pub mod database_query_health;
 pub mod delivery_worker;
 pub mod harness;

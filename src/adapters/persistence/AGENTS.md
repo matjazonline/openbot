@@ -330,8 +330,32 @@ migration creates, plus a content-hash mismatch that broke every internal delega
 as passing* and the suite reports the same total either way, so nothing about the output reveals it.
 Use `ALLOW_MISSING_DATABASE_URL=1` when you genuinely want the non-DB tests only.
 
-This runs parallel and should stay that way. Every fixture here still shares one database — the test
-one — so a new DB-backed test has to be written to tolerate that:
+**A test that sweeps the whole database gets a database of its own.** `test_pool` hands every test
+the same `mail_agents_test`; `own_database` (also `test_support.rs`) creates a uniquely named
+database, migrates it, and drops it when the handle falls out of scope — panic or not:
+
+```rust
+let Some(database) = own_database().await else { return };
+let pool = database.pool.clone();
+```
+
+Hold the handle for the length of the test: dropping it drops the database. Reach for it when the
+test **calls an unscoped operation** — `claim_pending_tasks`, `claim_deliveries`,
+`claim_provisioning_job`, `reap_expired_deliveries`, anything that sweeps a table with no company
+filter — or when it needs to **assert on whole-table state**, the totals and still-`pending` checks
+the rules below forbid. On a database with nothing else in it, a test states every row that exists
+and asserts the exact set a claim returned, instead of backdating rows by three centuries to outrank
+its neighbours and deleting its companies on the way out. `task/claim_tests.rs` is the worked
+example, and `thread/test_support.rs` exposes the choice as `Fixture::new` versus
+`Fixture::isolated`.
+
+It is not the default, because the isolation costs one migration run per test rather than per binary
+— moving the ~60 unscoped tests onto it took the suite from 7 s to ~17 s — and its pools are capped
+at five connections so parallel isolated tests stay clear of the server's `max_connections`. A test
+that only reads and writes its own company's rows should keep `test_pool`.
+
+The rest of the suite still shares one database, so a new DB-backed test on `test_pool` has to be
+written to tolerate that — and this runs parallel and should stay that way:
 
 - **Suffix every database-wide unique value** — company slugs, usernames, emails — with
   `Uuid::new_v4().simple()`. Channel slugs are unique per company, so those may stay fixed. A
@@ -341,6 +365,7 @@ one — so a new DB-backed test has to be written to tolerate that:
   `background_tasks` queue with no company filter, because that is what a real worker does. Assert
   that *your* row was claimed exactly once (filter by id), not that the queue returned one row, and
   keep the claim limit small so the test steals as little as possible from whatever else is running.
+  If the totals are the property under test, take `own_database` instead and assert the exact set.
 - **Do not assert that your row is still `pending`, or still unclaimed.** That asserts no unscoped
   claim ran in between, which is not a property this code has. Either drop the status from the
   assertion — `approval_lookup_is_scoped_and_token_is_consumed_once` counts its notification by
@@ -368,8 +393,9 @@ one — so a new DB-backed test has to be written to tolerate that:
   rule above: a new test left one `pending` `memory_provisioning_jobs` row, `claim_provisioning_job`
   is table-wide, and three unrelated tests failed intermittently because of it.
 
-If a test still cannot be isolated, run just that test rather than reaching for `--test-threads=1`
-for the whole suite — serialising everything hides the next isolation bug instead of surfacing it.
+A test that cannot be written to any of these rules is the case `own_database` exists for; prefer it
+over `--test-threads=1`, and if a test still cannot be isolated, run just that test rather than
+serialising the whole suite — that hides the next isolation bug instead of surfacing it.
 
 This blind spot is not hypothetical: `find_outbound_reply_excludes_outreach_messages` in
 `thread.rs` had three INSERTs naming columns that no migration creates (`task_outreaches.target_count`,

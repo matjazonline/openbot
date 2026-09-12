@@ -4,6 +4,8 @@
 //! The row-local transition attribution lives here too, beside the status-changing statements that
 //! are required to write it.
 
+use std::collections::HashSet;
+
 use sqlx::Postgres;
 use uuid::Uuid;
 
@@ -398,25 +400,68 @@ pub(crate) async fn insert_task(
     .await
     .map_err(AppError::from)?;
 
-    for (position, target) in targets.into_iter().enumerate() {
-        sqlx::query(
-            r#"INSERT INTO task_channel_targets (
-                    task_id, company_id, channel_id, thread_id, recipient_role, position
-               ) VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT (task_id, channel_id) DO NOTHING"#,
-        )
-        .bind(db.id)
-        .bind(company_id)
-        .bind(target.channel_id)
-        .bind(target.thread_id)
-        .bind(target.recipient_role.as_str())
-        .bind(position as i32)
-        .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
-    }
-
+    insert_channel_targets(tx, db.id, company_id, targets).await?;
     db.try_into()
+}
+
+/// The run's channel fan-out, as one statement however many channels the producer stated.
+///
+/// A channel stated twice keeps its first position and role, and every later channel keeps the
+/// position it was stated at -- what the row-at-a-time insert this replaced wrote, since its
+/// `ON CONFLICT` skipped the repeat without renumbering. The repeat is dropped before binding
+/// rather than left to that clause: within one statement, SQL promises nothing about which of two
+/// conflicting rows is inserted first.
+///
+/// The clause stays for the redelivery `insert_task` absorbs: a source message delivered again
+/// returns the task it already has, and that task's targets already exist.
+async fn insert_channel_targets(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    task_id: Uuid,
+    company_id: Uuid,
+    targets: Vec<TaskTarget>,
+) -> AppResult<()> {
+    let mut stated = HashSet::with_capacity(targets.len());
+    let targets: Vec<(i32, TaskTarget)> = targets
+        .into_iter()
+        .enumerate()
+        .filter(|(_, target)| stated.insert(target.channel_id))
+        .map(|(position, target)| (position as i32, target))
+        .collect();
+    if targets.is_empty() {
+        return Ok(());
+    }
+    // Projections of one list, so the arrays `unnest` zips together cannot differ in length -- a
+    // short array would be padded with NULLs rather than rejected.
+    let channel_ids: Vec<Uuid> = targets
+        .iter()
+        .map(|(_, target)| target.channel_id)
+        .collect();
+    let thread_ids: Vec<Uuid> = targets.iter().map(|(_, target)| target.thread_id).collect();
+    let roles: Vec<&str> = targets
+        .iter()
+        .map(|(_, target)| target.recipient_role.as_str())
+        .collect();
+    let positions: Vec<i32> = targets.iter().map(|(position, _)| *position).collect();
+    sqlx::query(
+        r#"INSERT INTO task_channel_targets (
+                task_id, company_id, channel_id, thread_id, recipient_role, position
+           )
+           SELECT $1, $2, target.channel_id, target.thread_id, target.recipient_role,
+                  target.position
+           FROM unnest($3::uuid[], $4::uuid[], $5::text[], $6::int4[])
+                AS target (channel_id, thread_id, recipient_role, position)
+           ON CONFLICT (task_id, channel_id) DO NOTHING"#,
+    )
+    .bind(task_id)
+    .bind(company_id)
+    .bind(&channel_ids)
+    .bind(&thread_ids)
+    .bind(&roles)
+    .bind(&positions)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
 }
 
 /// The channels this run drives: the ones the producer stated, or its own if it stated none.

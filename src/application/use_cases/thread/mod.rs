@@ -1553,9 +1553,13 @@ impl ThreadUseCases {
         self.task_persistence.change_task_ownership(command).await
     }
 
-    /// Execute a recovery command, composing a replacement internal request first when the
-    /// operation is reassignment. Persistence still commits the old target, new question and new
+    /// Execute a recovery command, composing a replacement request first when the operation is one
+    /// of the two reassignments. Persistence still commits the old target, new question and new
     /// delivery atomically.
+    ///
+    /// The two arms differ only in resolving *where* the replacement goes — an internal channel's
+    /// inbound address, or the address a person principal actually holds. Both then go through the
+    /// one composer, so a redirected question is the same shape of question as the original.
     pub async fn execute_delegation_command(
         &self,
         company: &Company,
@@ -1567,17 +1571,40 @@ impl ThreadUseCases {
                 outreach_id,
                 target_id,
                 new_channel_id,
-            } => Some(
-                self.compose_reassigned_target(
-                    company,
-                    task,
-                    outreach_id,
-                    target_id,
-                    new_channel_id,
-                    command.command_id,
+            } => {
+                let destination = self
+                    .internal_replacement_destination(company, task, new_channel_id, &command)
+                    .await?;
+                Some(
+                    self.compose_replacement_target(
+                        company,
+                        task,
+                        outreach_id,
+                        target_id,
+                        destination,
+                    )
+                    .await?,
                 )
-                .await?,
-            ),
+            }
+            DelegationOperation::ReassignPersonTarget {
+                outreach_id,
+                target_id,
+                new_principal_id,
+            } => {
+                let destination = self
+                    .person_replacement_destination(company, task, new_principal_id, &command)
+                    .await?;
+                Some(
+                    self.compose_replacement_target(
+                        company,
+                        task,
+                        outreach_id,
+                        target_id,
+                        destination,
+                    )
+                    .await?,
+                )
+            }
             _ => None,
         };
         self.task_persistence
@@ -1588,14 +1615,79 @@ impl ThreadUseCases {
             .await
     }
 
-    async fn compose_reassigned_target(
+    /// Where the replacement question goes, once the command's own name for it is an address.
+    async fn internal_replacement_destination(
+        &self,
+        company: &Company,
+        task: &BackgroundTask,
+        new_channel_id: Uuid,
+        command: &DelegationCommand,
+    ) -> AppResult<ReplacementDestination> {
+        let target = self
+            .channel_persistence
+            .get_by_id(new_channel_id)
+            .await?
+            .filter(|channel| channel.company_id == company.id && channel.enabled)
+            .ok_or_else(|| AppError::BadRequest("Choose an enabled internal channel.".into()))?;
+        Ok(ReplacementDestination {
+            recipient: target.inbound_address(&company.slug, &self.config.app_domain_name),
+            identity: OutreachTargetIdentity::InternalChannel {
+                channel_id: new_channel_id,
+            },
+            source_key: format!("task:{}:reassign:{}", task.id, command.command_id),
+        })
+    }
+
+    /// The address a redirected ask is re-asked at: one the new owner's principal actually holds.
+    ///
+    /// Built from the `participant_identities` row rather than from a formatted address, because
+    /// the adapter proves the replacement against that same row before it supersedes anything —
+    /// deriving the identity twice by two routes is how the two would one day disagree. A verified
+    /// claim wins over a merely observed one; a principal with no email identity at all is a
+    /// refusal, which is also what an agent principal produces.
+    async fn person_replacement_destination(
+        &self,
+        company: &Company,
+        task: &BackgroundTask,
+        new_principal_id: crate::entities::transport::PrincipalId,
+        command: &DelegationCommand,
+    ) -> AppResult<ReplacementDestination> {
+        let identities = self
+            .participant_persistence
+            .identities_for_principals(company.id, &[new_principal_id], TransportKind::Email)
+            .await?;
+        let held = identities
+            .iter()
+            .find(|identity| {
+                identity.status == crate::entities::participant::IdentityStatus::Verified
+            })
+            .or_else(|| identities.first())
+            .ok_or_else(|| {
+                AppError::BadRequest(
+                    "The chosen owner has no email address this question could be re-asked at."
+                        .into(),
+                )
+            })?;
+        Ok(ReplacementDestination {
+            recipient: EmailAddress::new(held.subject.as_str().to_string()),
+            identity: OutreachTargetIdentity::External {
+                identity: QualifiedIdentity::new(
+                    held.transport,
+                    held.namespace.clone(),
+                    held.subject.clone(),
+                ),
+            },
+            source_key: format!("task:{}:redirect:{}", task.id, command.command_id),
+        })
+    }
+
+    async fn compose_replacement_target(
         &self,
         company: &Company,
         task: &BackgroundTask,
         outreach_id: Uuid,
         target_id: Uuid,
-        new_channel_id: Uuid,
-        command_id: Uuid,
+        destination: ReplacementDestination,
     ) -> AppResult<OutreachTargetRequest> {
         let context = self
             .task_persistence
@@ -1608,14 +1700,12 @@ impl ThreadUseCases {
             .await?
             .filter(|channel| channel.company_id == company.id)
             .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
-        let target = self
-            .channel_persistence
-            .get_by_id(new_channel_id)
-            .await?
-            .filter(|channel| channel.company_id == company.id && channel.enabled)
-            .ok_or_else(|| AppError::BadRequest("Choose an enabled internal channel.".into()))?;
+        let ReplacementDestination {
+            recipient,
+            identity,
+            source_key,
+        } = destination;
         let from = Channel::address_for(&source.slug, &company.slug, &self.config.app_domain_name);
-        let recipient = target.inbound_address(&company.slug, &self.config.app_domain_name);
         let content = CanonicalContent::parse(&context.subject, &context.body)?;
         let message_id = CanonicalMessageId::random();
         let composed = self
@@ -1627,7 +1717,7 @@ impl ThreadUseCases {
                 task_id: Some(task.id),
                 correlation_id: context.correlation_id,
                 purpose: DeliveryPurpose::Outreach,
-                source_key: format!("task:{}:reassign:{command_id}", task.id),
+                source_key,
                 content: &content,
                 context: DeliveryContext::Email(EmailDeliveryContext {
                     from: from.clone(),
@@ -1674,13 +1764,25 @@ impl ThreadUseCases {
             ));
         }
         Ok(OutreachTargetRequest {
-            target: OutreachTargetIdentity::InternalChannel {
-                channel_id: new_channel_id,
-            },
+            target: identity,
             request: message,
             delivery: composed.delivery,
         })
     }
+}
+
+/// Where one replacement outreach target points, and what makes its delivery key its own.
+///
+/// Named rather than three positional arguments: `recipient` and the address inside `identity`
+/// are both addresses, so a transposed pair would compose a question to one party and record it as
+/// asked of another — exactly what `outreach_target_columns` then refuses, one layer too late to
+/// be a good error.
+struct ReplacementDestination {
+    recipient: EmailAddress,
+    identity: OutreachTargetIdentity,
+    /// The task and the command that asked for this replacement, so a retried command re-derives
+    /// the key the first attempt used and mails the new owner once.
+    source_key: String,
 }
 
 use serde::{Deserialize, Serialize};

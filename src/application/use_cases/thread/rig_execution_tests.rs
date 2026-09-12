@@ -1,5 +1,6 @@
 //! Production inbound dispatch, shared human policy, real PostgreSQL, scripted model only.
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::{
     entities::harness::HarnessKind,
     services::{
@@ -48,12 +49,10 @@ async fn checkpoint(fx: &Fixture, task_id: Uuid) -> RunCheckpoint {
 
 #[tokio::test]
 async fn rig_resumes_a_saved_batch_after_approval_and_atomically_dispatches_once() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let requests = Arc::new(AtomicUsize::new(0));
     let first = requests.clone();
     let second = requests.clone();
@@ -280,12 +279,10 @@ async fn accept_partial(
 #[tokio::test]
 async fn explicit_approval_does_not_approve_later_outreach_and_partial_results_resume_without_resend()
  {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let mut response = batch();
     response["choices"][0]["message"]["tool_calls"] = json!([
         {"id":"plan","type":"function","function":{"name":"request_approval","arguments":json!({"title":"Review","proposal":"Ask the supplier, then answer."}).to_string()}},
@@ -415,12 +412,10 @@ async fn explicit_approval_does_not_approve_later_outreach_and_partial_results_r
 #[tokio::test]
 async fn provider_deadline_cancels_the_claim_and_recovery_keeps_the_unknown_reservation() {
     use crate::entities::task::{TaskFailure, TaskFailureOutcome, TaskStopReason};
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = crate::adapters::persistence::test_support::UNSCOPED_CLAIM
-        .lock()
-        .await;
+    let pool = database.pool.clone();
     let (arrived_tx, arrived_rx) = tokio::sync::oneshot::channel();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel();
     let mut blocked = ScriptedResponse::turn(LlmTurn::text("This response must not commit."), 0);

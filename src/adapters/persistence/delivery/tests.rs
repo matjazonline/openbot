@@ -18,7 +18,7 @@ use crate::{
     adapters::persistence::{
         PostgresPersistence,
         test_support::{
-            DeliveryFixture, DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_pool,
+            DeliveryFixture, DeliveryFixtureRequest, delivery_fixture, own_database, test_pool,
         },
     },
     entities::{
@@ -238,9 +238,10 @@ fn standalone(key: DeliveryKey) -> NewStandaloneDelivery {
 /// Standalone notification rows use the same unique-key and claim protocol as attributed rows.
 #[tokio::test]
 async fn competing_standalone_notification_enqueues_create_one_claimable_delivery() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let key = DeliveryKey::parse(format!("notification:bounce:{}", Uuid::new_v4())).unwrap();
     let first = standalone(key.clone());
@@ -258,7 +259,6 @@ async fn competing_standalone_notification_enqueues_create_one_claimable_deliver
     assert_eq!(results[0].delivery_id(), results[1].delivery_id());
     let delivery_id = results[0].delivery_id();
 
-    let _guard = UNSCOPED_CLAIM.lock().await;
     sort_first(&persistence, delivery_id).await;
     let claimed = claim_mine(&persistence, WorkerId::random(), delivery_id)
         .await
@@ -374,13 +374,12 @@ async fn one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart
 /// Two claimants, one row. The loser must come away with nothing rather than a second lease.
 #[tokio::test]
 async fn two_claimants_never_own_the_same_delivery() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,
@@ -439,13 +438,12 @@ async fn two_claimants_never_own_the_same_delivery() {
 /// attempts affecting zero rows, so the run that owns the row now owns the outcome.
 #[tokio::test]
 async fn a_stale_execution_cannot_write_over_the_one_that_replaced_it() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,
@@ -550,13 +548,12 @@ async fn a_stale_execution_cannot_write_over_the_one_that_replaced_it() {
 /// message becomes two.
 #[tokio::test]
 async fn a_reaped_lease_retries_only_what_never_reached_the_provider() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     // Crash before send: the part is still `prepared`, so nothing was sent.
     let before = queue(
         &persistence,
@@ -659,13 +656,12 @@ async fn expire(persistence: &PostgresPersistence, delivery_id: DeliveryId) {
 /// way, and occupies a claim slot that other tenants' work is waiting for.
 #[tokio::test]
 async fn a_poison_delivery_goes_terminal_without_spinning() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,
@@ -721,13 +717,12 @@ async fn a_poison_delivery_goes_terminal_without_spinning() {
 /// A retryable failure backs off rather than returning immediately, and the fifth one dead-letters.
 #[tokio::test]
 async fn a_retryable_failure_backs_off_and_the_last_attempt_dead_letters() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,
@@ -784,13 +779,12 @@ async fn a_retryable_failure_backs_off_and_the_last_attempt_dead_letters() {
 /// else exercises.
 #[tokio::test]
 async fn a_multi_part_delivery_aggregates_from_its_parts() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,
@@ -875,13 +869,12 @@ async fn a_multi_part_delivery_aggregates_from_its_parts() {
 /// status, so it is invisible to the stuck-work census as well as to the worker.
 #[tokio::test]
 async fn a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let root = queue(
         &persistence,
         &scope,
@@ -955,13 +948,12 @@ async fn a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies() {
 /// A shutdown before the provider call gives the claim back rather than letting it lapse.
 #[tokio::test]
 async fn releasing_a_claim_costs_no_attempt_and_makes_it_immediately_claimable() {
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
     let scope = scope(&persistence).await;
-    let _guard = UNSCOPED_CLAIM.lock().await;
-
     let queued = queue(
         &persistence,
         &scope,

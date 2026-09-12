@@ -129,6 +129,58 @@ phase and note it in the commit message. Doing both independently guarantees a c
 
 ---
 
+## Implementation notes (2026-09-11)
+
+What landed differs from the text above in these places. The reasons are recorded so the next
+reader does not "fix" the code back to match the plan.
+
+- **§4.1 overstates the cost of the old statement.** Postgres was already pushing `ranked`'s
+  `WHERE` into every `UNION ALL` member. `raw` and `params` are each referenced once, so they are
+  inlined, and a qual on an append-rel subquery is pushed into its members. In the captured old
+  plan, the task branch's `Filter` carries `CASE WHEN owner_principal_kind = 'person' THEN
+  'principal' … END = 'principal'` and the matching `CASE … owner_principal_id … END = $3`, under
+  both custom and generic plans. Quals are cost-ordered, so those comparisons run before the
+  anti-join SubPlans. Teammates' rows were therefore not being probed and then discarded. What the
+  rewrite changes, as shape claims only:
+  1. Under `unassigned`, the approval and review branches leave the plan. A custom plan's `Append`
+     now has four children. The old one had five: the review branch's responsibility is the
+     literal `'principal'`, so the pushed-down qual already folded to false there. The approval
+     branch was the one still scanned, with every row failing `CASE … END = 'channel_team'`,
+     which the planner cannot see is always false. A generic plan keeps all six children in both
+     versions, but the new one gates approval and review behind `One-Time Filter: ($4 <>
+     'unassigned')`, so neither table is read.
+  2. The pushed predicate is now a plain column comparison instead of a `CASE` expression, so it
+     is index-eligible and estimated from column statistics. In the captured `my_work` plan, the
+     task branch reads `Index Cond: (company_id = … AND owner_principal_id = …)` on
+     `background_tasks_unsettled_owner_idx`. Before, it was a post-scan `Filter`. Which index is
+     chosen depends on data. Only the eligibility is structural.
+  3. `team_work` is unchanged.
+
+  Plans were captured with `EXPLAIN (COSTS OFF)` under `plan_cache_mode = force_custom_plan` and
+  `force_generic_plan` against `mail_agents_test`, whose schema comes from this checkout's
+  migration. No timings were taken.
+- **The task and delivery `unassigned` predicate is `owner_principal_kind IS DISTINCT FROM
+  'person'`**, not `<> 'person' OR owner_principal_id IS NULL`. It is the exact negation of the
+  `CASE WHEN owner_principal_kind = 'person'` that assigns responsibility, so it does not lean on
+  `background_tasks_owner_shape_check`. It matters in the delivery branch, where a delivery with no
+  task joins NULL owner columns and is channel-team work. As a check, the predicate was mutated by
+  hand to plain `<> 'person'`. Both new tests failed on the no-task delivery.
+- **The `all_owned` arm is now `($14 AND $4 = 'my_work')`.** Its principal predicate became the
+  branch's `my_work` conjunct, so keeping both would state it twice.
+- **Parameter binding moved into `bind_attention(sql, query)`.** This lets the test run the frozen
+  statement with exactly the parameters production binds. `list_attention` is its only production
+  caller.
+- **The "before" snapshot is the literal pre-change statement.** It is
+  `ATTENTION_SQL_BEFORE_PUSHDOWN` in `attention_tests.rs`, extracted from `HEAD` by script and
+  diffed against it. The membership assertions were run against the unchanged statement before the
+  rewrite. When the feed changes what it returns on purpose, retire the comparison rather than
+  edit the snapshot. `narrowed_views_are_the_team_view_split_by_responsibility` is the guard that
+  outlives it. It asserts that each narrowed view equals the team view split by responsibility.
+  That is exactly what breaks if a branch filter becomes narrower than `ranked`, for example if the
+  approval branch starts emitting `channel_team` while its `$4 <> 'unassigned'` skip remains.
+- **Phase 1.3 had already landed** (`1be803c`), so this rewrite is built on it, not folded in.
+- **`cargo sqlx prepare` produced no change.** The feed is a runtime `query_as`, not a macro.
+
 ## Acceptance criteria
 
 - Every union branch carries the responsibility predicate its own columns imply; `ranked`'s filter

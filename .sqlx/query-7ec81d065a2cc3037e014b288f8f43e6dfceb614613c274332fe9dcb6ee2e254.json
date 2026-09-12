@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT operation, reason, actor_kind, previous_owner_principal_id,\n                      previous_owner_kind, new_owner_principal_id, new_owner_kind,\n                      sequence, from_version, to_version\n                 FROM task_ownership_events\n                WHERE task_id = $1 AND operation = 'owner_removed'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "operation",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "actor_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "previous_owner_principal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "previous_owner_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "new_owner_principal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "new_owner_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "sequence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "from_version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "to_version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7ec81d065a2cc3037e014b288f8f43e6dfceb614613c274332fe9dcb6ee2e254"
+}

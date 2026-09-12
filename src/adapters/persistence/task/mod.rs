@@ -38,3 +38,7 @@ pub(crate) use rows::*;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "claim_tests.rs"]
+mod claim_tests;

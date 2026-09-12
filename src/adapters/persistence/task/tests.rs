@@ -7,7 +7,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::adapters::persistence::test_support::{
-    DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_machine, test_pool,
+    DeliveryFixtureRequest, delivery_fixture, own_database, test_machine, test_pool,
 };
 use crate::app_error::AppError;
 use crate::entities::message::{MessageDirection, MessageRole};
@@ -39,8 +39,8 @@ use crate::{
             TaskChainCard, TaskChainCounts, TaskFailure, TaskLeaseRef, TaskOwner,
             TaskOwnershipActor, TaskOwnershipAuthority, TaskOwnershipCommand,
             TaskOwnershipOperation, TaskOwnershipReason, TaskSource, TaskStatus, TaskStatusEvent,
-            TaskStopReason, TaskTransitionActorKind, TaskTransitionReason, ThreadActivity,
-            TokenUsage,
+            TaskStopReason, TaskTarget, TaskTransitionActorKind, TaskTransitionReason,
+            ThreadActivity, TokenUsage,
         },
         transport::PrincipalId,
         value_objects::MessageId,
@@ -2505,10 +2505,10 @@ async fn the_task_row_rejects_attribution_whose_shape_contradicts_its_actor_kind
 
 #[tokio::test]
 async fn pending_claims_take_one_company_round_before_a_second_task_from_a_backlog() {
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let suffix = Uuid::new_v4().simple().to_string();
     let email = format!("fair_owner_{suffix}@example.com");
@@ -3384,14 +3384,12 @@ async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_al
 
 #[tokio::test]
 async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_reclaimed() {
-    // Both claims below are unscoped, and the row is deliberately sorted to the very front of
-    // the queue -- which makes it the first thing any *other* unscoped claim takes too. Held
-    // from before the row is queued until after the last claim, so the only claims racing for
-    // it are this test's own two.
-    let _claim_guard = UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    // A database of this test's own, because both claims below are unscoped: the only task they
+    // can reach is the one this test queues, so the two of them race for precisely it.
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let suffix = Uuid::new_v4().simple().to_string();
     let username = format!("queue_owner_{suffix}");
@@ -3445,20 +3443,6 @@ async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_recl
         .await
         .unwrap();
 
-    // `claim_pending_tasks` polls the whole queue, not this company's slice of it. Its first
-    // sort key is the per-company round, and a brand-new company's only task is always round 1
-    // — so sorting this row ahead of every other round-1 row is what puts it first overall,
-    // ahead of concurrent tests' rows and any orphans a previously aborted run left behind.
-    // Without it both single-slot workers fill up elsewhere and never reach this task. Keeping
-    // the limit at 1 also means this test steals at most one foreign task.
-    sqlx::query(
-            "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '100 years' WHERE id = $1",
-        )
-        .bind(task.id)
-        .execute(&pool)
-        .await
-        .unwrap();
-
     let first_worker = Uuid::new_v4();
     let second_worker = Uuid::new_v4();
     let expires_at = chrono::Utc::now() + chrono::Duration::minutes(5);
@@ -3487,28 +3471,6 @@ async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_recl
         1,
         "competing claimants must produce one claimed transition event"
     );
-
-    // Two claims, one of which is ours by construction — so the other necessarily took someone
-    // else's task, and it now holds a five-minute lease on it. Hand it straight back: whichever
-    // test queued it is about to find its own task already claimed and fail on a state it never
-    // set. Releasing to 'pending' is where a reaped lease lands anyway.
-    let borrowed: Vec<Uuid> = claimed
-        .iter()
-        .map(|claim| claim.id)
-        .filter(|id| *id != task.id)
-        .collect();
-    if !borrowed.is_empty() {
-        sqlx::query(&format!(
-            "UPDATE background_tasks
-                    SET {CLEAR_TRANSITION}, status = 'pending', worker_id = NULL,
-                        execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL
-                  WHERE id = ANY($1)"
-        ))
-        .bind(&borrowed)
-        .execute(&pool)
-        .await
-        .unwrap();
-    }
 
     // This single row fills the worker's one-task batch. Failing it must move it behind
     // persisted backoff before `MoreWaiting` sends the worker straight into another
@@ -3544,21 +3506,6 @@ async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_recl
         immediate.iter().all(|claim| claim.id != task.id),
         "a failed full batch must not reclaim the same task on the zero-delay iteration"
     );
-    let immediate_borrowed: Vec<Uuid> = immediate.iter().map(|claim| claim.id).collect();
-    if !immediate_borrowed.is_empty() {
-        sqlx::query(&format!(
-            "UPDATE background_tasks
-                    SET {CLEAR_TRANSITION}, status = 'pending', worker_id = NULL,
-                        execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL
-                  WHERE id = ANY($1) AND worker_id = $2"
-        ))
-        .bind(&immediate_borrowed)
-        .bind(immediate_worker)
-        .execute(&pool)
-        .await
-        .unwrap();
-    }
-
     CompanyPersistence::delete(&persistence, company.id)
         .await
         .unwrap();
@@ -4311,7 +4258,7 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
         .unwrap();
 }
 
-async fn seed_channel_agent(
+pub(super) async fn seed_channel_agent(
     persistence: &PostgresPersistence,
     company_id: Uuid,
     label: &str,
@@ -4335,7 +4282,7 @@ async fn seed_channel_agent(
 
 /// A company and an enabled channel to hang tasks off, with a unique slug per call so
 /// database-backed tests do not collide with each other or with a previous run.
-async fn seed_company_and_channel(
+pub(super) async fn seed_company_and_channel(
     persistence: &PostgresPersistence,
 ) -> (
     crate::entities::company::Company,
@@ -5955,6 +5902,134 @@ async fn a_redelivered_message_rejoins_its_original_chain() {
     );
 }
 
+/// One `task_channel_targets` row, as the fan-out test compares it.
+#[derive(Debug, PartialEq, sqlx::FromRow)]
+struct StoredTarget {
+    position: i32,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    recipient_role: String,
+}
+
+impl StoredTarget {
+    fn stated(position: i32, target: &TaskTarget) -> Self {
+        Self {
+            position,
+            channel_id: target.channel_id,
+            thread_id: target.thread_id,
+            recipient_role: target.recipient_role.as_str().to_string(),
+        }
+    }
+}
+
+async fn stored_targets(pool: &sqlx::PgPool, task: &BackgroundTask) -> Vec<StoredTarget> {
+    sqlx::query_as(
+        r#"SELECT target.position, target.channel_id, target.thread_id, target.recipient_role
+           FROM task_channel_targets AS target
+           WHERE target.company_id = $1 AND target.task_id = $2
+           ORDER BY target.position"#,
+    )
+    .bind(task.company_id)
+    .bind(task.id)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// The channel fan-out is one statement, and it has to write what the row-at-a-time insert it
+/// replaced wrote: each channel at the position it was stated, a repeated channel once at its first
+/// position and role, and nothing for a task that states no channel and has no thread of its own.
+///
+/// The channels have no agent, so these tasks have no owner and no worker's claim can take them.
+#[tokio::test]
+async fn channel_targets_keep_their_stated_positions_and_a_repeated_channel_lands_once() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, _) = seed_company_and_channel(&persistence).await;
+    let mut targets = Vec::new();
+    for (label, recipient_role) in [
+        ("to", RecipientRole::To),
+        ("first-cc", RecipientRole::Cc),
+        ("second-cc", RecipientRole::Cc),
+    ] {
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: format!("Fan-out {label}"),
+                slug: format!("fan-out-{label}"),
+                agent_ids: Some(Vec::new()),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let thread = ThreadPersistence::create_thread(&persistence, channel.id, "Fan-out", &[])
+            .await
+            .unwrap();
+        targets.push(TaskTarget {
+            channel_id: channel.id,
+            thread_id: thread.id,
+            recipient_role,
+        });
+    }
+    let enqueue = |stated: Vec<TaskTarget>| {
+        persistence.enqueue_task(NewTask {
+            company_id: company.id,
+            channel_id: targets[0].channel_id,
+            thread_id: None,
+            task_type: "email_agent_dispatch".to_string(),
+            payload: serde_json::json!({}),
+            targets: stated,
+            source: TaskSource::Unattributed,
+            correlation_id: CorrelationId::new(),
+        })
+    };
+
+    let in_order = enqueue(targets.clone()).await.unwrap();
+    assert_eq!(
+        stored_targets(&pool, &in_order).await,
+        vec![
+            StoredTarget::stated(0, &targets[0]),
+            StoredTarget::stated(1, &targets[1]),
+            StoredTarget::stated(2, &targets[2]),
+        ]
+    );
+
+    let repeated = enqueue(vec![
+        targets[0],
+        targets[1],
+        TaskTarget {
+            recipient_role: RecipientRole::Cc,
+            ..targets[0]
+        },
+        targets[2],
+    ])
+    .await
+    .unwrap();
+    assert_eq!(
+        stored_targets(&pool, &repeated).await,
+        vec![
+            StoredTarget::stated(0, &targets[0]),
+            StoredTarget::stated(1, &targets[1]),
+            StoredTarget::stated(3, &targets[2]),
+        ],
+        "the repeat is dropped, and the channel after it keeps the position it was stated at"
+    );
+
+    let unstated = enqueue(Vec::new())
+        .await
+        .expect("a task with no fan-out still enqueues");
+    assert!(stored_targets(&pool, &unstated).await.is_empty());
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
 /// The census must see each kind of stall.
 ///
 /// Asserted as "at least ours" rather than as an exact delta: the suite shares one database
@@ -6232,6 +6307,237 @@ async fn delegation_commands_are_idempotent_fenced_and_audited() {
             2
         )
     );
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+/// An ordinary teammate: a member of the company with no owner or admin role, granted view of one
+/// channel so work in it may be handed to them.
+async fn seed_ordinary_member(
+    pool: &sqlx::PgPool,
+    company_id: Uuid,
+    channel_id: Uuid,
+    label: &str,
+) -> PrincipalId {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let user_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')",
+    )
+    .bind(user_id)
+    .bind(format!("{label}-{suffix}"))
+    .bind(format!("{label}-{suffix}@example.test"))
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    let principal = PrincipalId::random();
+    sqlx::query(
+        "INSERT INTO principals (id, company_id, kind, user_id, display_label) \
+         VALUES ($1, $2, 'person', $3, $4)",
+    )
+    .bind(principal.as_uuid())
+    .bind(company_id)
+    .bind(user_id)
+    .bind(label)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO channel_principal_grants \
+             (company_id, channel_id, principal_id, capability, provenance) \
+         VALUES ($1, $2, $3, 'view', 'manager')",
+    )
+    .bind(company_id)
+    .bind(channel_id)
+    .bind(principal.as_uuid())
+    .execute(pool)
+    .await
+    .unwrap();
+    principal
+}
+
+/// The authority the mailbox thread pane submits under: the teammate holding a task may recover the
+/// delegation on it without administering the company, and nobody else may, whatever they claim.
+///
+/// The route that draws those controls resolves `HumanOwner` for any non-manager without checking
+/// who actually owns the task — exactly as the ownership route does — so this is where that claim
+/// has to fail closed. Every rejection is the same `NotFound`: a caller learns whether they may act,
+/// never whose task it is.
+#[tokio::test]
+async fn a_task_owner_may_control_only_their_own_delegation() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let channel_id = fixture.task.channel_id;
+    let holder =
+        seed_ordinary_member(&pool, fixture.company.id, channel_id, "delegation-holder").await;
+    let bystander = seed_ordinary_member(
+        &pool,
+        fixture.company.id,
+        channel_id,
+        "delegation-bystander",
+    )
+    .await;
+
+    let claimed = persistence
+        .get_task_by_id(fixture.task.id)
+        .await
+        .unwrap()
+        .unwrap();
+    persistence
+        .change_task_ownership(ownership_command(
+            &claimed,
+            fixture.manager,
+            TaskOwnershipAuthority::Manager,
+            TaskOwnershipOperation::Transfer,
+            TaskOwner::Human(holder),
+        ))
+        .await
+        .unwrap();
+
+    let extend_command_id = Uuid::new_v4();
+    let mut extend = delegation_command(
+        &fixture,
+        extend_command_id,
+        1,
+        DelegationReason::DeadlineChanged,
+        DelegationOperation::ExtendOutreach {
+            outreach_id: fixture.outreach_id,
+            expires_at: Utc::now() + chrono::Duration::hours(48),
+        },
+    );
+    extend.command.actor = DelegationActor {
+        principal_id: holder,
+        authority: DelegationAuthority::HumanOwner,
+    };
+    assert_eq!(
+        persistence
+            .execute_delegation_command(extend)
+            .await
+            .unwrap()
+            .outreach_version,
+        2,
+        "the task's own human owner may extend the wait on it"
+    );
+    let audit: (String, String) = sqlx::query_as(
+        r#"SELECT actor_kind, authority FROM delegation_control_commands
+           WHERE task_id = $1 AND command_id = $2"#,
+    )
+    .bind(fixture.task.id)
+    .bind(extend_command_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(audit, ("person".into(), "human_owner".into()));
+
+    // A teammate who does not hold the task, and the holder reaching for an authority that is not
+    // theirs, are both refused -- as is the company's own manager principal claiming to be the
+    // owner it transferred the task away from.
+    for (actor, authority, case) in [
+        (bystander, DelegationAuthority::HumanOwner, "a bystander"),
+        (bystander, DelegationAuthority::CompanyManager, "a member"),
+        (
+            holder,
+            DelegationAuthority::CompanyManager,
+            "the holder as manager",
+        ),
+        (
+            fixture.manager,
+            DelegationAuthority::HumanOwner,
+            "the manager as owner",
+        ),
+    ] {
+        let mut denied = delegation_command(
+            &fixture,
+            Uuid::new_v4(),
+            2,
+            DelegationReason::NoLongerNeeded,
+            DelegationOperation::CancelOutreach {
+                outreach_id: fixture.outreach_id,
+            },
+        );
+        denied.command.actor = DelegationActor {
+            principal_id: actor,
+            authority,
+        };
+        assert!(
+            matches!(
+                persistence.execute_delegation_command(denied).await,
+                Err(AppError::NotFound(_))
+            ),
+            "{case} must not reach this delegation"
+        );
+    }
+
+    // A principal that belongs to another company is not this company's owner under any authority:
+    // the actor lookup is scoped by the command's company, so it resolves to nothing at all.
+    let (other_company, other_channel) = seed_company_and_channel(&persistence).await;
+    let outsider = seed_ordinary_member(
+        &pool,
+        other_company.id,
+        other_channel.id,
+        "delegation-outsider",
+    )
+    .await;
+    for authority in [
+        DelegationAuthority::HumanOwner,
+        DelegationAuthority::CompanyManager,
+    ] {
+        let mut foreign = delegation_command(
+            &fixture,
+            Uuid::new_v4(),
+            2,
+            DelegationReason::NoLongerNeeded,
+            DelegationOperation::CancelOutreach {
+                outreach_id: fixture.outreach_id,
+            },
+        );
+        foreign.command.actor = DelegationActor {
+            principal_id: outsider,
+            authority,
+        };
+        assert!(
+            matches!(
+                persistence.execute_delegation_command(foreign).await,
+                Err(AppError::NotFound(_))
+            ),
+            "a principal from another company must not reach this delegation as {authority:?}"
+        );
+    }
+
+    // The mailbox only ever draws these controls from a channel-scoped collaboration read, so a
+    // reader restricted to a different channel is offered nothing to submit in the first place.
+    assert!(
+        persistence
+            .get_collaboration_summary(
+                CollaborationReadScope {
+                    company_id: fixture.company.id,
+                    visible_channel_ids: &[other_channel.id],
+                },
+                fixture.task.id,
+            )
+            .await
+            .unwrap()
+            .is_none(),
+        "a task outside the reader's channels has no delegation to act on"
+    );
+
+    CompanyPersistence::delete(&persistence, other_company.id)
+        .await
+        .unwrap();
     CompanyPersistence::delete(&persistence, fixture.company.id)
         .await
         .unwrap();
@@ -6770,6 +7076,337 @@ async fn internal_reassignment_serializes_with_reply_and_preserves_old_target_hi
         Err(AppError::Conflict(_)) => assert_eq!(old_status, "responded"),
         other => panic!("unexpected reassignment race result: {other:?}"),
     }
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+/// A question addressed to a person is re-asked at another person, and both records survive it.
+///
+/// The mirror of the internal reassignment above, for the case a member removal produces: the old
+/// external target is superseded rather than cancelled, a correlated replacement goes to somebody
+/// who can actually answer, and the superseded side keeps its request, its delivery and any late
+/// reply it still draws — while no longer being able to satisfy quorum.
+#[tokio::test]
+async fn a_person_addressed_ask_is_redirected_to_another_person_and_is_idempotent() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    let old_target = fixture.target_ids[0];
+
+    // The taker's own identity row, because that is exactly what the adapter proves against.
+    let taker: (String, String, String) = sqlx::query_as(
+        r#"SELECT transport, namespace, subject FROM participant_identities
+           WHERE company_id = $1 AND principal_id = $2 AND transport = 'email' LIMIT 1"#,
+    )
+    .bind(fixture.company.id)
+    .bind(fixture.manager.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (_, _, taker_address) = taker.clone();
+
+    let redirect = |command_id: Uuid| {
+        let persistence = persistence.clone();
+        let fixture = &fixture;
+        let taker_address = taker_address.clone();
+        async move {
+            let key = format!("redirect-{}", Uuid::new_v4().simple());
+            let mut queued = delivery_fixture(
+                &persistence,
+                DeliveryFixtureRequest {
+                    task_id: Some(fixture.task.id),
+                    recipient: &taker_address,
+                    purpose: DeliveryPurpose::Outreach,
+                    ..DeliveryFixtureRequest::new(
+                        fixture.company.id,
+                        fixture.task.channel_id,
+                        fixture.task.thread_id.unwrap(),
+                        &key,
+                    )
+                },
+            )
+            .await;
+            let replacement_request = email_write(EmailMessageDraft {
+                id: Uuid::new_v4(),
+                thread_id: fixture.task.thread_id.unwrap(),
+                message_id: format!("<{key}@mailagents.test>").into(),
+                sender: "support@acme.mailagents.test".into(),
+                recipients_to: vec![taker_address.clone().into()],
+                subject: "Delegated question".into(),
+                clean_text_body: "Please answer".into(),
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                ..EmailMessageDraft::default()
+            });
+            queued.delivery.message_id = replacement_request.id;
+            let mut request = delegation_command(
+                fixture,
+                command_id,
+                1,
+                DelegationReason::TargetUnavailable,
+                DelegationOperation::ReassignPersonTarget {
+                    outreach_id: fixture.outreach_id,
+                    target_id: old_target,
+                    new_principal_id: fixture.manager,
+                },
+            );
+            request.replacement = Some(OutreachTargetRequest {
+                target: OutreachTargetIdentity::External {
+                    identity: crate::use_cases::thread::qualified_email_identity(
+                        taker_address.as_str(),
+                    )
+                    .unwrap(),
+                },
+                request: replacement_request,
+                delivery: queued.delivery,
+            });
+            persistence.execute_delegation_command(request).await
+        }
+    };
+
+    let command_id = Uuid::new_v4();
+    let result = redirect(command_id).await.unwrap();
+    assert_eq!(result.operation, "reassign_person_target");
+    assert_eq!(result.target_id, Some(old_target));
+    assert_eq!(result.outreach_version, 2, "one version, fenced and bumped");
+    let replacement_id = result
+        .replacement_target_id
+        .expect("a new target was created");
+
+    // The old side is superseded, not deleted: its address, its request and its delivery stay.
+    let superseded: (String, Option<String>, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+        r#"SELECT status, external_subject, request_message_id, delivery_id
+           FROM task_outreach_targets WHERE id = $1"#,
+    )
+    .bind(old_target)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(superseded.0, "superseded");
+    assert_eq!(
+        superseded.1.as_deref(),
+        Some(fixture.target_emails[0].as_str())
+    );
+    assert!(
+        superseded.2.is_some() && superseded.3.is_some(),
+        "{superseded:?}"
+    );
+
+    // The new side is a first-class external target correlated back to it.
+    let replacement: (String, String, Option<String>, Option<String>, Option<Uuid>) =
+        sqlx::query_as(
+            r#"SELECT status, target_kind, external_transport, external_subject,
+                      replaces_target_id
+               FROM task_outreach_targets WHERE id = $1"#,
+        )
+        .bind(replacement_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(replacement.0, "active");
+    assert_eq!(replacement.1, "external");
+    assert_eq!(replacement.2.as_deref(), Some("email"));
+    assert_eq!(replacement.3.as_deref(), Some(taker_address.as_str()));
+    assert_eq!(replacement.4, Some(old_target));
+
+    // The superseded target no longer counts toward quorum, and a reply from it arrives late.
+    let eligible: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM task_outreach_targets
+           WHERE outreach_id = $1 AND status IN ('active', 'responded')"#,
+    )
+    .bind(fixture.outreach_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(eligible, 1, "only the replacement can answer now");
+    let late = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<late-{}@partner.test>", Uuid::new_v4()).into(),
+            sender: fixture.target_emails[0].clone().into(),
+            subject: "Re: Delegated question".into(),
+            clean_text_body: "I am no longer here".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    persistence
+        .record_outreach_reply(
+            &crate::entities::outreach::OutreachReplyMatch {
+                outreach_id: fixture.outreach_id,
+                task_id: fixture.task.id,
+                target_id: old_target,
+                target_email: fixture.target_emails[0].clone().into(),
+            },
+            late.id,
+        )
+        .await
+        .unwrap();
+    let disposition: String = sqlx::query_scalar(
+        "SELECT disposition FROM task_outreach_replies WHERE response_association_id = $1",
+    )
+    .bind(late.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        disposition, "late",
+        "the old target cannot close the outreach"
+    );
+    let outreach_status: String =
+        sqlx::query_scalar("SELECT status FROM task_outreaches WHERE id = $1")
+            .bind(fixture.outreach_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(outreach_status, "waiting", "still waiting on the new owner");
+
+    // The audit row names the operation, the actor and both versions.
+    let audit: (String, String, String, i64, i64, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+        r#"SELECT operation, actor_kind, authority, from_version, to_version, actor_principal_id,
+                  target_id
+           FROM delegation_control_commands WHERE command_id = $1"#,
+    )
+    .bind(command_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(audit.0, "reassign_person_target");
+    assert_eq!(
+        (audit.1.as_str(), audit.2.as_str()),
+        ("person", "company_manager")
+    );
+    assert_eq!((audit.3, audit.4), (1, 2));
+    assert_eq!(audit.5, Some(fixture.manager.as_uuid()));
+    assert_eq!(audit.6, Some(old_target));
+
+    // A retry of the same command UUID replays the stored result rather than re-asking anybody.
+    let retried = redirect(command_id).await.unwrap();
+    assert_eq!(retried.replacement_target_id, Some(replacement_id));
+    let targets: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM task_outreach_targets WHERE outreach_id = $1")
+            .bind(fixture.outreach_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(targets, 2, "one original and one replacement, not three");
+
+    // And the replacement cannot be redirected at the person it is already addressed to.
+    let mut same_person = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        2,
+        DelegationReason::TargetUnavailable,
+        DelegationOperation::ReassignPersonTarget {
+            outreach_id: fixture.outreach_id,
+            target_id: replacement_id,
+            new_principal_id: fixture.manager,
+        },
+    );
+    same_person.replacement = Some(OutreachTargetRequest {
+        target: OutreachTargetIdentity::External {
+            identity: crate::use_cases::thread::qualified_email_identity(taker_address.as_str())
+                .unwrap(),
+        },
+        request: email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: fixture.task.thread_id.unwrap(),
+            message_id: format!("<noop-{}@mailagents.test>", Uuid::new_v4()).into(),
+            sender: "support@acme.mailagents.test".into(),
+            recipients_to: vec![taker_address.clone().into()],
+            subject: "Delegated question".into(),
+            clean_text_body: "Please answer".into(),
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            ..EmailMessageDraft::default()
+        }),
+        delivery: delivery_fixture(
+            &persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(fixture.task.id),
+                recipient: &taker_address,
+                purpose: DeliveryPurpose::Outreach,
+                ..DeliveryFixtureRequest::new(
+                    fixture.company.id,
+                    fixture.task.channel_id,
+                    fixture.task.thread_id.unwrap(),
+                    &format!("noop-{}", Uuid::new_v4().simple()),
+                )
+            },
+        )
+        .await
+        .delivery,
+    });
+    assert!(
+        matches!(
+            persistence.execute_delegation_command(same_person).await,
+            Err(AppError::BadRequest(_))
+        ),
+        "redirecting somebody at themselves is refused"
+    );
+
+    CompanyPersistence::delete(&persistence, fixture.company.id)
+        .await
+        .unwrap();
+}
+
+/// An internal-channel target is not a person's ask, and the person operation says so.
+///
+/// The guard is the mirror of `ReassignInternalTarget`'s: each operation accepts exactly the kind
+/// of target it knows how to replace, so a caller cannot re-address a channel's delegation at a
+/// mailbox by picking the wrong command.
+#[tokio::test]
+async fn redirecting_an_internal_target_at_a_person_is_refused() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture =
+        delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
+    sqlx::query(
+        r#"UPDATE task_outreach_targets
+           SET target_kind = 'internal_channel', internal_channel_id = $2,
+               external_transport = NULL, external_namespace = NULL, external_subject = NULL
+           WHERE id = $1"#,
+    )
+    .bind(fixture.target_ids[0])
+    .bind(fixture.task.channel_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut request = delegation_command(
+        &fixture,
+        Uuid::new_v4(),
+        1,
+        DelegationReason::TargetUnavailable,
+        DelegationOperation::ReassignPersonTarget {
+            outreach_id: fixture.outreach_id,
+            target_id: fixture.target_ids[0],
+            new_principal_id: fixture.manager,
+        },
+    );
+    request.replacement = None;
+    let refused = persistence.execute_delegation_command(request).await;
+    assert!(
+        matches!(refused, Err(AppError::BadRequest(_))),
+        "{refused:?}"
+    );
+    let untouched: String =
+        sqlx::query_scalar("SELECT status FROM task_outreach_targets WHERE id = $1")
+            .bind(fixture.target_ids[0])
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(untouched, "active", "a refused command moves nothing");
+
     CompanyPersistence::delete(&persistence, fixture.company.id)
         .await
         .unwrap();

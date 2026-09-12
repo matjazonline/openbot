@@ -965,4 +965,89 @@ mod tests {
         assert_eq!(child_task_depth(&summary), MAX_COLLABORATION_DEPTH);
         assert!(projection.truncated);
     }
+
+    #[test]
+    fn collaboration_owner_redacts_a_task_outside_the_viewer_scope() {
+        let owner_id = Uuid::new_v4();
+        let row = CollaborationTaskDb {
+            owner_principal_id: Some(owner_id),
+            owner_principal_kind: Some("person".into()),
+            owner_label: Some("Real Secret Specialist".into()),
+            owner_available: true,
+            ..task(Uuid::new_v4(), Uuid::new_v4())
+        };
+
+        let owner = collaboration_owner(&row, false).unwrap();
+
+        assert_eq!(owner.kind, CollaborationOwnerKind::Restricted);
+        assert_eq!(owner.principal_id, None);
+        assert_eq!(owner.label, "Internal specialist");
+        assert!(!format!("{owner:?}").contains("Real Secret Specialist"));
+    }
+
+    #[test]
+    fn target_identity_redacts_a_channel_outside_the_viewer_scope() {
+        let company_id = Uuid::new_v4();
+        let visible_channel_id = Uuid::new_v4();
+        let restricted_channel_id = Uuid::new_v4();
+        let mut row = target(Uuid::new_v4(), restricted_channel_id, None);
+        row.internal_channel_name = Some("Restricted Engineering Escalations".into());
+        let visible_channel_ids = [visible_channel_id];
+        let scope = CollaborationReadScope {
+            company_id,
+            visible_channel_ids: &visible_channel_ids,
+        };
+
+        let identity = target_identity(&row, scope).unwrap();
+
+        assert!(!identity.visible);
+        assert_eq!(identity.target, CollaborationTarget::RestrictedInternal);
+        assert_eq!(identity.label, "Internal specialist");
+        assert!(
+            !identity
+                .label
+                .contains("Restricted Engineering Escalations")
+        );
+    }
+
+    #[test]
+    fn a_nested_task_outside_the_viewer_scope_is_projected_as_a_restricted_summary() {
+        let company_id = Uuid::new_v4();
+        let visible_channel_id = Uuid::new_v4();
+        let restricted_channel_id = Uuid::new_v4();
+        let root_id = Uuid::new_v4();
+        let child_id = Uuid::new_v4();
+
+        // The delegation target itself points at a visible channel, so the projection descends
+        // into the child task, but that child task's own channel is outside the viewer's scope.
+        let delegated_target = target(root_id, visible_channel_id, Some(child_id));
+        let restricted_child = CollaborationTaskDb {
+            owner_principal_id: Some(Uuid::new_v4()),
+            owner_principal_kind: Some("person".into()),
+            owner_label: Some("Real Secret Specialist".into()),
+            status: TaskStatus::Processing.as_str().into(),
+            ..task(child_id, restricted_channel_id)
+        };
+        let visible_channel_ids = [visible_channel_id];
+        let mut projection = projection(
+            company_id,
+            &visible_channel_ids,
+            vec![task(root_id, visible_channel_id), restricted_child],
+            HashMap::from([(root_id, vec![delegated_target])]),
+        );
+
+        let summary = projection.build(root_id, 0).unwrap().unwrap();
+        let child = summary.children[0]
+            .child
+            .as_ref()
+            .expect("delegated target's channel was visible, so its child task is projected");
+
+        assert_eq!(child.owner.kind, CollaborationOwnerKind::Restricted);
+        assert_eq!(child.owner.label, "Internal specialist");
+        assert_eq!(child.owner.principal_id, None);
+        assert!(child.children.is_empty());
+        assert!(child.progress.is_none());
+        assert!(child.next_action.is_none());
+        assert!(!format!("{child:?}").contains("Real Secret Specialist"));
+    }
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO background_tasks (\n                       id, company_id, channel_id, correlation_id, task_type, status\n                   ) VALUES ($1, $2, $3, gen_random_uuid(), 'agent_run',\n                             'waiting_for_third_party_reply')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "96209317a9e78b4fe1534c1bc74f14238d1f4530c98216ebe8cb508efc6f767b"
+}

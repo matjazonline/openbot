@@ -73,6 +73,24 @@ pub enum DelegationOperation {
         target_id: Uuid,
         new_channel_id: Uuid,
     },
+    /// Re-address a person-addressed ask to another person of this company.
+    ///
+    /// The sibling above names a *channel*, which is how an ask delegated inside the company is
+    /// pointed somewhere else. An ask delegated to a **person** is stored as an external-identity
+    /// target matched through `participant_identities`, so what replaces it is another identity —
+    /// hence a principal here rather than a channel id, and hence its own variant: the guard, the
+    /// replacement's identity kind and the "different recipient" rule are all the other case's
+    /// mirror image, not its parameters.
+    ///
+    /// `new_principal_id` must be a `person` principal of the same company holding the email
+    /// identity the prepared replacement is addressed to; an `agent` principal is never valid,
+    /// because `create_agent_principal_on` writes no `participant_identities` row for one and so
+    /// an agent has no address an ask could be re-asked at.
+    ReassignPersonTarget {
+        outreach_id: Uuid,
+        target_id: Uuid,
+        new_principal_id: PrincipalId,
+    },
     ProceedWithPartial {
         outreach_id: Uuid,
     },
@@ -88,6 +106,7 @@ impl DelegationOperation {
             Self::CancelTarget { .. } => "cancel_target",
             Self::CancelOutreach { .. } => "cancel_outreach",
             Self::ReassignInternalTarget { .. } => "reassign_internal_target",
+            Self::ReassignPersonTarget { .. } => "reassign_person_target",
             Self::ProceedWithPartial { .. } => "proceed_with_partial",
             Self::StopTask { .. } => "stop_task",
         }
@@ -99,6 +118,7 @@ impl DelegationOperation {
             | Self::CancelTarget { outreach_id, .. }
             | Self::CancelOutreach { outreach_id }
             | Self::ReassignInternalTarget { outreach_id, .. }
+            | Self::ReassignPersonTarget { outreach_id, .. }
             | Self::ProceedWithPartial { outreach_id }
             | Self::StopTask { outreach_id } => outreach_id,
         }
@@ -107,7 +127,8 @@ impl DelegationOperation {
     pub const fn target_id(&self) -> Option<Uuid> {
         match *self {
             Self::CancelTarget { target_id, .. }
-            | Self::ReassignInternalTarget { target_id, .. } => Some(target_id),
+            | Self::ReassignInternalTarget { target_id, .. }
+            | Self::ReassignPersonTarget { target_id, .. } => Some(target_id),
             _ => None,
         }
     }

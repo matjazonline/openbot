@@ -4,10 +4,7 @@ use axum::extract::FromRef;
 use sqlx::PgPool;
 
 use crate::{
-    adapters::{
-        http::session::SessionAuthority, persistence::dashboard::DashboardPersistence,
-        storage::FileStorage,
-    },
+    adapters::{http::session::SessionAuthority, storage::FileStorage},
     application::{attention::AttentionPersistence, notification::NotificationPersistence},
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
@@ -16,6 +13,7 @@ use crate::{
         events::{MailboxEvents, TaskWakeups},
     },
     services::{
+        dashboard_snapshot::DashboardSnapshotService,
         database_query_health::DatabaseQueryHealthService,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_worker::MemoryWorker,
@@ -70,8 +68,9 @@ pub struct AppState {
     /// A latency hint after durable storage; polling remains authoritative.
     pub inbound_event_wakeups: InboundEventWakeups,
     pub task_wakeups: TaskWakeups,
-    /// Read-only aggregates behind `/ui/dashboard`.
-    pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Read-only aggregates behind `/ui/dashboard`, one reading per view per tick for every tab.
+    /// Handlers reach the aggregates only through this, so none can bypass the cache.
+    pub dashboard_snapshots: Arc<DashboardSnapshotService>,
     /// Derived human work and durable business summaries; source commands remain authoritative.
     pub attention: Arc<dyn AttentionPersistence>,
     /// Recipient-facing projection over the same operational sources as `attention`.
@@ -199,12 +198,6 @@ impl FromRef<AppState> for Arc<ResponseReviewUseCases> {
 impl FromRef<AppState> for Arc<MemoryUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.memory_use_cases.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.dashboard_persistence.clone()
     }
 }
 

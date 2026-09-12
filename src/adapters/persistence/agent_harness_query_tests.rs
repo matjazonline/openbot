@@ -1,12 +1,13 @@
 use super::*;
+use crate::adapters::persistence::test_support::own_database;
 use crate::use_cases::{agent::AgentPersistence, channel::ChannelPersistence};
 
 #[tokio::test]
 async fn harness_fence_covers_owner_only_tasks() {
-    let _queue_guard = super::super::test_support::UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let fixture = fixture(&pool).await;
     let p = PostgresPersistence::new(pool.clone());
     let channel = ChannelPersistence::create(
@@ -53,10 +54,10 @@ async fn harness_fence_covers_owner_only_tasks() {
 
 #[tokio::test]
 async fn harness_fence_covers_library_channel_assignments() {
-    let _queue_guard = super::super::test_support::UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let fixture = fixture(&pool).await;
     let p = PostgresPersistence::new(pool.clone());
     // Library agents have no company/principal; their channel relation must still fence them.
@@ -107,10 +108,10 @@ async fn harness_fence_covers_library_channel_assignments() {
 
 #[tokio::test]
 async fn task_creation_waits_for_a_competing_harness_change() {
-    let _queue_guard = super::super::test_support::UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let fixture = fixture(&pool).await;
     let mut editing = pool.begin().await.unwrap();
     sqlx::query("UPDATE agents SET harness_kind = 'rig' WHERE id = $1")

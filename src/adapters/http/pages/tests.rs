@@ -5,6 +5,7 @@ use crate::entities::collaboration::{
 use crate::entities::correlation::CorrelationId;
 use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
 use crate::entities::internal_note::{InternalNoteProvenance, InternalNoteView};
+use crate::entities::member_removal::{DelegatedAskAtStake, OwnedTaskAtStake};
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::message_view::{AuthorView, ExternalMessageRef};
 use crate::entities::runtime_metrics::{MachineId, MachineRegion};
@@ -3895,17 +3896,11 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
     assert!(stopped_html.contains(&stopped.channel_id.to_string()));
 }
 
-#[test]
-fn task_detail_delegation_controls_name_irreversible_external_consequences() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(
-        company.id,
-        channel.id,
-        TaskStatus::WaitingForThirdPartyReply,
-    );
+/// One outreach still waiting on one external recipient — the state every delegation control is
+/// drawn for.
+fn waiting_external_outreach(task: &BackgroundTask) -> CollaborationSummary {
     let now = Utc::now();
-    let summary = CollaborationSummary {
+    CollaborationSummary {
         task_id: task.id,
         outreach_id: Some(Uuid::new_v4()),
         outreach_version: Some(7),
@@ -3938,7 +3933,19 @@ fn task_detail_delegation_controls_name_irreversible_external_consequences() {
         as_of: now,
         truncated: false,
         detail_href: None,
-    };
+    }
+}
+
+#[test]
+fn task_detail_delegation_controls_name_irreversible_external_consequences() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let task = monitored_task(
+        company.id,
+        channel.id,
+        TaskStatus::WaitingForThirdPartyReply,
+    );
+    let summary = waiting_external_outreach(&task);
     let html = task_detail_pane(&TaskDetailPane {
         harness_diagnostics: None,
         harness_diagnostics_error: None,
@@ -3964,6 +3971,187 @@ fn task_detail_delegation_controls_name_irreversible_external_consequences() {
     assert!(html.contains("do not recall email"));
     assert!(!html.to_lowercase().contains("recall email</button>"));
     assert!(html.contains("hx-target=\"#task-pane\""));
+}
+
+/// Every label a surface offers, in the order it offers them.
+fn button_labels(html: &str) -> Vec<&str> {
+    html.split("<button")
+        .skip(1)
+        .filter_map(|button| button.split_once('>'))
+        .filter_map(|(_, rest)| rest.split_once("</button>"))
+        .map(|(label, _)| label)
+        .collect()
+}
+
+/// The two surfaces render from one source, so an operator cannot be told a control does one thing
+/// in the Tasks workspace and another in their mailbox. Only the route and the swap target differ.
+#[test]
+fn both_delegation_surfaces_offer_the_same_controls_in_the_same_words() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let task = monitored_task(
+        company.id,
+        channel.id,
+        TaskStatus::WaitingForThirdPartyReply,
+    );
+    let summary = waiting_external_outreach(&task);
+
+    let workspace = delegation_control_forms(
+        &summary,
+        &DelegationSurface {
+            action_prefix: &format!("/ui/tasks/{}/delegation", task.id),
+            action_suffix: "?company_id=x&amp;view=list",
+            target: "#task-pane",
+            scope_fields: "",
+            reassign_channels: &[],
+        },
+    );
+    let mailbox = delegation_control_forms(
+        &summary,
+        &DelegationSurface {
+            action_prefix: &format!("/ui/task-delegation/{}", task.id),
+            action_suffix: "",
+            target: "#detail-pane",
+            scope_fields: r#"<input type="hidden" name="thread_id" value="t">"#,
+            reassign_channels: &[],
+        },
+    );
+
+    assert_eq!(button_labels(&workspace), button_labels(&mailbox));
+    for warning in [
+        "do not recall email",
+        "may already have been received",
+        "Cancels an unsent delivery when possible",
+    ] {
+        assert!(workspace.contains(warning), "{warning} left the task pane");
+        assert!(mailbox.contains(warning), "{warning} left the mailbox");
+    }
+    assert!(mailbox.contains(&format!(
+        r##"hx-post="/ui/task-delegation/{}/cancel-outreach" hx-target="#detail-pane""##,
+        task.id
+    )));
+    assert!(!mailbox.contains("#task-pane"));
+    assert!(!workspace.contains("thread_id"));
+}
+
+/// A teammate holding a task may recover its delegation from the thread it happened on, without
+/// administering the company. Resolving the authority is the route's job — the pane's job is to
+/// draw the controls only for someone who has one, and to carry the fence and the scope the route
+/// re-checks.
+#[test]
+fn the_mailbox_offers_delegation_controls_to_the_task_owner_and_to_a_manager() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let task = monitored_task(
+        company.id,
+        channel.id,
+        TaskStatus::WaitingForThirdPartyReply,
+    );
+    let summary = waiting_external_outreach(&task);
+    let owner = PrincipalId::random();
+    let work = ThreadWorkSummary {
+        task_id: task.id,
+        ownership: crate::entities::task::TaskOwnership {
+            owner: TaskOwner::Human(owner),
+            version: 4,
+        },
+        owner_label: Some("Dana".into()),
+        activity: Some(ThreadActivity::WaitingReply),
+    };
+    let pane = |viewer: Option<PrincipalId>, manages: bool| {
+        message_pane(&MessagePane {
+            company_id: company.id,
+            channel: &channel,
+            thread: &thread,
+            messages: &[],
+            agent: None,
+            viewer_email: &mailbox_account_email(),
+            activity: Some(ThreadActivity::WaitingReply),
+            work: Some(work.clone()),
+            viewer_principal_id: viewer,
+            viewer_manages_tasks: manages,
+            private_handoff: None,
+            ownership_error: None,
+            owner_candidates: &[],
+            collaboration: Some(&summary),
+        })
+    };
+
+    let as_owner = pane(Some(owner), false);
+    assert!(as_owner.contains("Delegation controls"));
+    assert!(as_owner.contains("Extend deadline"));
+    assert!(as_owner.contains("Cancel waiting"));
+    assert!(as_owner.contains("Cancel outreach waiting"));
+    assert!(as_owner.contains("Stop task"));
+    // The outreach version it was drawn against, and the scope the route re-loads the task through.
+    assert!(as_owner.contains(r#"name="expected_version" value="7""#));
+    assert!(as_owner.contains(&format!(r#"name="thread_id" value="{}""#, thread.id)));
+    assert!(as_owner.contains(&format!(r#"name="channel_id" value="{}""#, channel.id)));
+    assert!(as_owner.contains(&format!(
+        r#"hx-post="/ui/task-delegation/{}/extend""#,
+        task.id
+    )));
+    // Reassignment needs the company's channel list, which this pane does not load.
+    assert!(!as_owner.contains("Reassign"));
+
+    // A manager reading someone else's thread keeps the controls; an ordinary teammate who holds
+    // nothing, and a reader with no principal at all, get none.
+    assert!(pane(Some(PrincipalId::random()), true).contains("Delegation controls"));
+    for hidden in [
+        pane(Some(PrincipalId::random()), false),
+        pane(None, false),
+        pane(None, true),
+    ] {
+        assert!(!hidden.contains("Delegation controls"));
+        assert!(!hidden.contains("/ui/task-delegation/"));
+    }
+}
+
+/// Nothing is left to act on once the outreach is finished, so the panel disappears rather than
+/// offering a command the fence would reject.
+#[test]
+fn a_settled_outreach_draws_no_delegation_controls_in_either_surface() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
+    let owner = PrincipalId::random();
+
+    for status in [
+        OutreachBusinessStatus::Completed,
+        OutreachBusinessStatus::Cancelled,
+    ] {
+        let summary = CollaborationSummary {
+            status,
+            ..waiting_external_outreach(&task)
+        };
+        let html = message_pane(&MessagePane {
+            company_id: company.id,
+            channel: &channel,
+            thread: &thread,
+            messages: &[],
+            agent: None,
+            viewer_email: &mailbox_account_email(),
+            activity: None,
+            work: Some(ThreadWorkSummary {
+                task_id: task.id,
+                ownership: crate::entities::task::TaskOwnership {
+                    owner: TaskOwner::Human(owner),
+                    version: 4,
+                },
+                owner_label: Some("Dana".into()),
+                activity: None,
+            }),
+            viewer_principal_id: Some(owner),
+            viewer_manages_tasks: true,
+            private_handoff: None,
+            ownership_error: None,
+            owner_candidates: &[],
+            collaboration: Some(&summary),
+        });
+        assert!(!html.contains("Delegation controls"), "{status:?}");
+    }
 }
 
 #[test]
@@ -4840,18 +5028,20 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
     let sam = team_member(company.id, Uuid::new_v4(), "sam", "member");
     let owner = team_member(company.id, company.user_id, "dana", "member");
 
+    let removal_endpoint = format!(
+        r##"hx-post="/ui/companies/{}/team/members/{}/removal""##,
+        company.id, sam.user_id
+    );
     let removable = member_pane(&MemberPane {
         company: &company,
         member: &sam,
         role: TeamRole::Owner,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
+        work_at_stake: None,
         error: None,
     });
-    assert!(removable.contains(&format!(
-        r##"hx-delete="/ui/companies/{}/team/members/{}""##,
-        company.id, sam.user_id
-    )));
+    assert!(removable.contains(&removal_endpoint));
     assert!(removable.contains("hx-confirm=\"Remove sam"));
     assert!(removable.contains("Access Role"));
     assert!(removable.contains(&format!(
@@ -4868,9 +5058,10 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         role: TeamRole::Owner,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
+        work_at_stake: None,
         error: None,
     });
-    assert!(!owner_pane.contains("hx-delete="));
+    assert!(!owner_pane.contains("/removal"));
     assert!(!owner_pane.contains("Access Role"));
     assert!(owner_pane.contains("cannot be removed"));
     // The stored role says "member", but owning the company outranks it.
@@ -4883,11 +5074,186 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         role: TeamRole::Member,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
+        work_at_stake: None,
         error: None,
     });
-    assert!(!read_only.contains("hx-delete="));
+    assert!(!read_only.contains("/removal"));
     assert!(!read_only.contains("Access Role"));
     assert!(read_only.contains("Only the company owner"));
+
+    // An empty pre-check is the common case and must read exactly like no pre-check at all.
+    let nothing_live = member_pane(&MemberPane {
+        company: &company,
+        member: &sam,
+        role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
+        work_at_stake: Some(&MemberWorkAtStake::default()),
+        error: None,
+    });
+    assert!(nothing_live.contains(&removal_endpoint));
+    assert!(!nothing_live.contains("Live work to hand over"));
+    assert!(
+        !nothing_live.contains(r#"name="owner""#),
+        "nothing to decide, so no decision is offered"
+    );
+}
+
+/// Live work makes the removal carry one decision — not a form per item.
+///
+/// One owner picker for every item, one shared handoff field, and the asks listed as what the same
+/// click re-asks at that owner. Every option names somebody: there is no "unassign all", so an
+/// empty candidate list is a dead end the pane explains rather than a third option. The Remove
+/// button stays: it is the thing that applies the choice, so there is no state where the admin has
+/// resolved some items and is waiting for a button to unlock.
+#[test]
+fn the_member_pane_asks_one_question_and_removes_in_one_click() {
+    let company = mailbox_company();
+    let sam = team_member(company.id, Uuid::new_v4(), "sam", "member");
+    let colleague = PrincipalId::new(Uuid::new_v4());
+    let task = OwnedTaskAtStake {
+        task_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        correlation_id: Uuid::new_v4(),
+        task_type: "agent_run".into(),
+        status: TaskStatus::Processing,
+        ownership_version: 4,
+    };
+    let ask = DelegatedAskAtStake {
+        task_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        outreach_id: Uuid::new_v4(),
+        target_id: Uuid::new_v4(),
+        outreach_version: 2,
+        subject: "Can you confirm the invoice?".into(),
+        asked_address: "sam@example.com".into(),
+        expires_at: Utc::now(),
+    };
+    let at_stake = MemberWorkAtStake {
+        owned_tasks: vec![task.clone()],
+        delegated_asks: vec![ask.clone()],
+        owner_candidates: vec![TaskOwnerCandidate {
+            owner: TaskOwner::Human(colleague),
+            label: "Dana".into(),
+        }],
+        truncated: false,
+    };
+
+    let pane = member_pane(&MemberPane {
+        company: &company,
+        member: &sam,
+        role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
+        work_at_stake: Some(&at_stake),
+        error: None,
+    });
+
+    // One submission, carrying the decision and doing the removal.
+    assert!(pane.contains(&format!(
+        r##"hx-post="/ui/companies/{}/team/members/{}/removal""##,
+        company.id, sam.user_id
+    )));
+    assert_eq!(
+        pane.matches("<form").count(),
+        2,
+        "the access-role form and the removal form, and no per-item form: {pane}"
+    );
+    assert!(pane.contains("Live work to hand over (2)"));
+    assert!(pane.contains("Remove from Team"));
+    assert!(
+        pane.contains("1 active task(s) and 1 pending ask(s) to them move to your chosen owner"),
+        "the confirm says what the one click does: {pane}"
+    );
+
+    // One owner picker for everything at stake, and every option in it names somebody.
+    assert_eq!(
+        pane.matches(r#"name="owner""#).count(),
+        1,
+        "exactly one decision point"
+    );
+    assert!(pane.contains("New owner for all 2 of sam's live item(s)"));
+    assert!(
+        !pane.contains(r#"value="unassigned""#),
+        "there is no unassign option left: {pane}"
+    );
+    assert!(pane.contains(&format!(
+        r#"<option value="human:{}">Dana</option>"#,
+        colleague.as_uuid()
+    )));
+    assert_eq!(
+        pane.matches(r#"name="handoff_instruction""#).count(),
+        1,
+        "one handoff instruction, shared by every task"
+    );
+
+    // The items themselves are listed for reading, with no control of their own.
+    assert!(pane.contains("agent_run"));
+    assert!(
+        pane.contains("1 pending ask(s) to this person will be redirected to the chosen owner.")
+    );
+    assert!(pane.contains("Can you confirm the invoice?"));
+    assert!(!pane.contains("Stop waiting on them"));
+    assert!(!pane.contains("will be cancelled"));
+    assert!(!pane.contains("/work/task/transfer"));
+    assert!(!pane.contains("/work/delegation"));
+
+    // Only asks at stake: still one decision, because an ask now needs a taker too.
+    let asks_only = MemberWorkAtStake {
+        owned_tasks: Vec::new(),
+        delegated_asks: vec![ask.clone()],
+        owner_candidates: at_stake.owner_candidates.clone(),
+        truncated: false,
+    };
+    let redirects_only = member_pane(&MemberPane {
+        company: &company,
+        member: &sam,
+        role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
+        work_at_stake: Some(&asks_only),
+        error: None,
+    });
+    assert_eq!(redirects_only.matches(r#"name="owner""#).count(), 1);
+    assert!(redirects_only.contains("New owner for all 1 of sam's live item(s)"));
+    assert!(
+        redirects_only
+            .contains("1 pending ask(s) to this person will be redirected to the chosen owner.")
+    );
+    assert!(redirects_only.contains("Remove from Team"));
+
+    // No eligible owner on every affected channel: no picker at all, and the pane says why the
+    // removal cannot go ahead rather than offering to leave the work to nobody.
+    let no_candidates = MemberWorkAtStake {
+        owner_candidates: Vec::new(),
+        ..at_stake.clone()
+    };
+    let blocked = member_pane(&MemberPane {
+        company: &company,
+        member: &sam,
+        role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
+        work_at_stake: Some(&no_candidates),
+        error: None,
+    });
+    assert!(!blocked.contains(r#"name="owner""#), "{blocked}");
+    assert!(!blocked.contains(r#"value="unassigned""#));
+    assert!(blocked.contains("cannot be removed yet"), "{blocked}");
+
+    // A member with no authority to remove anybody is shown none of it.
+    let read_only = member_pane(&MemberPane {
+        company: &company,
+        member: &sam,
+        role: TeamRole::Member,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
+        work_at_stake: Some(&at_stake),
+        error: None,
+    });
+    assert!(!read_only.contains("Live work to hand over"));
+    assert!(!read_only.contains(r#"name="owner""#));
+    assert!(!read_only.contains("Remove from Team"));
 }
 
 #[test]
@@ -5003,6 +5369,7 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Member,
         viewer_id: dana.user_id,
         avatar_draft: None,
+        work_at_stake: None,
         error: None,
     });
     assert!(own.contains(&format!(
@@ -5025,6 +5392,7 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Owner,
         viewer_id: company.user_id,
         avatar_draft: None,
+        work_at_stake: None,
         error: None,
     });
     assert!(!someone_else.contains("/avatar\""));
@@ -5037,6 +5405,7 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Member,
         viewer_id: dana.user_id,
         avatar_draft: Some("javascript:alert(1)"),
+        work_at_stake: None,
         error: Some("An avatar URL must start with http:// or https://."),
     });
     // ...but never as something a page would render: a draft that is not an `http` URL is shown

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO background_tasks (\n                   id, company_id, channel_id, correlation_id, task_type, status,\n                   owner_principal_id, owner_principal_kind, worker_id, execution_generation,\n                   locked_at, lock_expires_at, transition_reason, transition_actor_kind,\n                   transition_actor_id\n               ) VALUES (\n                   $1, $2, $3, gen_random_uuid(), 'agent_run', 'processing', $4, 'person', $5, $6,\n                   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '5 minutes',\n                   'claimed', 'worker', $5\n               )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "54f1be1661ab041e18763faea93832a04c3fa453c2cc78e5b029392c474710a4"
+}

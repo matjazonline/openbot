@@ -224,6 +224,167 @@ raising the batch size is not a free alternative to fixing the scan.
   obvious.
 - Existing lease, retry and reaping tests unchanged and green.
 
+## Implementation notes (2026-09-11)
+
+What landed, and where it differs from the text above. The reasons are recorded so the next
+reader does not "fix" the code back to match the plan. Plans, seeded row counts and the race
+reproduction are in `plan/db_improve/05-deferred-until-traffic.md` §5.
+
+- **Option A, chosen by the owner, for a different reason than the one given above.** Under load
+  the worker claims one slot at a time: `run_bounded_task_loop` asks for as many tasks as it has
+  free slots, and once every slot is busy each finished task frees exactly one. With a limit of
+  one, the old statement, A and B all return the same row, the oldest due task in the queue. So
+  fairness barely separates the options; cost does. A's cost depends on neither a tuning factor
+  nor how many parked tasks there are. B's window would step over every pending person-owned or
+  unassigned task on each claim, because those linger and sit at the old end of a `run_at`-led
+  index. Narrowing B's index to stop that would have cost the same schema change and reset as A.
+  The one-slot observation is finding 15; the rule change it calls for is the follow-up recorded
+  after these notes.
+- **A double claim the audit did not find is fixed here** (finding 14). The old statement's pending
+  check lived only in the ranking subquery. `FOR UPDATE` locks rows chosen under the statement's
+  snapshot, and when one was claimed and committed by another worker in between, Postgres followed
+  it to its new version and re-checked only conditions written against the locked table, here just
+  `id`. The second worker re-claimed the task and overwrote its `execution_generation`. The
+  rewrite repeats `status = 'pending' AND run_at <= CURRENT_TIMESTAMP AND owner_principal_kind =
+  'agent'` in `claimable`, against the row it locks. The channel-assignment `EXISTS` is not
+  repeated: an assignment removed just before the lock is indistinguishable from one removed just
+  after the claim commits, which no claim can prevent.
+- **The loose scan stays recursive; the readable `DISTINCT` form was not written.** On 16.14 it
+  planned as `Unique` over an index-only scan of every pending agent row. On the seed that was
+  21,118 rows read to find 60 companies. The claim above that PostgreSQL 18's skip scan serves
+  `DISTINCT` is wrong for the reason phase 2 recorded: skip scan needs a condition on a later
+  index column.
+- **`ROW_NUMBER()` stayed inside the `LATERAL`,** as sketched. Its window streams: on the seed
+  each slice's index scan stopped after `$1` rows.
+- **`due_company` is named `pending_company`,** because it lists companies with any pending agent
+  work, due or not. Putting `run_at <= CURRENT_TIMESTAMP` into the enumeration would make each
+  descent walk that company's not-yet-due rows. Leaving it out costs a company with nothing due
+  one empty descent in its slice.
+- **`FOR UPDATE OF task`,** where the old statement said `FOR UPDATE`. The same rows are locked,
+  because an unqualified locking clause already skipped CTE references; naming the table says so.
+- **The index was widened in place.** `pg_indexes` counts 16 on `background_tasks` before and
+  after. No other reader of the old leading column used it; the grep is below and in §5.
+- **A racing claim can come back short.** A task another claim holds locked still takes one of
+  its company's `$1` places, where the old statement's sort ran on past it. Only claims from
+  different machines can race: within a process the loop awaits each claim, and `claim_task` by id
+  is called only from tests. The worker reads a short batch as an empty queue until its next poll
+  (500 ms) or task-ready wakeup. Not "fixed" by looping, per the note above.
+- **The new tests live in `task/claim_tests.rs`**, not `tests.rs`, which is already 7,157 lines.
+  `seed_company_and_channel` and `seed_channel_agent` became `pub(super)` for them. Two things in
+  that file are deliberate:
+  - **Each test gets a database of its own**, through `test_support::own_database`: a unique name,
+    migrated, and dropped when the handle falls out of scope, panic or not. Asked for on
+    2026-09-12. The claim sweeps every row of the database it runs against, so on the shared test
+    database these tests had to hold `UNSCOPED_CLAIM`, backdate their tasks by three centuries to
+    outrank the neighbours, and delete their companies on the way out. Even then a panicking test
+    left a claimable task for the next test's claim to take, which is exactly what happened on the
+    first run: one expected failure cascaded into two unrelated ones. On a database with nothing
+    else in it, each test states every row that exists and asserts the exact set of claimed tasks.
+  - The race test's paused worker connects with `enable_hashjoin` and `enable_mergejoin` off. On
+    a near-empty table the planner builds the `UPDATE`'s hash on `claimable`, which locks the
+    whole batch before the first update and closes the window the test holds open. The setting
+    orders execution; it does not change what is re-checked.
+- **Run against the old statement** (with the new index in place), the three behaviour tests
+  passed and the race test failed with "the paused worker re-claimed a task another worker already
+  held".
+- **A second race test keeps the shape production has** (2026-09-12).
+  `concurrent_workers_never_receive_the_same_task_twice` runs eight workers against a three-company
+  backlog for fifteen rounds, with no lock and no planner setting, and asserts that no task is ever
+  returned to two of them. With the re-check removed it failed on all three runs it was tried
+  against, once by 35 duplicates in 135 hand-outs. It cannot prove the window is hit on a given
+  run, which is why the deterministic test stays. Note that the status ledger cannot be used for
+  this at all: `record_task_status_event` returns early when the status does not change, so a
+  second claim of an already-`processing` row writes no event — which is how the pre-existing
+  `concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_reclaimed` stayed green
+  throughout.
+- **The status ledger cannot detect a double claim, and is not where to fix that** (2026-09-12).
+  `record_task_status_event` skips any write that leaves `status` unchanged, which is what
+  `src/adapters/persistence/AGENTS.md` asks for: notification triggers fire on material state
+  changes, not on writes that leave the notified state alone. Recording same-status writes would
+  fabricate transitions for idempotent ones, such as a resume that sets `status = 'pending'` on an
+  already-pending row. A double claim is a fence violation rather than a transition, so two tests
+  guard the class instead:
+  - `a_task_with_a_live_lease_is_claimable_by_nobody` — neither the batch claim nor the by-id
+    claim takes a task that already carries a live lease, and neither overwrites the execution
+    generation that fences the worker running it.
+  - `every_statement_that_claims_a_task_requires_it_to_be_pending` — scans the crate's non-test
+    sources for `execution_generation = gen_random_uuid()` and fails unless the statement around it
+    also requires `status = 'pending'`. It catches a *new* claim path, including one no test of its
+    own exercises. Checked by adding an unguarded statement to `task/queue.rs`: the test failed and
+    named it by file and line.
+
+  A trigger rejecting `processing → processing` with a changed execution generation would enforce
+  this rather than detect it, and no legitimate path does that — only the two claims assign a
+  generation, and both require `pending`. It was deliberately not added: it costs a migration and
+  another database reset, and the statement is now fixed, tested and scanned. That is the thing to
+  reach for if a future claim path cannot be expressed as "pending only".
+- **Every test that held `UNSCOPED_CLAIM` now takes a database of its own, and the guard is gone**
+  (2026-09-12). Sixty tests across seventeen files held it to serialise unscoped claims and sweeps.
+  Isolation is the stronger property, so the static and its rationale were deleted along with the
+  workarounds it forced: the foreign-row releases in the task and delivery tests, and the
+  century-scale backdating that sorted a test's own row to the front. `Fixture::isolated` in
+  `thread/test_support.rs` does the same for the inbound tests that commit through a claim. The
+  suite's test time went from 7.1 s to about 17 s, which is what migrating one database per
+  isolated test costs. Isolated pools are capped at five connections, because sixty of them in
+  parallel would otherwise come within reach of the server's `max_connections`; the one test that
+  needs more fan-out opens a pool of its own.
+- **Both databases were recreated** with `./scripts/reset-db.sh --all`.
+- **Verified:** `cargo test` passed 1,443 lib tests (the baseline was 1,439) and the binary's 5,
+  none failed, 22 ignored. `cargo clippy --all-targets -- -D warnings` is clean. `cargo sqlx
+  prepare -- --all-targets` wrote no change to `.sqlx/`, as expected for a runtime query. The
+  fairness test is unedited.
+
+For the commit message, which the acceptance criteria below ask to carry the grep: readers of the
+old leading column, found by grepping non-test `src/` for `'pending'` and `run_at` on 2026-09-11.
+`TASK_PRESSURE_SQL`'s `due_now` and the stuck-work census's `queue_overdue` are `COUNT(*) FILTER`
+aggregates. `OUTSTANDING_SQL`'s pending arm is one side of an `OR`; its plans, empty and seeded,
+are unchanged and never used the index. `board.rs`'s `MIN(run_at) FILTER` aggregates an already
+selected chain. `CLAIM_TASK_SQL` and the `notify_agent_instruction` trigger go by primary key. The
+`status IN (…)` lists in `attention.rs`, `board.rs` and `operations.rs` cannot use a single-status
+partial index.
+
+## Follow-up: fewest running first (2026-09-11)
+
+This is a behaviour change, not a Class B rewrite: it changes which task a claim returns. The owner
+chose it on 2026-09-11, after the one-slot observation in the notes above (finding 15). It adds no
+index. It is justified by the scheduling it produces, not by plan evidence, so it sits outside the
+A/B/C classes this plan uses for performance changes, and none of their gates apply to it.
+
+- **The rule.** A candidate's `company_round` is now its place in its company's queue plus the
+  tasks that company has `processing` under a live lease (`in_flight`). A free slot goes to the
+  company with the fewest running, and ties go to the oldest waiting task. Each company's own queue
+  stays oldest-first. With nothing running, it orders exactly as phase 5 did, which is why every
+  earlier claim test, the fairness test included, passes unedited.
+- **What it fixes.** With a limit of one, the worker's steady state once every slot is busy, phase
+  5's ordering took the oldest due task anywhere. So a company with a deep backlog held every other
+  company's newer task until the backlog drained. On the seed, company 1 had 8 tasks running and
+  20,000 waiting. A limit-4 claim served companies 1, 60, 59 and 58 under phase 5's statement, and
+  60, 59, 58 and 57 under this one.
+- **Cost.** `in_flight` is an index scan of `background_tasks_processing_lease_idx` over live
+  leases only: one row per busy slot, across every machine. On the seed it read 8 rows. The whole
+  statement went from 876 to 879 buffers at limit 1, and from 1,357 to 1,360 at limit 4.
+- **What is counted.** Only `processing` rows with `lock_expires_at > CURRENT_TIMESTAMP`. An
+  expired lease's worker is gone, and the reaper is about to put its task back. Tasks in
+  `pending_approval` or `waiting_for_third_party_reply` hold no worker slot.
+- **No slot sits idle.** The round orders candidates and never drops one, so a company alone with
+  work still gets every slot.
+- **Racing claims can over-allocate by one.** Two claims that start together both see the same
+  committed running counts, so both can take a company for idle and each give it a task. The next
+  claim counts both.
+- **Tests** (`task/claim_tests.rs`): `a_free_slot_goes_to_the_company_with_the_fewest_tasks_running`,
+  `an_expired_lease_does_not_count_as_a_running_task`,
+  `a_company_alone_with_work_fills_the_whole_batch` and
+  `companies_running_the_same_number_of_tasks_are_served_oldest_first`. The last two could not be
+  written against the shared test database, where another test's due task is a company with
+  nothing running and outranks anything placed second. They became straightforward once each test
+  got a database of its own.
+- **Verified:** `cargo test` passed 1,450 lib tests (phase 5 left 1,443) and the binary's 5, none
+  failed, 22 ignored — that count includes the follow-up's two tests, the realistic race test and
+  the two guards above,
+  and the run covers the suite-wide move to per-test databases. `cargo clippy --all-targets -- -D
+  warnings` is clean, and `cargo sqlx prepare -- --all-targets` again wrote no change to `.sqlx/`.
+  A full run leaves no `mail_agents_own_%` database behind.
+
 ## Acceptance criteria
 
 - The claim statement contains no window function over an unbounded input; the plan shows the row

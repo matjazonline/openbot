@@ -169,6 +169,190 @@ scope/window matrix, and record them in this file.
 **Sensitive to:** `email_messages` and `task_attempts` cardinality and the selectivity of a single
 `thread_index` value or `started_at` window — both are indistinguishable from noise at current size.
 
+## 5. Task Claim: Per-Company Slices (landed, `plan/db_audit/phase5.md`)
+
+Not deferred — recorded here because it widens an index on the hottest table, and this file's rule
+is that every plan captured for such a change lives here.
+
+**What changed.** `claim_pending_tasks` (`src/adapters/persistence/task/operations.rs`) no longer
+ranks the whole due backlog with `ROW_NUMBER() OVER (PARTITION BY company_id …)`. A recursive
+loose index scan enumerates companies with pending agent work, a `LATERAL` slice takes at most
+`$1` rows from each, and the final `ORDER BY company_round, run_at, created_at, id … LIMIT $1` is
+unchanged. The claim's index was widened in place:
+
+    -- before
+    CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks
+        USING btree (run_at, created_at, id) WHERE (status = 'pending'::text);
+    -- after
+    CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks
+        USING btree (company_id, run_at, created_at, id)
+        WHERE ((status = 'pending'::text) AND (owner_principal_kind = 'agent'::text));
+
+`pg_indexes` counts 16 indexes on `background_tasks` before and after. The new predicate is
+narrower, so the index is maintained on a subset of the writes the old one was: the same writes,
+minus those to person-owned and unassigned pending tasks.
+
+**Environment for every capture below.** Local Homebrew PostgreSQL 16.14; CI and production run
+18.6 (see "Verification Gaps"). No timing was taken anywhere: `COSTS OFF`, and `TIMING OFF,
+SUMMARY OFF` wherever `ANALYZE` was used. Captured 2026-09-11.
+
+### Shape check against an empty database
+
+`mail_agents_schema_audit`, built from the migration (before: `HEAD`; after: the edited file), no
+`ANALYZE`. Custom and generic plans were identical in both, so one of each is shown.
+
+Before:
+
+    Update on background_tasks task
+      CTE claimable
+        ->  Limit
+              ->  LockRows
+                    ->  Sort
+                          Sort Key: ranked.company_round, ranked.run_at, ranked.created_at, task_1.id
+                          ->  Nested Loop
+                                ->  Subquery Scan on ranked
+                                      ->  WindowAgg
+                                            ->  Sort
+                                                  Sort Key: background_tasks.company_id, background_tasks.run_at, background_tasks.created_at, background_tasks.id
+                                                  ->  Index Scan using background_tasks_pending_ready_idx on background_tasks
+                                                        Index Cond: (run_at <= CURRENT_TIMESTAMP)
+                                                        Filter: ((owner_principal_kind = 'agent'::text) AND (SubPlan 1))
+                                                        SubPlan 1
+                                                          ->  Nested Loop  (principals_pkey, channel_agents_pkey)
+                                ->  Index Scan using background_tasks_pkey on background_tasks task_1
+                                      Index Cond: (id = ranked.id)
+      ->  Nested Loop
+            ->  CTE Scan on claimable
+            ->  Index Scan using background_tasks_pkey on background_tasks task
+                  Index Cond: (id = claimable.id)
+
+After:
+
+    Update on background_tasks task
+      CTE pending_company
+        ->  Recursive Union
+              ->  Limit
+                    ->  Index Only Scan using background_tasks_pending_ready_idx on background_tasks task_1
+              ->  WorkTable Scan on pending_company previous
+                    Filter: (company_id IS NOT NULL)
+      CTE claimable
+        ->  Limit
+              ->  LockRows
+                    ->  Sort
+                          Sort Key: slice.company_round, slice.run_at, slice.created_at, task_2.id
+                          ->  Nested Loop
+                                Join Filter: (slice.id = task_2.id)
+                                ->  Seq Scan on background_tasks task_2
+                                      Filter: ((status = 'pending'::text) AND (owner_principal_kind = 'agent'::text) AND (run_at <= CURRENT_TIMESTAMP))
+                                ->  Nested Loop
+                                      ->  CTE Scan on pending_company
+                                            Filter: (company_id IS NOT NULL)
+                                      ->  Subquery Scan on slice
+                                            ->  Limit
+                                                  ->  WindowAgg
+                                                        ->  Index Scan using background_tasks_pending_ready_idx on background_tasks task_3
+                                                              Index Cond: ((company_id = pending_company.company_id) AND (run_at <= CURRENT_TIMESTAMP))
+                                                              Filter: (SubPlan 3)
+                                                              SubPlan 3
+                                                                ->  Nested Loop  (principals_pkey, channel_agents_pkey)
+      ->  Hash Join
+            Hash Cond: (task.id = claimable.id)
+            ->  Seq Scan on background_tasks task
+            ->  Hash
+                  ->  CTE Scan on claimable
+
+What the shape shows: before, the only `Limit` sits above a `WindowAgg` and two `Sort`s over every
+due row. After, each company's rows come from an index scan in `run_at` order under its own
+`Limit`, with no sort between them, so the window is bounded by the slice. The loose scan is an
+`Index Only Scan` on the widened index. (The `Seq Scan`s are what the planner picks for a table
+with no rows; with data it probes `background_tasks_pkey`, below.)
+
+### Shape check against a synthetic seed
+
+`mail_agents_claim_seed`, built from the same migration, then seeded with triggers and foreign keys
+off (`session_replication_role = replica`), then `ANALYZE`d. **Not representative of production.**
+It exists to count rows and buffers per plan node. Distribution: one company with 20,000 due agent
+tasks spread over an hour, plus 1,000 not yet due; 59 companies with one to three due tasks each,
+newer than most of that backlog; 3,000 pending person-owned tasks and 600 pending unassigned ones,
+days old; 42,000 completed; 8 processing. Each claim ran inside a rolled-back transaction.
+
+| | Before, limit 1 | Before, limit 4 | After, limit 1 | After, limit 4 |
+|---|---|---|---|---|
+| Rows the candidate scan produced | 20,217 | 20,217 | 60 (one per company) | 122 |
+| Channel-assignment `EXISTS` probes | 20,217 | 20,217 | 60 | 122 |
+| Person-owned/unassigned rows stepped over | 3,600 | 3,600 | 0 (not in the index) | 0 |
+| Join back to `background_tasks` | `Seq Scan`, 66,726 rows | same | pkey probe × 60 | pkey probe × 122 |
+| Buffers, whole statement (custom plan) | 42,959 | 43,056 | 876 | 1,357 |
+| Buffers, generic plan | — | 44,712 | — | 1,356 |
+| Companies served, in order | — | 1, 60, 59, 58 | — | 1, 60, 59, 58 |
+
+The batch is identical — the fairness result is unchanged, only the work to reach it.
+
+Two supporting checks on the same seed:
+
+- **The new statement against the old index** (limit 4): 56,404 buffers — worse than the old
+  statement. Each of the 60 slices combined the company's `unsettled_owner` entries with a bitmap
+  scan of all 23,817 `run_at <= now` entries of the old index. The widening is what makes the
+  rewrite pay.
+- **`SELECT DISTINCT company_id … WHERE status = 'pending' AND owner_principal_kind = 'agent'`**
+  plans as `Unique` over an `Index Only Scan` of all 21,118 pending agent rows to find 60 companies.
+  That is why the enumeration is recursive rather than `DISTINCT`. PostgreSQL has no loose scan for
+  `DISTINCT`, and 18's skip scan needs a condition on a later index column, which a bare
+  `DISTINCT` does not have — the reading `plan/db_audit/phase2.md` recorded from the 18 docs.
+
+### Other readers of the old leading column
+
+Every non-test statement with a `status = 'pending'` predicate on `background_tasks`, found by grep
+on 2026-09-11:
+
+- `TASK_PRESSURE_SQL`'s `due_now` (`dashboard.rs`) and `census_stuck_work`'s `queue_overdue`
+  (`task/operations.rs`) — `COUNT(*) FILTER (…)` aggregates over the table or a company;
+  neither used the partial index.
+- `OUTSTANDING_SQL` (`dashboard.rs`) — its pending arm is one side of an `OR`. Captured before and
+  after, both forms: empty database, `Seq Scan` (global) and `background_tasks_company_channel_created_idx`
+  (company), unchanged; seeded, `Parallel Seq Scan` (global) and a `BitmapOr` of
+  `background_tasks_company_status_created_idx` and `background_tasks_unsettled_owner_idx`
+  (company), unchanged. It never read `background_tasks_pending_ready_idx`.
+- `board.rs`'s `MIN(run_at) FILTER (WHERE status = 'pending')` — an aggregate over an already
+  selected chain.
+- `CLAIM_TASK_SQL` (`task/queue.rs`) and the `notify_agent_instruction` trigger — by primary key.
+- `attention.rs`, `board.rs`, `operations.rs` status lists — `status IN (…)`, which a
+  single-status partial index cannot serve.
+
+### A double claim, found while capturing
+
+The old statement could re-claim a task another worker had claimed and committed after its
+snapshot: the pending check lived only in the ranking subquery, and a `FOR UPDATE` recheck
+re-evaluates only conditions on the locked table. Reproduced on the seed with two `psql` sessions,
+the second delayed by a materialized `pg_sleep` between its snapshot and its locking step: before,
+both sessions returned task `8fc003b3…` and it ended up held by the second worker; after, the
+second skipped it and took `398acf3f…`. The rewrite repeats the pending and owner checks against
+the locked row. `a_claim_never_takes_a_task_another_worker_claimed_after_its_snapshot`
+(`task/claim_tests.rs`) pins it deterministically, and fails against the old statement.
+
+### Follow-up: fewest running first
+
+Recorded in `plan/db_audit/phase5.md`, "Follow-up". A candidate's round now adds its company's live
+`processing` count (`in_flight`). The count is read through
+`background_tasks_processing_lease_idx`. This used the same seed, with company 1's 8 processing
+rows given live leases:
+
+| | Phase 5 statement | Follow-up |
+|---|---|---|
+| Companies served, limit 4 | 1, 60, 59, 58 | 60, 59, 58, 57 |
+| `in_flight` | — | `Index Scan using background_tasks_processing_lease_idx`, 8 rows |
+| Buffers, limit 1 / limit 4 / limit 4 generic | 876 / 1,357 / 1,356 (table above) | 879 / 1,360 / 1,362 |
+
+This is a scheduling change, not a performance one. The capture shows that it costs one index scan
+over live leases, which is bounded by the number of busy worker slots.
+
+### What would reopen it
+
+The claim now costs one index descent per company with pending agent work, plus at most `$1` rows
+from each. The number to watch once there is traffic is how many companies have pending agent work
+at once; if it reaches the thousands, `claim_pending_tasks` should rank in `pg_stat_statements` and
+this record is where the comparison starts.
+
 ## Evidence Tooling Still To Build
 
 `pg_stat_statements` ranks normalized statements, but it cannot distinguish a shallow offset from a

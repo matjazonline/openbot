@@ -88,6 +88,10 @@ const ATTENTION_SQL: &str = r#"
 WITH params AS (
     SELECT COALESCE($5::timestamptz, CURRENT_TIMESTAMP) AS as_of
 ), raw AS (
+    -- Every branch filters on the responsibility its own columns imply, so `my_work` and
+    -- `unassigned` never build a teammate's rows, or pay the task branch's anti-join probes for
+    -- them, only for `ranked` to discard them. Each filter reads `$4 <> '<view>' OR <predicate>`,
+    -- which leaves `team_work` exactly as it was. `ranked` keeps the authoritative copy.
     SELECT 'task'::text AS source_kind, task.id AS source_id, task.company_id,
            task.channel_id, task.thread_id, task.id AS task_id, task.correlation_id,
            task.status AS state,
@@ -115,9 +119,13 @@ WITH params AS (
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
     WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+      AND ($4 <> 'my_work'
+           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
+      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
       AND (
-        ($14 AND $4 = 'my_work' AND task.owner_principal_id = $3
-         AND task.owner_principal_kind = 'person')
+        -- `all_owned` lifts the status filter. The `my_work` conjunct above has already
+        -- confined the branch to the viewer's own tasks.
+        ($14 AND $4 = 'my_work')
         OR (task.status IN ('pending', 'processing', 'pending_approval',
                           'waiting_for_third_party_reply', 'failed', 'dead_letter')
         AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
@@ -167,6 +175,8 @@ WITH params AS (
      AND responsible.id = handoff.responsible_principal_id
     WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
       AND handoff.status = 'open'
+      AND ($4 <> 'my_work' OR handoff.responsible_principal_id = $3)
+      AND ($4 <> 'unassigned' OR handoff.responsible_principal_id IS NULL)
 
     UNION ALL
 
@@ -190,6 +200,11 @@ WITH params AS (
      AND approver.id = approval.approver_principal_id
     WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
       AND approval.status = 'pending'
+      AND ($4 <> 'my_work' OR approval.approver_principal_id = $3)
+      -- Skips the branch outright under `unassigned`. Sound only because the select list above
+      -- makes responsibility 'principal' or 'external', never 'channel_team', so `ranked` would
+      -- discard every row anyway. If this branch ever emits 'channel_team', this line goes.
+      AND $4 <> 'unassigned'
 
     UNION ALL
 
@@ -208,6 +223,10 @@ WITH params AS (
     LEFT JOIN background_tasks AS task
       ON task.company_id = draft.company_id AND task.id = draft.task_id
     WHERE review.company_id = $1 AND draft.channel_id = ANY($2) AND review.status = 'pending'
+      AND ($4 <> 'my_work' OR review.reviewer_principal_id = $3)
+      -- Skipped under `unassigned` for the same reason as approvals: responsibility here is
+      -- always 'principal'. If this branch ever emits 'channel_team', this line goes.
+      AND $4 <> 'unassigned'
 
     UNION ALL
 
@@ -229,6 +248,9 @@ WITH params AS (
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
     WHERE task.company_id = $1 AND task.channel_id = ANY($2)
       AND outreach.status = 'timeout_pending_approval'
+      AND ($4 <> 'my_work'
+           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
+      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
 
     UNION ALL
 
@@ -255,6 +277,10 @@ WITH params AS (
     WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
       AND delivery.status IN ('outcome_unknown', 'dead_letter')
       AND delivery.last_error_class IS DISTINCT FROM 'superseded'
+      AND ($4 <> 'my_work'
+           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
+      -- A delivery with no task joins NULL owner columns, which is channel-team work.
+      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
       AND NOT EXISTS (
           SELECT 1 FROM task_outreach_targets AS target
           JOIN task_outreaches AS outreach
@@ -263,6 +289,10 @@ WITH params AS (
             AND outreach.status = 'timeout_pending_approval'
       )
 ), ranked AS (
+    -- The authoritative responsibility filter. Every `raw` branch carries its own copy, and
+    -- this one stays as the backstop: a branch filter may be removed without changing a row,
+    -- but must never be narrower than this, because `ranked` cannot restore a row a branch
+    -- never produced.
     SELECT raw.*, params.as_of,
            CASE WHEN raw.due_at < params.as_of THEN 0
                 WHEN raw.due_at <= params.as_of + interval '24 hours' THEN 1 ELSE 2 END AS due_rank,
@@ -274,6 +304,14 @@ WITH params AS (
                                   AND raw.responsible_principal_id = $3)
            OR ($4 = 'unassigned' AND raw.responsibility_kind = 'channel_team'))
 ), after_cursor AS (
+    -- Every page sorts the whole filtered set, and that is inherent, not an oversight. `due_rank`
+    -- depends on `as_of`, so no index can supply this order, and an expression index on it is
+    -- impossible because the expression is not immutable. Do not add one. The branch filters
+    -- above shrink the input for `my_work` and `unassigned`; `team_work` sorts everything.
+    -- Two ways to bound it were considered and not taken: a `created_at` horizon in every
+    -- branch, which would hide old open items and so is a product decision rather than a
+    -- database one; and a rollup maintained by the `notify_attention_changed` triggers, whose
+    -- trade-offs are in plan/db_improve/kanban_denormalized_rollup_table_optimization.md.
     SELECT * FROM ranked
     WHERE NOT $6 OR (due_rank, priority_rank, created_at, source_kind, source_id)
           > ($7, $8, $9, $10, $11)
@@ -286,6 +324,39 @@ SELECT * FROM counted
 ORDER BY due_rank, priority_rank, created_at, source_kind, source_id
 LIMIT $13
 "#;
+
+/// Bind a feed statement to the fourteen parameters `query` implies.
+///
+/// Takes the statement rather than naming `ATTENTION_SQL` so a test can hold a reference
+/// statement to exactly the parameters production binds.
+fn bind_attention<'q>(
+    sql: &'q str,
+    query: AttentionQuery<'q>,
+) -> sqlx::query::QueryAs<'q, sqlx::Postgres, AttentionRow, sqlx::postgres::PgArguments> {
+    let cursor = query.cursor;
+    let view = match query.view {
+        AttentionView::MyWork => "my_work",
+        AttentionView::Unassigned => "unassigned",
+        AttentionView::TeamWork => "team_work",
+    };
+    let sentinel_time = DateTime::<Utc>::UNIX_EPOCH;
+    let sentinel_id = Uuid::nil();
+    sqlx::query_as::<_, AttentionRow>(sql)
+        .bind(query.company_id)
+        .bind(query.visible_channel_ids)
+        .bind(query.principal_id.as_uuid())
+        .bind(view)
+        .bind(cursor.map(|cursor| cursor.as_of))
+        .bind(cursor.is_some())
+        .bind(cursor.map_or(0_i32, |cursor| i32::from(cursor.due_rank)))
+        .bind(cursor.map_or(0_i32, |cursor| i32::from(cursor.priority_rank)))
+        .bind(cursor.map_or(sentinel_time, |cursor| cursor.created_at))
+        .bind(cursor.map_or("", |cursor| cursor.source_kind.as_str()))
+        .bind(cursor.map_or(sentinel_id, |cursor| cursor.source_id))
+        .bind((AttentionQuery::MAX_WORKING_SET + 1) as i64)
+        .bind((query.clamped_limit() + 1) as i64)
+        .bind(query.all_owned)
+}
 
 fn item_href(item: &AttentionItem) -> String {
     match item.source_kind {
@@ -460,30 +531,8 @@ async fn existing_event(
 impl AttentionPersistence for PostgresPersistence {
     async fn list_attention(&self, query: AttentionQuery<'_>) -> AppResult<AttentionPage> {
         let limit = query.clamped_limit();
-        let cursor = query.cursor;
-        let as_of = cursor.map(|cursor| cursor.as_of);
-        let view = match query.view {
-            AttentionView::MyWork => "my_work",
-            AttentionView::Unassigned => "unassigned",
-            AttentionView::TeamWork => "team_work",
-        };
-        let sentinel_time = DateTime::<Utc>::UNIX_EPOCH;
-        let sentinel_id = Uuid::nil();
-        let rows = sqlx::query_as::<_, AttentionRow>(ATTENTION_SQL)
-            .bind(query.company_id)
-            .bind(query.visible_channel_ids)
-            .bind(query.principal_id.as_uuid())
-            .bind(view)
-            .bind(as_of)
-            .bind(cursor.is_some())
-            .bind(cursor.map_or(0_i32, |cursor| i32::from(cursor.due_rank)))
-            .bind(cursor.map_or(0_i32, |cursor| i32::from(cursor.priority_rank)))
-            .bind(cursor.map_or(sentinel_time, |cursor| cursor.created_at))
-            .bind(cursor.map_or("", |cursor| cursor.source_kind.as_str()))
-            .bind(cursor.map_or(sentinel_id, |cursor| cursor.source_id))
-            .bind((AttentionQuery::MAX_WORKING_SET + 1) as i64)
-            .bind((limit + 1) as i64)
-            .bind(query.all_owned)
+        let as_of = query.cursor.map(|cursor| cursor.as_of);
+        let rows = bind_attention(ATTENTION_SQL, query)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;

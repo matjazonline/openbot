@@ -15,7 +15,9 @@ use crate::entities::{task::TaskStatus, transport::DeliveryStatus};
 ///
 /// Held as a value rather than two loose `i64`s so a caller cannot pass the bucket where the window
 /// belongs — they are both minute counts, which is exactly the swap the compiler could not catch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Hash` because it is half of the key the dashboard snapshot cache is kept under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DashboardWindow {
     minutes: i64,
     bucket_minutes: i64,

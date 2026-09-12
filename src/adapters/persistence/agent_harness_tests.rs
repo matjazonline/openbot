@@ -1,4 +1,5 @@
 use super::{PostgresPersistence, test_support::test_pool};
+use crate::adapters::persistence::test_support::own_database;
 use crate::{
     entities::creation::CreationProvenance,
     use_cases::{
@@ -70,10 +71,10 @@ async fn fixture(pool: &sqlx::PgPool) -> Fixture {
 
 #[tokio::test]
 async fn harness_change_competes_with_task_creation_and_waits_for_settlement() {
-    let _queue_guard = super::test_support::UNSCOPED_CLAIM.lock().await;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let Fixture {
         company,
         agent,
@@ -340,10 +341,10 @@ async fn response_contract_round_trip_patch_and_admission_fence() {
         response_contract::{ContractUpdate, ResponseContract},
     };
     use crate::use_cases::agent::AgentPersistence;
-    let Some(pool) = test_pool().await else {
+    let Some(database) = own_database().await else {
         return;
     };
-    let _guard = super::test_support::UNSCOPED_CLAIM.lock().await;
+    let pool = database.pool.clone();
     let fixture = fixture(&pool).await;
     change_harness(&pool, fixture.agent).await.unwrap();
     let persistence = PostgresPersistence::new(pool.clone());

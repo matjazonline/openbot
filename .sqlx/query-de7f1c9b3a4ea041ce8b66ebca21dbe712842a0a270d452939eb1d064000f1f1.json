@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO channel_agents (company_id, channel_id, agent_id, \"position\")\n                   VALUES ($1, $2, $3, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "de7f1c9b3a4ea041ce8b66ebca21dbe712842a0a270d452939eb1d064000f1f1"
+}

@@ -68,16 +68,20 @@ struct ResponseDraftDb {
     recipient_snapshot: serde_json::Value,
 }
 
-struct OutreachTargetColumns<'a> {
-    delivery_address: &'a str,
-    kind: &'static str,
-    internal_channel_id: Option<Uuid>,
-    external_transport: Option<&'a str>,
-    external_namespace: Option<&'a str>,
-    external_subject: Option<&'a str>,
+/// Which columns of `task_outreach_targets` describe one composed target.
+///
+/// `pub(super)` so a replacement target written by the delegation controls is derived here too
+/// rather than re-deciding the kind/identity mapping a second time.
+pub(super) struct OutreachTargetColumns<'a> {
+    pub(super) delivery_address: &'a str,
+    pub(super) kind: &'static str,
+    pub(super) internal_channel_id: Option<Uuid>,
+    pub(super) external_transport: Option<&'a str>,
+    pub(super) external_namespace: Option<&'a str>,
+    pub(super) external_subject: Option<&'a str>,
 }
 
-fn outreach_target_columns(
+pub(super) fn outreach_target_columns(
     target: &crate::task_queue::OutreachTargetRequest,
 ) -> AppResult<OutreachTargetColumns<'_>> {
     let delivery_address = target
@@ -358,7 +362,7 @@ impl TaskPersistence for PostgresPersistence {
                  ON target.company_id = outreach.company_id
                 AND target.outreach_id = outreach.id
                WHERE outreach.company_id = $1 AND task.id = $2 AND outreach.id = $3
-                 AND target.id = $4 AND target.target_kind = 'internal_channel'
+                 AND target.id = $4
                  AND task.thread_id IS NOT NULL"#,
         )
         .bind(company_id)
@@ -2054,39 +2058,119 @@ impl TaskPersistence for PostgresPersistence {
         lock_expires_at: DateTime<Utc>,
         limit: i64,
     ) -> AppResult<Vec<BackgroundTask>> {
+        // A free slot goes to the company with the fewest tasks running, without reading the
+        // backlog.
+        //
+        // Each candidate's `company_round` is its place in its company's queue plus the tasks that
+        // company already has running under a live lease. So the company with the fewest running
+        // is served first, ties go to the oldest waiting task, and each company's own queue stays
+        // oldest-first. Nothing is filtered by the round, only ordered, so a company alone with
+        // work still gets every slot. An expired lease is not counted: its worker is gone, and
+        // `reap_expired_task_leases` is about to put the task back.
+        //
+        // The running count is what makes this hold under load. Once every slot is busy the
+        // worker claims one at a time, and ranking by place in the queue alone gave a one-slot
+        // claim the oldest due task anywhere -- so one company's backlog held every other
+        // company's newer task until it drained.
+        //
+        // Ranking used to read every pending, due task at once, with `ROW_NUMBER() OVER (PARTITION
+        // BY company_id ...)`. A window has to see its whole partition before it emits a row, so
+        // every claim read the entire backlog, checked each row's channel assignment and sorted
+        // it twice before `LIMIT` applied -- most expensive exactly when the queue was deepest.
+        //
+        // Now `pending_company` walks the companies that have pending agent work, one index
+        // descent each, and `candidate` takes at most `$1` rows from each. That is every task that
+        // can win a place in the batch: a company's task number `$1 + 1` sorts behind at least
+        // `$1` of its own and never can. The cost is one descent per company plus at most `$1`
+        // rows each, however deep any company's backlog is; `background_tasks_pending_ready_idx`
+        // leads with `company_id` for it. `in_flight` reads only live leases, through
+        // `background_tasks_processing_lease_idx`.
+        //
+        // The other option was to rank a bounded window of the oldest due tasks in the whole
+        // queue. It needed no index change, but a company whose only task was newer than that
+        // window would not be seen at all, so neither its place nor its running count could put
+        // it first. `plan/db_audit/phase5.md` has both.
+        //
+        // The recursion is a loose index scan. `SELECT DISTINCT company_id` reads as the same
+        // thing but reads every pending row: PostgreSQL has no loose scan for `DISTINCT`, and
+        // 18's skip scan needs a condition on a later index column, which a bare `DISTINCT` lacks.
+        //
+        // `claimable` repeats the pending and owner checks on the row it locks, and they are not
+        // redundant. Candidates are chosen under this statement's snapshot and locked afterwards.
+        // If another worker claims and commits one in between, Postgres locks that task's new
+        // `processing` version and re-checks only the conditions written against the table being
+        // locked. With the checks only in the subquery, this claim took the task again and
+        // overwrote the first worker's execution generation. See
+        // `a_claim_never_takes_a_task_another_worker_claimed_after_its_snapshot`.
+        //
+        // A task another claim holds locked still uses one of its company's `$1` places, so two
+        // claims racing over one company's backlog can come back short; the worker reads a short
+        // batch as an empty queue until its next poll. Racing claims can also both see a company
+        // as idle and each give it a task; the next claim counts both. Nothing is lost either way.
         let db_list = sqlx::query_as::<_, BackgroundTaskDb>(
             // Pending rows only. An expired `processing` row used to be stolen right here, which
             // re-ran it without spending an attempt, without closing the open attempt and
             // without any backoff -- so a task that reliably outlived its lease looped for ever
             // instead of dead-lettering. `reap_expired_task_leases` now turns those back into
             // pending rows, paying an attempt each time.
-            r#"WITH ranked AS (
-                   SELECT id, run_at, created_at,
-                          ROW_NUMBER() OVER (
-                              PARTITION BY company_id
-                              ORDER BY run_at ASC, created_at ASC, id ASC
-                          ) AS company_round
-                   FROM background_tasks
-                   WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
-                     AND owner_principal_kind = 'agent'
-                     AND EXISTS (
-                         SELECT 1 FROM principals AS owner
-                         JOIN channel_agents AS assignment
-                           ON assignment.company_id = background_tasks.company_id
-                          AND assignment.channel_id = background_tasks.channel_id
-                          AND assignment.agent_id = owner.agent_id
-                         WHERE owner.company_id = background_tasks.company_id
-                           AND owner.id = background_tasks.owner_principal_id
-                           AND owner.kind = 'agent'
-                     )
+            r#"WITH RECURSIVE pending_company AS (
+                   (SELECT task.company_id
+                      FROM background_tasks AS task
+                     WHERE task.status = 'pending' AND task.owner_principal_kind = 'agent'
+                     ORDER BY task.company_id
+                     LIMIT 1)
+                   UNION ALL
+                   SELECT (SELECT task.company_id
+                             FROM background_tasks AS task
+                            WHERE task.status = 'pending' AND task.owner_principal_kind = 'agent'
+                              AND task.company_id > previous.company_id
+                            ORDER BY task.company_id
+                            LIMIT 1)
+                     FROM pending_company AS previous
+                    WHERE previous.company_id IS NOT NULL
+               ), in_flight AS (
+                   SELECT task.company_id, COUNT(*) AS running
+                     FROM background_tasks AS task
+                    WHERE task.status = 'processing' AND task.lock_expires_at > CURRENT_TIMESTAMP
+                    GROUP BY task.company_id
+               ), candidate AS (
+                   SELECT slice.id, slice.run_at, slice.created_at,
+                          COALESCE(in_flight.running, 0) + slice.queue_position AS company_round
+                     FROM pending_company
+                     LEFT JOIN in_flight ON in_flight.company_id = pending_company.company_id
+                    CROSS JOIN LATERAL (
+                        SELECT task.id, task.run_at, task.created_at,
+                               ROW_NUMBER() OVER (
+                                   ORDER BY task.run_at ASC, task.created_at ASC, task.id ASC
+                               ) AS queue_position
+                          FROM background_tasks AS task
+                         WHERE task.company_id = pending_company.company_id
+                           AND task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP
+                           AND task.owner_principal_kind = 'agent'
+                           AND EXISTS (
+                               SELECT 1 FROM principals AS owner
+                               JOIN channel_agents AS assignment
+                                 ON assignment.company_id = task.company_id
+                                AND assignment.channel_id = task.channel_id
+                                AND assignment.agent_id = owner.agent_id
+                               WHERE owner.company_id = task.company_id
+                                 AND owner.id = task.owner_principal_id
+                                 AND owner.kind = 'agent'
+                           )
+                         ORDER BY task.run_at ASC, task.created_at ASC, task.id ASC
+                         LIMIT $1
+                    ) AS slice
+                    WHERE pending_company.company_id IS NOT NULL
                ), claimable AS (
                    SELECT task.id
-                   FROM background_tasks AS task
-                   JOIN ranked ON ranked.id = task.id
-                   ORDER BY ranked.company_round ASC, ranked.run_at ASC,
-                            ranked.created_at ASC, task.id ASC
-                   FOR UPDATE SKIP LOCKED
-                   LIMIT $1
+                     FROM background_tasks AS task
+                     JOIN candidate ON candidate.id = task.id
+                    WHERE task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP
+                      AND task.owner_principal_kind = 'agent'
+                    ORDER BY candidate.company_round ASC, candidate.run_at ASC,
+                             candidate.created_at ASC, task.id ASC
+                      FOR UPDATE OF task SKIP LOCKED
+                    LIMIT $1
                )
                UPDATE background_tasks AS task
                SET status = 'processing',

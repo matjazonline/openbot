@@ -565,10 +565,7 @@ mod tests {
     use crate::{
         adapters::{
             monitoring::InMemoryMonitor,
-            persistence::{
-                PostgresPersistence,
-                test_support::{UNSCOPED_CLAIM, test_pool},
-            },
+            persistence::{PostgresPersistence, test_support::own_database},
         },
         entities::memory::{
             MemoryChunk, MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope,
@@ -706,10 +703,10 @@ mod tests {
 
     #[tokio::test]
     async fn healthy_slow_readiness_does_not_retry_create_or_spend_failure_budget() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
         let suffix = Uuid::new_v4().simple().to_string();
         let user = persistence
@@ -798,10 +795,10 @@ mod tests {
 
     #[tokio::test]
     async fn transient_status_failure_spends_failure_budget_and_preserves_create_phase() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
         let suffix = Uuid::new_v4().simple().to_string();
         let user = persistence
@@ -896,10 +893,10 @@ mod tests {
 
     #[tokio::test]
     async fn deletion_during_provisioning_is_reconciled_to_confirmed_absence() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
-        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let pool = database.pool.clone();
         let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
         let suffix = Uuid::new_v4().simple().to_string();
         let user = persistence

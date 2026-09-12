@@ -4,16 +4,29 @@
 //! already long; this one is reporting, never writes, and its queries are shaped by what a panel
 //! needs rather than by what a worker does.
 //!
+//! How often these run is not decided here. `services::dashboard_snapshot` shares one reading per
+//! view across every tab for a tick, and this adapter answers each question it is asked.
+//!
 //! # Scope
 //!
-//! Every query takes `company: Option<Uuid>` and filters with `($1::uuid IS NULL OR company_id =
-//! $1)`, so the company rollup and the operator's cross-company rollup are the *same* statement with
-//! a different bind. Two statements would be two places for the scoping rule to drift, and the one
-//! that drifts open leaks another company's traffic.
+//! Every aggregate exists twice. The company form filters on `company_id = $n`. The global form has
+//! no company predicate at all, for the operator's cross-company rollup. [`ScopedSql`] builds both
+//! from one template, and Rust chooses between them on `company: Option<Uuid>`.
+//!
+//! This used to be one statement per aggregate, filtered with `($1::uuid IS NULL OR company_id =
+//! $1)`. That is correct under a custom plan, where Postgres folds the `IS NULL` away and the
+//! predicate reaches the index. Under a generic plan the parameter is unknown when the plan is
+//! built, so the `OR` survives as a filter applied after the scan. A company's dashboard then reads
+//! every company's rows and discards the rest. sqlx prepares these statements, and a five-second
+//! tick reaches Postgres's switch to a generic plan within a minute, so this was a real risk.
+//!
+//! The single statement guarded against the scoping rule being written in two places, and one copy
+//! drifting open. The shared template now gives that guarantee instead: both forms are the same
+//! text, and each aggregate states its company predicate exactly once.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::Row;
+use sqlx::{Postgres, Row, postgres::PgArguments, query::Query};
 use std::{str::FromStr, sync::LazyLock};
 use uuid::Uuid;
 
@@ -29,16 +42,57 @@ use crate::{
         task::TaskStatus,
         transport::DeliveryStatus,
     },
+    services::dashboard_snapshot::DashboardPersistence,
 };
 
-#[async_trait]
-pub trait DashboardPersistence: Send + Sync {
-    /// One complete reading, for `company` or — with `None` — for every company at once.
-    async fn dashboard_snapshot(
-        &self,
+type PgQuery<'q> = Query<'q, Postgres, PgArguments>;
+
+/// Where a template takes its company predicate.
+const SCOPE: &str = "{scope}";
+
+/// One aggregate as the pair of statements it really is: one company's rows, or every company's.
+///
+/// Built from a template that carries [`SCOPE`] exactly once. The company form puts its predicate
+/// there and the global form puts nothing, so the two differ by that one clause and nothing else.
+///
+/// The predicate always binds the statement's *last* parameter. The global form can then leave
+/// that parameter out, instead of carrying one it never reads.
+struct ScopedSql {
+    company: String,
+    global: String,
+}
+
+impl ScopedSql {
+    /// `predicate` is the whole clause the company form adds, with its own leading `WHERE` or `AND`.
+    fn new(template: &str, predicate: &str) -> Self {
+        assert_eq!(
+            template.matches(SCOPE).count(),
+            1,
+            "a scoped template marks exactly one place for its company predicate"
+        );
+        Self {
+            company: template.replacen(SCOPE, predicate, 1),
+            global: template.replacen(SCOPE, "", 1),
+        }
+    }
+
+    /// The statement for `company`, for a template with no parameters of its own.
+    fn query(&self, company: Option<Uuid>) -> PgQuery<'_> {
+        self.query_with(company, |query| query)
+    }
+
+    /// The statement for `company`, with `bind` applying every parameter except the company. The
+    /// company is bound last in the company form and not at all in the global form.
+    fn query_with<'q>(
+        &'q self,
         company: Option<Uuid>,
-        window: DashboardWindow,
-    ) -> AppResult<DashboardSnapshot>;
+        bind: impl FnOnce(PgQuery<'q>) -> PgQuery<'q>,
+    ) -> PgQuery<'q> {
+        match company {
+            Some(company) => bind(sqlx::query(&self.company)).bind(company),
+            None => bind(sqlx::query(&self.global)),
+        }
+    }
 }
 
 /// Counts of `background_tasks` grouped by status, plus the two states no grouping shows.
@@ -46,7 +100,7 @@ const TASK_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
       FROM background_tasks
-     WHERE ($1::uuid IS NULL OR company_id = $1)
+     {scope}
      GROUP BY status
      ORDER BY status"#;
 
@@ -64,13 +118,13 @@ const TASK_PRESSURE_SQL: &str = r#"
                WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
       FROM background_tasks
-     WHERE ($1::uuid IS NULL OR company_id = $1)"#;
+     {scope}"#;
 
 const DELIVERY_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
       FROM message_deliveries
-     WHERE ($1::uuid IS NULL OR company_id = $1)
+     {scope}
      GROUP BY status
      ORDER BY status"#;
 
@@ -91,7 +145,7 @@ const DELIVERY_PRESSURE_SQL: &str = r#"
                WHERE status IN ('pending', 'retryable') AND available_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
       FROM message_deliveries
-     WHERE ($1::uuid IS NULL OR company_id = $1)"#;
+     {scope}"#;
 
 /// Every bucket boundary in the window, whether or not anything happened in it.
 ///
@@ -101,23 +155,27 @@ const DELIVERY_PRESSURE_SQL: &str = r#"
 /// with a time axis cannot: the gap closes up and the axis then claims two adjacent columns were
 /// five minutes apart when they were an hour apart.
 ///
-/// The slots are floored on the same epoch grid as the data (`floor(epoch / $2) * $2`), because the
+/// The slots are floored on the same epoch grid as the data (`floor(epoch / $1) * $1`), because the
 /// join is on equality: a boundary derived any other way would miss every bucket by a fraction of a
 /// second and every row would come back zero.
 ///
-/// The span reads `$3 * 60 - $2` rather than a bucket count because it is the same statement: from
+/// The span reads `$2 * 60 - $1` rather than a bucket count because it is the same statement: from
 /// the newest boundary, step back the whole window and forward one bucket, so the newest boundary is
 /// included and the count comes out at `minutes / bucket_minutes` exactly.
+///
+/// `$1` and `$2` rather than anything later because the company, when there is one, has to be the
+/// last parameter — see [`ScopedSql`]. Every bucketed statement binds them through
+/// [`bucketed`], so the numbering is stated once.
 ///
 /// Shared as one string rather than copied into each query — three copies of this arithmetic is
 /// three chances for one chart's x-axis to silently disagree with the others'.
 const SLOTS_CTE: &str = r#"
     WITH slots AS (
         SELECT generate_series(
-                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $2) * $2)
-                       - make_interval(secs => $3 * 60 - $2),
-                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $2) * $2),
-                   make_interval(secs => $2)
+                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $1) * $1)
+                       - make_interval(secs => $2 * 60 - $1),
+                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $1) * $1),
+                   make_interval(secs => $1)
                ) AS bucket
     )"#;
 
@@ -131,13 +189,13 @@ const SLOTS_CTE: &str = r#"
 /// contributes a single `completed`. Attempt-level counts come from [`ATTEMPT_STATS_SQL`].
 const THROUGHPUT_BODY: &str = r#",
     finished AS (
-        SELECT to_timestamp(floor(extract(epoch FROM updated_at) / $2) * $2) AS bucket,
+        SELECT to_timestamp(floor(extract(epoch FROM updated_at) / $1) * $1) AS bucket,
                COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
                COUNT(*) FILTER (WHERE status IN ('failed', 'dead_letter'))::bigint AS failed
           FROM background_tasks
-         WHERE ($1::uuid IS NULL OR company_id = $1)
-           AND status IN ('completed', 'failed', 'dead_letter')
-           AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+         WHERE status IN ('completed', 'failed', 'dead_letter')
+           AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
+           {scope}
          GROUP BY bucket
     )
     SELECT slots.bucket,
@@ -160,7 +218,7 @@ const THROUGHPUT_BODY: &str = r#",
 /// boundary — which keeps this consistent with `ATTEMPT_STATS_SQL`'s window filter.
 const LATENCY_BODY: &str = r#",
     measured AS (
-        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $2) * $2) AS bucket,
+        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $1) * $1) AS bucket,
                percentile_disc(0.5) WITHIN GROUP (
                    ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
                              * 1000)::double precision
@@ -169,10 +227,10 @@ const LATENCY_BODY: &str = r#",
                    ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
                              * 1000)::double precision
                ) AS p95_ms
-          FROM task_attempts attempt
-          JOIN background_tasks task ON task.id = attempt.task_id
-         WHERE ($1::uuid IS NULL OR task.company_id = $1)
-           AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+          FROM task_attempts AS attempt
+          JOIN background_tasks AS task ON task.id = attempt.task_id
+         WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
+           {scope}
          GROUP BY bucket
     )
     SELECT slots.bucket,
@@ -197,15 +255,15 @@ const LATENCY_BODY: &str = r#",
 /// The `open_tasks` CTE narrows before the join on purpose. The join is buckets x tasks over a table
 /// with no retention, so without it the 24-hour window scans every task the system has ever run;
 /// with it the work is bounded by "unfinished, or finished recently", which is what the
-/// `(company_id, status, created_at DESC, id DESC)` index is for.
+/// `(company_id, status, created_at DESC, id DESC)` index is for in the company form.
 const QUEUE_DEPTH_BODY: &str = r#",
     open_tasks AS (
         SELECT created_at, updated_at, status
           FROM background_tasks
-         WHERE ($1::uuid IS NULL OR company_id = $1)
-           AND (status IN ('pending', 'processing', 'pending_approval',
+         WHERE (status IN ('pending', 'processing', 'pending_approval',
                            'waiting_for_third_party_reply')
-                OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $3))
+                OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2))
+           {scope}
     )
     SELECT slots.bucket,
            COUNT(open_tasks.created_at)::bigint AS open_count
@@ -217,16 +275,6 @@ const QUEUE_DEPTH_BODY: &str = r#",
                  OR open_tasks.updated_at > slots.bucket)
      GROUP BY slots.bucket
      ORDER BY slots.bucket"#;
-
-/// The four bucketed statements, each [`SLOTS_CTE`] followed by its own body.
-///
-/// Assembled once at first use rather than on every read: the dashboard re-reads on a five-second
-/// tick for every connected tab, and there is no reason for that to rebuild four strings each time.
-static THROUGHPUT_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{THROUGHPUT_BODY}"));
-static LATENCY_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{LATENCY_BODY}"));
-static RETRY_RATE_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{RETRY_RATE_BODY}"));
-static QUEUE_DEPTH_SQL: LazyLock<String> =
-    LazyLock::new(|| format!("{SLOTS_CTE}{QUEUE_DEPTH_BODY}"));
 
 /// Duration percentiles and token spend over the window, from `task_attempts`.
 ///
@@ -255,20 +303,20 @@ const ATTEMPT_STATS_SQL: &str = r#"
            COALESCE(SUM(attempt.completion_tokens), 0)::bigint AS completion_tokens
       FROM task_attempts AS attempt
       JOIN background_tasks AS task ON task.id = attempt.task_id
-     WHERE ($1::uuid IS NULL OR task.company_id = $1)
-       AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)"#;
+     WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
+       {scope}"#;
 
 /// Retry share per bucket, including empty buckets as `attempts = 0` so the chart keeps its time
 /// axis without claiming that an idle interval had a zero-percent retry rate.
 const RETRY_RATE_BODY: &str = r#",
     measured AS (
-        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $2) * $2) AS bucket,
+        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $1) * $1) AS bucket,
                COUNT(*)::bigint AS attempts,
                COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries
           FROM task_attempts AS attempt
           JOIN background_tasks AS task ON task.id = attempt.task_id
-         WHERE ($1::uuid IS NULL OR task.company_id = $1)
-           AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+         WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
+           {scope}
          GROUP BY bucket
     )
     SELECT slots.bucket,
@@ -306,19 +354,74 @@ const OUTSTANDING_SQL: &str = r#"
       FROM background_tasks AS task
       JOIN companies AS company ON company.id = task.company_id
       JOIN channels AS channel ON channel.id = task.channel_id
-     WHERE ($1::uuid IS NULL OR task.company_id = $1)
-       AND (
+     WHERE (
              task.status IN ('processing', 'pending_approval',
                              'waiting_for_third_party_reply', 'dead_letter')
              OR (task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP)
            )
+       {scope}
      ORDER BY (task.status = 'dead_letter'
                 OR (task.status = 'processing'
                     AND (task.lock_expires_at IS NULL
                          OR task.lock_expires_at <= CURRENT_TIMESTAMP))) DESC,
               task.updated_at DESC,
               task.id DESC
-     LIMIT $2"#;
+     LIMIT $1"#;
+
+/// Each aggregate's company and global forms, assembled once at first use.
+///
+/// The predicate is the only text the two forms do not share. Its placeholder is one past the
+/// template's own parameters: `$1` for the four unparameterised counts, `$3` after [`SLOTS_CTE`]'s
+/// two, and `$2` after the window of [`ATTEMPT_STATS_SQL`] or the limit of [`OUTSTANDING_SQL`].
+///
+/// Assembled at first use rather than on every read. A reading is taken at most once per tick per
+/// view, and there is still no reason to rebuild twenty strings each time.
+static TASK_QUEUE: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(TASK_QUEUE_SQL, "WHERE company_id = $1"));
+static TASK_PRESSURE: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(TASK_PRESSURE_SQL, "WHERE company_id = $1"));
+static DELIVERY_QUEUE: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(DELIVERY_QUEUE_SQL, "WHERE company_id = $1"));
+static DELIVERY_PRESSURE: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(DELIVERY_PRESSURE_SQL, "WHERE company_id = $1"));
+static THROUGHPUT: LazyLock<ScopedSql> = LazyLock::new(|| {
+    ScopedSql::new(
+        &format!("{SLOTS_CTE}{THROUGHPUT_BODY}"),
+        "AND company_id = $3",
+    )
+});
+static LATENCY: LazyLock<ScopedSql> = LazyLock::new(|| {
+    ScopedSql::new(
+        &format!("{SLOTS_CTE}{LATENCY_BODY}"),
+        "AND task.company_id = $3",
+    )
+});
+static QUEUE_DEPTH: LazyLock<ScopedSql> = LazyLock::new(|| {
+    ScopedSql::new(
+        &format!("{SLOTS_CTE}{QUEUE_DEPTH_BODY}"),
+        "AND company_id = $3",
+    )
+});
+static RETRY_RATE: LazyLock<ScopedSql> = LazyLock::new(|| {
+    ScopedSql::new(
+        &format!("{SLOTS_CTE}{RETRY_RATE_BODY}"),
+        "AND task.company_id = $3",
+    )
+});
+static ATTEMPT_STATS: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(ATTEMPT_STATS_SQL, "AND task.company_id = $2"));
+static OUTSTANDING: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(OUTSTANDING_SQL, "AND task.company_id = $2"));
+
+/// A bucketed statement with its parameters bound: the bucket width and the window span as
+/// [`SLOTS_CTE`]'s `$1` and `$2`, then the company, if there is one, as `$3`.
+fn bucketed(statement: &ScopedSql, company: Option<Uuid>, window: DashboardWindow) -> PgQuery<'_> {
+    statement.query_with(company, |query| {
+        query
+            .bind(window.bucket_seconds())
+            .bind(window.minutes() as i32)
+    })
+}
 
 #[async_trait]
 impl DashboardPersistence for PostgresPersistence {
@@ -329,6 +432,10 @@ impl DashboardPersistence for PostgresPersistence {
     ) -> AppResult<DashboardSnapshot> {
         // Sequential rather than joined: these are eight unrelated aggregates over two tables, and
         // a single query producing all of them would be a cross join nobody could read or index.
+        //
+        // Sequential rather than concurrent, too. The snapshot cache runs this once per view per
+        // tick, however many tabs are open. Saving seven round trips for that one caller is not
+        // worth taking eight pool connections at once away from the workers that need them.
         Ok(DashboardSnapshot {
             tasks: self.task_queue_health(company).await?,
             deliveries: self.delivery_health(company).await?,
@@ -344,8 +451,8 @@ impl DashboardPersistence for PostgresPersistence {
 
 impl PostgresPersistence {
     async fn task_queue_health(&self, company: Option<Uuid>) -> AppResult<TaskQueueHealth> {
-        let rows = sqlx::query(TASK_QUEUE_SQL)
-            .bind(company)
+        let rows = TASK_QUEUE
+            .query(company)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -360,8 +467,8 @@ impl PostgresPersistence {
             });
         }
 
-        let pressure = sqlx::query(TASK_PRESSURE_SQL)
-            .bind(company)
+        let pressure = TASK_PRESSURE
+            .query(company)
             .fetch_one(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -374,8 +481,8 @@ impl PostgresPersistence {
     }
 
     async fn delivery_health(&self, company: Option<Uuid>) -> AppResult<DeliveryHealth> {
-        let rows = sqlx::query(DELIVERY_QUEUE_SQL)
-            .bind(company)
+        let rows = DELIVERY_QUEUE
+            .query(company)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -390,8 +497,8 @@ impl PostgresPersistence {
             });
         }
 
-        let pressure = sqlx::query(DELIVERY_PRESSURE_SQL)
-            .bind(company)
+        let pressure = DELIVERY_PRESSURE
+            .query(company)
             .fetch_one(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -408,10 +515,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<ThroughputBucket>> {
-        let rows = sqlx::query(&THROUGHPUT_SQL)
-            .bind(company)
-            .bind(window.bucket_seconds())
-            .bind(window.minutes() as i32)
+        let rows = bucketed(&THROUGHPUT, company, window)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -434,10 +538,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<LatencyBucket>> {
-        let rows = sqlx::query(&LATENCY_SQL)
-            .bind(company)
-            .bind(window.bucket_seconds())
-            .bind(window.minutes() as i32)
+        let rows = bucketed(&LATENCY, company, window)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -470,10 +571,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<QueueDepthBucket>> {
-        let rows = sqlx::query(&QUEUE_DEPTH_SQL)
-            .bind(company)
-            .bind(window.bucket_seconds())
-            .bind(window.minutes() as i32)
+        let rows = bucketed(&QUEUE_DEPTH, company, window)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -495,10 +593,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<RetryRateBucket>> {
-        let rows = sqlx::query(&RETRY_RATE_SQL)
-            .bind(company)
-            .bind(window.bucket_seconds())
-            .bind(window.minutes() as i32)
+        let rows = bucketed(&RETRY_RATE, company, window)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -517,9 +612,8 @@ impl PostgresPersistence {
     }
 
     async fn outstanding(&self, company: Option<Uuid>) -> AppResult<Vec<OutstandingTask>> {
-        let rows = sqlx::query(OUTSTANDING_SQL)
-            .bind(company)
-            .bind(OUTSTANDING_LIMIT)
+        let rows = OUTSTANDING
+            .query_with(company, |query| query.bind(OUTSTANDING_LIMIT))
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -551,9 +645,8 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<AttemptStats> {
-        let row = sqlx::query(ATTEMPT_STATS_SQL)
-            .bind(company)
-            .bind(window.minutes() as i32)
+        let row = ATTEMPT_STATS
+            .query_with(company, |query| query.bind(window.minutes() as i32))
             .fetch_one(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -578,334 +671,5 @@ impl PostgresPersistence {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Exercises every dashboard query against a live database.
-    //!
-    //! These queries use the runtime sqlx API, so nothing checks their SQL or their parameter types
-    //! at build time — a `make_interval(mins => $3)` handed a `float8` fails at request time, on the
-    //! page, in production. Running each one for real is the only thing that catches it.
-    //!
-    //! No-ops without `DATABASE_URL`, exactly like the tests in [`super::super`], so the rest of the
-    //! suite still runs without a database.
-
-    use super::*;
-    use crate::adapters::persistence::test_support::{test_machine, test_pool};
-    use crate::entities::task::NewTask;
-    use crate::entities::task::{
-        TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskStopReason, TokenUsage,
-    };
-    use crate::task_queue::TaskPersistence;
-    use crate::use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        user::UserPersistence,
-    };
-
-    async fn test_persistence() -> Option<PostgresPersistence> {
-        Some(PostgresPersistence::new(test_pool().await?))
-    }
-
-    /// A company and a task of this test's own, for the attempt-ledger tests below.
-    ///
-    /// `task_attempts.task_id` is a foreign key, so those tests need a task that exists. They used
-    /// to take whichever task happened to already be in the database and return early when there
-    /// was none — which meant they reported success while asserting nothing the moment the table
-    /// was empty, and the table is empty at the start of every run now. Owning the fixture keeps
-    /// them honest and scopes them to a company nothing else touches.
-    async fn task_fixture(persistence: &PostgresPersistence, label: &str) -> (Uuid, Uuid) {
-        let suffix = Uuid::new_v4().simple().to_string();
-        let username = format!("{label}_{suffix}");
-        let email = format!("{username}@example.com");
-        persistence
-            .create_user(&username, &email, "hash")
-            .await
-            .expect("the fixture user is created");
-        let owner = UserPersistence::get_by_email(persistence, &email)
-            .await
-            .expect("the fixture user is readable")
-            .expect("the fixture user was just created");
-        let company = CompanyPersistence::create(
-            persistence,
-            owner.id,
-            CompanyWrite {
-                name: "Dashboard Test".to_string(),
-                slug: format!("{label}-{suffix}"),
-                ..CompanyWrite::default()
-            },
-        )
-        .await
-        .expect("the fixture company is created");
-        let channel = ChannelPersistence::create(
-            persistence,
-            company.id,
-            ChannelWrite {
-                name: "Dashboard".into(),
-                slug: "dashboard".into(),
-                enabled: false,
-                ..ChannelWrite::default()
-            },
-        )
-        .await
-        .expect("the fixture channel is created");
-        let task = persistence
-            .enqueue_task(NewTask::starting_new_chain(
-                company.id,
-                channel.id,
-                None,
-                "dashboard-probe",
-                serde_json::json!({}),
-            ))
-            .await
-            .expect("the fixture task is queued");
-
-        (task.id, company.id)
-    }
-
-    #[tokio::test]
-    async fn the_global_snapshot_runs() {
-        let Some(persistence) = test_persistence().await else {
-            return;
-        };
-
-        persistence
-            .dashboard_snapshot(None, DashboardWindow::last_hour())
-            .await
-            .expect("every dashboard query is valid SQL with the parameter types it is bound with");
-    }
-
-    #[tokio::test]
-    async fn a_company_scoped_snapshot_runs_and_stays_inside_its_company() {
-        let Some(persistence) = test_persistence().await else {
-            return;
-        };
-
-        // A company that owns nothing: every count must be zero. If the `($1 IS NULL OR ...)`
-        // guard were ever written so that a bound uuid fell through to the unfiltered branch, this
-        // is what would catch it — the global snapshot above cannot, because it looks the same
-        // either way.
-        let nobody = Uuid::new_v4();
-        let snapshot = persistence
-            .dashboard_snapshot(Some(nobody), DashboardWindow::last_hour())
-            .await
-            .expect("the scoped queries run");
-
-        assert_eq!(snapshot.tasks.total(), 0, "{:?}", snapshot.tasks);
-        assert_eq!(snapshot.tasks.stalled, 0);
-        assert_eq!(snapshot.deliveries.total(), 0, "{:?}", snapshot.deliveries);
-        // Gap-filled, so "owns nothing" reads as a full series of zeroes rather than no series at
-        // all: `SLOTS_CTE` generates one bucket per slice of the window from `CURRENT_TIMESTAMP`
-        // alone, and never sees `$1`. An emptiness check here would assert the chart has no x-axis.
-        assert_eq!(snapshot.throughput_total(), 0, "{:?}", snapshot.throughput);
-        assert_eq!(snapshot.attempts, AttemptStats::default());
-    }
-
-    /// Reads the percentiles with a *finished* attempt in the window.
-    ///
-    /// [`the_global_snapshot_runs`] cannot catch a wrong percentile column type on its own: with
-    /// nothing finished the value is `NULL`, and a `NULL` is never decoded. `extract(epoch ...)`
-    /// returns `numeric`, so without the cast in [`ATTEMPT_STATS_SQL`] this is where it shows.
-    #[tokio::test]
-    async fn finished_attempts_decode_their_latency_percentiles() {
-        let Some(persistence) = test_persistence().await else {
-            return;
-        };
-
-        let (task_id, company) = task_fixture(&persistence, "latency").await;
-
-        let attempt = TaskAttemptRef {
-            task_id,
-            attempt_number: 9_998,
-            execution_generation: Uuid::new_v4(),
-            worker_id: Uuid::new_v4(),
-        };
-        persistence
-            .begin_task_attempt(attempt, &test_machine())
-            .await
-            .expect("the ledger row opens");
-        persistence
-            .finish_task_attempt(&TaskAttemptOutcome {
-                attempt,
-                status: TaskAttemptStatus::Completed,
-                stop_reason: TaskStopReason::Completed,
-                error: None,
-                tokens: Some(TokenUsage::new(3, 5)),
-            })
-            .await
-            .expect("the ledger row closes");
-
-        // Scoped to this task's company so a neighbouring test cannot empty the window from under
-        // it — the assertion needs at least one finished attempt to be there.
-        let snapshot = persistence
-            .dashboard_snapshot(Some(company), DashboardWindow::last_hour())
-            .await
-            .expect("the percentile columns decode once something has finished");
-
-        assert!(
-            snapshot.attempts.p50_ms.is_some(),
-            "a finished attempt must produce a latency: {:?}",
-            snapshot.attempts
-        );
-
-        CompanyPersistence::delete(&persistence, company)
-            .await
-            .expect("the fixture company is removed");
-    }
-
-    #[tokio::test]
-    async fn retry_rate_counts_only_attempt_numbers_above_one_and_stays_company_scoped() {
-        let Some(persistence) = test_persistence().await else {
-            return;
-        };
-        let (task_id, company) = task_fixture(&persistence, "retry-rate").await;
-
-        for attempt_number in [1, 2] {
-            persistence
-                .begin_task_attempt(
-                    TaskAttemptRef {
-                        task_id,
-                        attempt_number,
-                        execution_generation: Uuid::new_v4(),
-                        worker_id: Uuid::new_v4(),
-                    },
-                    &test_machine(),
-                )
-                .await
-                .expect("the attempt starts");
-        }
-
-        for window in DashboardWindow::PRESETS {
-            let snapshot = persistence
-                .dashboard_snapshot(Some(company), window)
-                .await
-                .expect("the scoped attempt aggregates run");
-            assert_eq!(snapshot.attempts.attempts, 2);
-            assert_eq!(snapshot.attempts.retries, 1);
-            assert_eq!(snapshot.attempts.retry_rate_percent(), Some(50.0));
-            assert_eq!(snapshot.retry_rate.len() as i64, window.bucket_count());
-            assert!(snapshot.retry_rate.iter().any(|bucket| {
-                bucket.attempts == 2 && bucket.retries == 1 && bucket.rate_percent() == Some(50.0)
-            }));
-        }
-
-        let unrelated = persistence
-            .dashboard_snapshot(Some(Uuid::new_v4()), DashboardWindow::last_hour())
-            .await
-            .expect("an unrelated company scope runs");
-        assert_eq!(unrelated.attempts, AttemptStats::default());
-        assert!(
-            unrelated
-                .retry_rate
-                .iter()
-                .all(|bucket| bucket.attempts == 0)
-        );
-
-        CompanyPersistence::delete(&persistence, company)
-            .await
-            .expect("the fixture company is removed");
-    }
-
-    #[tokio::test]
-    async fn an_attempt_is_ledgered_and_can_be_reopened_by_a_re_run() {
-        let Some(persistence) = test_persistence().await else {
-            return;
-        };
-
-        let (task_id, company) = task_fixture(&persistence, "ledger").await;
-
-        // A number far above any real retry count, so this test cannot collide with live rows.
-        let attempt = TaskAttemptRef {
-            task_id,
-            attempt_number: 9_999,
-            execution_generation: Uuid::new_v4(),
-            worker_id: Uuid::new_v4(),
-        };
-
-        persistence
-            .begin_task_attempt(attempt, &test_machine())
-            .await
-            .expect("the ledger row opens");
-
-        let outcome = TaskAttemptOutcome {
-            attempt,
-            status: TaskAttemptStatus::Completed,
-            stop_reason: TaskStopReason::Completed,
-            error: None,
-            tokens: Some(TokenUsage::new(11, 7)),
-        };
-        assert!(
-            persistence
-                .finish_task_attempt(&outcome)
-                .await
-                .expect("the ledger row closes"),
-            "closing a row that was just opened must report that it wrote"
-        );
-
-        // Closing twice must not write twice: the second call finds no open row, which is the same
-        // guard that stops a superseded run from overwriting the run that took its task over.
-        assert!(
-            !persistence
-                .finish_task_attempt(&outcome)
-                .await
-                .expect("the second close runs"),
-            "an already-closed attempt must not be closed again"
-        );
-
-        // A task re-claimed after its lease lapsed comes back with the same attempt number. The
-        // conflict must reopen the row rather than fail the insert.
-        let replacement = TaskAttemptRef {
-            execution_generation: Uuid::new_v4(),
-            worker_id: Uuid::new_v4(),
-            ..attempt
-        };
-        persistence
-            .begin_task_attempt(replacement, &test_machine())
-            .await
-            .expect("a re-run reopens the same attempt rather than colliding with it");
-
-        assert!(
-            !persistence
-                .finish_task_attempt(&outcome)
-                .await
-                .expect("the stale execution can report without writing"),
-            "the execution replaced during reclaim must not finish the new ledger row"
-        );
-        assert!(
-            persistence
-                .finish_task_attempt(&TaskAttemptOutcome {
-                    attempt: replacement,
-                    ..outcome.clone()
-                })
-                .await
-                .expect("the replacement execution closes"),
-            "the current execution generation must still be able to finish"
-        );
-
-        let reopened: (String, Option<i32>, Option<String>, Uuid) = sqlx::query_as(
-            "SELECT status, prompt_tokens, stop_reason, worker_id FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
-        )
-        .bind(task_id)
-        .bind(9_999_i32)
-        .fetch_one(persistence.pool())
-        .await
-        .expect("the reopened row is readable");
-
-        assert_eq!(
-            reopened.0,
-            TaskAttemptStatus::Completed.as_str(),
-            "the replacement run finished"
-        );
-        assert_eq!(reopened.1, Some(11));
-        assert_eq!(
-            reopened.2.as_deref(),
-            Some(TaskStopReason::Completed.as_str())
-        );
-        assert_eq!(
-            reopened.3, replacement.worker_id,
-            "reopening the row hands it to the run that reclaimed the task, not the one that vanished"
-        );
-
-        CompanyPersistence::delete(&persistence, company)
-            .await
-            .expect("the fixture company is removed");
-    }
-}
+#[path = "dashboard_tests.rs"]
+mod tests;

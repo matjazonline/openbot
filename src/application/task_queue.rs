@@ -293,6 +293,11 @@ pub trait TaskPersistence: Send + Sync {
     ) -> AppResult<DelegationCommandResult>;
 
     /// Load the canonical request facts needed to compose a replacement transport delivery.
+    ///
+    /// Kind-agnostic on purpose: the same question, thread and chain are what a replacement
+    /// carries whether the old target named a channel or a person. Which *kind* of target may be
+    /// replaced by which operation is decided inside the command's own transaction, under the row
+    /// lock, rather than by what this read happened to return.
     async fn outreach_reassignment_context(
         &self,
         company_id: Uuid,

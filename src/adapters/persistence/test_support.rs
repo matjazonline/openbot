@@ -30,9 +30,19 @@
 //! the tests skip as before. That is the switch for a CI job that deliberately runs without
 //! Postgres — this repository has no CI at all today, which is why the old default was protecting
 //! nothing.
+//!
+//! # A test that cannot share at all gets a database of its own
+//!
+//! The queue claims sweep every row of the database they run against, so a test asserting *which*
+//! rows a claim took cannot tolerate a neighbour's rows, and a test that leaves a claimable row
+//! behind breaks whichever test claims it next. [`own_database`] hands one test a database of its
+//! own, migrated, and drops it when the handle goes out of scope — on a panic too.
+//! `task/claim_tests.rs` runs on it, which is why those tests assert exact claim results instead of
+//! working around whatever else is in the queue.
 
-use sqlx::PgPool;
-use tokio::sync::{Mutex, OnceCell};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{Connection, PgConnection, PgPool};
+use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 use crate::{
@@ -68,24 +78,6 @@ pub fn test_machine() -> MachineIdentity {
         region: Some(MachineRegion::new("tst")),
     }
 }
-
-/// Serialises tests that exercise an *unscoped* queue claim.
-///
-/// A separate database keeps the tests away from a running server, but it does nothing about the
-/// tests themselves: they share one database and `cargo test` runs them in parallel. A claim like
-/// `claim_and_advance_due_schedules` sweeps every due row up to its batch size *and advances what
-/// it takes*, so two tests that each queue one row and assert their own comes back cannot overlap
-/// — whichever claims first carries off both rows, and the other fails on a row that was claimed,
-/// just not by it.
-///
-/// Nothing about the ordering or the batch size fixes that, which is what separates this from the
-/// crowding a test can fix on its own (`an_expired_delivery_lease_costs_an_attempt_and_reaches_the_cap`
-/// sorts its row to the front and claims with a limit of 1). Here the row is *consumed* by the
-/// other claim, so the two simply have to not run at the same time.
-///
-/// Hold it from before the row is queued until after the claim under test. It is a
-/// [`tokio::sync::Mutex`], so a panicking test releases it without poisoning it for the rest.
-pub static UNSCOPED_CLAIM: Mutex<()> = Mutex::const_new(());
 
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
@@ -146,18 +138,28 @@ fn test_database_url() -> Option<String> {
 /// `rsplit_once('/')` over the whole URL would still find the last path separator and rebuild the
 /// parameters into the database name.
 fn with_test_database_name(url: &str) -> String {
+    let base = url.split_once('?').map_or(url, |(base, _)| base);
+    let name = base.rsplit_once('/').map_or("", |(_, name)| name);
+
+    // Nothing to rename: no database name at all, or already a test database — a
+    // `TEST_DATABASE_URL` that went through `DATABASE_URL`, or a second call. Suffixing again
+    // would invent `mail_agents_test_test`. Hand the URL back and let the connection report why.
+    if name.is_empty() || name.ends_with(TEST_DB_SUFFIX) {
+        return url.to_string();
+    }
+    with_database_name(url, &format!("{name}{TEST_DB_SUFFIX}"))
+}
+
+/// Point `url` at database `name`, leaving everything else about it alone.
+fn with_database_name(url: &str, name: &str) -> String {
     let (base, query) = match url.split_once('?') {
         Some((base, query)) => (base, Some(query)),
         None => (url, None),
     };
 
     let renamed = match base.rsplit_once('/') {
-        // Already a test database — a `TEST_DATABASE_URL` that went through `DATABASE_URL`, or a
-        // second call. Suffixing again would invent `mail_agents_test_test`.
-        Some((_, name)) if name.ends_with(TEST_DB_SUFFIX) => base.to_string(),
-        Some((prefix, name)) if !name.is_empty() => format!("{prefix}/{name}{TEST_DB_SUFFIX}"),
-        // No database name to rename; hand it back and let the connection attempt report why.
-        _ => base.to_string(),
+        Some((prefix, _)) => format!("{prefix}/{name}"),
+        None => base.to_string(),
     };
 
     match query {
@@ -229,6 +231,94 @@ pub async fn test_pool() -> Option<PgPool> {
         .await;
 
     Some(pool)
+}
+
+/// A database created for one test, dropped when this handle goes out of scope.
+///
+/// Hold it for the length of the test and take `database.pool.clone()` for a persistence handle:
+///
+/// ```ignore
+/// let Some(database) = own_database().await else { return };
+/// let pool = database.pool.clone();
+/// ```
+pub struct OwnDatabase {
+    /// A pool against this test's own database.
+    pub pool: PgPool,
+    name: String,
+    admin_url: String,
+}
+
+impl Drop for OwnDatabase {
+    fn drop(&mut self) {
+        // There is no async `Drop` to hang this on, and the test's runtime may be mid-unwind and
+        // about to shut down, so the statement runs on a thread and a runtime of its own.
+        let name = std::mem::take(&mut self.name);
+        let admin_url = std::mem::take(&mut self.admin_url);
+        let dropped = std::thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("a runtime for one statement")
+                .block_on(admin_statement(
+                    &admin_url,
+                    // `FORCE`: this test's pool still holds connections, and a panicking test may
+                    // have left others open.
+                    &format!(r#"DROP DATABASE "{name}" WITH (FORCE)"#),
+                ));
+        })
+        .join();
+        if dropped.is_err() {
+            // Reported, not raised: a test that is already failing keeps its own panic, and a
+            // `mail_agents_own_%` database left behind shows up in `psql -l`.
+            eprintln!("could not drop this test's database; it is left behind");
+        }
+    }
+}
+
+/// A database of this test's own: created, migrated, and dropped when the handle drops.
+///
+/// `None` when no database is configured and skipping has been permitted, exactly as [`test_pool`]
+/// skips. Migrations run once per database rather than once per binary, which is what the isolation
+/// costs: the database starts empty, so the test states every row that exists in it.
+pub async fn own_database() -> Option<OwnDatabase> {
+    let url = test_database_url()?;
+    // Generated, so it needs no quoting beyond the identifier quotes: `CREATE DATABASE` takes no
+    // parameters.
+    let name = format!("mail_agents_own_{}", Uuid::new_v4().simple());
+    let admin_url = with_database_name(&url, "postgres");
+    admin_statement(&admin_url, &format!(r#"CREATE DATABASE "{name}""#)).await;
+
+    // Every isolated test holds a pool of its own and `cargo test` runs them in parallel, so these
+    // are kept small: the default of ten would put a busy machine's worth of tests within reach of
+    // the server's `max_connections`. A test that needs more fan-out than this opens its own pool.
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&with_database_name(&url, &name))
+        .await
+        .expect("a database this test just created accepts connections");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("a fresh database accepts this checkout's migrations");
+
+    Some(OwnDatabase {
+        pool,
+        name,
+        admin_url,
+    })
+}
+
+/// Run one statement against the maintenance database. `CREATE`/`DROP DATABASE` cannot run inside
+/// a transaction or through a pool holding other connections to the target.
+async fn admin_statement(admin_url: &str, statement: &str) {
+    let mut connection = PgConnection::connect(admin_url)
+        .await
+        .expect("the maintenance database is reachable");
+    sqlx::query(statement)
+        .execute(&mut connection)
+        .await
+        .unwrap_or_else(|error| panic!("{statement} failed: {error}"));
+    let _ = connection.close().await;
 }
 
 /// One canonical message and one delivery carrying it, on the channel's own email interface.

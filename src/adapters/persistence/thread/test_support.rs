@@ -5,7 +5,7 @@
 //! shares one database and runs in parallel, so a whole-table assertion would be a coin toss.
 
 use super::*;
-use crate::adapters::persistence::test_support::test_pool;
+use crate::adapters::persistence::test_support::{OwnDatabase, own_database, test_pool};
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
@@ -32,12 +32,25 @@ pub(super) struct Fixture {
     pub(super) channel_id: Uuid,
     pub(super) thread: Thread,
     pub(super) suffix: String,
+    /// Dropped with the fixture, taking its database with it. `None` for a fixture that shares the
+    /// test database with everything else.
+    _database: Option<OwnDatabase>,
 }
 
 impl Fixture {
     /// `None` when there is no database to talk to.
     pub(super) async fn new(label: &str) -> Option<Self> {
-        let pool = test_pool().await?;
+        Self::build(test_pool().await?, None, label).await
+    }
+
+    /// A fixture on a database of its own, for a test that calls an unscoped claim: those sweep
+    /// every row of the database they run against, so they must not see another test's.
+    pub(super) async fn isolated(label: &str) -> Option<Self> {
+        let database = own_database().await?;
+        Self::build(database.pool.clone(), Some(database), label).await
+    }
+
+    async fn build(pool: PgPool, database: Option<OwnDatabase>, label: &str) -> Option<Self> {
         let persistence = PostgresPersistence::new(pool.clone());
 
         let suffix = Uuid::new_v4().simple().to_string();
@@ -80,6 +93,7 @@ impl Fixture {
             channel_id: channel.id,
             thread,
             suffix,
+            _database: database,
         })
     }
 

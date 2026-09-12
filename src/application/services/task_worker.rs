@@ -38,9 +38,9 @@ use crate::{
 };
 
 /// How long the task loop waits before looking for work again. This is the whole delay between a
-/// message being ingested and its agent starting, so it is short: the claim is one index scan
-/// against `background_tasks_pending_ready_idx`, which costs nothing to run twice a second against
-/// an empty queue.
+/// message being ingested and its agent starting, so it is short: against an empty queue the claim
+/// is one descent of `background_tasks_pending_ready_idx` that finds no company with pending work,
+/// which costs nothing to run twice a second.
 const TASK_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// How often the schedule loop checks for due recurring or one-off runs.

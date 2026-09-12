@@ -166,6 +166,11 @@ one shared `test_support` module instead of re-declaring them per file. The 700 
 `thread.rs` exist because the decision logic isn't pure — following the extraction rule above
 deletes most of the need for them.
 
+A test that wants a real database takes one from `adapters::persistence::test_support`, wherever in
+the tree it lives: `test_pool` for the shared test database, `own_database` for a migrated database
+of its own — required for any test that calls an unscoped claim or sweep, or asserts on whole-table
+state. `src/adapters/persistence/AGENTS.md` has the rules either choice commits you to.
+
 # Regenerate sqlx query metadata after touching SQL
 
 **Whenever you add or change a SQL query, regenerate it and commit the result:**
