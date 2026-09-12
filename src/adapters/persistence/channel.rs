@@ -520,6 +520,11 @@ impl ChannelPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+        // The `COALESCE` on the two override columns below makes `None` mean "leave it alone", so
+        // neither override can be cleared back to "inherit" through this statement. The sibling
+        // reply-handling override deliberately does not join them: it is written only through
+        // `ThreadHandoffPolicyPersistence::set_channel_reply_handling_override`, which binds its
+        // `Option` directly. See `plan/manual_handoff/phase1.md` §1.5 before editing this.
         let (access_mode, participants) = channel_access(write.participant_emails.clone());
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(

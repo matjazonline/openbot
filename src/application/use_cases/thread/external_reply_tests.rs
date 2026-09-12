@@ -404,6 +404,7 @@ async fn fixture_with_capabilities(
                 companies: persistence.clone(),
                 participants: persistence.clone(),
                 tasks: persistence.clone(),
+                handoff_policy: persistence.clone(),
             },
             InboundIngestPorts {
                 committer: persistence.clone(),

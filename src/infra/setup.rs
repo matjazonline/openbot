@@ -47,6 +47,7 @@ use crate::{
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
+        thread_handoff::ThreadHandoffUseCases,
         user::{EmailConfirmation, UserUseCases},
     },
 };
@@ -240,6 +241,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         config.clone(),
     ));
     let response_review_use_cases = Arc::new(ResponseReviewUseCases::new(postgres_arc.clone()));
+    let thread_handoff_use_cases = Arc::new(ThreadHandoffUseCases::new(postgres_arc.clone()));
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
@@ -249,6 +251,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
                 companies: postgres_arc.clone(),
                 participants: postgres_arc.clone(),
                 tasks: postgres_arc.clone(),
+                handoff_policy: postgres_arc.clone(),
             },
             InboundIngestPorts {
                 committer: postgres_arc.clone(),
@@ -348,6 +351,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         thread_use_cases,
         approval_use_cases,
         response_review_use_cases,
+        thread_handoff_use_cases,
         memory_use_cases,
         memory_worker,
         inbound_event_worker,

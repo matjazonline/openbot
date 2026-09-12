@@ -65,6 +65,10 @@ impl fmt::Display for BusinessPriority {
 pub enum AttentionSourceKind {
     Task,
     Handoff,
+    /// One thread's inbound-triggered handoff -- `thread_handoffs`, not `manual_handoffs`. The two
+    /// are different features that both call themselves a handoff; see
+    /// [`crate::entities::thread_handoff`].
+    ThreadHandoff,
     Approval,
     ResponseReview,
     DelegationDecision,
@@ -76,6 +80,7 @@ impl AttentionSourceKind {
         match self {
             Self::Task => "task",
             Self::Handoff => "handoff",
+            Self::ThreadHandoff => "thread_handoff",
             Self::Approval => "approval",
             Self::ResponseReview => "response_review",
             Self::DelegationDecision => "delegation_decision",
@@ -91,6 +96,7 @@ impl FromStr for AttentionSourceKind {
         match value {
             "task" => Ok(Self::Task),
             "handoff" => Ok(Self::Handoff),
+            "thread_handoff" => Ok(Self::ThreadHandoff),
             "approval" => Ok(Self::Approval),
             "response_review" => Ok(Self::ResponseReview),
             "delegation_decision" => Ok(Self::DelegationDecision),
@@ -330,22 +336,51 @@ mod tests {
 
     #[test]
     fn cursor_round_trips_every_sort_component() {
-        let cursor = AttentionCursor {
-            as_of: DateTime::parse_from_rfc3339("2026-09-07T10:00:00.123456Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            due_rank: 1,
-            priority_rank: 0,
-            created_at: DateTime::parse_from_rfc3339("2026-09-01T09:30:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            source_kind: AttentionSourceKind::ResponseReview,
-            source_id: Uuid::new_v4(),
-        };
+        // Both handoff kinds, because `Display`/`FromStr` split on `~` and a source kind that
+        // carried one would silently truncate the cursor rather than fail to parse.
+        for source_kind in [
+            AttentionSourceKind::ResponseReview,
+            AttentionSourceKind::ThreadHandoff,
+        ] {
+            let cursor = AttentionCursor {
+                as_of: DateTime::parse_from_rfc3339("2026-09-07T10:00:00.123456Z")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                due_rank: 1,
+                priority_rank: 0,
+                created_at: DateTime::parse_from_rfc3339("2026-09-01T09:30:00Z")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                source_kind,
+                source_id: Uuid::new_v4(),
+            };
+            assert_eq!(
+                cursor.to_string().parse::<AttentionCursor>().unwrap(),
+                cursor
+            );
+        }
+    }
+
+    /// The two handoff features share a word and nothing else, so neither name may parse as the
+    /// other and neither may be reached by a near miss.
+    #[test]
+    fn the_thread_handoff_kind_is_its_own_vocabulary() {
+        assert_eq!(AttentionSourceKind::ThreadHandoff.as_str(), "thread_handoff");
         assert_eq!(
-            cursor.to_string().parse::<AttentionCursor>().unwrap(),
-            cursor
+            "thread_handoff".parse::<AttentionSourceKind>(),
+            Ok(AttentionSourceKind::ThreadHandoff)
         );
+        assert_eq!(
+            "handoff".parse::<AttentionSourceKind>(),
+            Ok(AttentionSourceKind::Handoff),
+            "the manual handoff keeps the bare word it already owns"
+        );
+        for value in ["threadhandoff", "handoff ", "thread-handoff", ""] {
+            assert_eq!(
+                value.parse::<AttentionSourceKind>(),
+                Err(format!("invalid attention source kind '{value}'")),
+            );
+        }
     }
 
     #[test]

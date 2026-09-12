@@ -834,11 +834,20 @@ CREATE TABLE public.channels (
     owner_agent_id uuid,
     external_response_review_override text,
     preferred_reviewer_principal_id uuid,
+    external_reply_handling_override text,
     CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT channels_external_reply_handling_override_check CHECK (((external_reply_handling_override IS NULL) OR (external_reply_handling_override = ANY (ARRAY['automatic'::text, 'manual_handoff'::text])))),
     CONSTRAINT channels_external_response_review_override_check CHECK (((external_response_review_override IS NULL) OR (external_response_review_override = ANY (ARRAY['autonomous'::text, 'review_all_external'::text])))),
     CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
 );
+
+
+--
+-- Name: COLUMN channels.external_reply_handling_override; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.channels.external_reply_handling_override IS 'NULL inherits the company policy live rather than meaning automatic: a company that switches its default moves every inheriting channel with it, so the effective value is resolved with COALESCE at read time and never copied into the channel row.';
 
 
 --
@@ -1666,6 +1675,23 @@ $$;
 
 
 --
+-- Name: thread_handoff_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.thread_handoff_events_are_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE'
+       AND NOT EXISTS (SELECT 1 FROM companies WHERE id = OLD.company_id) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'thread handoff events are immutable' USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
 -- Name: transport_requires_installation(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2091,8 +2117,10 @@ CREATE TABLE public.companies (
     avatar_url text,
     memory_provider text,
     external_response_review text DEFAULT 'autonomous'::text NOT NULL,
+    external_reply_handling text DEFAULT 'automatic'::text NOT NULL,
     CONSTRAINT companies_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
     CONSTRAINT companies_default_participants_bounded CHECK (((default_participant_emails IS NULL) OR ((cardinality(default_participant_emails) <= 64) AND (array_position(default_participant_emails, NULL::public.citext) IS NULL) AND (array_position(default_participant_emails, ''::public.citext) IS NULL)))),
+    CONSTRAINT companies_external_reply_handling_check CHECK ((external_reply_handling = ANY (ARRAY['automatic'::text, 'manual_handoff'::text]))),
     CONSTRAINT companies_external_response_review_check CHECK ((external_response_review = ANY (ARRAY['autonomous'::text, 'review_all_external'::text]))),
     CONSTRAINT companies_memory_provider_check CHECK (((memory_provider IS NULL) OR (memory_provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text])))),
     CONSTRAINT companies_name_not_blank CHECK ((btrim(name) <> ''::text)),
@@ -3400,6 +3428,71 @@ CREATE TABLE public.task_status_events (
     CONSTRAINT task_status_events_retry_count_check CHECK ((retry_count >= 0)),
     CONSTRAINT task_status_events_sequence_check CHECK ((sequence > 0)),
     CONSTRAINT task_status_events_to_status_check CHECK ((to_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))
+);
+
+
+--
+-- Name: thread_handoff_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.thread_handoff_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_id uuid NOT NULL,
+    handoff_id uuid NOT NULL,
+    generation uuid NOT NULL,
+    command_id uuid NOT NULL,
+    command_fingerprint text NOT NULL,
+    operation text NOT NULL,
+    actor_kind text NOT NULL,
+    actor_principal_id uuid,
+    from_state text,
+    to_state text NOT NULL,
+    from_version bigint NOT NULL,
+    to_version bigint NOT NULL,
+    previous_priority text,
+    new_priority text,
+    previous_due_at timestamp with time zone,
+    new_due_at timestamp with time zone,
+    previous_responsible_principal_id uuid,
+    new_responsible_principal_id uuid,
+    task_id uuid,
+    draft_id uuid,
+    draft_version integer,
+    failure_reason text,
+    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT thread_handoff_events_actor_check CHECK ((((actor_kind = 'system'::text) AND (actor_principal_id IS NULL)) OR ((actor_kind = ANY (ARRAY['human'::text, 'agent'::text])) AND (actor_principal_id IS NOT NULL)))),
+    CONSTRAINT thread_handoff_events_failure_reason_check CHECK (((failure_reason IS NULL) OR ((btrim(failure_reason) <> ''::text) AND (octet_length(failure_reason) <= 2048)))),
+    CONSTRAINT thread_handoff_events_operation_check CHECK ((operation = ANY (ARRAY['opened'::text, 'regenerated'::text, 'claimed'::text, 'released'::text, 'reassigned'::text, 'attributes_changed'::text, 'draft_requested'::text, 'draft_ready'::text, 'draft_failed'::text, 'resolved'::text, 'dismissed'::text]))),
+    CONSTRAINT thread_handoff_events_priority_check CHECK ((((previous_priority IS NULL) OR (previous_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))) AND ((new_priority IS NULL) OR (new_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))))),
+    CONSTRAINT thread_handoff_events_state_check CHECK ((((from_state IS NULL) OR (from_state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text]))) AND (to_state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text])))),
+    CONSTRAINT thread_handoff_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1))))
+);
+
+
+--
+-- Name: thread_handoffs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.thread_handoffs (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    generation uuid NOT NULL,
+    state text DEFAULT 'needs_instruction'::text NOT NULL,
+    source_message_id uuid NOT NULL,
+    responsible_principal_id uuid,
+    business_priority text DEFAULT 'normal'::text NOT NULL,
+    business_due_at timestamp with time zone,
+    version bigint DEFAULT 1 NOT NULL,
+    generation_opened_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    closed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT thread_handoffs_closure_check CHECK ((((state = ANY (ARRAY['resolved'::text, 'dismissed'::text])) AND (closed_at IS NOT NULL)) OR ((state <> ALL (ARRAY['resolved'::text, 'dismissed'::text])) AND (closed_at IS NULL)))),
+    CONSTRAINT thread_handoffs_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
+    CONSTRAINT thread_handoffs_state_check CHECK ((state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text]))),
+    CONSTRAINT thread_handoffs_version_check CHECK ((version > 0))
 );
 
 
@@ -4742,6 +4835,54 @@ ALTER TABLE ONLY public.task_status_events
 
 
 --
+-- Name: thread_handoff_events thread_handoff_events_command_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_events
+    ADD CONSTRAINT thread_handoff_events_command_key UNIQUE (company_id, handoff_id, command_id);
+
+
+--
+-- Name: thread_handoff_events thread_handoff_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_events
+    ADD CONSTRAINT thread_handoff_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: thread_handoffs thread_handoffs_company_id_generation_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_company_id_generation_key UNIQUE (company_id, generation);
+
+
+--
+-- Name: thread_handoffs thread_handoffs_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_company_id_id_key UNIQUE (company_id, id);
+
+
+--
+-- Name: thread_handoffs thread_handoffs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: thread_handoffs thread_handoffs_thread_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_thread_key UNIQUE (company_id, thread_id);
+
+
+--
 -- Name: thread_messages thread_messages_channel_message_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6067,6 +6208,33 @@ CREATE TRIGGER task_status_actionable_notification AFTER DELETE OR UPDATE OF sta
 --
 
 CREATE TRIGGER task_status_events_notify_chain AFTER INSERT ON public.task_status_events FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: thread_handoff_events thread_handoff_events_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER thread_handoff_events_immutable BEFORE DELETE OR UPDATE ON public.thread_handoff_events FOR EACH ROW EXECUTE FUNCTION public.thread_handoff_events_are_immutable();
+
+
+--
+-- Name: thread_handoffs thread_handoffs_bump_cleanup_version; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER thread_handoffs_bump_cleanup_version BEFORE UPDATE OF responsible_principal_id ON public.thread_handoffs FOR EACH ROW EXECUTE FUNCTION public.bump_handoff_version_for_responsibility_cleanup();
+
+
+--
+-- Name: thread_handoffs thread_handoffs_notify_attention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+-- `generation` is in the column list so a regeneration wakes the queue even when the state,
+-- responsibility, priority and due time are all unchanged. No `notifications` row is written by
+-- any of this: thread handoffs audit into `thread_handoff_events`, which is not
+-- `attention_source_events`, so `handoff_actionable_notification` and
+-- `notification_from_attention_source()` never fire for them. Email and push notifications are
+-- out of scope by schema rather than by discipline.
+CREATE TRIGGER thread_handoffs_notify_attention AFTER INSERT OR DELETE OR UPDATE OF state, responsible_principal_id, business_priority, business_due_at, version, generation ON public.thread_handoffs FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('thread_handoff');
 
 
 --
@@ -7409,6 +7577,46 @@ ALTER TABLE ONLY public.task_status_events
 
 ALTER TABLE ONLY public.task_status_events
     ADD CONSTRAINT task_status_events_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoff_events thread_handoff_events_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_events
+    ADD CONSTRAINT thread_handoff_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoffs thread_handoffs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoffs thread_handoffs_responsible_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_responsible_fk FOREIGN KEY (company_id, responsible_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responsible_principal_id);
+
+
+--
+-- Name: thread_handoffs thread_handoffs_source_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_source_message_fk FOREIGN KEY (company_id, source_message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoffs thread_handoffs_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoffs
+    ADD CONSTRAINT thread_handoffs_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --

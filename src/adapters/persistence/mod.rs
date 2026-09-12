@@ -31,6 +31,7 @@ pub mod task;
 #[cfg(test)]
 pub mod test_support;
 pub mod thread;
+pub mod thread_handoff;
 pub mod user;
 
 #[derive(Clone)]

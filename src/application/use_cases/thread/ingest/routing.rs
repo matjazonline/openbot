@@ -19,6 +19,7 @@ use crate::{
         outreach::OutreachReplyMatch,
         participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
+        thread_handoff::{HoldDecision, OutsideReplyFacts, holds_outside_reply},
         transport::{
             ChannelBindingId, ChannelSelector, DeliveryPurpose, QualifiedIdentity, TransportKind,
         },
@@ -66,6 +67,18 @@ pub(crate) struct ChannelCandidate {
     pub step: PipelineStep,
     /// This sender's standing on the channel, resolved once during authorization.
     pub access: crate::entities::channel::ParticipantAccess,
+}
+
+/// The channel-shaped half of the hold rule, as `prepare_channels` established it.
+///
+/// A named struct rather than four adjacent `bool` parameters: they are interchangeable at the
+/// call site and a transposed pair would silently hold the wrong messages.
+#[derive(Debug, Clone, Copy)]
+struct HoldFacts {
+    continues_existing_thread: bool,
+    sender_is_outside: bool,
+    channel_answers: bool,
+    closes_outreach: bool,
 }
 
 /// Everything phase 2 learned about where the message was addressed.
@@ -596,12 +609,33 @@ impl ThreadUseCases {
                     .cc_was_mentioned(candidate, &body_text, directory)
                     .await?;
 
+            let hold = self
+                .hold_decision(
+                    candidate,
+                    HoldFacts {
+                        // Read from the target rather than from "the subject looks like a reply":
+                        // the thread the message actually lands in is the only honest answer.
+                        continues_existing_thread: matches!(target, ThreadTarget::Existing(_)),
+                        // The stable actor's company membership, resolved once above. Not
+                        // `candidate.access.trusted`, which is a channel-ACL verdict and is true
+                        // for an explicitly listed outsider.
+                        sender_is_outside: !sender.context.membership.is_team(),
+                        channel_answers: answers,
+                        // The *folded* match, after `authorize_thread_injection` added the
+                        // correlated one. Reading the earlier lookup would hold a reply that a
+                        // correlated outreach had just authorised and strand its waiting task.
+                        closes_outreach: outreach.is_some(),
+                    },
+                )
+                .await?;
+
             channels.push(PreparedChannel {
                 candidate: candidate.clone(),
                 target,
                 answers,
                 outreach,
                 principals: crate::transport::BoundedVec::parse("thread principals", principals)?,
+                hold,
             });
         }
 
@@ -609,6 +643,49 @@ impl ThreadUseCases {
             channels,
             body_text,
         }))
+    }
+
+    /// Whether this channel's copy of the message waits for the team.
+    ///
+    /// One extra read per candidate, and it is a read rather than a snapshot for the reason the
+    /// override column exists: a company that changes its default must move every inheriting
+    /// channel with it, live. A channel whose policy cannot be resolved is an error rather than an
+    /// assumed `Automatic` -- this value decides whether a customer's message is answered at all.
+    async fn hold_decision(
+        &self,
+        candidate: &ChannelCandidate,
+        facts: HoldFacts,
+    ) -> AppResult<HoldDecision> {
+        let handling = self
+            .thread_handoff_policy
+            .reply_handling_policy(candidate.company.id, candidate.channel.id)
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Channel '{}' has no reply-handling policy to resolve",
+                    candidate.channel.slug
+                ))
+            })?
+            .effective();
+        if !handling.holds_outside_replies() {
+            return Ok(HoldDecision::Automatic);
+        }
+        // `asks_for_an_answer` is the one term this loop cannot see: the disposition is folded
+        // message-wide, from every address the mail named, in `CommitPlan::build`. So the rule is
+        // asked here with the five channel-shaped terms and that sixth one is applied there.
+        let eligible = holds_outside_reply(OutsideReplyFacts {
+            handling,
+            continues_existing_thread: facts.continues_existing_thread,
+            sender_is_outside: facts.sender_is_outside,
+            channel_answers: facts.channel_answers,
+            asks_for_an_answer: true,
+            closes_outreach: facts.closes_outreach,
+        });
+        Ok(if eligible {
+            HoldDecision::Hold
+        } else {
+            HoldDecision::NotEligible
+        })
     }
 
     /// Refuse a sender who is neither on the thread nor answering one of its outreaches, and tell

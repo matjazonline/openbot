@@ -409,6 +409,13 @@ pub struct ThreadUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     participant_persistence: Arc<dyn ParticipantPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
+    /// Whether a channel answers an outside reply itself or waits for the team.
+    ///
+    /// Required rather than optional, for the reason `deliveries` below is: a deployment that
+    /// forgot to wire it would answer every held customer immediately, which is the one failure
+    /// this feature exists to prevent.
+    thread_handoff_policy:
+        Arc<dyn crate::application::thread_handoff::ThreadHandoffPolicyPersistence>,
     committer: Arc<dyn InboundMessageCommitter>,
     correlation_store: Arc<dyn ExternalCorrelationStore>,
     binding_persistence: Arc<dyn ChannelBindingPersistence>,
@@ -449,6 +456,8 @@ pub struct ThreadStores {
     pub companies: Arc<dyn CompanyPersistence>,
     pub participants: Arc<dyn ParticipantPersistence>,
     pub tasks: Arc<dyn TaskPersistence>,
+    /// The effective reply-handling policy of a channel, resolved live at ingest.
+    pub handoff_policy: Arc<dyn crate::application::thread_handoff::ThreadHandoffPolicyPersistence>,
 }
 
 impl ThreadUseCases {
@@ -468,6 +477,7 @@ impl ThreadUseCases {
             company_persistence: stores.companies,
             participant_persistence: stores.participants,
             task_persistence: stores.tasks,
+            thread_handoff_policy: stores.handoff_policy,
             committer: ingest.committer,
             correlation_store: ingest.correlation,
             standalone_deliveries: ingest.standalone_deliveries,

@@ -40,6 +40,7 @@
 //! `task/claim_tests.rs` runs on it, which is why those tests assert exact claim results instead of
 //! working around whatever else is in the queue.
 
+use chrono::{DateTime, Utc};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection, PgPool};
 use tokio::sync::OnceCell;
@@ -48,11 +49,14 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
+        attention::BusinessPriority,
         correlation::CorrelationId,
         message::{CanonicalMessageId, MessageDirection, MessageRole},
         runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
+        thread_handoff::ThreadHandoffState,
         transport::{
-            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, TransportKind,
+            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, PrincipalId,
+            TransportKind,
         },
         value_objects::EmailAddress,
     },
@@ -455,6 +459,95 @@ fn fixture_part(key: &DeliveryKey, index: u16, body: &str) -> RenderedPart {
         .expect("a small object encodes"),
         digest: ContentDigest::sha256_of(body.as_bytes()),
     }
+}
+
+/// One `thread_handoffs` row and the canonical message it names.
+///
+/// Shared because three test modules need the same two rows -- the projection tests, the command
+/// tests and the route tests -- and because the handoff's foreign keys make "just insert a row"
+/// impossible: its source message has to be a real, same-company message.
+pub struct ThreadHandoffFixture {
+    pub handoff_id: Uuid,
+    pub generation: Uuid,
+    pub message_id: CanonicalMessageId,
+}
+
+/// What a fixture handoff should look like. Defaults to a freshly held reply nobody has claimed.
+pub struct ThreadHandoffFixtureRequest {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub state: ThreadHandoffState,
+    pub responsible_principal_id: Option<PrincipalId>,
+    pub priority: BusinessPriority,
+    pub due_at: Option<DateTime<Utc>>,
+}
+
+impl ThreadHandoffFixtureRequest {
+    pub const fn new(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) -> Self {
+        Self {
+            company_id,
+            channel_id,
+            thread_id,
+            state: ThreadHandoffState::NeedsInstruction,
+            responsible_principal_id: None,
+            priority: BusinessPriority::Normal,
+            due_at: None,
+        }
+    }
+}
+
+/// Write the message and the handoff row that names it, at version 1.
+///
+/// Written directly rather than through `open_handoff_generation_on`, because a projection or
+/// command test needs to state a state, a responsibility and a priority that the opening path
+/// deliberately cannot produce. `closed_at` follows the state, so `thread_handoffs_closure_check`
+/// accepts a terminal fixture as readily as an open one.
+pub async fn thread_handoff_fixture(
+    persistence: &PostgresPersistence,
+    request: ThreadHandoffFixtureRequest,
+) -> ThreadHandoffFixture {
+    let write = MessageWrite::internal(
+        request.thread_id,
+        MessageAuthorWrite::Platform,
+        "Invoice 4471".to_string(),
+        "Any news on this?".to_string(),
+        MessageDirection::Inbound,
+        MessageRole::Human,
+        CorrelationId::new(),
+    )
+    .external_conversation();
+    let message_id = write.id;
+    ThreadPersistence::create_message(persistence, &write)
+        .await
+        .expect("the fixture message is stored");
+
+    let fixture = ThreadHandoffFixture {
+        handoff_id: Uuid::new_v4(),
+        generation: Uuid::new_v4(),
+        message_id,
+    };
+    sqlx::query(
+        r#"INSERT INTO thread_handoffs (
+               id, company_id, channel_id, thread_id, generation, state, source_message_id,
+               responsible_principal_id, business_priority, business_due_at, closed_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                     CASE WHEN $6 IN ('resolved', 'dismissed') THEN CURRENT_TIMESTAMP END)"#,
+    )
+    .bind(fixture.handoff_id)
+    .bind(request.company_id)
+    .bind(request.channel_id)
+    .bind(request.thread_id)
+    .bind(fixture.generation)
+    .bind(request.state.as_str())
+    .bind(message_id.as_uuid())
+    .bind(request.responsible_principal_id.map(PrincipalId::as_uuid))
+    .bind(request.priority.as_str())
+    .bind(request.due_at)
+    .execute(persistence.pool())
+    .await
+    .expect("the fixture handoff is stored");
+    fixture
 }
 
 #[cfg(test)]

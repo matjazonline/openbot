@@ -34,6 +34,7 @@ use crate::{
         thread::{
             InboundIngestResult, IngressOrigin, ReplyDelivery, SimulationMode, ThreadUseCases,
         },
+        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
@@ -93,6 +94,10 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{company_id}/channels/{id}/threads",
             get(list_channel_threads_json),
         )
+        .route(
+            "/api/companies/{company_id}/channels/{id}/reply-handling",
+            get(get_reply_handling_json).put(put_reply_handling_json),
+        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -109,6 +114,12 @@ pub struct ChannelForm {
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
     pub external_response_review_override: Option<String>,
+    /// `"inherit"` and the empty string clear the override; an unrecognised value is refused.
+    ///
+    /// Absent means "not submitted", and is left alone rather than cleared: no channel form
+    /// renders this control today, so an absent field is the browser's silence about a setting the
+    /// dedicated policy page owns, not a request to reset it.
+    pub external_reply_handling_override: Option<String>,
     pub preferred_reviewer_principal_id: Option<Uuid>,
     pub retrieve_company_memory: Option<String>,
     pub retrieve_agent_memory: Option<String>,
@@ -177,6 +188,33 @@ pub(super) fn parse_review_override(
     }
 }
 
+/// What a submitted channel form asks of the reply-handling policy.
+///
+/// The policy is saved by a **second** write, after the channel itself, because it must be
+/// clearable: `ChannelPersistence::update` writes its overrides through `COALESCE($n, column)`,
+/// which cannot express "back to inherit" (phase 1 §1.5). A failure between the two leaves the
+/// channel saved with its previous policy — acceptable, because the policy write is idempotent and
+/// re-submittable, and because the alternative is reproducing that bug on a new column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SubmittedReplyHandling {
+    /// The field was not submitted at all; leave the stored policy exactly as it is.
+    Unsubmitted,
+    /// Write this policy, where `None` returns the channel to inheriting the company default.
+    Write(Option<crate::entities::thread_handoff::ExternalReplyHandling>),
+}
+
+/// Read the channel form's reply-handling field, refusing a value the policy does not name.
+///
+/// Deliberately not [`parse_review_override`]'s shape, which maps an unrecognised string to `None`
+/// and so turns a typo into "inherit".
+pub(super) fn parse_reply_handling_form(value: Option<&str>) -> AppResult<SubmittedReplyHandling> {
+    match value {
+        None => Ok(SubmittedReplyHandling::Unsubmitted),
+        Some(value) => super::ui_thread_handoffs::parse_reply_handling_override(value)
+            .map(SubmittedReplyHandling::Write),
+    }
+}
+
 pub fn slugify(input: &str) -> String {
     let clean: String = input
         .trim()
@@ -230,6 +268,10 @@ pub struct ChannelJsonPayload {
     pub add_3rd_party: Option<bool>,
     pub external_response_review_override:
         Option<crate::entities::response_draft::ExternalResponseReview>,
+    /// Omitted or `null` returns the channel to inheriting the company default: like every other
+    /// field here, a PUT replaces rather than patches.
+    pub external_reply_handling_override:
+        Option<crate::entities::thread_handoff::ExternalReplyHandling>,
     pub preferred_reviewer_principal_id: Option<Uuid>,
     #[serde(default)]
     pub retrieve_company_memory: bool,
@@ -387,6 +429,7 @@ async fn list_channels_page(
     company_use_cases,
     channel_use_cases,
     agent_use_cases,
+    thread_handoff_use_cases,
     config,
     user,
     form
@@ -395,10 +438,15 @@ async fn list_channels_page(
 ///
 /// Every exit from the create/update handlers ends in the same fragment, optionally headed by an
 /// error alert, so the reload lives here instead of at each `return`.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -439,6 +487,11 @@ async fn create_channel_handler(
         Ok(memory) => memory,
         Err(error) => return view.render(Some(error)).await,
     };
+    let reply_handling =
+        match parse_reply_handling_form(form.external_reply_handling_override.as_deref()) {
+            Ok(submitted) => submitted,
+            Err(error) => return view.render(Some(error.to_string())).await,
+        };
 
     let write = ChannelWrite {
         enabled,
@@ -475,13 +528,26 @@ async fn create_channel_handler(
                 .await
         }
     };
-    match created {
-        Ok(_) => view.render(None).await,
+    let created = match created {
+        Ok(channel) => channel,
         Err(err) => {
-            view.render(Some(format!("Failed to create channel: {err}")))
-                .await
+            return view
+                .render(Some(format!("Failed to create channel: {err}")))
+                .await;
         }
+    };
+    if let SubmittedReplyHandling::Write(policy_override) = reply_handling
+        && let Err(err) = thread_handoff_use_cases
+            .set_channel_reply_handling_override(company_id, created.id, policy_override)
+            .await
+    {
+        return view
+            .render(Some(format!(
+                "Channel saved, but reply handling failed: {err}"
+            )))
+            .await;
     }
+    view.render(None).await
 }
 
 /// Everything needed to re-render the channel list after any outcome.
@@ -638,14 +704,20 @@ async fn cancel_channel_edit(
     company_use_cases,
     channel_use_cases,
     agent_use_cases,
+    thread_handoff_use_cases,
     config,
     user,
     form
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn update_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -678,6 +750,11 @@ async fn update_channel_handler(
     };
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
+    let reply_handling =
+        match parse_reply_handling_form(form.external_reply_handling_override.as_deref()) {
+            Ok(submitted) => submitted,
+            Err(error) => return Html(pages::error_alert(&error.to_string())),
+        };
 
     let write = ChannelWrite {
         name: form.name,
@@ -703,7 +780,7 @@ async fn update_channel_handler(
         created_by: None,
     };
 
-    match channel_use_cases
+    let updated = match channel_use_cases
         .update_channel(
             user.id,
             company_id,
@@ -713,14 +790,24 @@ async fn update_channel_handler(
         )
         .await
     {
-        Ok(wf) => Html(pages::channel_row_fragment(
-            &company,
-            &config.app_domain_name,
-            &wf,
-            &agents,
-        )),
-        Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
+        Ok(updated) => updated,
+        Err(err) => return Html(pages::error_alert(&format!("Update failed: {err}"))),
+    };
+    if let SubmittedReplyHandling::Write(policy_override) = reply_handling
+        && let Err(err) = thread_handoff_use_cases
+            .set_channel_reply_handling_override(company_id, channel_id, policy_override)
+            .await
+    {
+        return Html(pages::error_alert(&format!(
+            "Channel saved, but reply handling failed: {err}"
+        )));
     }
+    Html(pages::channel_row_fragment(
+        &company,
+        &config.app_domain_name,
+        &updated,
+        &agents,
+    ))
 }
 
 /// DELETE /companies/{company_id}/channels/{id} - HTMX delete channel (Protected).
@@ -1456,6 +1543,7 @@ async fn list_channel_threads_json(
 /// JSON API: Create company channel (Protected).
 async fn create_channel_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(payload): Json<ChannelJsonPayload>,
@@ -1469,6 +1557,7 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let reply_handling_override = payload.external_reply_handling_override;
     let agent_ids = payload.agent_ids;
     let agent = payload.system_prompt.as_deref().and_then(|prompt| {
         let prompt = prompt.trim();
@@ -1514,6 +1603,10 @@ async fn create_channel_json(
                 .await?
         }
     };
+    // A second write, because the override must be clearable. See `SubmittedReplyHandling`.
+    thread_handoff_use_cases
+        .set_channel_reply_handling_override(company_id, channel.id, reply_handling_override)
+        .await?;
 
     Ok((
         StatusCode::CREATED,
@@ -1539,13 +1632,15 @@ async fn get_channel_json(
 }
 
 /// JSON API: Update company channel (Protected).
-async fn update_channel_json(
+pub(super) async fn update_channel_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ChannelJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
     let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
+    let reply_handling_override = payload.external_reply_handling_override;
     let slug = payload
         .slug
         .as_deref()
@@ -1585,6 +1680,10 @@ async fn update_channel_json(
             confirm_spam_disabled,
         )
         .await?;
+    // A second write, because the override must be clearable. See `SubmittedReplyHandling`.
+    thread_handoff_use_cases
+        .set_channel_reply_handling_override(company_id, channel_id, reply_handling_override)
+        .await?;
 
     Ok((
         StatusCode::OK,
@@ -1593,6 +1692,72 @@ async fn update_channel_json(
             channel,
         }),
     ))
+}
+
+/// One channel's reply-handling policy, as the API reads it back.
+///
+/// `ChannelResponse` serializes [`Channel`], which deliberately does not carry the override — it is
+/// snapshotted into durable task payloads, and a policy that must be resolved live has no business
+/// being frozen into a queue row. So the policy gets its own pair of routes.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReplyHandlingResponse {
+    pub company_default: crate::entities::thread_handoff::ExternalReplyHandling,
+    pub channel_override: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
+    pub effective: crate::entities::thread_handoff::ExternalReplyHandling,
+    pub inherited: bool,
+}
+
+impl From<crate::entities::thread_handoff::ExternalReplyHandlingPolicy> for ReplyHandlingResponse {
+    fn from(policy: crate::entities::thread_handoff::ExternalReplyHandlingPolicy) -> Self {
+        Self {
+            company_default: policy.company_default,
+            channel_override: policy.channel_override,
+            effective: policy.effective(),
+            inherited: policy.is_inherited(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReplyHandlingPayload {
+    /// `null` returns the channel to inheriting the company default.
+    pub channel_override: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
+}
+
+/// JSON API: Read one channel's reply-handling policy (Protected).
+pub(super) async fn get_reply_handling_json(
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<impl IntoResponse> {
+    super::ui_thread_handoffs::authorize_policy_manager(&company_use_cases, user.id, company_id)
+        .await?;
+    let policy = thread_handoff_use_cases
+        .reply_handling_policy(company_id, channel_id)
+        .await?
+        .ok_or_else(crate::use_cases::channel::channel_not_found)?;
+    Ok((StatusCode::OK, Json(ReplyHandlingResponse::from(policy))))
+}
+
+/// JSON API: Set or clear one channel's reply-handling override (Protected).
+pub(super) async fn put_reply_handling_json(
+    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<ReplyHandlingPayload>,
+) -> AppResult<impl IntoResponse> {
+    super::ui_thread_handoffs::authorize_policy_manager(&company_use_cases, user.id, company_id)
+        .await?;
+    thread_handoff_use_cases
+        .set_channel_reply_handling_override(company_id, channel_id, payload.channel_override)
+        .await?;
+    let policy = thread_handoff_use_cases
+        .reply_handling_policy(company_id, channel_id)
+        .await?
+        .ok_or_else(crate::use_cases::channel::channel_not_found)?;
+    Ok((StatusCode::OK, Json(ReplyHandlingResponse::from(policy))))
 }
 
 /// JSON API: Delete company channel (Protected).

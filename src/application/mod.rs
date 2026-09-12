@@ -4,5 +4,6 @@ pub mod model_providers;
 pub mod notification;
 pub mod services;
 pub mod task_queue;
+pub mod thread_handoff;
 pub mod transport;
 pub mod use_cases;

@@ -22,7 +22,9 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
+    application::thread_handoff::ThreadHandoffPolicyPersistence,
     entities::participant::{IdentityClaimMetadata, IdentityProvenance},
+    entities::thread_handoff::{ExternalReplyHandling, ExternalReplyHandlingPolicy},
     entities::{
         correlation::CorrelationId,
         creation::CreationProvenance,
@@ -80,6 +82,9 @@ impl ThreadUseCases {
         config: Arc<AppConfig>,
     ) -> Self {
         let ingest = InMemoryIngress::ports(thread_persistence.clone(), task_persistence.clone());
+        // The same double answers the reply-handling policy, so a fixture that already holds the
+        // thread store can put one of its channels on `ManualHandoff` without a second handle.
+        let handoff_policy: Arc<dyn ThreadHandoffPolicyPersistence> = thread_persistence.clone();
         let renderers = Arc::new(
             crate::transport::ports::TransportRenderers::new()
                 .register(Arc::new(
@@ -94,6 +99,7 @@ impl ThreadUseCases {
                 companies: company_persistence,
                 participants: participant_persistence,
                 tasks: task_persistence,
+                handoff_policy: handoff_policy.clone(),
             },
             ingest,
             renderers,
@@ -192,6 +198,13 @@ struct Store {
     notes: HashMap<Uuid, (CanonicalMessageId, InternalNoteView)>,
     note_commands: HashMap<Uuid, (String, CanonicalMessageId)>,
     tombstone_commands: HashMap<Uuid, (String, Uuid)>,
+    /// Company reply-handling defaults; absent means the migration default, `Automatic`.
+    company_reply_handling: HashMap<Uuid, ExternalReplyHandling>,
+    /// Channel overrides. An absent key inherits; `Some(None)` is an override cleared back to it.
+    channel_reply_handling: HashMap<Uuid, Option<ExternalReplyHandling>>,
+    /// Every commit request handed to the double, so a test can assert what the plan asked for
+    /// rather than only what the double chose to make of it.
+    commits: Vec<InboundCommitRequest>,
 }
 
 /// An in-memory [`ThreadPersistence`].
@@ -229,6 +242,29 @@ impl InMemoryThreads {
     /// Seed a thread without going through creation, for a fixture that starts mid-conversation.
     pub fn insert_thread(&self, thread: Thread) {
         self.store.lock().unwrap().threads.push(thread);
+    }
+
+    /// Put one channel on a reply-handling policy of its own.
+    pub fn set_channel_reply_handling(&self, channel_id: Uuid, policy: ExternalReplyHandling) {
+        self.store
+            .lock()
+            .unwrap()
+            .channel_reply_handling
+            .insert(channel_id, Some(policy));
+    }
+
+    /// Change the company default every inheriting channel follows.
+    pub fn set_company_reply_handling(&self, company_id: Uuid, policy: ExternalReplyHandling) {
+        self.store
+            .lock()
+            .unwrap()
+            .company_reply_handling
+            .insert(company_id, policy);
+    }
+
+    /// Every commit request this double was handed, in order.
+    pub fn committed_requests(&self) -> Vec<InboundCommitRequest> {
+        self.store.lock().unwrap().commits.clone()
     }
 
     pub fn threads(&self) -> Vec<Thread> {
@@ -1515,12 +1551,74 @@ impl ExternalCorrelationStore for InMemoryIngress {
     }
 }
 
+/// The reply-handling policy, as the ingest path reads it.
+///
+/// No default arm hides a missing channel: an unknown one resolves to the migration default, which
+/// is what a channel created before this feature existed genuinely has.
+#[async_trait]
+impl ThreadHandoffPolicyPersistence for InMemoryThreads {
+    async fn reply_handling_policy(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Option<ExternalReplyHandlingPolicy>> {
+        let store = self.store.lock().unwrap();
+        let company_default = store
+            .company_reply_handling
+            .get(&company_id)
+            .copied()
+            .unwrap_or_default();
+        let channel_override = store
+            .channel_reply_handling
+            .get(&channel_id)
+            .copied()
+            .flatten();
+        Ok(Some(ExternalReplyHandlingPolicy::resolve(
+            company_default,
+            channel_override,
+        )))
+    }
+
+    async fn set_company_reply_handling(
+        &self,
+        company_id: Uuid,
+        policy: ExternalReplyHandling,
+    ) -> AppResult<()> {
+        self.store
+            .lock()
+            .unwrap()
+            .company_reply_handling
+            .insert(company_id, policy);
+        Ok(())
+    }
+
+    async fn set_channel_reply_handling_override(
+        &self,
+        _company_id: Uuid,
+        channel_id: Uuid,
+        policy_override: Option<ExternalReplyHandling>,
+    ) -> AppResult<()> {
+        self.store
+            .lock()
+            .unwrap()
+            .channel_reply_handling
+            .insert(channel_id, policy_override);
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl InboundMessageCommitter for InMemoryIngress {
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome> {
+        self.threads
+            .store
+            .lock()
+            .unwrap()
+            .commits
+            .push(request.clone());
         let mut thread_ids = Vec::with_capacity(request.associations.len());
         for association in &request.associations {
             let emails: Vec<EmailAddress> = association
@@ -1669,6 +1767,13 @@ impl InboundMessageCommitter for InMemoryIngress {
             message_id: stored.canonical_id,
             thread_ids,
             task_id,
+            // The double stores no handoff rows; it reports the ids the plan asked for, which is
+            // what the application-layer tests assert against.
+            handoff_ids: if already_stored {
+                Vec::new()
+            } else {
+                request.holds.iter().map(|hold| hold.handoff_id).collect()
+            },
             delivery_ids: Vec::new(),
         })
     }

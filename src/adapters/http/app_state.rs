@@ -34,6 +34,7 @@ use crate::{
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::ThreadUseCases,
+        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
@@ -59,6 +60,8 @@ pub struct AppState {
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub response_review_use_cases: Arc<ResponseReviewUseCases>,
+    /// Reply-handling policy reads and writes. Not `manual_handoffs`.
+    pub thread_handoff_use_cases: Arc<ThreadHandoffUseCases>,
     pub memory_use_cases: Arc<MemoryUseCases>,
     pub memory_worker: Arc<MemoryWorker>,
     /// Owns claims on authenticated provider events. Routes only store and wake it.
@@ -192,6 +195,12 @@ impl FromRef<AppState> for Arc<ApprovalUseCases> {
 impl FromRef<AppState> for Arc<ResponseReviewUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.response_review_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<ThreadHandoffUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.thread_handoff_use_cases.clone()
     }
 }
 

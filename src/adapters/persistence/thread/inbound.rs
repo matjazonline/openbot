@@ -31,6 +31,7 @@ use crate::{
         PostgresPersistence,
         delivery::enqueue::insert_delivery_on,
         task::{insert_task, record_outreach_reply_on},
+        thread_handoff::{OpenHandoffGeneration, open_handoff_generation_on},
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -109,6 +110,10 @@ async fn commit_on(
     apply_outreach_transitions(tx, request, stored.id).await?;
 
     let task_id = create_task(tx, request, &threads, stored.id).await?;
+    // After the task and before the fan-out: the handoff's foreign keys need the stored message
+    // and the resolved threads, and keeping the statement order of the whole commit fixed is what
+    // stops two concurrent inbound commits on one thread taking their locks in opposite orders.
+    let handoff_ids = create_handoffs(tx, request, &threads, stored.id).await?;
     let delivery_ids = create_deliveries(tx, request).await?;
     complete_claimed_event(tx, request).await?;
 
@@ -117,6 +122,7 @@ async fn commit_on(
         message_id: stored.id,
         thread_ids: threads.iter().map(|thread| thread.thread_id).collect(),
         task_id,
+        handoff_ids,
         delivery_ids,
     })
 }
@@ -171,6 +177,9 @@ async fn recognise_redelivery(
         message_id,
         thread_ids,
         task_id: task_for_message(tx, request.company_id, message_id).await?,
+        // A redelivery opens no generation: the first delivery already opened whichever one this
+        // message earned, and a second would fence a draft written for the very same message.
+        handoff_ids: Vec::new(),
         // A redelivery fans out nothing: the first delivery's intents are already durable.
         delivery_ids: Vec::new(),
     })
@@ -669,6 +678,52 @@ async fn create_task(
     )
     .await?;
     Ok(Some(created.id))
+}
+
+/// Open one `thread_handoffs` generation per held channel, with no task for any of them.
+///
+/// A hold naming a channel with no association is a planner bug rather than a user error, and gets
+/// the same `Internal` treatment `task_targets` gives a target with no association: the whole
+/// commit rolls back instead of writing a handoff pointing at a conversation the message never
+/// joined.
+async fn create_handoffs(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    threads: &[ResolvedThread],
+    message_id: CanonicalMessageId,
+) -> AppResult<Vec<Uuid>> {
+    if request.holds.is_empty() {
+        return Ok(Vec::new());
+    }
+    let thread_of: HashMap<Uuid, Uuid> = threads
+        .iter()
+        .map(|thread| (thread.channel_id, thread.thread_id))
+        .collect();
+
+    let mut opened = Vec::with_capacity(request.holds.len());
+    for hold in &request.holds {
+        let thread_id = thread_of.get(&hold.channel_id).copied().ok_or_else(|| {
+            AppError::Internal(format!(
+                "Held channel {} has no association in this commit",
+                hold.channel_id
+            ))
+        })?;
+        opened.push(
+            open_handoff_generation_on(
+                tx,
+                OpenHandoffGeneration {
+                    company_id: request.company_id,
+                    channel_id: hold.channel_id,
+                    thread_id,
+                    handoff_id: hold.handoff_id,
+                    generation: hold.generation,
+                    source_message_id: message_id,
+                },
+            )
+            .await?,
+        );
+    }
+    Ok(opened)
 }
 
 /// Pair every task target with the thread this commit put the message in.

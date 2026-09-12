@@ -9,11 +9,12 @@ use uuid::Uuid;
 
 use crate::{
     app_error::AppResult,
-    entities::outreach::OutreachReplyMatch,
+    entities::{outreach::OutreachReplyMatch, thread_handoff::HoldDecision},
     transport::{
         BoundedVec, CanonicalContent, InboundCommitRequest, InboundDraft, InboundEnvelope,
-        InboundOutreachTransition, InboundTaskRequest, InboundTaskTarget, MAX_THREAD_ASSOCIATIONS,
-        MessageDisposition, NewDelivery, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
+        InboundHold, InboundOutreachTransition, InboundTaskRequest, InboundTaskTarget,
+        MAX_THREAD_ASSOCIATIONS, MessageDisposition, NewDelivery, ThreadAssociation,
+        ThreadPrincipalIntent, ThreadTarget,
     },
     use_cases::thread::ingest::{AGENT_DISPATCH_TASK, ReplyDelivery, routing::ResolvedAddresses},
 };
@@ -32,6 +33,21 @@ pub(crate) struct PreparedChannel {
     pub outreach: Option<OutreachReplyMatch>,
     /// The handles this channel's thread gains from the message, under this channel's own policy.
     pub principals: BoundedVec<ThreadPrincipalIntent, { crate::transport::MAX_THREAD_PRINCIPALS }>,
+    /// Whether this channel's copy waits for the team, as far as this channel can tell.
+    ///
+    /// Five of the six eligibility terms are channel-shaped and are decided in `prepare_channels`.
+    /// The sixth -- whether the message asked for an answer at all -- is folded message-wide, so
+    /// [`holds`] applies it here.
+    pub hold: HoldDecision,
+}
+
+/// Whether this channel's copy is actually held, once the message-wide disposition is folded in.
+///
+/// A free function rather than a method so the rule is unit-testable without building a
+/// [`CommitPlan`], and so the two independent gates -- an explicit `FileOnly` and a channel hold --
+/// meet in exactly one place.
+const fn holds(hold: HoldDecision, disposition: MessageDisposition) -> bool {
+    matches!(hold, HoldDecision::Hold) && disposition.answers()
 }
 
 /// What phases 3 and 4 concluded for every channel the message reached.
@@ -52,6 +68,7 @@ pub(crate) struct CommitPlan {
     envelope: InboundEnvelope,
     associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     task: Option<InboundTaskRequest>,
+    holds: BoundedVec<InboundHold, MAX_THREAD_ASSOCIATIONS>,
     outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
     deliveries: Vec<NewDelivery>,
     prepared: PreparedChannels,
@@ -100,15 +117,34 @@ impl CommitPlan {
 
         // Passive matches have their copy filed on their history; keeping them out of the task is
         // what stops the worker treating a channel that was merely copied as one that must answer.
+        // A held channel is dropped for a different reason -- it *would* have answered, and the
+        // team asked to be consulted first -- and gains a `thread_handoffs` row below instead.
         let targets: Vec<_> = prepared
             .channels
             .iter()
-            .filter(|channel| channel.answers && channel.outreach.is_none())
+            .filter(|channel| {
+                channel.answers && channel.outreach.is_none() && !holds(channel.hold, disposition)
+            })
             .map(|channel| InboundTaskTarget {
                 channel_id: channel.candidate.channel.id,
                 role: channel.candidate.role,
             })
             .collect();
+        let holds = BoundedVec::parse(
+            "thread handoffs",
+            prepared
+                .channels
+                .iter()
+                .filter(|channel| holds(channel.hold, disposition))
+                .map(|channel| InboundHold {
+                    channel_id: channel.candidate.channel.id,
+                    // Fresh on every held message. An existing row keeps its own id and takes only
+                    // the new generation, so a replacement is one `ON CONFLICT` away.
+                    handoff_id: Uuid::new_v4(),
+                    generation: Uuid::new_v4(),
+                })
+                .collect(),
+        )?;
         let outreach_transitions = BoundedVec::parse(
             "outreach transitions",
             prepared
@@ -130,10 +166,13 @@ impl CommitPlan {
             company_id: resolved.company.id,
             envelope,
             associations: BoundedVec::parse("thread associations", associations)?,
+            // No hold term here on purpose: a message whose every answering channel is held leaves
+            // `targets` empty, and this guard already turns that into no task at all.
             task: (disposition.answers() && !targets.is_empty()).then(|| InboundTaskRequest {
                 task_type: AGENT_DISPATCH_TASK.to_string(),
                 targets,
             }),
+            holds,
             outreach_transitions,
             // Inbound fan-out onto a channel's *other* interfaces has a durable queue now, but
             // nothing to fan out to: email is the only transport a channel speaks, and delivering
@@ -155,6 +194,7 @@ impl CommitPlan {
             claimed_event: None,
             associations: self.associations.clone(),
             task: self.task.clone(),
+            holds: self.holds.clone(),
             outreach_transitions: self.outreach_transitions.clone(),
             deliveries: self.deliveries.clone(),
             reply_delivery: self.reply_delivery,
@@ -193,5 +233,266 @@ impl CommitPlan {
 
     pub(crate) fn into_prepared(self) -> PreparedChannels {
         self.prepared
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        entities::{
+            channel::{Channel, ChannelAccessMode, ParticipantAccess},
+            company::Company,
+            creation::CreationProvenance,
+            transport::{
+                ChannelBindingId, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
+                IdentitySubject, QualifiedIdentity, TransportKind,
+            },
+        },
+        transport::{IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension},
+    };
+    use chrono::Utc;
+
+    fn company() -> Company {
+        Company {
+            channel_defaults: Default::default(),
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme".to_string(),
+            slug: "acme".into(),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    fn channel(company_id: Uuid, slug: &str) -> Channel {
+        Channel {
+            owner_agent_id: None,
+            enabled: true,
+            add_3rd_party: false,
+            id: Uuid::new_v4(),
+            company_id,
+            name: slug.to_string(),
+            description: None,
+            slug: slug.into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
+            agent_ids: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: CreationProvenance::system(),
+            created_at: Utc::now(),
+        }
+    }
+
+    fn identity(address: &str) -> QualifiedIdentity {
+        QualifiedIdentity::new(
+            TransportKind::Email,
+            IdentityNamespace::parse("email").unwrap(),
+            IdentitySubject::parse(address).unwrap(),
+        )
+    }
+
+    fn draft(disposition: MessageDisposition) -> InboundDraft {
+        InboundDraft {
+            event_key: None,
+            message_key: ExternalMessageKey::parse("<hold@example.com>").unwrap(),
+            thread_key: ExternalThreadKey::parse("<hold@example.com>").unwrap(),
+            reply_message_keys: BoundedVec::empty(),
+            reply_thread_keys: BoundedVec::empty(),
+            author: identity("ana@client.com"),
+            addressed: BoundedVec::empty(),
+            content: CanonicalContent::parse("Invoice 4471", "Any news?").unwrap(),
+            attachments: BoundedVec::empty(),
+            directives: IngressDirectives {
+                disposition,
+                ..IngressDirectives::default()
+            },
+            policy: IngressPolicyFacts::TrustedApplication,
+            correlation_id: crate::entities::correlation::CorrelationId::new(),
+            extension: ProtocolExtension::none(),
+        }
+    }
+
+    /// One answering channel, with the hold verdict `prepare_channels` would have reached.
+    fn prepared_channel(company: &Company, slug: &str, hold: HoldDecision) -> PreparedChannel {
+        let channel = channel(company.id, slug);
+        PreparedChannel {
+            candidate: ChannelCandidate {
+                company: company.clone(),
+                binding_id: ChannelBindingId::new(channel.id),
+                matched_slug: channel.slug.clone(),
+                handle: identity(&format!("{slug}@acme.example")),
+                role: crate::transport::RecipientRole::To,
+                step: PipelineStep::only(),
+                access: ParticipantAccess {
+                    authorized: true,
+                    trusted: false,
+                },
+                channel,
+            },
+            target: ThreadTarget::Existing(Uuid::new_v4()),
+            answers: true,
+            outreach: None,
+            principals: BoundedVec::empty(),
+            hold,
+        }
+    }
+
+    fn plan_for(company: &Company, channels: Vec<PreparedChannel>) -> InboundCommitRequest {
+        plan_with_disposition(company, channels, MessageDisposition::Answer)
+    }
+
+    fn plan_with_disposition(
+        company: &Company,
+        channels: Vec<PreparedChannel>,
+        disposition: MessageDisposition,
+    ) -> InboundCommitRequest {
+        let resolved = ResolvedAddresses {
+            company: company.clone(),
+            candidates: Vec::new(),
+            outreach_by_channel: std::collections::HashMap::new(),
+        };
+        CommitPlan::build(
+            &draft(disposition),
+            &resolved,
+            PreparedChannels {
+                channels,
+                body_text: "Any news?".to_string(),
+            },
+            ReplyDelivery::Send,
+        )
+        .expect("a hand-made plan is within every bound")
+        .request()
+    }
+
+    #[test]
+    fn a_held_channel_leaves_the_task_to_its_automatic_sibling() {
+        let company = company();
+        let support = prepared_channel(&company, "support", HoldDecision::Hold);
+        let billing = prepared_channel(&company, "billing", HoldDecision::Automatic);
+        let support_id = support.candidate.channel.id;
+        let billing_id = billing.candidate.channel.id;
+
+        let request = plan_for(&company, vec![support, billing]);
+
+        let task = request.task.expect("billing still answers");
+        assert_eq!(
+            task.targets
+                .iter()
+                .map(|target| target.channel_id)
+                .collect::<Vec<_>>(),
+            vec![billing_id]
+        );
+        assert_eq!(
+            request
+                .holds
+                .iter()
+                .map(|hold| hold.channel_id)
+                .collect::<Vec<_>>(),
+            vec![support_id]
+        );
+    }
+
+    #[test]
+    fn holding_every_answering_channel_leaves_no_task_at_all() {
+        let company = company();
+        let channels = vec![
+            prepared_channel(&company, "support", HoldDecision::Hold),
+            prepared_channel(&company, "billing", HoldDecision::Hold),
+        ];
+        let expected: Vec<Uuid> = channels
+            .iter()
+            .map(|channel| channel.candidate.channel.id)
+            .collect();
+
+        let request = plan_for(&company, channels);
+
+        assert!(request.task.is_none(), "no channel is left to answer");
+        assert_eq!(
+            request
+                .holds
+                .iter()
+                .map(|hold| hold.channel_id)
+                .collect::<Vec<_>>(),
+            expected
+        );
+        // Every generation is its own, even within one commit: two threads never share one.
+        assert_ne!(request.holds[0].generation, request.holds[1].generation);
+        assert_ne!(request.holds[0].handoff_id, request.holds[1].handoff_id);
+    }
+
+    /// The two gates are independent and both fire here. A `.quiet` message already produces no
+    /// task, and asking the team to act on a message that asked nobody to act would be wrong.
+    #[test]
+    fn a_file_only_message_is_neither_answered_nor_held() {
+        let company = company();
+        let request = plan_with_disposition(
+            &company,
+            vec![prepared_channel(&company, "support", HoldDecision::Hold)],
+            MessageDisposition::FileOnly,
+        );
+
+        assert!(request.task.is_none());
+        assert!(request.holds.is_empty());
+        // The hold changes the task, never the message: this is still the customer's own message.
+        assert_eq!(
+            request.envelope.directives.disposition,
+            MessageDisposition::FileOnly
+        );
+    }
+
+    /// A reply that closes an outreach is `NotEligible` by the time it gets here, and the existing
+    /// `outreach.is_none()` term is what keeps it out of the task.
+    #[test]
+    fn a_channel_that_closes_an_outreach_is_neither_held_nor_targeted() {
+        let company = company();
+        let mut support = prepared_channel(&company, "support", HoldDecision::NotEligible);
+        support.outreach = Some(OutreachReplyMatch {
+            outreach_id: Uuid::new_v4(),
+            task_id: Uuid::new_v4(),
+            target_id: Uuid::new_v4(),
+            target_email: "ana@client.com".into(),
+        });
+        let billing = prepared_channel(&company, "billing", HoldDecision::Automatic);
+        let billing_id = billing.candidate.channel.id;
+
+        let request = plan_for(&company, vec![support, billing]);
+
+        assert!(request.holds.is_empty());
+        let task = request.task.expect("billing still answers");
+        assert_eq!(
+            task.targets
+                .iter()
+                .map(|target| target.channel_id)
+                .collect::<Vec<_>>(),
+            vec![billing_id]
+        );
+    }
+
+    /// A held message keeps the disposition it arrived with. Folding the hold into
+    /// `MessageDisposition` would reclassify a paying customer's email as a private internal note.
+    #[test]
+    fn a_held_message_keeps_the_answer_disposition() {
+        let company = company();
+        let request = plan_for(
+            &company,
+            vec![prepared_channel(&company, "support", HoldDecision::Hold)],
+        );
+
+        assert_eq!(
+            request.envelope.directives.disposition,
+            MessageDisposition::Answer
+        );
+        assert_eq!(request.holds.len(), 1);
+        assert!(request.task.is_none());
     }
 }

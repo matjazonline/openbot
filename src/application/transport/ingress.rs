@@ -645,6 +645,25 @@ pub struct InboundOutreachTransition {
     pub matched: OutreachReplyMatch,
 }
 
+/// One channel's copy of an eligible outside reply that must wait for the team.
+///
+/// Named by channel, not by thread, for the same reason [`InboundTaskTarget`] is: the thread may
+/// not exist until the commit writes it. The commit resolves the pair from the association it just
+/// wrote, so a hold with no association is unrepresentable.
+///
+/// Identifiers only. Nothing about the handoff reaches a durable task payload, so a worker can
+/// never snapshot a generation that a newer customer message has since replaced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InboundHold {
+    pub channel_id: Uuid,
+    /// The handoff row id to use when this thread has no handoff yet. A fresh UUID per commit;
+    /// an existing row keeps its own id and only takes the new generation.
+    pub handoff_id: Uuid,
+    /// The generation this hold opens. New on every held message, including a second hold on a
+    /// thread whose previous generation is still open.
+    pub generation: Uuid,
+}
+
 impl InboundTaskRequest {
     pub fn primary(&self) -> Option<InboundTaskTarget> {
         self.targets.first().copied()
@@ -655,7 +674,10 @@ impl InboundTaskRequest {
 ///
 /// The whole point of one named struct is that these rows agree: a canonical message visible
 /// without its provider mapping is a message a redelivery will duplicate, and one visible without
-/// its task is a message no agent will ever answer.
+/// its task is a message no agent will ever answer -- *unless* a hold is what removed the task.
+/// `holds` is what makes that case legible: a held channel's copy is a perfectly ordinary customer
+/// message whose answer was deliberately deferred to the team, and the `thread_handoffs` row that
+/// says so becomes visible in the same transaction as the message itself.
 #[derive(Debug, Clone)]
 pub struct InboundCommitRequest {
     pub company_id: Uuid,
@@ -665,6 +687,12 @@ pub struct InboundCommitRequest {
     pub claimed_event: Option<ExecutionLease<InboundEventId>>,
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     pub task: Option<InboundTaskRequest>,
+    /// The channels whose copy of this message waits for the team instead of running their agent.
+    ///
+    /// Bounded by [`MAX_THREAD_ASSOCIATIONS`] rather than by a limit of its own: at most one
+    /// handoff per thread and at most one thread per channel per message, so the holds one commit
+    /// can write can never outnumber the associations it writes.
+    pub holds: BoundedVec<InboundHold, MAX_THREAD_ASSOCIATIONS>,
     pub outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
     /// The fan-out this message is immediately owed, already composed and frozen.
     ///
@@ -705,6 +733,12 @@ pub struct InboundCommitOutcome {
     /// The threads the message is now associated with, in association order.
     pub thread_ids: Vec<Uuid>,
     pub task_id: Option<Uuid>,
+    /// The `thread_handoffs` rows this commit opened a generation on, in hold order.
+    ///
+    /// Empty for a duplicate and for every unheld message. Returned so the caller can name what
+    /// was opened without a second query -- a hold whose row id the caller had to guess would be a
+    /// hold it could not audit.
+    pub handoff_ids: Vec<Uuid>,
     /// The deliveries this commit created. Empty for a duplicate, which must not fan out twice.
     pub delivery_ids: Vec<crate::entities::transport::DeliveryId>,
 }

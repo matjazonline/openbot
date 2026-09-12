@@ -1,11 +1,15 @@
 use super::*;
 use crate::{
-    adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture, test_pool},
-    application::task_queue::TaskPersistence,
+    adapters::persistence::test_support::{
+        DeliveryFixtureRequest, ThreadHandoffFixtureRequest, delivery_fixture, test_pool,
+        thread_handoff_fixture,
+    },
+    application::{task_queue::TaskPersistence, thread_handoff::ThreadHandoffPolicyPersistence},
     entities::{
         attention::{AttentionView, BusinessPriority},
         creation::CreationProvenance,
         task::{ResumeActor, TaskOwner, TaskStatus},
+        thread_handoff::{ThreadHandoffCommand, ThreadHandoffOperation, ThreadHandoffState},
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite},

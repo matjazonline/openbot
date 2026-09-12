@@ -10,6 +10,7 @@ use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageDirection;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+use crate::entities::thread_handoff::ExternalReplyHandling;
 use crate::infra::config::ResendApiConfig;
 use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
 use crate::transport::{DeliveryCreation, NewDelivery};
@@ -5344,5 +5345,318 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     assert!(
         quiet_result.task_id.is_none(),
         "FileOnly must not create an agent task"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// The hold gate, driven end to end through the in-memory committer.
+//
+// Every row of the plan's behaviour table is a case here. The assertions are on the *captured
+// commit request* rather than on what the double chose to store, because the request is what the
+// read-only phases decided and the SQL committer would have been handed.
+// ---------------------------------------------------------------------------------------------
+
+/// A team-only `support` channel that anyone may write to, so an outsider's first contact is
+/// authorized and the "new conversations are never held" row can actually be exercised.
+fn public_support_fixture() -> ChannelFixture {
+    channel_fixture(TestChannel {
+        participant_emails: Some(vec!["@public".into(), "team@acme.com".into()]),
+        ..TestChannel::default()
+    })
+}
+
+/// The last commit request the double was handed.
+fn last_commit(fixture: &ChannelFixture) -> crate::transport::InboundCommitRequest {
+    fixture
+        .threads
+        .committed_requests()
+        .last()
+        .cloned()
+        .expect("the message was accepted, so it was committed")
+}
+
+/// Open the thread the outside replies below continue: a teammate writes to `support` and copies
+/// the client, who joins the thread and is therefore allowed to answer into it.
+async fn open_thread_with_an_outsider(fixture: &ChannelFixture) {
+    let opened = fixture
+        .use_cases
+        .ingest_test_email(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+    assert!(opened.accepted, "the fixture's own thread must open");
+}
+
+#[tokio::test]
+async fn an_outside_reply_to_an_existing_thread_is_held_on_a_manual_handoff_channel() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(outsider_reply())
+        .await
+        .unwrap();
+
+    assert!(
+        reply.accepted,
+        "a held message is still filed on the thread"
+    );
+    assert!(reply.task_id.is_none(), "no agent runs for a held reply");
+    let request = last_commit(&fixture);
+    assert!(request.task.is_none());
+    assert_eq!(request.holds.len(), 1);
+    assert_eq!(request.holds[0].channel_id, fixture.channel_id);
+    // The hold is a separate axis from the disposition: this is still the customer's own message.
+    assert_eq!(
+        request.envelope.directives.disposition,
+        MessageDisposition::Answer
+    );
+    assert_eq!(request.associations.len(), 1);
+}
+
+#[tokio::test]
+async fn an_outside_reply_is_answered_immediately_on_an_automatic_channel() {
+    let fixture = channel_fixture(TestChannel::default());
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(outsider_reply())
+        .await
+        .unwrap();
+
+    assert!(reply.task_id.is_some(), "today's behaviour is the default");
+    assert!(last_commit(&fixture).holds.is_empty());
+}
+
+/// A company that switches its default moves every inheriting channel with it, live — the channel
+/// row is never touched, so this is the test that proves the policy is resolved rather than copied.
+#[tokio::test]
+async fn an_inheriting_channel_follows_the_company_default_into_holding() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_company_reply_handling(fixture.company_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(outsider_reply())
+        .await
+        .unwrap();
+
+    assert!(reply.task_id.is_none());
+    assert_eq!(last_commit(&fixture).holds.len(), 1);
+}
+
+/// A first contact has nothing to hold *against*: no history for a teammate to instruct from, and
+/// the agent's greeting is the fastest useful answer.
+#[tokio::test]
+async fn a_new_conversation_from_outside_is_never_held() {
+    let fixture = public_support_fixture();
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+
+    let first = fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some("Message-ID: <first-contact@external.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            from: "client@external.com".to_string(),
+            subject: Some("Hello".to_string()),
+            text: Some("Do you sell widgets?".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert!(first.accepted);
+    assert!(first.task_id.is_some(), "the agent greets a first contact");
+    assert!(last_commit(&fixture).holds.is_empty());
+}
+
+/// The team is not "outside". A teammate who wants a hold writes an internal note instead.
+#[tokio::test]
+async fn a_teammates_reply_to_an_existing_thread_is_never_held() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <team-reply@acme.com>\nIn-Reply-To: <cc-outsider@acme.com>\n"
+                    .to_string(),
+            ),
+            from: "team@acme.com".to_string(),
+            ..message_to_support_cc_outsider()
+        })
+        .await
+        .unwrap();
+
+    assert!(reply.task_id.is_some());
+    assert!(last_commit(&fixture).holds.is_empty());
+}
+
+/// An explicit `FileOnly` already produces no task; a handoff would ask the team to act on a
+/// message that asked nobody to.
+#[tokio::test]
+async fn a_quiet_outside_reply_is_never_held() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            to: "support.quiet@acme.mailagents.com".to_string(),
+            ..outsider_reply()
+        })
+        .await
+        .unwrap();
+
+    assert!(reply.accepted);
+    assert!(reply.task_id.is_none());
+    let request = last_commit(&fixture);
+    assert!(
+        request.holds.is_empty(),
+        "the two gates are independent and only the quiet one fires"
+    );
+    assert_eq!(
+        request.envelope.directives.disposition,
+        MessageDisposition::FileOnly
+    );
+}
+
+/// A channel the body never named was not going to answer, so there is nothing to hold.
+#[tokio::test]
+async fn a_passively_copied_held_channel_is_never_held() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <passive-cc@external.com>\nIn-Reply-To: <cc-outsider@acme.com>\n"
+                    .to_string(),
+            ),
+            to: "someone@elsewhere.test".to_string(),
+            cc: Some("support@acme.mailagents.com".to_string()),
+            from: "client@external.com".to_string(),
+            subject: Some("Re: Client inquiry".to_string()),
+            text: Some("Thanks, noted.".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert!(reply.accepted);
+    assert!(reply.task_id.is_none(), "a passive copy runs no agent");
+    assert!(last_commit(&fixture).holds.is_empty());
+}
+
+/// Holding a correlated outreach reply would strand the task that is waiting for it. The match is
+/// read *after* `authorize_thread_injection` folded it in, which is what this exercises.
+#[tokio::test]
+async fn an_outside_reply_that_closes_an_outreach_is_never_held() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    // The waiting run, as the outreach correlation double states it: this thread is expecting
+    // exactly this address to answer exactly this outbound turn.
+    let thread_id = fixture.threads.threads()[0].id;
+    {
+        let mut tasks = fixture.tasks.tasks.lock().unwrap();
+        let waiting = tasks
+            .first_mut()
+            .expect("the opening message ran the agent");
+        waiting.thread_id = Some(thread_id);
+        waiting.payload = serde_json::json!({
+            "test_outreach": {
+                "outreach_id": Uuid::new_v4(),
+                "target_email": "client@external.com",
+                "outbound_message_id": "<outreach-question@acme.com>"
+            }
+        });
+    }
+
+    let reply = fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <outreach-answer@external.com>\n\
+                 In-Reply-To: <cc-outsider@acme.com>\n\
+                 References: <cc-outsider@acme.com> <outreach-question@acme.com>\n"
+                    .to_string(),
+            ),
+            ..outsider_reply()
+        })
+        .await
+        .unwrap();
+
+    assert!(reply.accepted);
+    let request = last_commit(&fixture);
+    assert_eq!(
+        request.outreach_transitions.len(),
+        1,
+        "the reply must still close the outreach it answers"
+    );
+    assert!(
+        request.holds.is_empty(),
+        "holding it would strand the waiting task"
+    );
+}
+
+/// A second reply while the first is still held takes a new generation rather than a second hold.
+#[tokio::test]
+async fn a_second_outside_reply_opens_another_generation_on_the_same_thread() {
+    let fixture = channel_fixture(TestChannel::default());
+    fixture
+        .threads
+        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
+    open_thread_with_an_outsider(&fixture).await;
+
+    fixture
+        .use_cases
+        .ingest_test_email(outsider_reply())
+        .await
+        .unwrap();
+    let first = last_commit(&fixture);
+
+    fixture
+        .use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <outsider-reply-2@external.com>\n\
+                 In-Reply-To: <cc-outsider@acme.com>\n"
+                    .to_string(),
+            ),
+            ..outsider_reply()
+        })
+        .await
+        .unwrap();
+    let second = last_commit(&fixture);
+
+    assert_eq!(first.holds.len(), 1);
+    assert_eq!(second.holds.len(), 1);
+    assert_ne!(
+        first.holds[0].generation, second.holds[0].generation,
+        "each held message opens a generation of its own"
     );
 }

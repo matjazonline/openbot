@@ -52,6 +52,10 @@ pub struct CompanyForm {
     pub slug: String,
     pub enable_llm_spam_guardrail: Option<bool>,
     pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
+    /// The company's reply-handling default. Omitted preserves the stored value, exactly like
+    /// [`CompanyForm::external_response_review`] — this struct is both the HTML form and the JSON
+    /// payload, so a PUT that does not name the field must not reset it.
+    pub external_reply_handling: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
     /// The company's picture. A save carries what it was sent, so the edit form keeps the stored
     /// URL in a hidden field rather than dropping the picture on every rename.
     pub avatar_url: Option<String>,
@@ -92,6 +96,7 @@ impl CompanyForm {
             slug: self.slug.clone(),
             enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
             external_response_review: self.external_response_review,
+            external_reply_handling: self.external_reply_handling,
             memory_provider: None,
             channel_defaults: crate::entities::company::CompanyChannelDefaults {
                 add_3rd_party: self.default_add_3rd_party.unwrap_or(false),
@@ -383,7 +388,7 @@ async fn create_company_json(
 }
 
 /// JSON API: Update company (Protected).
-async fn update_company_json(
+pub(super) async fn update_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(memory_use_cases): State<Arc<MemoryUseCases>>,
     State(config): State<Arc<AppConfig>>,

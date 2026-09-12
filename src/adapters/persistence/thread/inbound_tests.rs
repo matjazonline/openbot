@@ -24,10 +24,10 @@ use crate::transport::{
     AddressedIdentity, AuthenticatedInboundEvent, BoundedVec, CanonicalContent,
     ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome,
     InboundCommitRequest, InboundEnvelope, InboundEventInbox, InboundEventPayload,
-    InboundEventQueue, InboundMessageCommitter, InboundOutreachTransition, InboundTaskRequest,
-    InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension,
-    RecipientRole, ReplyDelivery, SafeHeaderFacts, ThreadAssociation, ThreadPrincipalIntent,
-    ThreadTarget, WorkerId,
+    InboundEventQueue, InboundHold, InboundMessageCommitter, InboundOutreachTransition,
+    InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep,
+    ProtocolExtension, RecipientRole, ReplyDelivery, SafeHeaderFacts, ThreadAssociation,
+    ThreadPrincipalIntent, ThreadTarget, WorkerId,
 };
 use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
 
@@ -123,6 +123,7 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
                 role: RecipientRole::To,
             }],
         }),
+        holds: BoundedVec::empty(),
         outreach_transitions: BoundedVec::empty(),
         deliveries: Vec::new(),
         reply_delivery: ReplyDelivery::Send,
@@ -1409,6 +1410,528 @@ async fn lease_loss_at_final_commit_rolls_back_every_canonical_effect() {
     // The row keeps the lapsed lease rather than settling itself: the reaper owns that decision,
     // and it is the only place an attempt is charged for a lease nobody renewed.
     assert_eq!(event_status(&fixture, stored).await, "processing");
+
+    fixture.cleanup().await;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The hold gate: an eligible outside reply is filed as the customer message it is, and opens a
+// `thread_handoffs` generation, with no `background_tasks` row for that channel.
+//
+// Every assertion below is scoped to the fixture's own company. The suite shares one database and
+// runs in parallel, so a whole-table count would be a coin toss.
+// ---------------------------------------------------------------------------------------------
+
+/// A commit that holds the fixture's channel instead of running its agent.
+async fn held_request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitRequest {
+    let mut request = request(fixture, rfc, body).await;
+    hold_the_only_channel(&mut request, fixture.channel_id);
+    request
+}
+
+/// Drop the task and state the hold, exactly as `CommitPlan::build` would for a held channel.
+fn hold_the_only_channel(request: &mut InboundCommitRequest, channel_id: Uuid) {
+    request.task = None;
+    request.holds = BoundedVec::parse(
+        "thread handoffs",
+        vec![InboundHold {
+            channel_id,
+            handoff_id: Uuid::new_v4(),
+            generation: Uuid::new_v4(),
+        }],
+    )
+    .unwrap();
+}
+
+/// The one handoff of the fixture's company, by the key that makes it unique.
+async fn handoff_row(
+    fixture: &Fixture,
+) -> (Uuid, Uuid, String, i64, Option<Uuid>, String, bool, Uuid) {
+    sqlx::query_as(
+        r#"SELECT id, generation, state, version, responsible_principal_id, business_priority,
+                  (closed_at IS NOT NULL), source_message_id
+           FROM thread_handoffs WHERE company_id = $1"#,
+    )
+    .bind(fixture.company_id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap()
+}
+
+async fn handoff_count(fixture: &Fixture) -> i64 {
+    count(
+        fixture,
+        "SELECT count(*) FROM thread_handoffs WHERE company_id = $1",
+    )
+    .await
+}
+
+/// Every event of this company's handoffs, oldest first, as the fields the opening write sets.
+async fn handoff_events(
+    fixture: &Fixture,
+) -> Vec<(String, String, Option<Uuid>, i64, i64, Uuid, Uuid)> {
+    sqlx::query_as(
+        r#"SELECT operation, actor_kind, actor_principal_id, from_version, to_version,
+                  command_id, generation
+           FROM thread_handoff_events WHERE company_id = $1
+           ORDER BY to_version, occurred_at"#,
+    )
+    .bind(fixture.company_id)
+    .fetch_all(&fixture.pool)
+    .await
+    .unwrap()
+}
+
+/// Case 8 and 9: the first generation, and no run for it.
+#[tokio::test]
+async fn a_held_reply_opens_one_generation_and_creates_no_task() {
+    let Some(fixture) = Fixture::new("inbound_hold_first").await else {
+        return;
+    };
+    let rfc = format!("<hold-first-{}@example.com>", fixture.suffix);
+    let request = held_request(&fixture, &rfc, "Any news on the invoice?").await;
+
+    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
+
+    assert_eq!(outcome.disposition, CommitDisposition::Created);
+    assert!(outcome.task_id.is_none(), "a held reply runs no agent");
+    assert_eq!(outcome.handoff_ids.len(), 1);
+    assert_eq!(task_count(&fixture).await, 0);
+    assert_eq!(message_count(&fixture).await, 1);
+    // Everything else about a held message is exactly what an unheld one produces: its thread
+    // association, and the provider mapping a redelivery is recognised by.
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM thread_messages WHERE company_id = $1"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM external_messages WHERE company_id = $1"
+        )
+        .await,
+        1
+    );
+
+    let (id, _, state, version, responsible, priority, closed, source) =
+        handoff_row(&fixture).await;
+    assert_eq!(id, outcome.handoff_ids[0]);
+    assert_eq!(state, "needs_instruction");
+    assert_eq!(version, 1);
+    assert_eq!(responsible, None, "a fresh handoff is the channel team's");
+    assert_eq!(priority, "normal");
+    assert!(!closed);
+    assert_eq!(source, outcome.message_id.as_uuid());
+
+    let events = handoff_events(&fixture).await;
+    assert_eq!(events.len(), 1);
+    let (operation, actor_kind, actor, from_version, to_version, command_id, _) = &events[0];
+    assert_eq!(operation, "opened");
+    assert_eq!(actor_kind, "system");
+    assert_eq!(*actor, None, "an arriving message is not a person acting");
+    assert_eq!((*from_version, *to_version), (0, 1));
+    assert_eq!(
+        *command_id,
+        outcome.message_id.as_uuid(),
+        "the canonical message id is what makes the opening write idempotent"
+    );
+
+    // The held copy is an ordinary customer message: same audience, same entry kind.
+    let (audience, entry_kind): (String, String) = sqlx::query_as(
+        r#"SELECT message.audience, association.entry_kind
+           FROM messages AS message
+           JOIN thread_messages AS association ON association.message_id = message.id
+           WHERE message.company_id = $1"#,
+    )
+    .bind(fixture.company_id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(audience, "external_conversation");
+    assert_eq!(entry_kind, "conversation");
+
+    fixture.cleanup().await;
+}
+
+/// Case 10: a second reply replaces the generation rather than opening a second handoff.
+#[tokio::test]
+async fn a_second_held_reply_replaces_the_generation_in_place() {
+    let Some(fixture) = Fixture::new("inbound_hold_second").await else {
+        return;
+    };
+    let first_rfc = format!("<hold-a-{}@example.com>", fixture.suffix);
+    let first = fixture
+        .persistence
+        .commit_inbound(held_request(&fixture, &first_rfc, "First").await)
+        .await
+        .unwrap();
+    let (_, first_generation, _, _, _, _, _, _) = handoff_row(&fixture).await;
+
+    let second_rfc = format!("<hold-b-{}@example.com>", fixture.suffix);
+    let mut second = held_request(&fixture, &second_rfc, "Second").await;
+    second.envelope.source.thread_key = ExternalThreadKey::parse(&first_rfc).unwrap();
+    let second = fixture.persistence.commit_inbound(second).await.unwrap();
+
+    assert_eq!(handoff_count(&fixture).await, 1, "one handoff per thread");
+    assert_eq!(
+        second.handoff_ids, first.handoff_ids,
+        "the same row moved on"
+    );
+    let (_, generation, state, version, _, _, closed, source) = handoff_row(&fixture).await;
+    assert_ne!(generation, first_generation);
+    assert_eq!(state, "needs_instruction");
+    assert_eq!(version, 2);
+    assert!(!closed);
+    assert_eq!(source, second.message_id.as_uuid());
+
+    let events = handoff_events(&fixture).await;
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[1].0, "regenerated");
+    assert_eq!((events[1].3, events[1].4), (1, 2));
+    assert_eq!(events[1].6, generation);
+
+    fixture.cleanup().await;
+}
+
+/// Case 11: responsibility and attributes are about who is looking after this conversation. A new
+/// customer message is not a reason to un-assign it.
+#[tokio::test]
+async fn a_replacement_keeps_the_responsibility_and_the_attributes() {
+    let Some(fixture) = Fixture::new("inbound_hold_keep").await else {
+        return;
+    };
+    let first_rfc = format!("<hold-keep-a-{}@example.com>", fixture.suffix);
+    fixture
+        .persistence
+        .commit_inbound(held_request(&fixture, &first_rfc, "First").await)
+        .await
+        .unwrap();
+
+    let claimant = fixture
+        .persistence
+        .resolve_or_create_external_identity(
+            fixture.company_id,
+            IdentityObservation {
+                identity: identity("bo@acme.example"),
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::TransportIngress,
+            },
+        )
+        .await
+        .unwrap()
+        .principal
+        .id;
+    let due = chrono::Utc::now() + chrono::Duration::hours(4);
+    sqlx::query(
+        r#"UPDATE thread_handoffs
+           SET responsible_principal_id = $2, business_priority = 'high', business_due_at = $3
+           WHERE company_id = $1"#,
+    )
+    .bind(fixture.company_id)
+    .bind(claimant.as_uuid())
+    .bind(due)
+    .execute(&fixture.pool)
+    .await
+    .unwrap();
+    let (_, first_generation, _, claimed_version, _, _, _, _) = handoff_row(&fixture).await;
+
+    let second_rfc = format!("<hold-keep-b-{}@example.com>", fixture.suffix);
+    let mut second = held_request(&fixture, &second_rfc, "Second").await;
+    second.envelope.source.thread_key = ExternalThreadKey::parse(&first_rfc).unwrap();
+    fixture.persistence.commit_inbound(second).await.unwrap();
+
+    let (_, generation, state, version, responsible, priority, _, _) = handoff_row(&fixture).await;
+    assert_ne!(generation, first_generation, "the generation moved");
+    assert_eq!(state, "needs_instruction");
+    assert_eq!(version, claimed_version + 1);
+    assert_eq!(
+        responsible,
+        Some(claimant.as_uuid()),
+        "a thread Bo claimed stays Bo's"
+    );
+    assert_eq!(priority, "high");
+    let kept_due: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("SELECT business_due_at FROM thread_handoffs WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
+    assert!(kept_due.is_some());
+
+    fixture.cleanup().await;
+}
+
+/// Case 12: the state returns to `needs_instruction` from anywhere, and `closed_at` is cleared —
+/// which the closure check would otherwise refuse outright.
+#[tokio::test]
+async fn a_replacement_reopens_a_drafting_or_resolved_handoff() {
+    let Some(fixture) = Fixture::new("inbound_hold_reopen").await else {
+        return;
+    };
+    let root = format!("<hold-reopen-{}@example.com>", fixture.suffix);
+    fixture
+        .persistence
+        .commit_inbound(held_request(&fixture, &root, "First").await)
+        .await
+        .unwrap();
+
+    for (index, (state, closed)) in [("drafting", false), ("resolved", true)].iter().enumerate() {
+        sqlx::query("UPDATE thread_handoffs SET state = $2, closed_at = $3 WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .bind(state)
+            .bind(closed.then(chrono::Utc::now))
+            .execute(&fixture.pool)
+            .await
+            .expect("the fixture may put the row in any legal state");
+
+        let rfc = format!("<hold-reopen-{index}-{}@example.com>", fixture.suffix);
+        let mut next = held_request(&fixture, &rfc, "Another reply").await;
+        next.envelope.source.thread_key = ExternalThreadKey::parse(&root).unwrap();
+        fixture.persistence.commit_inbound(next).await.unwrap();
+
+        let (_, _, reopened, _, _, _, still_closed, _) = handoff_row(&fixture).await;
+        assert_eq!(reopened, "needs_instruction", "replaced a {state} handoff");
+        assert!(
+            !still_closed,
+            "the closure check refuses an open row with a closed_at"
+        );
+    }
+
+    fixture.cleanup().await;
+}
+
+/// Case 13: the same inbound message delivered twice is one message, one handoff, one generation,
+/// one event and no task. `recognise_redelivery` returns before any of this is reached.
+#[tokio::test]
+async fn a_redelivered_held_message_opens_no_second_generation() {
+    let Some(fixture) = Fixture::new("inbound_hold_redelivery").await else {
+        return;
+    };
+    let rfc = format!("<hold-dup-{}@example.com>", fixture.suffix);
+    let first = fixture
+        .persistence
+        .commit_inbound(held_request(&fixture, &rfc, "Same message").await)
+        .await
+        .unwrap();
+    let (_, generation, _, _, _, _, _, _) = handoff_row(&fixture).await;
+
+    let again = fixture
+        .persistence
+        .commit_inbound(held_request(&fixture, &rfc, "Same message").await)
+        .await
+        .unwrap();
+
+    assert_eq!(again.disposition, CommitDisposition::Duplicate);
+    assert_eq!(again.message_id, first.message_id);
+    assert!(again.handoff_ids.is_empty(), "a redelivery opens nothing");
+    assert!(again.task_id.is_none());
+    assert_eq!(message_count(&fixture).await, 1);
+    assert_eq!(handoff_count(&fixture).await, 1);
+    assert_eq!(task_count(&fixture).await, 0);
+    assert_eq!(handoff_events(&fixture).await.len(), 1);
+    let (_, still, _, version, _, _, _, _) = handoff_row(&fixture).await;
+    assert_eq!(still, generation);
+    assert_eq!(version, 1);
+
+    fixture.cleanup().await;
+}
+
+/// Case 14: one message, two channels, one task and one handoff.
+#[tokio::test]
+async fn a_message_to_a_held_and_an_automatic_channel_produces_one_of_each() {
+    let Some(fixture) = Fixture::new("inbound_hold_mixed").await else {
+        return;
+    };
+    let billing_id = fixture.extra_channel("billing").await;
+    let billing_binding = fixture.email_binding_of(billing_id).await;
+    let support_binding = fixture.email_binding_of(fixture.channel_id).await;
+    let rfc = format!("<hold-mixed-{}@example.com>", fixture.suffix);
+
+    let mut request = request(&fixture, &rfc, "Two teams, please").await;
+    request.associations = BoundedVec::parse(
+        "thread associations",
+        vec![
+            ThreadAssociation {
+                channel_id: fixture.channel_id,
+                binding_id: support_binding,
+                target: ThreadTarget::Create {
+                    subject: "Quick question".to_string(),
+                },
+                role: RecipientRole::To,
+                step: PipelineStep::only(),
+                principals: sender_principals(),
+            },
+            ThreadAssociation {
+                channel_id: billing_id,
+                binding_id: billing_binding,
+                target: ThreadTarget::Create {
+                    subject: "Quick question".to_string(),
+                },
+                role: RecipientRole::To,
+                step: PipelineStep::only(),
+                principals: sender_principals(),
+            },
+        ],
+    )
+    .unwrap();
+    // Support is held; billing answers.
+    request.task = Some(InboundTaskRequest {
+        task_type: AGENT_DISPATCH.to_string(),
+        targets: vec![InboundTaskTarget {
+            channel_id: billing_id,
+            role: RecipientRole::To,
+        }],
+    });
+    request.holds = BoundedVec::parse(
+        "thread handoffs",
+        vec![InboundHold {
+            channel_id: fixture.channel_id,
+            handoff_id: Uuid::new_v4(),
+            generation: Uuid::new_v4(),
+        }],
+    )
+    .unwrap();
+
+    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
+
+    assert_eq!(message_count(&fixture).await, 1, "one canonical message");
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM thread_messages WHERE company_id = $1"
+        )
+        .await,
+        2
+    );
+    assert_eq!(task_count(&fixture).await, 1);
+    let task_channel: Uuid =
+        sqlx::query_scalar("SELECT channel_id FROM background_tasks WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
+    assert_eq!(task_channel, billing_id, "billing's task still runs");
+
+    assert_eq!(handoff_count(&fixture).await, 1);
+    let handoff_channel: Uuid =
+        sqlx::query_scalar("SELECT channel_id FROM thread_handoffs WHERE company_id = $1")
+            .bind(fixture.company_id)
+            .fetch_one(&fixture.pool)
+            .await
+            .unwrap();
+    assert_eq!(handoff_channel, fixture.channel_id);
+    assert_eq!(outcome.handoff_ids.len(), 1);
+
+    fixture.cleanup().await;
+}
+
+/// Case 15: two commits racing to hold one thread. Neither may raise a duplicate-key error out of
+/// an ingest -- the `ON CONFLICT (company_id, thread_id) DO UPDATE` is what turns the loser into a
+/// replacement rather than a failure. The row ends at version 2 with one of the two generations,
+/// and there are two events.
+#[tokio::test]
+async fn two_concurrent_commits_on_one_thread_serialise_on_the_unique_key() {
+    let Some(fixture) = Fixture::new("inbound_hold_race").await else {
+        return;
+    };
+    // Both generations open on this already-existing thread, so neither commit creates it and the
+    // race is exactly the one the `ON CONFLICT` has to survive.
+    let thread = fixture
+        .extra_thread(fixture.channel_id, "Invoice 4471")
+        .await;
+    let binding = fixture.email_binding_of(fixture.channel_id).await;
+
+    let mut requests = Vec::new();
+    for index in 0..2 {
+        let rfc = format!("<hold-race-{index}-{}@example.com>", fixture.suffix);
+        let mut request = held_request(&fixture, &rfc, "Racing reply").await;
+        request.envelope.source.thread_key = ExternalThreadKey::parse(&rfc).unwrap();
+        request.associations = BoundedVec::parse(
+            "thread associations",
+            vec![ThreadAssociation {
+                channel_id: fixture.channel_id,
+                binding_id: binding,
+                target: ThreadTarget::Existing(thread.id),
+                role: RecipientRole::To,
+                step: PipelineStep::only(),
+                principals: sender_principals(),
+            }],
+        )
+        .unwrap();
+        requests.push(request);
+    }
+    let second = requests.pop().unwrap();
+    let first = requests.pop().unwrap();
+    let first_generation = first.holds[0].generation;
+    let second_generation = second.holds[0].generation;
+
+    let left = fixture.persistence.clone();
+    let right = fixture.persistence.clone();
+    let (one, two) = tokio::join!(
+        tokio::spawn(async move { left.commit_inbound(first).await }),
+        tokio::spawn(async move { right.commit_inbound(second).await }),
+    );
+    one.unwrap()
+        .expect("neither commit may raise a duplicate key");
+    two.unwrap()
+        .expect("neither commit may raise a duplicate key");
+
+    assert_eq!(handoff_count(&fixture).await, 1);
+    let (_, generation, state, version, _, _, _, _) = handoff_row(&fixture).await;
+    assert_eq!(version, 2, "the loser saw the winner's version");
+    assert_eq!(state, "needs_instruction");
+    assert!(
+        generation == first_generation || generation == second_generation,
+        "the surviving generation is one of the two that raced"
+    );
+    let events = handoff_events(&fixture).await;
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].0, "opened");
+    assert_eq!(events[1].0, "regenerated");
+    assert_eq!(task_count(&fixture).await, 0);
+
+    fixture.cleanup().await;
+}
+
+/// Case 19: a hold naming a channel with no association is a planner bug, and the whole commit
+/// rolls back — no message, no thread, no mapping. The task equivalent is proved just above.
+#[tokio::test]
+async fn a_hold_with_no_association_rolls_the_whole_commit_back() {
+    let Some(fixture) = Fixture::new("inbound_hold_rollback").await else {
+        return;
+    };
+    let rfc = format!("<hold-orphan-{}@example.com>", fixture.suffix);
+    let mut request = held_request(&fixture, &rfc, "Anyone there?").await;
+    hold_the_only_channel(&mut request, Uuid::new_v4());
+
+    let refused = fixture.persistence.commit_inbound(request).await;
+    assert!(refused.is_err(), "a hold with no association is refused");
+
+    assert_eq!(message_count(&fixture).await, 0);
+    assert_eq!(handoff_count(&fixture).await, 0);
+    assert_eq!(task_count(&fixture).await, 0);
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM external_messages WHERE company_id = $1"
+        )
+        .await,
+        0
+    );
+    // The fixture's own thread survives; nothing this commit would have opened does.
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM threads WHERE company_id = $1"
+        )
+        .await,
+        1
+    );
 
     fixture.cleanup().await;
 }

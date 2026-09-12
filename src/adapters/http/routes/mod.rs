@@ -16,6 +16,7 @@ pub mod onboarding;
 pub mod schedule;
 pub mod skill_library;
 pub mod task;
+pub mod thread_handoffs;
 pub mod ui;
 pub mod ui_agents;
 pub mod ui_attachments;
@@ -32,6 +33,7 @@ mod ui_response_reviews;
 pub mod ui_schedules;
 pub mod ui_tasks;
 pub mod ui_team;
+mod ui_thread_handoffs;
 pub mod ui_uploads;
 pub mod user;
 pub mod webhooks;
@@ -84,6 +86,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(agent_library::router())
         .merge(approval::router())
         .merge(attention::router())
+        .merge(thread_handoffs::router())
         .merge(monitoring::router())
         .merge(notifications::router())
         .merge(onboarding::router())
@@ -101,6 +104,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_response_reviews::router())
         .merge(ui_tasks::router())
         .merge(ui_team::router())
+        .merge(ui_thread_handoffs::router())
         .merge(ui_uploads::router())
         .route_layer(middleware::from_fn_with_state(sessions, auth::require_auth))
         .layer(middleware::from_fn(ui_error_feedback));

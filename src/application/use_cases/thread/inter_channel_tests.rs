@@ -287,6 +287,7 @@ async fn fixture_for_harness(
                 companies: persistence.clone(),
                 participants: persistence.clone(),
                 tasks: persistence.clone(),
+                handoff_policy: persistence.clone(),
             },
             InboundIngestPorts {
                 committer: persistence.clone(),

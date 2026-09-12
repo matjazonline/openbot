@@ -107,6 +107,8 @@ pub struct CompanyWrite {
     pub enable_llm_spam_guardrail: Option<bool>,
     /// `None` preserves the current value on update and chooses autonomous on create.
     pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
+    /// `None` preserves the current value on update and chooses automatic on create.
+    pub external_reply_handling: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
     pub memory_provider: Option<MemoryProviderKind>,
     pub channel_defaults: CompanyChannelDefaults,
     /// The company's picture, already parsed as a URL a page may render.
@@ -799,6 +801,7 @@ mod tests {
                     external_response_review: Some(
                         crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
                     ),
+                    external_reply_handling: None,
                     memory_provider: None,
                     channel_defaults: crate::entities::company::CompanyChannelDefaults::default(),
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),

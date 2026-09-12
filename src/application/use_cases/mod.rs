@@ -13,6 +13,7 @@ pub mod response_review;
 pub mod schedule;
 pub mod skill;
 pub mod thread;
+pub mod thread_handoff;
 pub mod user;
 
 pub mod mcp;

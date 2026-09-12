@@ -87,6 +87,9 @@ pub struct NotificationScope {
 pub enum AttentionWakeSource {
     Task,
     Handoff,
+    /// `thread_handoffs`, the inbound-triggered handoff -- a different feature from the
+    /// `Handoff` above, which is `manual_handoffs`.
+    ThreadHandoff,
     ResponseReview,
     Delegation,
     Delivery,
@@ -406,6 +409,24 @@ mod tests {
                 channel_id: id(2),
                 source_kind: AttentionWakeSource::Handoff,
                 source_id: id(6),
+            }
+        );
+
+        // The `thread_handoffs_notify_attention` trigger's argument, which is the only thing
+        // standing between a renamed source kind and a queue that silently stops updating.
+        let thread_handoff_payload = r#"{
+            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
+            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
+            "source_kind": "thread_handoff",
+            "source_id": "0a8f5f5e-0000-4000-8000-000000000007"
+        }"#;
+        assert_eq!(
+            serde_json::from_str::<AttentionScope>(thread_handoff_payload).unwrap(),
+            AttentionScope {
+                company_id: id(3),
+                channel_id: id(2),
+                source_kind: AttentionWakeSource::ThreadHandoff,
+                source_id: id(7),
             }
         );
 

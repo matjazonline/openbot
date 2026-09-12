@@ -151,6 +151,10 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
     let source = match item.source_kind {
         AttentionSourceKind::Task => "Task",
         AttentionSourceKind::Handoff => "Handoff",
+        // The work, not the table: this badge is read by somebody deciding whether to pick the
+        // item up. The state is rendered separately below, so `needs_instruction` and
+        // `draft_ready` are still told apart.
+        AttentionSourceKind::ThreadHandoff => "Needs instruction",
         AttentionSourceKind::Approval => "Approval",
         AttentionSourceKind::ResponseReview => "Review",
         AttentionSourceKind::DelegationDecision => "Delegation decision",

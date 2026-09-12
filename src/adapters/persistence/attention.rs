@@ -180,6 +180,47 @@ WITH params AS (
 
     UNION ALL
 
+    -- `thread_handoffs`, the inbound-triggered one-per-thread handoff, which is a different
+    -- feature from `manual_handoffs` above and shares no table, state machine or version with it.
+    -- Its title and next action are derived here rather than stored: the row holds no free text,
+    -- so there is nothing to bound, escape, or keep in step with a renamed thread.
+    SELECT 'thread_handoff', handoff.id, handoff.company_id, handoff.channel_id,
+           -- `task_id` and `correlation_id` are a stage, not an oversight: a handoff has no task
+           -- until Phase 4 starts a drafting run, and `thread_handoff_runs` does not exist yet.
+           -- Phase 4 replaces both with a LEFT JOIN on that table.
+           handoff.thread_id, NULL::uuid, NULL::uuid, handoff.state,
+           handoff.responsible_principal_id,
+           CASE WHEN handoff.responsible_principal_id IS NULL
+                THEN 'channel_team' ELSE 'principal' END,
+           COALESCE(responsible.display_label, 'Channel team'), thread.subject,
+           CASE handoff.state
+             WHEN 'needs_instruction' THEN 'Tell the agent what to do, reply, or dismiss'
+             WHEN 'draft_ready' THEN 'Review the drafted reply and send it'
+             ELSE 'Waiting for the drafting run'
+           END,
+           -- `expires_at` is NULL because nothing expires a handoff: a value here would feed
+           -- `AttentionCursor::for_item`'s `due_rank` and invent an SLA nobody agreed to.
+           handoff.business_priority, handoff.business_due_at, NULL::timestamptz,
+           -- `created_at` is `generation_opened_at`, so the queue's age describes *this* wait
+           -- rather than the first time this thread was ever held.
+           handoff.version, handoff.generation_opened_at, handoff.updated_at
+    FROM thread_handoffs AS handoff
+    JOIN threads AS thread
+      ON (thread.company_id, thread.channel_id, thread.id)
+       = (handoff.company_id, handoff.channel_id, handoff.thread_id)
+    LEFT JOIN principals AS responsible
+      ON responsible.company_id = handoff.company_id
+     AND responsible.id = handoff.responsible_principal_id
+    WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
+      -- This predicate and `ThreadHandoffState::is_actionable` are two spellings of one rule:
+      -- `drafting` is visible progress rather than work, and the two terminal states are gone for
+      -- good. Changing one without the other is the bug.
+      AND handoff.state IN ('needs_instruction', 'draft_ready')
+      AND ($4 <> 'my_work' OR handoff.responsible_principal_id = $3)
+      AND ($4 <> 'unassigned' OR handoff.responsible_principal_id IS NULL)
+
+    UNION ALL
+
     SELECT 'approval', approval.id, approval.company_id, approval.channel_id,
            approval.thread_id, approval.task_id, task.correlation_id, approval.status,
            approval.approver_principal_id,
@@ -387,17 +428,32 @@ fn item_href(item: &AttentionItem) -> String {
                 item.company_id, item.channel_id
             ),
         },
+        // Unlike the manual handoff above, `thread_handoffs.thread_id` is `NOT NULL`, so there is
+        // no fallback to write. A `None` here would mean that constraint was removed, and a link
+        // to the wrong thread is worse than a panic a test will find.
+        AttentionSourceKind::ThreadHandoff => format!(
+            "/ui?company_id={}&channel_id={}&thread_id={}",
+            item.company_id,
+            item.channel_id,
+            item.thread_id
+                .expect("a thread handoff always names its thread"),
+        ),
     }
 }
 
-fn command_fingerprint<T: serde::Serialize>(value: &T) -> AppResult<String> {
+/// SHA-256 of a command's semantic fields, so a replay with different parameters is a conflict
+/// rather than a silent overwrite.
+///
+/// Shared with `thread_handoff.rs`, which fingerprints its own command through the same helper so
+/// the two idempotency stores cannot drift into hashing different things.
+pub(crate) fn command_fingerprint<T: serde::Serialize>(value: &T) -> AppResult<String> {
     let encoded = serde_json::to_vec(value).map_err(|error| {
         AppError::Internal(format!("Could not encode attention command: {error}"))
     })?;
     Ok(format!("{:x}", Sha256::digest(encoded)))
 }
 
-async fn actor_is_manager(
+pub(crate) async fn actor_is_manager(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     actor: PrincipalId,
@@ -419,7 +475,7 @@ async fn actor_is_manager(
     .map_err(AppError::from)
 }
 
-async fn require_human_principal(
+pub(crate) async fn require_human_principal(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     principal_id: PrincipalId,
@@ -438,7 +494,7 @@ async fn require_human_principal(
     Ok(())
 }
 
-async fn require_channel_principal(
+pub(crate) async fn require_channel_principal(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     channel_id: Uuid,
@@ -480,7 +536,7 @@ struct ExistingEvent {
     to_version: i64,
 }
 
-async fn lock_attention_source(
+pub(crate) async fn lock_attention_source(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     source_kind: &str,
@@ -640,6 +696,15 @@ impl AttentionPersistence for PostgresPersistence {
     }
 
     async fn change_source_attributes(&self, command: AttentionSourceCommand) -> AppResult<u64> {
+        // A thread handoff is fenced on its generation as well as its version and audits into its
+        // own table, so it is refused here rather than given a fifth branch: see
+        // `plan/manual_handoff/phase3.md` §3.5. Refusing it also keeps
+        // `attention_source_events_source_kind_check` free of a value nothing writes.
+        if command.source_kind == AttentionSourceKind::ThreadHandoff {
+            return Err(AppError::BadRequest(
+                "Thread handoff responsibility must be changed through its own command.".into(),
+            ));
+        }
         if !matches!(
             command.source_kind,
             AttentionSourceKind::Task | AttentionSourceKind::Handoff
@@ -711,7 +776,8 @@ impl AttentionPersistence for PostgresPersistence {
                         .map_err(AppError::from)?;
                     row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
                 }
-                AttentionSourceKind::Approval
+                AttentionSourceKind::ThreadHandoff
+                | AttentionSourceKind::Approval
                 | AttentionSourceKind::ResponseReview
                 | AttentionSourceKind::DelegationDecision
                 | AttentionSourceKind::DeliveryFailure => unreachable!(),
@@ -781,7 +847,8 @@ impl AttentionPersistence for PostgresPersistence {
                 .await
                 .map_err(AppError::from)?;
             }
-            AttentionSourceKind::Approval
+            AttentionSourceKind::ThreadHandoff
+            | AttentionSourceKind::Approval
             | AttentionSourceKind::ResponseReview
             | AttentionSourceKind::DelegationDecision
             | AttentionSourceKind::DeliveryFailure => unreachable!(),

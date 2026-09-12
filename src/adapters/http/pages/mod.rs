@@ -93,6 +93,7 @@ mod task_monitor;
 mod tasks;
 mod team_settings;
 mod thread_activity;
+mod thread_handoffs;
 
 pub use agent_library_multi_select::*;
 pub use agent_settings::*;
@@ -131,6 +132,7 @@ pub use task_monitor::*;
 pub use tasks::*;
 pub use team_settings::*;
 pub use thread_activity::*;
+pub use thread_handoffs::*;
 
 /// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic
 /// `datetime` attribute; the page shell replaces the UTC fallback text with the reader's local
