@@ -371,7 +371,7 @@ pub(crate) async fn insert_task(
          execution_generation, locked_at, lock_expires_at, run_at, created_at, updated_at";
     let conflict = match source {
         TaskSource::Message(_) => {
-            "ON CONFLICT (company_id, source_message_uuid)              DO UPDATE SET source_message_uuid = EXCLUDED.source_message_uuid"
+            "ON CONFLICT (company_id, source_message_uuid, channel_id)              DO UPDATE SET source_message_uuid = EXCLUDED.source_message_uuid"
         }
         TaskSource::ScheduleRun(_) => {
             "ON CONFLICT (company_id, source_schedule_run_id)              DO UPDATE SET source_schedule_run_id = EXCLUDED.source_schedule_run_id"

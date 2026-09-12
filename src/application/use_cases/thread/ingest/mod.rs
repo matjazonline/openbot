@@ -460,7 +460,7 @@ impl ThreadUseCases {
             company: Some(primary.company.clone()),
             channel: Some(primary.channel.clone()),
             envelope: Some(envelope),
-            task_id: outcome.task_id,
+            task_ids: outcome.task_ids,
             reply_delivery,
             channel_matches,
         })

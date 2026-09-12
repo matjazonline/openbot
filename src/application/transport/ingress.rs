@@ -626,11 +626,11 @@ pub struct InboundTaskTarget {
     pub role: RecipientRole,
 }
 
-/// The agent-dispatch task this message should create, if any.
+/// One addressed pipeline's agent-dispatch task.
 ///
-/// It names the channels the run drives, first one primary; the canonical message id is not known
-/// until the commit assigns one, which is exactly why the committer -- not the caller -- builds the
-/// durable payload.
+/// A `+` address chains its channels in one run; separate To/Cc addresses get separate tasks and
+/// replies. The first surviving channel owns the run. The canonical message id is assigned by the
+/// commit, so the committer builds the durable payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InboundTaskRequest {
     pub task_type: String,
@@ -670,6 +670,26 @@ impl InboundTaskRequest {
     }
 }
 
+/// Refuse a channel assigned to separate runs before any part of ingress is written.
+pub(crate) fn each_channel_in_one_task(
+    tasks: &[InboundTaskRequest],
+) -> crate::app_error::AppResult<()> {
+    let mut owners = std::collections::HashMap::new();
+    for (index, task) in tasks.iter().enumerate() {
+        for target in &task.targets {
+            if owners
+                .insert(target.channel_id, index)
+                .is_some_and(|owner| owner != index)
+            {
+                return Err(crate::app_error::AppError::BadRequest(
+                    "An inbound channel cannot belong to more than one task".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Everything one accepted inbound message must make durable, together or not at all.
 ///
 /// The whole point of one named struct is that these rows agree: a canonical message visible
@@ -686,7 +706,8 @@ pub struct InboundCommitRequest {
     /// a durable inbox. `None` for direct ingress, which has nothing to fence.
     pub claimed_event: Option<ExecutionLease<InboundEventId>>,
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
-    pub task: Option<InboundTaskRequest>,
+    /// One per addressed pipeline, in address order. A channel appears in at most one.
+    pub tasks: BoundedVec<InboundTaskRequest, MAX_THREAD_ASSOCIATIONS>,
     /// The channels whose copy of this message waits for the team instead of running their agent.
     ///
     /// Bounded by [`MAX_THREAD_ASSOCIATIONS`] rather than by a limit of its own: at most one
@@ -732,7 +753,8 @@ pub struct InboundCommitOutcome {
     pub message_id: CanonicalMessageId,
     /// The threads the message is now associated with, in association order.
     pub thread_ids: Vec<Uuid>,
-    pub task_id: Option<Uuid>,
+    /// Task ids in the same order as the commit request.
+    pub task_ids: Vec<Uuid>,
     /// The `thread_handoffs` rows this commit opened a generation on, in hold order.
     ///
     /// Empty for a duplicate and for every unheld message. Returned so the caller can name what
@@ -746,6 +768,25 @@ pub struct InboundCommitOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn task_channels_may_be_disjoint_but_cannot_overlap_between_runs() {
+        let channel = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        let task = |channels: &[Uuid]| InboundTaskRequest {
+            task_type: "agent_dispatch".into(),
+            targets: channels
+                .iter()
+                .map(|channel_id| InboundTaskTarget {
+                    channel_id: *channel_id,
+                    role: RecipientRole::To,
+                })
+                .collect(),
+        };
+        assert!(each_channel_in_one_task(&[]).is_ok());
+        assert!(each_channel_in_one_task(&[task(&[channel]), task(&[other])]).is_ok());
+        assert!(each_channel_in_one_task(&[task(&[other, channel]), task(&[channel])]).is_err());
+    }
 
     #[test]
     fn content_is_refused_rather_than_truncated_when_it_exceeds_its_bound() {

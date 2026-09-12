@@ -250,6 +250,7 @@ async fn revoke_internal_child(
            JOIN background_tasks AS child
              ON child.company_id = target.company_id
             AND child.source_message_uuid = inbound_source.message_id
+            AND child.channel_id = target.internal_channel_id
            WHERE target.id = $1
            ORDER BY child.created_at, child.id LIMIT 1
            FOR UPDATE OF child"#,

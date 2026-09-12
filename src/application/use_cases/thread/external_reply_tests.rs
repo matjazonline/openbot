@@ -44,6 +44,9 @@ const CUSTOMER_FIRST_MESSAGE_ID: &str = "<c0@client.example>";
 /// What the scripted agent answers. Distinctive enough to find in a body column.
 const AGENT_ANSWER: &str = "Your invoice was reissued on 14 March.";
 
+#[path = "external_reply_tests/per_address_tests.rs"]
+mod per_address_tests;
+
 fn external_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
@@ -153,10 +156,14 @@ impl Fixture {
 
     /// The one delivery queued on this channel, with its frozen parts, read back from the queue.
     async fn queued_delivery(&self) -> QueuedDelivery {
+        self.queued_delivery_on(self.channel.id).await
+    }
+
+    async fn queued_delivery_on(&self, channel_id: Uuid) -> QueuedDelivery {
         let rows = sqlx::query_as::<_, (Uuid, String)>(
             "SELECT id, idempotency_key FROM message_deliveries WHERE channel_id = $1",
         )
-        .bind(self.channel.id)
+        .bind(channel_id)
         .fetch_all(&self.pool)
         .await
         .expect("the delivery rows are readable");
@@ -498,7 +505,9 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
     );
     let thread = first.thread.clone().expect("the first mail opens a thread");
     let first_task = first
-        .task_id
+        .task_ids
+        .first()
+        .copied()
         .expect("the first mail enqueues a dispatch task");
 
     // The agent runs. Everything from here to the delivery row is production code; only the model
@@ -682,7 +691,11 @@ async fn a_stored_skill_and_tool_grant_run_through_the_production_harness() {
         ))
         .await
         .expect("the capability test mail is ingested");
-    let task_id = ingest.task_id.expect("the mail queues an agent run");
+    let task_id = ingest
+        .task_ids
+        .first()
+        .copied()
+        .expect("the mail queues an agent run");
     let outcome = fx
         .threads
         .execute_claimed_agent_task_and_dispatch(
@@ -748,7 +761,9 @@ async fn a_reply_naming_only_the_answer_still_finds_the_thread_it_answers() {
     );
     let thread = first.thread.clone().expect("the first mail opens a thread");
     let first_task = first
-        .task_id
+        .task_ids
+        .first()
+        .copied()
         .expect("the first mail enqueues a dispatch task");
 
     let lease = fx.claim(first_task).await;

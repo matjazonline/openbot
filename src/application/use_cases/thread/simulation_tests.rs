@@ -56,7 +56,7 @@ async fn queued_simulation_continues_after_a_tool_and_renders_validated_json() {
     )
     .await
     .unwrap();
-    let task = ingest.task_id.unwrap();
+    let task = ingest.task_ids[0];
     let lease = fx.claim(task).await;
     assert!(matches!(
         fx.threads

@@ -184,10 +184,14 @@ the grouping is wrong.
 
 ## Done when
 
-- [ ] `CommitPlan::build` emits one task request per address, through a pure, unit-tested helper.
-- [ ] Both publish paths cross-file the reply as `delegation`, in their existing transaction.
-- [ ] Cases 1-18 pass. Tests that changed are listed in the PR with the reason for each.
-- [ ] README §3.7 and the `InboundTaskRequest` doc describe the new rule and the cross-filing,
+- [x] `CommitPlan::build` emits one task request per address, through a pure, unit-tested helper.
+- [x] Both publish paths cross-file the reply as `delegation`, in their existing transaction.
+- [x] Cases 1-18 pass. Tests that changed are listed in [`implementation.md`](implementation.md) with the reason for each.
+- [x] README §3.7 and the `InboundTaskRequest` doc describe the new rule and the cross-filing,
       including the worked example.
-- [ ] The end-to-end check in the general file passes by hand.
-- [ ] `cargo test` + `cargo clippy --all-targets -- -D warnings` are green.
+- [x] The end-to-end check in the general file passes through an automated real-worker/email-egress fixture; see [`implementation.md`](implementation.md) for the substitution for the live manual exercise.
+- [x] `cargo test` + `cargo clippy --all-targets -- -D warnings` are green.
+
+Validation: 2026-09-12 — 1,507 library tests and 5 main-process tests passed, with 22
+existing opt-in tests ignored. Clippy, offline compilation, SQLx preparation, formatting,
+transport boundary checks, and the full library suite at the stock 2 MiB stack budget passed.

@@ -72,7 +72,7 @@ async fn structured_dispatch_preserves_json_and_exhaustion_has_no_publication() 
             ))
             .await
             .unwrap();
-        let task = ingest.task_id.unwrap();
+        let task = ingest.task_ids[0];
         let lease = fx.claim(task).await;
         let result = fx
             .threads
@@ -183,7 +183,7 @@ async fn structured_review_rejects_invalid_edits_and_serializes_edit_against_app
         ))
         .await
         .unwrap();
-    let task = ingest.task_id.unwrap();
+    let task = ingest.task_ids[0];
     let lease = fx.claim(task).await;
     let result = fx
         .threads
@@ -324,7 +324,7 @@ async fn structured_scheduled_dispatch_delivers_the_validated_json_body() {
         ))
         .await
         .unwrap();
-    let task_id = ingest.task_id.unwrap();
+    let task_id = ingest.task_ids[0];
     let task = fx
         .persistence
         .get_task_by_id(task_id)

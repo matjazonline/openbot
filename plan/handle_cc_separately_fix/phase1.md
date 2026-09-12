@@ -121,8 +121,14 @@ on the old key. `fetch_thread_tasks` already filters by thread and needs nothing
 
 ## Done when
 
-- [ ] Constraint replaced in the init migration, both databases recreated, `.sqlx` regenerated.
-- [ ] `tasks` / `task_ids` everywhere, no `task_id` left on the commit outcome or the ingest result.
-- [ ] Dispatch reads the running task from the lease, and `ReplyDeliveryMode::Direct` is gone.
-- [ ] The three child joins name the channel.
-- [ ] New tests above pass, and `cargo test` + `cargo clippy --all-targets -- -D warnings` are green.
+- [x] Constraint replaced in the init migration, both databases recreated, `.sqlx` regenerated.
+- [x] `tasks` / `task_ids` everywhere, no `task_id` left on the commit outcome or the ingest result.
+- [x] Dispatch reads the running task from the lease, and `ReplyDeliveryMode::Direct` is gone.
+- [x] The three child joins name the channel.
+- [x] New tests above pass, and `cargo test` + `cargo clippy --all-targets -- -D warnings` are green.
+
+Validation: 2026-09-12 — offline all-target compilation, SQLx preparation, formatting,
+`cargo test --locked --offline --all-targets` (1,489 library tests and 5 main tests passed;
+22 existing opt-in tests ignored), and Clippy with warnings denied all passed.
+The final run used an isolated PostgreSQL cluster on the external workspace volume after
+the internal disk filled; both fresh databases accepted all migrations.

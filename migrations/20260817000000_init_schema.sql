@@ -3692,11 +3692,14 @@ ALTER TABLE ONLY public.background_tasks
 
 
 --
--- Name: background_tasks background_tasks_company_source_message_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: background_tasks background_tasks_company_source_message_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_company_source_message_key UNIQUE (company_id, source_message_uuid);
+    ADD CONSTRAINT background_tasks_company_source_message_channel_key UNIQUE (company_id, source_message_uuid, channel_id);
+
+COMMENT ON CONSTRAINT background_tasks_company_source_message_channel_key ON public.background_tasks
+    IS 'One source message causes at most one task per channel, where the channel is the first of one addressed pipeline.';
 
 
 --

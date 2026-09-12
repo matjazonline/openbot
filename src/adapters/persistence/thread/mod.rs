@@ -10,6 +10,7 @@ mod external;
 mod inbound;
 mod internal_note;
 mod message;
+mod reply_publication;
 mod views;
 
 #[cfg(test)]
@@ -32,7 +33,10 @@ mod inbound_tests;
 #[path = "view_tests.rs"]
 mod view_tests;
 
-pub(crate) use message::{associate_message_on, insert_message_on};
+pub(crate) use message::{InsertedMessage, associate_message_on, insert_message_on};
+#[cfg(test)]
+pub(crate) use reply_publication::file_in_sibling_threads_on;
+pub(crate) use reply_publication::{TaskReplyPublication, publish_task_reply_on};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};

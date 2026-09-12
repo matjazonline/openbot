@@ -1,5 +1,16 @@
 use super::*;
 
+#[derive(sqlx::FromRow)]
+struct LockedReview {
+    draft_status: String,
+    review_status: String,
+    channel_id: Uuid,
+    reviewer_principal_id: Uuid,
+    expires_at: DateTime<Utc>,
+    publication_snapshot: serde_json::Value,
+    task_id: Option<Uuid>,
+}
+
 pub(super) async fn execute_command(
     persistence: &PostgresPersistence,
     command: ReviewCommand,
@@ -19,11 +30,10 @@ pub(super) async fn execute_command(
     }
     let version = i32::try_from(command.expected_draft_version)
         .map_err(|_| AppError::BadRequest("Draft version is out of range.".into()))?;
-    let current: Option<(String, String, Uuid, Uuid, DateTime<Utc>, serde_json::Value)> =
-        sqlx::query_as(
-            r#"SELECT draft.status, review.status, draft.channel_id,
+    let current: Option<LockedReview> = sqlx::query_as(
+        r#"SELECT draft.status AS draft_status, review.status AS review_status, draft.channel_id,
                       review.reviewer_principal_id, review.expires_at,
-                      draft.publication_snapshot
+                      draft.publication_snapshot, draft.task_id
                FROM response_drafts AS draft
                JOIN response_reviews AS review
                  ON (review.company_id, review.draft_id, review.draft_version) =
@@ -34,15 +44,22 @@ pub(super) async fn execute_command(
                      WHERE latest.company_id = $1 AND latest.id = $2
                  )
                FOR UPDATE OF draft, review"#,
-        )
-        .bind(command.company_id)
-        .bind(command.draft_id.as_uuid())
-        .bind(version)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-    let Some((draft_status, review_status, channel_id, assigned_reviewer, expires_at, snapshot)) =
-        current
+    )
+    .bind(command.company_id)
+    .bind(command.draft_id.as_uuid())
+    .bind(version)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    let Some(LockedReview {
+        draft_status,
+        review_status,
+        channel_id,
+        reviewer_principal_id: assigned_reviewer,
+        expires_at,
+        publication_snapshot: snapshot,
+        task_id,
+    }) = current
     else {
         return Err(AppError::Conflict(
             "The draft version is stale; refresh and try again.".into(),
@@ -84,7 +101,7 @@ pub(super) async fn execute_command(
     let result =
         match &command.action {
             ReviewAction::Approve { rationale } => {
-                approve_on(&mut tx, &command, snapshot, rationale.as_deref()).await?
+                approve_on(&mut tx, &command, snapshot, task_id, rationale.as_deref()).await?
             }
             ReviewAction::Reject { feedback } => {
                 reject_on(&mut tx, &command, feedback.trim()).await?;
@@ -224,30 +241,13 @@ async fn approve_on(
     tx: &mut Transaction<'_, Postgres>,
     command: &ReviewCommand,
     snapshot: serde_json::Value,
+    task_id: Option<Uuid>,
     rationale: Option<&str>,
 ) -> AppResult<ReviewCommandResult> {
     let publication: DraftPublicationSnapshot = decode_json(snapshot, "draft publication")?;
-    crate::adapters::response_schema::validate_publication(
-        publication.message(),
-        publication.delivery(),
-    )?;
-    let message = publication.message();
+    let reply = approved_publication(command.company_id, &publication, task_id)?;
+    let stored = crate::adapters::persistence::thread::publish_task_reply_on(tx, reply).await?;
     let delivery = publication.delivery();
-    if message.id != delivery.message_id || delivery.company_id != command.company_id {
-        return Err(AppError::Internal(
-            "Stored draft publication scope is inconsistent.".into(),
-        ));
-    }
-    let stored = insert_message_on(tx, message).await?;
-    for &thread_id in publication.also_in_threads() {
-        crate::adapters::persistence::thread::associate_message_on(
-            tx,
-            thread_id,
-            stored.canonical_id,
-            message.entry_kind,
-        )
-        .await?;
-    }
     let delivery_creation = insert_delivery_on(tx, delivery).await?;
     let delivery_id = delivery_creation.delivery_id();
     let version = i32::try_from(command.expected_draft_version).unwrap_or(i32::MAX);
@@ -316,6 +316,30 @@ async fn approve_on(
         draft_version: command.expected_draft_version,
         published_message_id: Some(stored.canonical_id),
         delivery: Some(delivery_creation),
+    })
+}
+
+fn approved_publication(
+    company_id: Uuid,
+    publication: &DraftPublicationSnapshot,
+    task_id: Option<Uuid>,
+) -> AppResult<crate::adapters::persistence::thread::TaskReplyPublication<'_>> {
+    crate::adapters::response_schema::validate_publication(
+        publication.message(),
+        publication.delivery(),
+    )?;
+    let message = publication.message();
+    let delivery = publication.delivery();
+    if message.id != delivery.message_id || delivery.company_id != company_id {
+        return Err(AppError::Internal(
+            "Stored draft publication scope is inconsistent.".into(),
+        ));
+    }
+    Ok(crate::adapters::persistence::thread::TaskReplyPublication {
+        company_id,
+        task_id,
+        message,
+        also_in_threads: publication.also_in_threads(),
     })
 }
 

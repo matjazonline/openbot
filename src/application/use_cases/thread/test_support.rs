@@ -1605,6 +1605,44 @@ impl ThreadHandoffPolicyPersistence for InMemoryThreads {
             .insert(channel_id, policy_override);
         Ok(())
     }
+
+    /// The responsibility commands have no in-memory model: nothing in the application-layer ingest
+    /// suite drives a handoff through claim/release/reassign/set-attributes, and their locking,
+    /// fencing and idempotency are exercised against the real database in
+    /// `adapters::persistence::thread_handoff_tests`. An `Internal` error here, rather than a
+    /// silently-successful stub, is what makes a future test that *does* call this fail loudly
+    /// instead of asserting against fabricated state.
+    async fn change_thread_handoff(
+        &self,
+        _command: crate::entities::thread_handoff::ThreadHandoffCommand,
+    ) -> AppResult<u64> {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff responsibility commands".into(),
+        ))
+    }
+
+    async fn get_thread_handoff(
+        &self,
+        _company_id: Uuid,
+        _handoff_id: Uuid,
+        _visible_channel_ids: &[Uuid],
+    ) -> AppResult<Option<crate::entities::thread_handoff::ThreadHandoff>> {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff responsibility commands".into(),
+        ))
+    }
+
+    async fn thread_handoffs_for_threads(
+        &self,
+        _company_id: Uuid,
+        _thread_ids: &[Uuid],
+        _visible_channel_ids: &[Uuid],
+    ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::thread_handoff::ThreadHandoff>>
+    {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff responsibility commands".into(),
+        ))
+    }
 }
 
 #[async_trait]
@@ -1613,6 +1651,7 @@ impl InboundMessageCommitter for InMemoryIngress {
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome> {
+        crate::transport::each_channel_in_one_task(&request.tasks)?;
         self.threads
             .store
             .lock()
@@ -1706,14 +1745,14 @@ impl InboundMessageCommitter for InMemoryIngress {
             }
         }
 
-        let mut task_id = None;
-        if let Some(task) = request.task.as_ref() {
-            let thread_of: std::collections::HashMap<Uuid, Uuid> = request
-                .associations
-                .iter()
-                .map(|association| association.channel_id)
-                .zip(thread_ids.iter().copied())
-                .collect();
+        let thread_of: std::collections::HashMap<Uuid, Uuid> = request
+            .associations
+            .iter()
+            .map(|association| association.channel_id)
+            .zip(thread_ids.iter().copied())
+            .collect();
+        let mut task_ids = Vec::with_capacity(request.tasks.len());
+        for task in &request.tasks {
             let targets: Vec<TaskTarget> = task
                 .targets
                 .iter()
@@ -1755,7 +1794,7 @@ impl InboundMessageCommitter for InMemoryIngress {
                     correlation_id: envelope.correlation_id,
                 })
                 .await?;
-            task_id = Some(created.id);
+            task_ids.push(created.id);
         }
 
         Ok(InboundCommitOutcome {
@@ -1766,7 +1805,7 @@ impl InboundMessageCommitter for InMemoryIngress {
             },
             message_id: stored.canonical_id,
             thread_ids,
-            task_id,
+            task_ids,
             // The double stores no handoff rows; it reports the ids the plan asked for, which is
             // what the application-layer tests assert against.
             handoff_ids: if already_stored {

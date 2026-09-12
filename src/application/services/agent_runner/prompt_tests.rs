@@ -42,6 +42,27 @@ fn parts<'a>(message: &'a str) -> PromptParts<'a> {
 }
 
 #[test]
+fn another_agents_reply_is_labelled_as_delegation_context() {
+    let history = [AgentHistoryMessage {
+        entry_kind: ThreadEntryKind::Delegation,
+        ..history_message(
+            MessageRole::Agent,
+            "Billing Desk",
+            "Invoice",
+            "March was reissued.",
+        )
+    }];
+    let prompt = PromptParts {
+        history: &history,
+        ..parts("What did billing say?")
+    }
+    .compose(&UntrustedFence::fixed("FENCE"));
+    assert!(prompt.contains(
+        "[External conversation | Delegation | Agent (Billing Desk) | Subject: Invoice]: March was reissued."
+    ));
+}
+
+#[test]
 fn the_latest_message_carries_its_subject_just_above_the_body() {
     let prompt = PromptParts {
         subject: Some("URGENT: invoice #442"),
