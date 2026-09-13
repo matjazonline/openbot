@@ -311,6 +311,18 @@ async fn approve_on(
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
+    // Inside the publication transaction, so "the handoff resolves when the delivery is durably
+    // enqueued" is a transactional fact rather than a hope -- and Send racing Dismiss has exactly
+    // one winner, because whichever commits second finds the state it required already gone.
+    // A draft that belongs to no drafting run matches nothing here and changes nothing.
+    crate::adapters::persistence::thread_handoff::resolve_handoff_for_draft_on(
+        tx,
+        command.company_id,
+        command.draft_id.as_uuid(),
+        command.actor_principal_id,
+        command.command_id,
+    )
+    .await?;
     Ok(ReviewCommandResult {
         draft_id: command.draft_id,
         draft_version: command.expected_draft_version,

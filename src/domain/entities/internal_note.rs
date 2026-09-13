@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{message::CanonicalMessageId, transport::PrincipalId};
+use crate::entities::{
+    message::CanonicalMessageId, thread_handoff::HandoffRunRequest, transport::PrincipalId,
+};
 
 /// Notes are intentionally much smaller than transport messages. They are collaboration context,
 /// not an alternate upload path; attachments remain unsupported until their security lifecycle is
@@ -91,6 +93,9 @@ pub struct AskOwnerToAct {
     pub expected_ownership_version: u64,
     pub note_ids: Vec<Uuid>,
     pub command_id: Uuid,
+    /// Set when this wake-up is a handoff's **Generate draft**, so the same transaction that wakes
+    /// the agent also records the run and moves the handoff. `None` is an ordinary ask.
+    pub handoff: Option<HandoffRunRequest>,
 }
 
 impl AskOwnerToAct {
@@ -98,6 +103,9 @@ impl AskOwnerToAct {
         if self.expected_ownership_version == 0 || self.expected_ownership_version > i64::MAX as u64
         {
             return Err("The expected ownership version is invalid.".into());
+        }
+        if let Some(handoff) = self.handoff {
+            handoff.validate()?;
         }
         if self.note_ids.is_empty() {
             return Err("Select at least one active internal note.".into());
@@ -122,10 +130,15 @@ pub struct StartAgentTask {
     pub thread_id: Uuid,
     pub note_ids: Vec<Uuid>,
     pub command_id: Uuid,
+    /// Set when this task is a handoff's **Generate draft**. See [`AskOwnerToAct::handoff`].
+    pub handoff: Option<HandoffRunRequest>,
 }
 
 impl StartAgentTask {
     pub fn validate(&self) -> Result<(), String> {
+        if let Some(handoff) = self.handoff {
+            handoff.validate()?;
+        }
         if self.note_ids.is_empty() {
             return Err("Select at least one active internal note.".into());
         }
@@ -215,6 +228,7 @@ mod tests {
             expected_ownership_version: 1,
             note_ids: Vec::new(),
             command_id: Uuid::new_v4(),
+            handoff: None,
         };
         assert!(ask.validate().is_err());
         ask.expected_ownership_version = 0;
@@ -234,6 +248,7 @@ mod tests {
             thread_id: ask.thread_id,
             note_ids: ask.note_ids,
             command_id: Uuid::new_v4(),
+            handoff: None,
         };
         assert!(start.validate().is_ok());
     }

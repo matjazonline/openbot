@@ -3470,6 +3470,36 @@ CREATE TABLE public.thread_handoff_events (
 
 
 --
+-- Name: thread_handoff_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+-- `UNIQUE (company_id, generation)` is the load-bearing key: at most one drafting run per handoff
+-- generation, ever, so two concurrent "Generate draft" commands produce one run and one task while
+-- the loser's whole transaction rolls back. There is deliberately no foreign key from
+-- (company_id, generation) to thread_handoffs(company_id, generation): a second outside reply
+-- *updates* that column in place, which a plain foreign key would block and an ON UPDATE CASCADE
+-- would resolve by dragging the finished run onto the new generation -- taking the unique key with
+-- it and blocking the new generation's own draft. A dangling generation on a superseded run is
+-- harmless; the run is marked `superseded` in the same transaction that moves the generation.
+
+CREATE TABLE public.thread_handoff_runs (
+    company_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    handoff_id uuid NOT NULL,
+    generation uuid NOT NULL,
+    requested_by_principal_id uuid NOT NULL,
+    command_id uuid NOT NULL,
+    draft_id uuid,
+    draft_version integer,
+    state text DEFAULT 'running'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT thread_handoff_runs_draft_check CHECK ((((draft_id IS NULL) AND (draft_version IS NULL)) OR ((draft_id IS NOT NULL) AND (draft_version > 0)))),
+    CONSTRAINT thread_handoff_runs_state_check CHECK ((state = ANY (ARRAY['running'::text, 'drafted'::text, 'failed'::text, 'superseded'::text])))
+);
+
+
+--
 -- Name: thread_handoffs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4851,6 +4881,22 @@ ALTER TABLE ONLY public.thread_handoff_events
 
 ALTER TABLE ONLY public.thread_handoff_events
     ADD CONSTRAINT thread_handoff_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: thread_handoff_runs thread_handoff_runs_generation_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_runs
+    ADD CONSTRAINT thread_handoff_runs_generation_key UNIQUE (company_id, generation);
+
+
+--
+-- Name: thread_handoff_runs thread_handoff_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_runs
+    ADD CONSTRAINT thread_handoff_runs_pkey PRIMARY KEY (company_id, task_id);
 
 
 --
@@ -7588,6 +7634,22 @@ ALTER TABLE ONLY public.task_status_events
 
 ALTER TABLE ONLY public.thread_handoff_events
     ADD CONSTRAINT thread_handoff_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoff_runs thread_handoff_runs_handoff_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_runs
+    ADD CONSTRAINT thread_handoff_runs_handoff_fk FOREIGN KEY (company_id, handoff_id) REFERENCES public.thread_handoffs(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: thread_handoff_runs thread_handoff_runs_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.thread_handoff_runs
+    ADD CONSTRAINT thread_handoff_runs_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
 
 
 --

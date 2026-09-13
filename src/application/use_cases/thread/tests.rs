@@ -5434,7 +5434,10 @@ async fn an_outside_reply_is_answered_immediately_on_an_automatic_channel() {
         .await
         .unwrap();
 
-    assert!(!reply.task_ids.is_empty(), "today's behaviour is the default");
+    assert!(
+        !reply.task_ids.is_empty(),
+        "today's behaviour is the default"
+    );
     assert!(last_commit(&fixture).holds.is_empty());
 }
 
@@ -5481,7 +5484,10 @@ async fn a_new_conversation_from_outside_is_never_held() {
         .unwrap();
 
     assert!(first.accepted);
-    assert!(!first.task_ids.is_empty(), "the agent greets a first contact");
+    assert!(
+        !first.task_ids.is_empty(),
+        "the agent greets a first contact"
+    );
     assert!(last_commit(&fixture).holds.is_empty());
 }
 

@@ -185,10 +185,10 @@ WITH params AS (
     -- Its title and next action are derived here rather than stored: the row holds no free text,
     -- so there is nothing to bound, escape, or keep in step with a renamed thread.
     SELECT 'thread_handoff', handoff.id, handoff.company_id, handoff.channel_id,
-           -- `task_id` and `correlation_id` are a stage, not an oversight: a handoff has no task
-           -- until Phase 4 starts a drafting run, and `thread_handoff_runs` does not exist yet.
-           -- Phase 4 replaces both with a LEFT JOIN on that table.
-           handoff.thread_id, NULL::uuid, NULL::uuid, handoff.state,
+           -- `task_id` is the drafting run's task when one exists. `correlation_id` stays NULL:
+           -- nothing reads it for this kind, and joining `background_tasks` for symmetry would
+           -- buy a probe per row for a column no surface renders.
+           handoff.thread_id, run.task_id, NULL::uuid, handoff.state,
            handoff.responsible_principal_id,
            CASE WHEN handoff.responsible_principal_id IS NULL
                 THEN 'channel_team' ELSE 'principal' END,
@@ -211,6 +211,10 @@ WITH params AS (
     LEFT JOIN principals AS responsible
       ON responsible.company_id = handoff.company_id
      AND responsible.id = handoff.responsible_principal_id
+    -- At most one run per generation (`thread_handoff_runs_generation_key`), so this join cannot
+    -- multiply the row, and a generation opened after a run finished simply finds none.
+    LEFT JOIN thread_handoff_runs AS run
+      ON run.company_id = handoff.company_id AND run.generation = handoff.generation
     WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
       -- This predicate and `ThreadHandoffState::is_actionable` are two spellings of one rule:
       -- `drafting` is visible progress rather than work, and the two terminal states are gone for
@@ -264,6 +268,15 @@ WITH params AS (
     LEFT JOIN background_tasks AS task
       ON task.company_id = draft.company_id AND task.id = draft.task_id
     WHERE review.company_id = $1 AND draft.channel_id = ANY($2) AND review.status = 'pending'
+      -- A draft a thread handoff's drafting run produced is queued as its handoff, not as a
+      -- review: one piece of work, one item. This is the same de-duplication the `task` branch
+      -- performs against pending reviews, pointed the other way, and it is `DraftTarget`'s
+      -- `HandoffDraft`-beats-`Review` precedence written in SQL. The /reviews page still lists
+      -- the draft -- only the attention feed de-duplicates.
+      AND NOT EXISTS (
+          SELECT 1 FROM thread_handoff_runs AS run
+          WHERE run.company_id = draft.company_id AND run.task_id = draft.task_id
+      )
       AND ($4 <> 'my_work' OR review.reviewer_principal_id = $3)
       -- Skipped under `unassigned` for the same reason as approvals: responsibility here is
       -- always 'principal'. If this branch ever emits 'channel_team', this line goes.

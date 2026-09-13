@@ -12,6 +12,7 @@ use crate::{
     app_error::AppResult,
     entities::thread_handoff::{
         ExternalReplyHandling, ExternalReplyHandlingPolicy, ThreadHandoff, ThreadHandoffCommand,
+        ThreadHandoffDismiss, ThreadHandoffDraft,
     },
 };
 
@@ -46,6 +47,14 @@ pub trait ThreadHandoffPolicyPersistence: Send + Sync {
     /// non-existent case answers `NotFound` with one message, so an id cannot be probed.
     async fn change_thread_handoff(&self, command: ThreadHandoffCommand) -> AppResult<u64>;
 
+    /// Give up on this generation, returning the handoff's new version.
+    ///
+    /// Writes the handoff and its event and nothing else: the customer's message stays on the
+    /// thread exactly as it is, because dismissing is "we are not answering this through the
+    /// handoff queue", not "this did not happen". A `drafting` handoff is refused -- a run is in
+    /// flight, and the answer to stopping it is to let it finish or let it fail.
+    async fn dismiss_thread_handoff(&self, command: ThreadHandoffDismiss) -> AppResult<u64>;
+
     /// One handoff in any state, or `None` when this company and channel list cannot see it.
     async fn get_thread_handoff(
         &self,
@@ -53,6 +62,31 @@ pub trait ThreadHandoffPolicyPersistence: Send + Sync {
         handoff_id: Uuid,
         visible_channel_ids: &[Uuid],
     ) -> AppResult<Option<ThreadHandoff>>;
+
+    /// The draft this handoff generation's drafting run produced, if it produced one.
+    ///
+    /// The route that sends a drafted reply needs the draft id and version, and takes both from
+    /// the run rather than from the client: a body naming its own draft id would let one handoff's
+    /// Send publish another's draft.
+    async fn thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        handoff_id: Uuid,
+        generation: Uuid,
+        visible_channel_ids: &[Uuid],
+    ) -> AppResult<Option<ThreadHandoffDraft>>;
+
+    /// End a drafting run whose *draft* expired, and hand its reply back to the team.
+    ///
+    /// Only the *matching* generation returns to `needs_instruction`, so an expiry belonging to a
+    /// generation the thread has moved past changes nothing. A run whose task died is ended by the
+    /// task path itself, inside the transaction that records the failure.
+    async fn expire_thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+        reason: &str,
+    ) -> AppResult<()>;
 
     /// The open handoff of each of `thread_ids` that has one, keyed by thread.
     async fn thread_handoffs_for_threads(

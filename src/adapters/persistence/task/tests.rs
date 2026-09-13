@@ -120,6 +120,7 @@ async fn competing_ask_agent_retries_requeue_once_and_fence_the_old_run() {
         expected_ownership_version: task.ownership.version,
         note_ids: vec![other_note.id],
         command_id: Uuid::new_v4(),
+        handoff: None,
     };
     assert!(matches!(
         persistence.ask_owner_to_act(&wrong_thread, actor).await,
@@ -145,6 +146,7 @@ async fn competing_ask_agent_retries_requeue_once_and_fence_the_old_run() {
         expected_ownership_version: processing.ownership.version,
         note_ids: vec![note.id],
         command_id: Uuid::new_v4(),
+        handoff: None,
     };
     let (first, retry) = tokio::join!(
         persistence.ask_owner_to_act(&command, actor),
@@ -245,6 +247,7 @@ async fn start_agent_task_is_idempotent_and_delivers_selected_notes_to_its_first
         thread_id,
         note_ids: vec![note.id],
         command_id: Uuid::new_v4(),
+        handoff: None,
     };
     let started = persistence.start_agent_task(&command, actor).await.unwrap();
     let retry = persistence.start_agent_task(&command, actor).await.unwrap();
@@ -309,6 +312,7 @@ async fn start_agent_task_is_idempotent_and_delivers_selected_notes_to_its_first
                 thread_id: unassigned_thread.id,
                 note_ids: vec![unassigned_note.id],
                 command_id: Uuid::new_v4(),
+                handoff: None,
             },
             actor,
         )
@@ -7691,4 +7695,1205 @@ async fn assert_note_request_uses_platform_author(pool: &sqlx::PgPool, company_i
         count, 1,
         "retries reuse one platform-authored event without a synthetic transport identity"
     );
+}
+
+// -- Phase 4: the drafting run on the worker path -----------------------------------------------
+
+/// A company, a channel with an agent, a queued task, and a held customer reply on that task's
+/// thread with a drafting run already recorded for it.
+///
+/// The run row is written directly rather than through `start_agent_task`: what these tests are
+/// about is what the *completion* does with a run that exists, and the command that produces one is
+/// covered in `adapters::persistence::thread_handoff_tests`.
+struct HandoffRunFixture {
+    persistence: PostgresPersistence,
+    company: crate::entities::company::Company,
+    channel: crate::entities::channel::Channel,
+    task: BackgroundTask,
+    thread_id: Uuid,
+    /// The company owner's principal: the handoff's responsible principal, and so the draft's
+    /// assigned reviewer.
+    responsible: PrincipalId,
+    handoff_id: Uuid,
+    generation: Uuid,
+}
+
+impl HandoffRunFixture {
+    async fn new(persistence: &PostgresPersistence, pool: &sqlx::PgPool) -> Self {
+        Self::with_review_policy(persistence, pool, false).await
+    }
+
+    async fn with_review_policy(
+        persistence: &PostgresPersistence,
+        pool: &sqlx::PgPool,
+        review_required: bool,
+    ) -> Self {
+        let (company, channel) = seed_company_and_channel(persistence).await;
+        if review_required {
+            ResponseReviewPersistence::set_company_review_policy(
+                persistence,
+                company.id,
+                ExternalResponseReview::ReviewAllExternal,
+            )
+            .await
+            .unwrap();
+        }
+        let task = enqueue_chain(persistence, company.id, channel.id, "handoff-draft").await;
+        let thread_id = task.thread_id.unwrap();
+        let responsible = PrincipalId::new(
+            sqlx::query_scalar::<_, Uuid>(
+                "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+            )
+            .bind(company.id)
+            .bind(company.user_id)
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        );
+        let held = crate::adapters::persistence::test_support::thread_handoff_fixture(
+            persistence,
+            crate::adapters::persistence::test_support::ThreadHandoffFixtureRequest {
+                state: crate::entities::thread_handoff::ThreadHandoffState::Drafting,
+                responsible_principal_id: Some(responsible),
+                ..crate::adapters::persistence::test_support::ThreadHandoffFixtureRequest::new(
+                    company.id, channel.id, thread_id,
+                )
+            },
+        )
+        .await;
+        let fixture = Self {
+            persistence: persistence.clone(),
+            company,
+            channel,
+            task,
+            thread_id,
+            responsible,
+            handoff_id: held.handoff_id,
+            generation: held.generation,
+        };
+        fixture.insert_run(fixture.task.id, held.generation).await;
+        fixture
+    }
+
+    async fn insert_run(&self, task_id: Uuid, generation: Uuid) {
+        sqlx::query(
+            r#"INSERT INTO thread_handoff_runs (
+                   company_id, task_id, handoff_id, generation, requested_by_principal_id,
+                   command_id
+               ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(self.company.id)
+        .bind(task_id)
+        .bind(self.handoff_id)
+        .bind(generation)
+        .bind(self.responsible.as_uuid())
+        .bind(Uuid::new_v4())
+        .execute(self.persistence.pool())
+        .await
+        .unwrap();
+    }
+
+    /// The agent's proposed external reply, committed exactly as the worker commits one.
+    async fn commit_reply(
+        &self,
+        lease: TaskLeaseRef,
+    ) -> crate::app_error::AppResult<DispatchCommit> {
+        let agent_principal = lease.claimed_owner.agent_principal_id().unwrap();
+        let agent_id: Uuid =
+            sqlx::query_scalar("SELECT agent_id FROM principals WHERE company_id = $1 AND id = $2")
+                .bind(self.company.id)
+                .bind(agent_principal.as_uuid())
+                .fetch_one(self.persistence.pool())
+                .await
+                .unwrap();
+        let reply = AgentReply {
+            message: MessageWrite::internal(
+                self.thread_id,
+                MessageAuthorWrite::Agent(crate::use_cases::thread::AgentAuthor {
+                    agent_id,
+                    display_label: "Chain Agent".into(),
+                }),
+                "Re: invoice 4471",
+                "Our terms are 30 days from the invoice date.",
+                MessageDirection::Outbound,
+                MessageRole::Agent,
+                self.task.correlation_id,
+            )
+            .external_conversation(),
+            also_in_threads: Vec::new(),
+        };
+        let mut delivery = delivery_fixture(
+            &self.persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(self.task.id),
+                body: "Our terms are 30 days from the invoice date.",
+                ..DeliveryFixtureRequest::new(
+                    self.company.id,
+                    self.channel.id,
+                    self.thread_id,
+                    "handoff-draft",
+                )
+            },
+        )
+        .await
+        .delivery;
+        delivery.message_id = reply.message.id;
+        delivery.correlation_id = self.task.correlation_id;
+        self.persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease,
+                reply: &reply,
+                deliveries: vec![delivery],
+                review_candidate: Some(AgentReviewCandidate {
+                    recipients: crate::entities::response_draft::DraftRecipientSnapshot::email(
+                        "customer@example.com".into(),
+                        Vec::new(),
+                    ),
+                    evidence: Vec::new(),
+                }),
+                payload: serde_json::json!({"answer": "drafted"}),
+                complete_outreach: false,
+            })
+            .await
+    }
+
+    async fn handoff(&self) -> crate::entities::thread_handoff::ThreadHandoff {
+        crate::application::thread_handoff::ThreadHandoffPolicyPersistence::get_thread_handoff(
+            &self.persistence,
+            self.company.id,
+            self.handoff_id,
+            &[self.channel.id],
+        )
+        .await
+        .unwrap()
+        .expect("the handoff is readable")
+    }
+
+    async fn run_state(&self, task_id: Uuid) -> (String, Option<Uuid>, Option<i32>) {
+        sqlx::query_as("SELECT state, draft_id, draft_version FROM thread_handoff_runs WHERE company_id = $1 AND task_id = $2")
+            .bind(self.company.id)
+            .bind(task_id)
+            .fetch_one(self.persistence.pool())
+            .await
+            .unwrap()
+    }
+
+    async fn handoff_events(&self) -> Vec<(String, String, Option<String>)> {
+        sqlx::query_as(
+            r#"SELECT operation, actor_kind, failure_reason FROM thread_handoff_events
+               WHERE company_id = $1 AND handoff_id = $2 ORDER BY to_version, occurred_at"#,
+        )
+        .bind(self.company.id)
+        .bind(self.handoff_id)
+        .fetch_all(self.persistence.pool())
+        .await
+        .unwrap()
+    }
+
+    /// Every attention item this company's owner can see for this thread.
+    async fn attention_kinds(&self) -> Vec<crate::entities::attention::AttentionSourceKind> {
+        self.attention_items()
+            .await
+            .into_iter()
+            .map(|item| item.source_kind)
+            .collect()
+    }
+
+    async fn attention_items(&self) -> Vec<crate::entities::attention::AttentionItem> {
+        let mut items: Vec<crate::entities::attention::AttentionItem> = Vec::new();
+        for view in [
+            crate::entities::attention::AttentionView::MyWork,
+            crate::entities::attention::AttentionView::Unassigned,
+            crate::entities::attention::AttentionView::TeamWork,
+        ] {
+            let page = crate::application::attention::AttentionPersistence::list_attention(
+                &self.persistence,
+                crate::entities::attention::AttentionQuery {
+                    company_id: self.company.id,
+                    principal_id: self.responsible,
+                    visible_channel_ids: &[self.channel.id],
+                    view,
+                    all_owned: false,
+                    cursor: None,
+                    limit: 50,
+                },
+            )
+            .await
+            .unwrap();
+            for item in page.items {
+                if item.thread_id == Some(self.thread_id)
+                    && !items.iter().any(|seen| seen.source_id == item.source_id)
+                {
+                    items.push(item);
+                }
+            }
+        }
+        items
+    }
+
+    async fn cleanup(&self) {
+        CompanyPersistence::delete(&self.persistence, self.company.id)
+            .await
+            .unwrap();
+    }
+}
+
+/// Cases 13 and 14.
+#[tokio::test]
+async fn a_handoff_run_writes_a_draft_instead_of_publishing_and_leaves_the_transfer_column_alone() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let lease = claim(&persistence, fx.task.id).await;
+
+    let outcome = fx.commit_reply(lease).await.unwrap();
+    let DispatchCommit::PendingReview {
+        draft_id,
+        draft_version,
+    } = outcome
+    else {
+        panic!("a handoff run must park its answer, not publish it")
+    };
+    assert_eq!(draft_version, 1);
+
+    // No canonical message and no delivery: the answer exists only as a draft.
+    let counts: (i64, i64) = sqlx::query_as(
+        r#"SELECT (SELECT COUNT(*) FROM message_deliveries WHERE task_id = $1),
+                  (SELECT COUNT(*) FROM response_drafts WHERE company_id = $2 AND task_id = $1)"#,
+    )
+    .bind(fx.task.id)
+    .bind(fx.company.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (0, 1));
+
+    let (reviewer, source_handoff_generation): (Uuid, Option<Uuid>) = sqlx::query_as(
+        r#"SELECT reviewer_principal_id, source_handoff_generation FROM response_drafts
+           WHERE company_id = $1 AND id = $2 AND version = 1"#,
+    )
+    .bind(fx.company.id)
+    .bind(draft_id.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        reviewer,
+        fx.responsible.as_uuid(),
+        "the assigned reviewer is the handoff's responsible principal"
+    );
+    // Case 14: `source_handoff_generation` is the task-ownership-transfer id, not this plan's
+    // generation. An agent-owned dispatch with no transfer leaves it NULL, and it must never be
+    // written with the thread handoff's generation.
+    assert_eq!(source_handoff_generation, None);
+    assert_ne!(source_handoff_generation, Some(fx.generation));
+
+    let handoff = fx.handoff().await;
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::DraftReady
+    );
+    assert_eq!(handoff.version, 2);
+    assert_eq!(
+        fx.run_state(fx.task.id).await,
+        ("drafted".to_string(), Some(draft_id.as_uuid()), Some(1))
+    );
+    let events = fx.handoff_events().await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0, "draft_ready");
+    assert_eq!(events[0].1, "agent");
+    // §4.6's projection seam: the queued item now names the run's task rather than `NULL`.
+    let items = fx.attention_items().await;
+    assert_eq!(items.len(), 1);
+    assert_eq!(
+        items[0].source_kind,
+        crate::entities::attention::AttentionSourceKind::ThreadHandoff
+    );
+    assert_eq!(items[0].task_id, Some(fx.task.id));
+    assert_eq!(
+        persistence
+            .get_task_by_id(fx.task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::PendingApproval
+    );
+    fx.cleanup().await;
+}
+
+/// Case 15. Review policy on and a handoff run: one draft, and one attention item for the thread.
+#[tokio::test]
+async fn a_handoff_draft_on_a_review_channel_is_queued_once_as_its_handoff() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::with_review_policy(&persistence, &pool, true).await;
+    let lease = claim(&persistence, fx.task.id).await;
+
+    let outcome = fx.commit_reply(lease).await.unwrap();
+    assert!(matches!(outcome, DispatchCommit::PendingReview { .. }));
+
+    assert_eq!(
+        fx.attention_kinds().await,
+        vec![crate::entities::attention::AttentionSourceKind::ThreadHandoff],
+        "one piece of work appears once, as the handoff rather than as a review"
+    );
+    fx.cleanup().await;
+}
+
+/// Case 16. The same policy without a handoff: the suppression predicate must not over-reach.
+#[tokio::test]
+async fn an_ordinary_review_draft_is_still_queued_as_a_response_review() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::with_review_policy(&persistence, &pool, true).await;
+    // Take the run and the handoff away: this is now an ordinary review-policy dispatch.
+    sqlx::query("DELETE FROM thread_handoff_runs WHERE company_id = $1")
+        .bind(fx.company.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM thread_handoffs WHERE company_id = $1")
+        .bind(fx.company.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let lease = claim(&persistence, fx.task.id).await;
+
+    let outcome = fx.commit_reply(lease).await.unwrap();
+    assert!(matches!(outcome, DispatchCommit::PendingReview { .. }));
+
+    assert_eq!(
+        fx.attention_kinds().await,
+        vec![crate::entities::attention::AttentionSourceKind::ResponseReview],
+        "a draft that belongs to no drafting run is still a review item"
+    );
+    fx.cleanup().await;
+}
+
+/// Case 17. A newer customer reply lands while the agent is writing.
+#[tokio::test]
+async fn a_run_whose_generation_was_replaced_is_refused_and_writes_nothing() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let lease = claim(&persistence, fx.task.id).await;
+
+    // A second outside reply, through the path the inbound commit uses.
+    let replacement = Uuid::new_v4();
+    let message_id: Uuid = sqlx::query_scalar(
+        "SELECT source_message_id FROM thread_handoffs WHERE company_id = $1 AND id = $2",
+    )
+    .bind(fx.company.id)
+    .bind(fx.handoff_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let mut tx = pool.begin().await.unwrap();
+    crate::adapters::persistence::thread_handoff::open_handoff_generation_on(
+        &mut tx,
+        crate::adapters::persistence::thread_handoff::OpenHandoffGeneration {
+            company_id: fx.company.id,
+            channel_id: fx.channel.id,
+            thread_id: fx.thread_id,
+            handoff_id: fx.handoff_id,
+            generation: replacement,
+            source_message_id: crate::entities::message::CanonicalMessageId::new(message_id),
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let refused = fx
+        .commit_reply(lease)
+        .await
+        .expect_err("the reply answers a message that is no longer the newest one");
+    assert!(matches!(&refused, AppError::Conflict(_)), "{refused:?}");
+
+    let drafts: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM response_drafts WHERE company_id = $1")
+            .bind(fx.company.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(drafts, 0, "the whole transaction rolled back");
+    assert_eq!(
+        fx.delivery_count().await,
+        0,
+        "and above all: no mail answering the superseded message was queued"
+    );
+    let handoff = fx.handoff().await;
+    assert_eq!(handoff.generation, replacement);
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::NeedsInstruction
+    );
+    assert_eq!(
+        fx.run_state(fx.task.id).await.0,
+        "superseded",
+        "the regeneration marked the outgoing run"
+    );
+    fx.cleanup().await;
+}
+
+/// Case 18. A terminal task failure hands the reply back to the team.
+#[tokio::test]
+async fn a_dead_lettered_draft_task_returns_the_reply_to_needs_instruction() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let lease = claim(&persistence, fx.task.id).await;
+
+    // A multi-byte failure that the 2048-byte column has to cut on a character boundary.
+    let error = "é".repeat(4096);
+    assert!(
+        persistence
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: &error,
+                next_run_at: Utc::now(),
+                outcome: TaskFailureOutcome::DeadLetter,
+                reason: TaskStopReason::TerminalFailure,
+            })
+            .await
+            .unwrap()
+    );
+
+    assert_eq!(fx.run_state(fx.task.id).await.0, "failed");
+    let handoff = fx.handoff().await;
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::NeedsInstruction
+    );
+    assert_eq!(handoff.version, 2);
+    assert_eq!(
+        handoff.responsible_principal_id,
+        Some(fx.responsible),
+        "a failed run does not un-claim the reply"
+    );
+    let events = fx.handoff_events().await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0, "draft_failed");
+    assert_eq!(events[0].1, "system");
+    let reason = events[0].2.as_deref().expect("the failure is recorded");
+    assert!(reason.len() <= 2048 && reason.starts_with('é'));
+    fx.cleanup().await;
+}
+
+/// Case 19. The `AND generation = $3` predicate: a stale failure drags nothing backwards.
+#[tokio::test]
+async fn a_failure_for_a_replaced_generation_leaves_the_newer_one_alone() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let lease = claim(&persistence, fx.task.id).await;
+    // The generation moves on while the doomed run is still in flight.
+    sqlx::query(
+        r#"UPDATE thread_handoffs
+           SET generation = $3, state = 'needs_instruction', version = version + 1
+           WHERE company_id = $1 AND id = $2"#,
+    )
+    .bind(fx.company.id)
+    .bind(fx.handoff_id)
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .unwrap();
+    let before = fx.handoff().await;
+
+    assert!(
+        persistence
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: "the provider gave up",
+                next_run_at: Utc::now(),
+                outcome: TaskFailureOutcome::DeadLetter,
+                reason: TaskStopReason::TerminalFailure,
+            })
+            .await
+            .unwrap()
+    );
+
+    assert_eq!(
+        fx.run_state(fx.task.id).await.0,
+        "failed",
+        "the run's own outcome is still recorded"
+    );
+    let after = fx.handoff().await;
+    assert_eq!((after.version, after.state), (before.version, before.state));
+    assert!(
+        fx.handoff_events().await.is_empty(),
+        "nothing about the handoff changed, so nothing is audited"
+    );
+    fx.cleanup().await;
+}
+
+/// Case 20. Responsibility survives a task transfer, which is a different axis entirely.
+#[tokio::test]
+async fn transferring_the_draft_task_changes_neither_the_handoffs_owner_nor_its_state() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let before = fx.handoff().await;
+
+    let task = persistence
+        .get_task_by_id(fx.task.id)
+        .await
+        .unwrap()
+        .unwrap();
+    persistence
+        .change_task_ownership(ownership_command(
+            &task,
+            fx.responsible,
+            TaskOwnershipAuthority::Manager,
+            TaskOwnershipOperation::Transfer,
+            TaskOwner::Human(fx.responsible),
+        ))
+        .await
+        .unwrap();
+
+    let after = fx.handoff().await;
+    assert_eq!(
+        after.responsible_principal_id,
+        before.responsible_principal_id
+    );
+    assert_eq!((after.state, after.version), (before.state, before.version));
+    assert_eq!(fx.run_state(fx.task.id).await.0, "running");
+    fx.cleanup().await;
+}
+
+// -- Phase 4: send, edit and send, dismiss ------------------------------------------------------
+
+impl HandoffRunFixture {
+    /// Drive the run to `draft_ready`, returning the draft it produced.
+    async fn drafted(&self) -> crate::entities::response_draft::ResponseDraftId {
+        let lease = claim(&self.persistence, self.task.id).await;
+        let DispatchCommit::PendingReview { draft_id, .. } =
+            self.commit_reply(lease).await.unwrap()
+        else {
+            panic!("a handoff run parks its answer")
+        };
+        draft_id
+    }
+
+    async fn send(
+        &self,
+        draft_id: crate::entities::response_draft::ResponseDraftId,
+        version: u32,
+        actor: PrincipalId,
+    ) -> crate::app_error::AppResult<crate::use_cases::response_review::ReviewCommandResult> {
+        self.persistence
+            .execute_review_command(ReviewCommand {
+                company_id: self.company.id,
+                draft_id,
+                expected_draft_version: version,
+                command_id: Uuid::new_v4(),
+                actor_principal_id: actor,
+                action: ReviewAction::Approve { rationale: None },
+            })
+            .await
+    }
+
+    async fn dismiss(&self, actor: PrincipalId) -> crate::app_error::AppResult<u64> {
+        let handoff = self.handoff().await;
+        crate::application::thread_handoff::ThreadHandoffPolicyPersistence::dismiss_thread_handoff(
+            &self.persistence,
+            crate::entities::thread_handoff::ThreadHandoffDismiss {
+                company_id: self.company.id,
+                handoff_id: self.handoff_id,
+                command_id: Uuid::new_v4(),
+                expected_version: handoff.version,
+                expected_generation: handoff.generation,
+                actor_principal_id: actor,
+                visible_channel_ids: vec![self.channel.id],
+            },
+        )
+        .await
+    }
+
+    async fn delivery_count(&self) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM message_deliveries WHERE company_id = $1")
+            .bind(self.company.id)
+            .fetch_one(self.persistence.pool())
+            .await
+            .unwrap()
+    }
+}
+
+/// Case 21. Send publishes through the existing review machinery and resolves the generation in
+/// the same transaction.
+#[tokio::test]
+async fn sending_a_handoff_draft_publishes_once_and_resolves_the_generation() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let draft_id = fx.drafted().await;
+
+    let published = fx.send(draft_id, 1, fx.responsible).await.unwrap();
+    assert!(published.published_message_id.is_some());
+    assert!(published.delivery.is_some());
+
+    let counts: (i64, i64, i64, i64) = sqlx::query_as(
+        r#"SELECT (SELECT COUNT(*) FROM message_deliveries WHERE company_id = $1),
+                  (SELECT COUNT(*) FROM response_draft_publications WHERE company_id = $1),
+                  (SELECT COUNT(*) FROM response_drafts
+                    WHERE company_id = $1 AND id = $2 AND status = 'published'),
+                  (SELECT COUNT(*) FROM response_reviews
+                    WHERE company_id = $1 AND draft_id = $2 AND status = 'published')"#,
+    )
+    .bind(fx.company.id)
+    .bind(draft_id.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (1, 1, 1, 1));
+    assert_eq!(
+        persistence
+            .get_task_by_id(fx.task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Completed
+    );
+
+    let handoff = fx.handoff().await;
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::Resolved
+    );
+    assert_eq!(handoff.version, 3, "drafted, then resolved");
+    let closed_at: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "SELECT closed_at FROM thread_handoffs WHERE company_id = $1 AND id = $2",
+    )
+    .bind(fx.company.id)
+    .bind(fx.handoff_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(closed_at.is_some());
+    let operations: Vec<String> = fx
+        .handoff_events()
+        .await
+        .into_iter()
+        .map(|event| event.0)
+        .collect();
+    assert_eq!(operations, vec!["draft_ready", "resolved"]);
+    assert!(
+        fx.attention_kinds().await.is_empty(),
+        "a resolved handoff is nobody's work"
+    );
+    fx.cleanup().await;
+}
+
+/// Case 22. Only the assigned reviewer may send -- the company owner included.
+#[tokio::test]
+async fn sending_a_handoff_draft_is_refused_for_anyone_but_the_responsible_principal() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let mut fx = HandoffRunFixture::new(&persistence, &pool).await;
+    // Hand the reply to a teammate, so the company owner is a manager who is *not* the reviewer.
+    let teammate = add_teammate_principal(&persistence, &pool, fx.company.id).await;
+    let owner = fx.responsible;
+    sqlx::query(
+        "UPDATE thread_handoffs SET responsible_principal_id = $3 WHERE company_id = $1 AND id = $2",
+    )
+    .bind(fx.company.id)
+    .bind(fx.handoff_id)
+    .bind(teammate.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    fx.responsible = teammate;
+    let draft_id = fx.drafted().await;
+
+    let refused = fx
+        .send(draft_id, 1, owner)
+        .await
+        .expect_err("only a reassignment is owner-permitted on a review");
+    assert!(matches!(&refused, AppError::NotFound(_)), "{refused:?}");
+    assert_eq!(
+        fx.handoff().await.state,
+        crate::entities::thread_handoff::ThreadHandoffState::DraftReady,
+        "a refused send leaves the reply exactly where it was"
+    );
+    assert_eq!(fx.delivery_count().await, 0);
+
+    fx.send(draft_id, 1, teammate)
+        .await
+        .expect("the responsible principal is the assigned reviewer");
+    fx.cleanup().await;
+}
+
+/// Case 23. Edit and send is the existing pair of commands, in order.
+#[tokio::test]
+async fn editing_then_sending_publishes_the_second_version_and_resolves_the_handoff() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let draft_id = fx.drafted().await;
+
+    let replacement = fx.edited_draft(draft_id, &pool).await;
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fx.company.id,
+            draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fx.responsible,
+            action: ReviewAction::Edit {
+                replacement: Box::new(replacement),
+            },
+        })
+        .await
+        .unwrap();
+    fx.send(draft_id, 2, fx.responsible).await.unwrap();
+
+    let statuses: Vec<(i32, String)> = sqlx::query_as(
+        "SELECT version, status FROM response_drafts WHERE company_id = $1 AND id = $2 ORDER BY version",
+    )
+    .bind(fx.company.id)
+    .bind(draft_id.as_uuid())
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        statuses,
+        vec![(1, "superseded".to_string()), (2, "published".to_string())]
+    );
+    assert_eq!(fx.delivery_count().await, 1, "one reply, not two");
+    assert_eq!(
+        fx.handoff().await.state,
+        crate::entities::thread_handoff::ThreadHandoffState::Resolved
+    );
+    fx.cleanup().await;
+}
+
+/// Case 24. Edit and send racing Send: the edit stales the version the sender held.
+#[tokio::test]
+async fn an_edit_stales_a_concurrent_send_and_only_one_reply_is_published() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let draft_id = fx.drafted().await;
+
+    let replacement = fx.edited_draft(draft_id, &pool).await;
+    persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fx.company.id,
+            draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fx.responsible,
+            action: ReviewAction::Edit {
+                replacement: Box::new(replacement),
+            },
+        })
+        .await
+        .unwrap();
+
+    let stale = fx
+        .send(draft_id, 1, fx.responsible)
+        .await
+        .expect_err("version 1 is no longer the draft to publish");
+    assert!(matches!(&stale, AppError::Conflict(_)), "{stale:?}");
+    fx.send(draft_id, 2, fx.responsible).await.unwrap();
+
+    assert_eq!(fx.delivery_count().await, 1);
+    let messages: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM response_draft_publications WHERE company_id = $1",
+    )
+    .bind(fx.company.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(messages, 1, "one publication for one handoff generation");
+    fx.cleanup().await;
+}
+
+/// Case 25. Send racing Dismiss: exactly one wins, and a dismissal sends nothing.
+#[tokio::test]
+async fn dismissing_a_drafted_reply_makes_a_later_send_impossible() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let draft_id = fx.drafted().await;
+
+    assert_eq!(fx.dismiss(fx.responsible).await.unwrap(), 3);
+    assert_eq!(
+        fx.handoff().await.state,
+        crate::entities::thread_handoff::ThreadHandoffState::Dismissed
+    );
+
+    // The review machinery still has a pending draft, so the publication itself succeeds -- what
+    // must not happen is a second resolution of a handoff that is already closed.
+    fx.send(draft_id, 1, fx.responsible).await.unwrap();
+    let handoff = fx.handoff().await;
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::Dismissed,
+        "the dismissal stands: `Send` resolves only a `draft_ready` generation"
+    );
+    assert_eq!(handoff.version, 3, "and it writes nothing further");
+    let operations: Vec<String> = fx
+        .handoff_events()
+        .await
+        .into_iter()
+        .map(|event| event.0)
+        .collect();
+    assert_eq!(operations, vec!["draft_ready", "dismissed"]);
+
+    // The other order: dismissal after a send finds nothing to close.
+    let refused = fx
+        .dismiss(fx.responsible)
+        .await
+        .expect_err("a dismissed handoff is terminal");
+    assert!(matches!(&refused, AppError::NotFound(_)), "{refused:?}");
+    fx.cleanup().await;
+}
+
+/// Case 26. An expired review: the reply goes back to the team and nothing was sent.
+#[tokio::test]
+async fn an_expired_handoff_draft_returns_the_reply_to_the_team() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    let draft_id = fx.drafted().await;
+    // `response_reviews_expiry_check` wants an expiry after the row was created, so the whole
+    // review moves into the past rather than just its deadline.
+    sqlx::query(
+        r#"UPDATE response_reviews
+           SET created_at = CURRENT_TIMESTAMP - interval '2 days',
+               expires_at = CURRENT_TIMESTAMP - interval '1 day'
+           WHERE company_id = $1 AND draft_id = $2"#,
+    )
+    .bind(fx.company.id)
+    .bind(draft_id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let expired = fx
+        .send(draft_id, 1, fx.responsible)
+        .await
+        .expect_err("an expired review cannot be published");
+    assert!(
+        matches!(&expired, AppError::Conflict(message) if message == "This review has expired."),
+        "{expired:?}"
+    );
+
+    // What the route does with that conflict.
+    crate::application::thread_handoff::ThreadHandoffPolicyPersistence::expire_thread_handoff_draft(
+        &persistence,
+        fx.company.id,
+        fx.task.id,
+        "the drafted reply expired before it was sent",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(fx.run_state(fx.task.id).await.0, "failed");
+    let handoff = fx.handoff().await;
+    assert_eq!(
+        handoff.state,
+        crate::entities::thread_handoff::ThreadHandoffState::NeedsInstruction
+    );
+    assert_eq!(fx.delivery_count().await, 0, "nothing was enqueued");
+    let events = fx.handoff_events().await;
+    assert_eq!(events.last().unwrap().0, "draft_failed");
+    assert_eq!(
+        events.last().unwrap().2.as_deref(),
+        Some("the drafted reply expired before it was sent")
+    );
+    fx.cleanup().await;
+}
+
+impl HandoffRunFixture {
+    /// Version 2 of this draft, with one sentence changed: the replacement an **Edit** carries.
+    async fn edited_draft(
+        &self,
+        draft_id: crate::entities::response_draft::ResponseDraftId,
+        pool: &sqlx::PgPool,
+    ) -> PreparedReviewDraft {
+        let current = self
+            .persistence
+            .publication_for_reviewer(self.company.id, draft_id, 1, self.responsible)
+            .await
+            .unwrap()
+            .unwrap();
+        let queued = delivery_fixture(
+            &self.persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(self.task.id),
+                subject: "Re: invoice 4471",
+                body: "Our terms are 30 days, as agreed in March.",
+                ..DeliveryFixtureRequest::new(
+                    self.company.id,
+                    self.channel.id,
+                    self.thread_id,
+                    "handoff-draft-edit",
+                )
+            },
+        )
+        .await;
+        sqlx::query("DELETE FROM messages WHERE id = $1")
+            .bind(queued.message_id.as_uuid())
+            .execute(pool)
+            .await
+            .unwrap();
+        let mut edited = current.message().clone();
+        edited.id = queued.delivery.message_id;
+        edited.clean_text_body = "Our terms are 30 days, as agreed in March.".into();
+        let publication = DraftPublicationSnapshot::new(edited, queued.delivery).unwrap();
+        PreparedReviewDraft::new(
+            draft_id,
+            2,
+            self.company.id,
+            self.channel.id,
+            self.thread_id,
+            Some(self.task.id),
+            self.responsible,
+            self.responsible,
+            crate::entities::response_draft::DraftRecipientSnapshot::email(
+                "customer@example.com".into(),
+                Vec::new(),
+            ),
+            Vec::new(),
+            publication,
+        )
+        .unwrap()
+    }
+}
+
+/// A teammate with a principal and a membership, and no authority over anybody else's work.
+async fn add_teammate_principal(
+    persistence: &PostgresPersistence,
+    pool: &sqlx::PgPool,
+    company_id: Uuid,
+) -> PrincipalId {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let user = persistence
+        .create_user(
+            &format!("handoff-teammate-{suffix}"),
+            &format!("handoff-teammate-{suffix}@example.com"),
+            "hash",
+        )
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(user.id)
+    .execute(pool)
+    .await
+    .unwrap();
+    let principal = PrincipalId::random();
+    sqlx::query(
+        r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
+           VALUES ($1, $2, 'person', $3, 'Bo Okonkwo')"#,
+    )
+    .bind(principal.as_uuid())
+    .bind(company_id)
+    .bind(user.id)
+    .execute(pool)
+    .await
+    .unwrap();
+    principal
+}
+
+/// Case 5. **Generate draft** on a thread whose agent-owned task is already running: the existing
+/// task is requeued rather than a second one started, and the run is recorded in that same
+/// transaction.
+#[tokio::test]
+async fn generate_draft_on_a_running_agent_task_requeues_it_and_records_one_run() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    // The fixture leaves the handoff `drafting` with a run of its own, which is the *outcome* of
+    // this command rather than its precondition, so both are put back first.
+    let fx = HandoffRunFixture::new(&persistence, &pool).await;
+    sqlx::query("DELETE FROM thread_handoff_runs WHERE company_id = $1")
+        .bind(fx.company.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE thread_handoffs SET state = 'needs_instruction' WHERE company_id = $1 AND id = $2",
+    )
+    .bind(fx.company.id)
+    .bind(fx.handoff_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let note = ThreadPersistence::create_internal_note(
+        &persistence,
+        &AddInternalNote {
+            company_id: fx.company.id,
+            channel_id: fx.channel.id,
+            thread_id: fx.thread_id,
+            text: "Quote her the 30-day terms; do not offer the discount.".into(),
+            command_id: Uuid::new_v4(),
+            supersedes_note_id: None,
+            provenance: InternalNoteProvenance::Api,
+        },
+        fx.responsible,
+    )
+    .await
+    .unwrap()
+    .internal_note
+    .unwrap();
+    let lease = claim(&persistence, fx.task.id).await;
+    let processing = persistence
+        .get_task_by_id(fx.task.id)
+        .await
+        .unwrap()
+        .unwrap();
+    let handoff = fx.handoff().await;
+
+    let outcome = persistence
+        .ask_owner_to_act(
+            &AskOwnerToAct {
+                company_id: fx.company.id,
+                channel_id: fx.channel.id,
+                thread_id: fx.thread_id,
+                task_id: fx.task.id,
+                expected_ownership_version: processing.ownership.version,
+                note_ids: vec![note.id],
+                command_id: Uuid::new_v4(),
+                handoff: Some(crate::entities::thread_handoff::HandoffRunRequest {
+                    handoff_id: fx.handoff_id,
+                    generation: handoff.generation,
+                    expected_version: handoff.version,
+                }),
+            },
+            fx.responsible,
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome, AskOwnerOutcome::Requeued);
+
+    let tasks: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM background_tasks WHERE company_id = $1")
+            .bind(fx.company.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(tasks, 1, "the thread's existing task is the drafting run");
+    assert_eq!(
+        persistence
+            .get_task_by_id(fx.task.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        TaskStatus::Pending
+    );
+    // The requeue closes the attempt the old execution had open, which is what makes the wake-up
+    // visible in the ledger rather than only in the task row.
+    let closed: Vec<(String, Option<String>)> = sqlx::query_as(
+        r#"SELECT status, stop_reason FROM task_attempts
+           WHERE task_id = $1 AND execution_generation = $2"#,
+    )
+    .bind(fx.task.id)
+    .bind(lease.execution_generation)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(
+        closed
+            .iter()
+            .all(|(status, reason)| status == "failed"
+                && reason.as_deref() == Some("agent_instruction")),
+        "{closed:?}"
+    );
+
+    assert_eq!(
+        fx.run_state(fx.task.id).await,
+        ("running".into(), None, None)
+    );
+    let after = fx.handoff().await;
+    assert_eq!(
+        after.state,
+        crate::entities::thread_handoff::ThreadHandoffState::Drafting
+    );
+    assert_eq!(after.version, handoff.version + 1);
+    assert_eq!(fx.handoff_events().await.len(), 1);
+    assert_eq!(fx.handoff_events().await[0].0, "draft_requested");
+
+    let new_lease = claim(&persistence, fx.task.id).await;
+    assert!(persistence.mark_task_completed(new_lease).await.unwrap());
+    fx.cleanup().await;
+}
+
+/// Case 28. The regression guard for §4.5: an ordinary review approval, on a company with no
+/// thread handoffs at all, must not be changed by the `UPDATE ... FROM thread_handoff_runs` that
+/// resolving a handoff added to `approve_on`.
+#[tokio::test]
+async fn an_ordinary_review_approval_touches_no_thread_handoff_state() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let fixture = pending_response_review(&persistence, &pool).await;
+
+    let published = persistence
+        .execute_review_command(ReviewCommand {
+            company_id: fixture.company_id,
+            draft_id: fixture.draft_id,
+            expected_draft_version: 1,
+            command_id: Uuid::new_v4(),
+            actor_principal_id: fixture.owner,
+            action: ReviewAction::Approve { rationale: None },
+        })
+        .await
+        .unwrap();
+    assert!(published.published_message_id.is_some());
+
+    let handoff_rows: (i64, i64, i64) = sqlx::query_as(
+        r#"SELECT (SELECT COUNT(*) FROM thread_handoffs WHERE company_id = $1),
+                  (SELECT COUNT(*) FROM thread_handoff_runs WHERE company_id = $1),
+                  (SELECT COUNT(*) FROM thread_handoff_events WHERE company_id = $1)"#,
+    )
+    .bind(fixture.company_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        handoff_rows,
+        (0, 0, 0),
+        "a review approval with no handoff writes nothing to any handoff table"
+    );
+    CompanyPersistence::delete(&persistence, fixture.company_id)
+        .await
+        .unwrap();
 }

@@ -27,7 +27,7 @@ use crate::{
     },
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
-        thread::ThreadUseCases,
+        thread::ThreadUseCases, thread_handoff::ThreadHandoffUseCases,
     },
 };
 
@@ -166,6 +166,7 @@ async fn load_scope(
 
 async fn render_result(
     thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
     agent_use_cases: &AgentUseCases,
     scope: &NoteScope,
     viewer: &Viewer,
@@ -175,6 +176,7 @@ async fn render_result(
     Ok(Html(
         render_message_pane(
             thread_use_cases,
+            handoff_use_cases,
             scope.company_id,
             &scope.channel,
             &scope.thread,
@@ -190,6 +192,7 @@ async fn add_note_ui(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
     Form(form): Form<InternalNoteForm>,
@@ -222,6 +225,7 @@ async fn add_note_ui(
         .map(|error| error.to_string());
     render_result(
         &thread_use_cases,
+        &handoff_use_cases,
         &agent_use_cases,
         &scope,
         &viewer,
@@ -230,10 +234,15 @@ async fn add_note_ui(
     .await
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn tombstone_note_ui(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
     Path(note_id): Path<Uuid>,
@@ -265,6 +274,7 @@ async fn tombstone_note_ui(
         .map(|error| error.to_string());
     render_result(
         &thread_use_cases,
+        &handoff_use_cases,
         &agent_use_cases,
         &scope,
         &viewer,
@@ -277,6 +287,7 @@ async fn ask_owner_ui(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
     HtmlForm(form): HtmlForm<NoteActionForm>,
@@ -302,6 +313,7 @@ async fn ask_owner_ui(
                     expected_ownership_version,
                     note_ids: form.note_ids,
                     command_id: form.command_id,
+                    handoff: None,
                 },
                 scope.actor,
             )
@@ -314,6 +326,7 @@ async fn ask_owner_ui(
     let error = result.err().map(|error| error.to_string());
     render_result(
         &thread_use_cases,
+        &handoff_use_cases,
         &agent_use_cases,
         &scope,
         &viewer,
@@ -326,6 +339,7 @@ async fn start_task_ui(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
     HtmlForm(form): HtmlForm<NoteActionForm>,
@@ -348,6 +362,7 @@ async fn start_task_ui(
                 thread_id: form.thread_id,
                 note_ids: form.note_ids,
                 command_id: form.command_id,
+                handoff: None,
             },
             scope.actor,
         )
@@ -356,6 +371,7 @@ async fn start_task_ui(
         .map(|error| error.to_string());
     render_result(
         &thread_use_cases,
+        &handoff_use_cases,
         &agent_use_cases,
         &scope,
         &viewer,
@@ -477,6 +493,7 @@ async fn ask_owner_api(
                 expected_ownership_version,
                 note_ids: body.note_ids,
                 command_id: body.command_id,
+                handoff: None,
             },
             scope.actor,
         )
@@ -515,6 +532,7 @@ async fn start_task_api(
                 thread_id,
                 note_ids: body.note_ids,
                 command_id: body.command_id,
+                handoff: None,
             },
             scope.actor,
         )

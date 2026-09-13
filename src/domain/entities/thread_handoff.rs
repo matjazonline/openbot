@@ -255,15 +255,7 @@ pub struct ThreadHandoffCommand {
 impl ThreadHandoffCommand {
     /// The rules that need no database, checked before anything is locked.
     pub fn validate(&self) -> Result<(), String> {
-        if self.expected_version == 0 || self.expected_version > i64::MAX as u64 {
-            return Err(format!(
-                "Thread handoff expected version must be between 1 and {}.",
-                i64::MAX
-            ));
-        }
-        if self.expected_generation.is_nil() {
-            return Err("Thread handoff expected generation must name a generation.".into());
-        }
+        validate_fences(self.expected_version, self.expected_generation)?;
         // Rejected rather than silently rewritten, so the audit's `operation` cannot record a
         // reassignment that was really somebody taking the work themselves.
         if let ThreadHandoffOperation::Reassign { to } = self.operation
@@ -273,6 +265,124 @@ impl ThreadHandoffCommand {
         }
         Ok(())
     }
+}
+
+/// Give up on this generation without answering it, and without touching the thread.
+///
+/// Its own command rather than a fifth [`ThreadHandoffOperation`]: dismissal moves the *state*,
+/// while all four operations above deliberately leave it exactly where it was. Both fences travel
+/// with it for the same reason they travel with a responsibility command.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThreadHandoffDismiss {
+    pub company_id: Uuid,
+    pub handoff_id: Uuid,
+    pub command_id: Uuid,
+    pub expected_version: u64,
+    pub expected_generation: Uuid,
+    pub actor_principal_id: PrincipalId,
+    /// Authorization context, not command semantics; omitted from the idempotency fingerprint.
+    #[serde(skip)]
+    pub visible_channel_ids: Vec<Uuid>,
+}
+
+impl ThreadHandoffDismiss {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_fences(self.expected_version, self.expected_generation)
+    }
+}
+
+/// The two fences every handoff command carries, checked before anything is locked.
+fn validate_fences(expected_version: u64, expected_generation: Uuid) -> Result<(), String> {
+    if expected_version == 0 || expected_version > i64::MAX as u64 {
+        return Err(format!(
+            "Thread handoff expected version must be between 1 and {}.",
+            i64::MAX
+        ));
+    }
+    if expected_generation.is_nil() {
+        return Err("Thread handoff expected generation must name a generation.".into());
+    }
+    Ok(())
+}
+
+/// The handoff generation an agent run answers, when the run was started from a handoff.
+///
+/// Carried as an `Option` on [`crate::entities::internal_note::AskOwnerToAct`] and
+/// [`crate::entities::internal_note::StartAgentTask`] because both surfaces predate handoffs and
+/// must keep working unchanged: a `None` is "an ordinary agent run", not "a handoff run with a
+/// missing id".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HandoffRunRequest {
+    pub handoff_id: Uuid,
+    pub generation: Uuid,
+    pub expected_version: u64,
+}
+
+impl HandoffRunRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.handoff_id.is_nil() {
+            return Err("Thread handoff id must name a handoff.".into());
+        }
+        validate_fences(self.expected_version, self.generation)
+    }
+}
+
+/// The draft one handoff generation's drafting run produced, and the task that produced it.
+///
+/// The correlation between a handoff generation and a response draft is exactly this row: the
+/// draft's own `source_handoff_generation` column means something else entirely (the latest task
+/// *ownership transfer* event) and must not be read as this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThreadHandoffDraft {
+    pub task_id: Uuid,
+    pub draft_id: Uuid,
+    pub draft_version: u32,
+}
+
+/// Where an agent's proposed external reply goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DraftTarget {
+    /// Publish it and queue the delivery. Today's default.
+    Publish,
+    /// Park it for a human reviewer, because the channel requires review.
+    Review,
+    /// Park it as this handoff generation's proposed reply.
+    HandoffDraft,
+}
+
+/// Draft-versus-publish, as a pure decision over two already-loaded facts.
+///
+/// `HandoffDraft` wins over `Review` when both hold: a handoff draft already names a human -- the
+/// responsible principal, who is also its assigned reviewer -- so listing it in the generic review
+/// queue as well would show one piece of work twice. The attention projection spells the same
+/// precedence in SQL, and the two must agree.
+pub const fn draft_target(review_required: bool, is_handoff_run: bool) -> DraftTarget {
+    if is_handoff_run {
+        DraftTarget::HandoffDraft
+    } else if review_required {
+        DraftTarget::Review
+    } else {
+        DraftTarget::Publish
+    }
+}
+
+/// What `thread_handoff_events_failure_reason_check` accepts, in bytes.
+pub const MAX_HANDOFF_FAILURE_REASON_BYTES: usize = 2048;
+
+/// The head of `reason` that fits the column, cut on a character boundary.
+///
+/// The `CHECK` counts bytes, so a naive `&reason[..2048]` panics whenever the 2048th byte lands
+/// inside a multi-byte character -- and letting the `CHECK` do the truncating is not truncation at
+/// all, it is a failed insert inside the transaction that was recording a failure.
+pub fn truncate_failure_reason(reason: &str) -> &str {
+    if reason.len() <= MAX_HANDOFF_FAILURE_REASON_BYTES {
+        return reason;
+    }
+    let mut end = MAX_HANDOFF_FAILURE_REASON_BYTES;
+    while end > 0 && !reason.is_char_boundary(end) {
+        end -= 1;
+    }
+    &reason[..end]
 }
 
 /// What an accepted command actually did, in `thread_handoff_events`' vocabulary.
@@ -688,6 +798,108 @@ mod tests {
                 "{body} must be a deserialization error, never a default"
             );
         }
+    }
+
+    /// Case 1.
+    #[test]
+    fn draft_target_covers_all_four_combinations() {
+        assert_eq!(draft_target(false, false), DraftTarget::Publish);
+        assert_eq!(draft_target(true, false), DraftTarget::Review);
+        assert_eq!(draft_target(false, true), DraftTarget::HandoffDraft);
+    }
+
+    /// Case 1, the precedence decision, named on its own because it is the one that can regress
+    /// into listing one piece of work twice.
+    #[test]
+    fn a_handoff_run_on_a_review_channel_drafts_for_the_handoff_not_the_review_queue() {
+        assert_eq!(draft_target(true, true), DraftTarget::HandoffDraft);
+    }
+
+    /// Case 3.
+    #[test]
+    fn a_failure_reason_is_cut_on_a_character_boundary_under_the_column_bound() {
+        let short = "the drafting run failed";
+        assert_eq!(truncate_failure_reason(short), short);
+
+        // 'é' is two bytes, so byte 2048 of this string lands mid-character: 2048 is even and each
+        // character starts on an even offset... which is exactly why the naive slice panics here.
+        let multibyte = "é".repeat(MAX_HANDOFF_FAILURE_REASON_BYTES);
+        let cut = truncate_failure_reason(&multibyte);
+        assert!(cut.len() <= MAX_HANDOFF_FAILURE_REASON_BYTES);
+        assert_eq!(cut.chars().count(), MAX_HANDOFF_FAILURE_REASON_BYTES / 2);
+
+        // One byte of ASCII shifts every following character onto an odd offset, so the 2048th
+        // byte is now the first half of an 'é' and the cut has to step back one byte.
+        let offset = format!("x{multibyte}");
+        let cut = truncate_failure_reason(&offset);
+        assert_eq!(cut.len(), MAX_HANDOFF_FAILURE_REASON_BYTES - 1);
+        assert!(
+            offset.starts_with(cut),
+            "truncation keeps the head as it is"
+        );
+        // A cut that landed mid-character would have panicked above rather than reaching here.
+        assert!(cut.ends_with('é'));
+    }
+
+    #[test]
+    fn a_dismissal_and_a_run_request_are_fenced_by_the_same_two_rules() {
+        let dismiss = ThreadHandoffDismiss {
+            company_id: Uuid::new_v4(),
+            handoff_id: Uuid::new_v4(),
+            command_id: Uuid::new_v4(),
+            expected_version: 1,
+            expected_generation: Uuid::new_v4(),
+            actor_principal_id: PrincipalId::random(),
+            visible_channel_ids: vec![Uuid::new_v4()],
+        };
+        assert_eq!(dismiss.validate(), Ok(()));
+        assert!(
+            ThreadHandoffDismiss {
+                expected_version: 0,
+                ..dismiss.clone()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            ThreadHandoffDismiss {
+                expected_generation: Uuid::nil(),
+                ..dismiss
+            }
+            .validate()
+            .is_err()
+        );
+
+        let request = HandoffRunRequest {
+            handoff_id: Uuid::new_v4(),
+            generation: Uuid::new_v4(),
+            expected_version: 1,
+        };
+        assert_eq!(request.validate(), Ok(()));
+        assert!(
+            HandoffRunRequest {
+                generation: Uuid::nil(),
+                ..request
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            HandoffRunRequest {
+                handoff_id: Uuid::nil(),
+                ..request
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            HandoffRunRequest {
+                expected_version: 0,
+                ..request
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]

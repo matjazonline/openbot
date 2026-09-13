@@ -240,7 +240,10 @@ impl CommitPlan {
 /// A held channel is excluded here too, for the same reason the single-task shape excluded it from
 /// `targets`: it *would* have answered, but the team asked to be consulted first, and it gains a
 /// `thread_handoffs` row instead of a place in any pipeline.
-fn pipelines(channels: &[PreparedChannel], disposition: MessageDisposition) -> Vec<Vec<InboundTaskTarget>> {
+fn pipelines(
+    channels: &[PreparedChannel],
+    disposition: MessageDisposition,
+) -> Vec<Vec<InboundTaskTarget>> {
     let mut groups: Vec<Vec<InboundTaskTarget>> = Vec::new();
     let mut previous_handle = None;
     for channel in channels.iter().filter(|channel| {

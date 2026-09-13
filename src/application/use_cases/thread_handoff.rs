@@ -11,6 +11,7 @@ use crate::{
     application::thread_handoff::ThreadHandoffPolicyPersistence,
     entities::thread_handoff::{
         ExternalReplyHandling, ExternalReplyHandlingPolicy, ThreadHandoff, ThreadHandoffCommand,
+        ThreadHandoffDismiss, ThreadHandoffDraft,
     },
 };
 
@@ -65,6 +66,14 @@ impl ThreadHandoffUseCases {
         self.persistence.change_thread_handoff(command).await
     }
 
+    /// Give up on one handoff generation, returning its new version.
+    ///
+    /// Same scoping contract as [`Self::change_thread_handoff`]: the caller proves membership and
+    /// fills `visible_channel_ids` before this is called.
+    pub async fn dismiss_thread_handoff(&self, command: ThreadHandoffDismiss) -> AppResult<u64> {
+        self.persistence.dismiss_thread_handoff(command).await
+    }
+
     /// One handoff, scoped to the channels the caller proved they may read.
     ///
     /// `None` covers "no such handoff", "another company's" and "a channel you cannot view"
@@ -77,6 +86,31 @@ impl ThreadHandoffUseCases {
     ) -> AppResult<Option<ThreadHandoff>> {
         self.persistence
             .get_thread_handoff(company_id, handoff_id, visible_channel_ids)
+            .await
+    }
+
+    /// The draft this handoff generation's run produced, scoped to the caller's channels.
+    pub async fn thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        handoff_id: Uuid,
+        generation: Uuid,
+        visible_channel_ids: &[Uuid],
+    ) -> AppResult<Option<ThreadHandoffDraft>> {
+        self.persistence
+            .thread_handoff_draft(company_id, handoff_id, generation, visible_channel_ids)
+            .await
+    }
+
+    /// End a drafting run whose draft expired, and hand the reply back to the team.
+    pub async fn expire_thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+        reason: &str,
+    ) -> AppResult<()> {
+        self.persistence
+            .expire_thread_handoff_draft(company_id, task_id, reason)
             .await
     }
 

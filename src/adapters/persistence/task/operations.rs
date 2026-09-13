@@ -13,7 +13,7 @@
 //! structural cleanup this phase is scoped to. Recorded as deferred debt; revisit with the split.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use sqlx::postgres::types::PgInterval;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
@@ -27,6 +27,10 @@ use crate::{
         delivery::enqueue::insert_delivery_on,
         response_review::{create_review_draft_on, effective_review_required_on},
         thread::insert_message_on,
+        thread_handoff::{
+            DraftedHandoffRun, HandoffRunEnd, complete_handoff_run_on, fail_handoff_run_on,
+            handoff_run_for_task_on,
+        },
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -44,16 +48,59 @@ use crate::{
             TaskStatusEvent, TaskStatusEventCursor, TaskStopReason, TaskTransitionReason,
             ThreadActivity, ThreadWorkSummary, TokenUsage, TransitionActor,
         },
+        thread_handoff::{DraftTarget, draft_target},
         transport::{DeliveryId, PrincipalId},
         value_objects::MessageId,
     },
     task_queue::{
-        CollaborationReadScope, DelegationCommandRequest, HumanTaskCompletion,
-        HumanTaskCompletionResult, OutreachReassignmentContext,
+        AgentReviewCandidate, CollaborationReadScope, DelegationCommandRequest,
+        HumanTaskCompletion, HumanTaskCompletionResult, OutreachReassignmentContext,
     },
     transport::{DeliveryCreation, NewDelivery},
-    use_cases::response_review::{DraftPublicationSnapshot, PreparedReviewDraft},
+    use_cases::{
+        response_review::{DraftPublicationSnapshot, PreparedReviewDraft},
+        thread::AgentReply,
+    },
 };
+
+/// How long a handoff draft waits for the person who asked for it.
+///
+/// Deliberately shorter than `DEFAULT_REVIEW_EXPIRY_DAYS`, and stated rather than inherited. A
+/// handoff draft is not a reviewer's queue item: it answers a customer who is already waiting, and
+/// it is addressed to one named person who pressed a button minutes ago. Seven days of silence on
+/// one of these means the reply is stale, not that the reviewer is busy. Expiry is survivable --
+/// Send converts it into a `draft_failed` transition that returns the reply to
+/// `needs_instruction`, so the team can ask for a fresh draft against the message as it stands.
+const HANDOFF_DRAFT_EXPIRY_DAYS: i64 = 3;
+
+/// The immutable draft a parked dispatch stores, built with no `await` of its own.
+///
+/// Synchronous on purpose: it is the part the review branch and the handoff-draft branch share,
+/// and an `async fn` here would materialise another future inside the deepest `await` chain in the
+/// process -- the one `src/AGENTS.md` caps at its current size.
+fn prepared_dispatch_draft(
+    reply: &AgentReply,
+    task_id: Uuid,
+    candidate: &AgentReviewCandidate,
+    delivery: &NewDelivery,
+    author: PrincipalId,
+) -> AppResult<PreparedReviewDraft> {
+    let publication = DraftPublicationSnapshot::new(reply.message.clone(), delivery.clone())?
+        .with_also_in_threads(reply.also_in_threads.clone())?;
+    PreparedReviewDraft::new(
+        crate::entities::response_draft::ResponseDraftId::new(reply.message.id.as_uuid()),
+        1,
+        delivery.company_id,
+        delivery.channel_id,
+        reply.message.thread_id,
+        Some(task_id),
+        author,
+        author,
+        candidate.recipients.clone(),
+        candidate.evidence.clone(),
+        publication,
+    )
+}
 
 #[derive(sqlx::FromRow)]
 struct ResponseDraftDb {
@@ -1015,7 +1062,7 @@ impl TaskPersistence for PostgresPersistence {
         // The sweep is one statement over rows held by different workers, so the attribution
         // cannot come from a value the caller knows. `worker_id` on the right-hand side is read
         // from the old row version, which makes each event name the worker that lost *that* lease.
-        let reaped = sqlx::query_as::<_, (Uuid, i32)>(
+        let reaped = sqlx::query_as::<_, (Uuid, i32, Uuid, String)>(
             r#"UPDATE background_tasks
                SET transition_reason = 'lease_lost',
                    transition_actor_kind = 'worker',
@@ -1039,7 +1086,7 @@ impl TaskPersistence for PostgresPersistence {
                    updated_at = CURRENT_TIMESTAMP
                WHERE status = 'processing'
                  AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP)
-               RETURNING id, retry_count"#,
+               RETURNING id, retry_count, company_id, status"#,
         )
         .bind(LEASE_EXPIRED_ERROR)
         .fetch_all(&mut *tx)
@@ -1049,7 +1096,7 @@ impl TaskPersistence for PostgresPersistence {
         // Close each reaped run's ledger row. `retry_count` was just incremented, and the attempt
         // that vanished was numbered with the value it now holds -- attempt N is the run made
         // after N-1 failures.
-        for (task_id, retry_count) in &reaped {
+        for (task_id, retry_count, company_id, status) in &reaped {
             sqlx::query(
                 r#"UPDATE task_attempts
                    SET status = $3,
@@ -1066,6 +1113,19 @@ impl TaskPersistence for PostgresPersistence {
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
+            // A lost lease alone changes nothing about a handoff: the task is pending again and
+            // some execution will still finish it. A lost lease that spent the last attempt is a
+            // terminal failure, and the reply goes back to the team.
+            if status == "dead_letter" {
+                fail_handoff_run_on(
+                    &mut tx,
+                    *company_id,
+                    *task_id,
+                    HandoffRunEnd::TaskFailed,
+                    LEASE_EXPIRED_ERROR,
+                )
+                .await?;
+            }
         }
 
         tx.commit().await.map_err(AppError::from)?;
@@ -1476,14 +1536,26 @@ impl TaskPersistence for PostgresPersistence {
             .bind(commit.lease.claimed_owner.principal_id().map(|id| id.as_uuid()))
             .bind(commit.lease.ownership_version as i64).execute(&mut *tx).await?;
 
-        if !commit.deliveries.is_empty()
+        // The drafting run this task is executing, if it has one at all. Read after the lease
+        // fence, so a run that has lost the task still writes nothing, and keyed by task id
+        // because that is the only identifier the durable payload carries. A run that is no longer
+        // current is still found here and refused below -- never quietly published.
+        let handoff_run = if commit.deliveries.is_empty() {
+            None
+        } else {
+            handoff_run_for_task_on(&mut tx, company_id, commit.lease.task_id).await?
+        };
+        let review_required = !commit.deliveries.is_empty()
             && effective_review_required_on(
                 &mut tx,
                 commit.deliveries[0].company_id,
                 commit.deliveries[0].channel_id,
             )
-            .await?
-        {
+            .await?;
+        if !matches!(
+            draft_target(review_required, handoff_run.is_some()),
+            DraftTarget::Publish
+        ) {
             if commit.deliveries.len() != 1 {
                 return Err(AppError::BadRequest(
                     "A reviewed response requires exactly one logical delivery.".into(),
@@ -1498,9 +1570,6 @@ impl TaskPersistence for PostgresPersistence {
                 .agent_principal_id()
                 .ok_or_else(|| AppError::Conflict("The task is no longer agent-owned.".into()))?;
             let delivery = &commit.deliveries[0];
-            let publication =
-                DraftPublicationSnapshot::new(commit.reply.message.clone(), delivery.clone())?
-                    .with_also_in_threads(commit.reply.also_in_threads.clone())?;
             let handoff_generation: Option<Uuid> = sqlx::query_scalar(
                 r#"SELECT id FROM task_ownership_events
                    WHERE company_id = $1 AND task_id = $2 AND operation = 'transfer'
@@ -1513,23 +1582,42 @@ impl TaskPersistence for PostgresPersistence {
             .fetch_optional(&mut *tx)
             .await
             .map_err(AppError::from)?;
-            let mut draft = PreparedReviewDraft::new(
-                crate::entities::response_draft::ResponseDraftId::new(
-                    commit.reply.message.id.as_uuid(),
-                ),
-                1,
-                delivery.company_id,
-                delivery.channel_id,
-                commit.reply.message.thread_id,
-                Some(commit.lease.task_id),
+            let mut draft = prepared_dispatch_draft(
+                commit.reply,
+                commit.lease.task_id,
+                candidate,
+                delivery,
                 author,
-                author,
-                candidate.recipients.clone(),
-                candidate.evidence.clone(),
-                publication,
             )?;
+            // Left exactly as it was: despite its name this column holds the id of the latest
+            // *task ownership transfer* event, which is a different sense of "handoff" from this
+            // one. A thread handoff correlates to its draft through `thread_handoff_runs.task_id`.
             draft.source_handoff_generation = handoff_generation;
-            create_review_draft_on(&mut tx, &draft, None).await?;
+            if handoff_run.is_some() {
+                draft.expires_at = Utc::now() + Duration::days(HANDOFF_DRAFT_EXPIRY_DAYS);
+            }
+            // The assigned reviewer is fixed to the handoff's responsible principal, which is what
+            // lets Send go through the existing review machinery unchanged. A `NULL` means a
+            // manager released the handoff mid-run; that falls back to `resolve_reviewer_on`,
+            // exactly as an ordinary review draft does.
+            let reviewer = handoff_run
+                .and_then(|run| run.responsible_principal_id)
+                .map(PrincipalId::new);
+            create_review_draft_on(&mut tx, &draft, reviewer).await?;
+            if let Some(run) = handoff_run {
+                complete_handoff_run_on(
+                    &mut tx,
+                    DraftedHandoffRun {
+                        company_id,
+                        task_id: commit.lease.task_id,
+                        run,
+                        agent: author,
+                        draft_id: draft.id.as_uuid(),
+                        draft_version: i32::try_from(draft.version).unwrap_or(i32::MAX),
+                    },
+                )
+                .await?;
+            }
 
             if commit.complete_outreach {
                 let outreach_ids: Vec<Uuid> = sqlx::query_scalar(

@@ -187,6 +187,8 @@ pub struct MailboxPage<'a> {
     pub selected_thread_id: Option<Uuid>,
     /// What each listed thread is doing, for the row badges.
     pub activity: &'a HashMap<Uuid, ThreadActivity>,
+    /// The held customer reply each listed thread is waiting on. Threads with none are absent.
+    pub handoffs: &'a HashMap<Uuid, ThreadHandoffMark>,
     /// Pre-rendered right-hand pane: messages, the compose form, or a placeholder.
     pub detail_html: &'a str,
 }
@@ -203,6 +205,8 @@ pub struct ThreadColumn<'a> {
     pub selected_thread_id: Option<Uuid>,
     /// What each thread is doing, for the row badges. Threads with nothing in flight are absent.
     pub activity: &'a HashMap<Uuid, ThreadActivity>,
+    /// The held customer reply each thread is waiting on. Threads with none are absent.
+    pub handoffs: &'a HashMap<Uuid, ThreadHandoffMark>,
 }
 
 /// The detail pane showing one thread's messages.
@@ -225,6 +229,14 @@ pub struct MessagePane<'a> {
     pub ownership_error: Option<&'a str>,
     pub owner_candidates: &'a [TaskOwnerCandidate],
     pub collaboration: Option<&'a CollaborationSummary>,
+    /// The held customer reply this thread is waiting on, when it has one -- as the banner's own
+    /// view, already built.
+    ///
+    /// The view rather than the entity, and it restates this pane's own ids, because the live
+    /// stream builds the very same value and hands it to the very same renderer: a banner that
+    /// streams in must be indistinguishable from one that came with the page, exactly as
+    /// [`message_bubble_chat`] requires of a bubble.
+    pub handoff: Option<ThreadHandoffBannerView<'a>>,
 }
 
 /// The detail pane showing the new-message form for a thread that is already open.
@@ -596,8 +608,22 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
                 return;
             }
 
-            // The open thread's activity strip appearing makes the pane taller, which would push
-            // the newest message out of view for someone sitting at the live edge.
+            // A thread row's held-reply badge redraws in place. Unlike the activity badge it does
+            // not lift the quiet on a replied row: a held reply is durable and was already there
+            // before the reply, so it is not news the reader has yet to see.
+            if (swapped && swapped.classList && swapped.classList.contains('thread-handoff-mark')) {
+                return;
+            }
+
+            // The open thread's held-reply banner and its activity strip both make the pane taller,
+            // which would push the newest message out of view for someone sitting at the live edge.
+            if (swapped && swapped.id === 'thread-handoff') {
+                if (wasAtBottomBeforeStream) {
+                    scrollToNewestMessageStart();
+                }
+                return;
+            }
+
             if (swapped && swapped.id === 'thread-activity') {
                 if (wasAtBottomBeforeStream) {
                     scrollToNewestMessageStart();
@@ -821,7 +847,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{thread_handoffs}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -837,6 +863,7 @@ pub(crate) fn application_javascript() -> String {
         delegation = EVENT_DELEGATION_SCRIPT,
         request_errors = REQUEST_ERROR_SCRIPT,
         button_busy = BUTTON_BUSY_SCRIPT,
+        thread_handoffs = super::thread_handoffs::THREAD_HANDOFF_SCRIPT,
     )
 }
 
@@ -923,6 +950,7 @@ document.addEventListener('click', function (event) {
         }
         case 'pick-channel-library-agent': pickChannelLibraryAgent(control); break;
         case 'copy-text': copyTextFrom(control); break;
+        case 'thread-handoff': postThreadHandoff(control); break;
         case 'delete-library-agent': deleteLibraryAgent(control.dataset.agentId); break;
         // 'isolate' carries no behaviour. It exists so that `closest('[data-action]')` stops
         // here rather than resolving to a clickable ancestor -- the delegated stand-in for the
@@ -1058,6 +1086,7 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
             next_cursor: page.next_cursor,
             selected_thread_id: page.selected_thread_id,
             activity: page.activity,
+            handoffs: page.handoffs,
         }),
         None => empty_thread_column(),
     };
@@ -2018,6 +2047,7 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
         column.selected_thread_id == Some(thread.id),
         ThreadRowMarks {
             activity: column.activity.get(&thread.id).copied(),
+            handoff: column.handoffs.get(&thread.id).copied(),
             from_other_channel: opened_by_another_channel(thread, column.app_domain_name),
             ..ThreadRowMarks::default()
         },
@@ -2084,6 +2114,8 @@ pub fn other_channel_glyph(from_other_channel: bool, title: &str) -> String {
 pub struct ThreadRowMarks {
     /// What this thread is doing. Threads with nothing in flight leave it `None`.
     pub activity: Option<ThreadActivity>,
+    /// The held customer reply this thread is waiting on, if any.
+    pub handoff: Option<ThreadHandoffMark>,
     /// Who spoke last. Only rows arriving over the stream carry this -- see [`thread_row_fragment`].
     pub last_role: Option<MessageRole>,
     /// This thread was opened by an agent in another channel.
@@ -2124,6 +2156,7 @@ pub fn thread_row_fragment(
                         <span class="flex min-w-0 items-center gap-1.5">{channel_glyph}<span class="truncate font-semibold">{subject}</span></span>
                         <span class="flex shrink-0 items-center gap-1.5">
                             <span class="thread-mark text-sm leading-none text-success"></span>
+                            {handoff_slot}
                             {activity_slot}
                             <span class="text-xs opacity-60">{updated_at}</span>
                         </span>
@@ -2141,6 +2174,9 @@ pub fn thread_row_fragment(
             marks.from_other_channel,
             "Opened by an agent in another channel",
         ),
+        // Before the activity slot: reading left to right, "what the team must do" comes before
+        // "what the machine is doing", and then the timestamp.
+        handoff_slot = thread_handoff_slot(thread.id, marks.handoff),
         activity_slot = thread_activity_slot(thread.id, marks.activity),
         // Only rows arriving over the stream carry this: the reply mark means "while you were
         // watching", so a freshly rendered page has nothing to mark and needs no lookup.
@@ -2227,6 +2263,13 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         .map(|message| format!("&after={}", message.cursor()))
         .unwrap_or_default();
 
+    let note_actions = internal_note_actions(pane);
+    // Empty when the thread has no held reply, and present either way: the container is where the
+    // first streamed banner lands, the same arrangement `#no-messages` has above.
+    let handoff_banner = pane
+        .handoff
+        .as_ref()
+        .map_or_else(String::new, super::thread_handoff_banner);
     format!(
         r##"
         <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
@@ -2253,6 +2296,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 sse-swap="message" hx-swap="beforeend">
                 {messages_html}
             </div>
+            <div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML">{handoff_banner}</div>
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
             {owner_panel}
             {delegation_panel}
@@ -2272,6 +2316,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         channel_id = pane.channel.id,
         after = after,
         messages_html = messages_html,
+        handoff_banner = handoff_banner,
         pane_error = pane
             .ownership_error
             .map_or_else(String::new, |message| format!(
@@ -2282,7 +2327,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         owner_panel = task_owner_panel(pane),
         delegation_panel = delegation_panel(pane),
         human_completion = human_completion_composer(pane),
-        note_actions = internal_note_actions(pane),
+        note_actions = note_actions,
         note_composer = internal_note_composer(pane),
         composer = thread_composer(pane),
         diagnostics_dialog = DIAGNOSTICS_DIALOG,

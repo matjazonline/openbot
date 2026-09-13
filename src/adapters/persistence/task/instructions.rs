@@ -7,13 +7,17 @@ use uuid::Uuid;
 
 use super::queue::insert_task;
 use crate::{
-    adapters::persistence::thread::insert_message_on,
+    adapters::persistence::{
+        thread::insert_message_on,
+        thread_handoff::{StartHandoffRun, start_handoff_run_on},
+    },
     app_error::{AppError, AppResult},
     entities::{
         correlation::CorrelationId,
         internal_note::{AgentInstructionNote, AskOwnerOutcome, AskOwnerToAct, StartAgentTask},
         message::{CanonicalMessageId, MessageDirection, MessageRole, ThreadEntryKind},
         task::{BackgroundTask, NewTask, TaskLeaseRef, TaskSource},
+        thread_handoff::HandoffRunRequest,
         transport::PrincipalId,
     },
     transport::{BoundedVec, InboundTaskPayload, InboundTaskPayloadV1, ReplyDelivery},
@@ -22,6 +26,24 @@ use crate::{
 
 fn fingerprint(value: serde_json::Value) -> String {
     format!("{:x}", Sha256::digest(value.to_string().as_bytes()))
+}
+
+/// Add the handoff generation to a command's fingerprint, and only when there is one.
+///
+/// A `None` must leave the fingerprint byte-for-byte what it was before handoffs existed: every
+/// ask and start command recorded so far is replayed against a stored hash, and a `"handoff": null`
+/// key would turn each of those replays into "same id, different parameters" -- a `Conflict` on a
+/// retry that used to succeed. Two presses of **Generate draft** sharing a `command_id` but naming
+/// different generations must be exactly that conflict, which is why the field is here at all.
+fn with_handoff(mut fields: serde_json::Value, handoff: Option<HandoffRunRequest>) -> String {
+    if let Some(handoff) = handoff {
+        fields["handoff"] = serde_json::json!({
+            "handoff_id": handoff.handoff_id,
+            "generation": handoff.generation,
+            "expected_version": handoff.expected_version,
+        });
+    }
+    fingerprint(fields)
 }
 
 async fn advisory_lock(
@@ -260,15 +282,18 @@ pub(crate) async fn ask_owner_to_act(
     actor: PrincipalId,
 ) -> AppResult<AskOwnerOutcome> {
     command.validate().map_err(AppError::BadRequest)?;
-    let command_fingerprint = fingerprint(serde_json::json!({
-        "company_id": command.company_id,
-        "channel_id": command.channel_id,
-        "thread_id": command.thread_id,
-        "task_id": command.task_id,
-        "expected_ownership_version": command.expected_ownership_version,
-        "note_ids": command.note_ids,
-        "actor": actor.as_uuid(),
-    }));
+    let command_fingerprint = with_handoff(
+        serde_json::json!({
+            "company_id": command.company_id,
+            "channel_id": command.channel_id,
+            "thread_id": command.thread_id,
+            "task_id": command.task_id,
+            "expected_ownership_version": command.expected_ownership_version,
+            "note_ids": command.note_ids,
+            "actor": actor.as_uuid(),
+        }),
+        command.handoff,
+    );
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     advisory_lock(&mut tx, command.company_id, command.command_id).await?;
     if let Some((stored_fingerprint, outcome)) = sqlx::query_as::<_, (String, String)>(
@@ -317,6 +342,22 @@ pub(crate) async fn ask_owner_to_act(
     .await?;
     if outcome == AskOwnerOutcome::Requeued {
         requeue_processing_task(&mut tx, command, actor, &task).await?;
+    }
+    // After the task is locked, never before: every command in this module takes the task first
+    // and the handoff second, so an ask racing a start cannot deadlock on the opposite order.
+    if let Some(request) = command.handoff {
+        start_handoff_run_on(
+            &mut tx,
+            StartHandoffRun {
+                company_id: command.company_id,
+                thread_id: command.thread_id,
+                task_id: command.task_id,
+                command_id: command.command_id,
+                actor,
+                request,
+            },
+        )
+        .await?;
     }
     tx.commit().await.map_err(AppError::from)?;
     Ok(outcome)
@@ -462,13 +503,16 @@ pub(crate) async fn start_agent_task(
     actor: PrincipalId,
 ) -> AppResult<BackgroundTask> {
     command.validate().map_err(AppError::BadRequest)?;
-    let command_fingerprint = fingerprint(serde_json::json!({
-        "company_id": command.company_id,
-        "channel_id": command.channel_id,
-        "thread_id": command.thread_id,
-        "note_ids": command.note_ids,
-        "actor": actor.as_uuid(),
-    }));
+    let command_fingerprint = with_handoff(
+        serde_json::json!({
+            "company_id": command.company_id,
+            "channel_id": command.channel_id,
+            "thread_id": command.thread_id,
+            "note_ids": command.note_ids,
+            "actor": actor.as_uuid(),
+        }),
+        command.handoff,
+    );
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     advisory_lock(&mut tx, command.company_id, command.command_id).await?;
     advisory_lock(&mut tx, command.company_id, command.thread_id).await?;
@@ -510,6 +554,23 @@ pub(crate) async fn start_agent_task(
     ensure_thread_has_no_active_task(&mut tx, command).await?;
     let task = create_selected_note_task(&mut tx, command).await?;
     record_started_task_instruction(&mut tx, command, actor, &command_fingerprint, &task).await?;
+    // The run is written after the task because it names it, and in the same transaction because a
+    // refused fence must take the task with it: a rolled-back start leaves no orphan task running
+    // for a handoff that never entered `drafting`.
+    if let Some(request) = command.handoff {
+        start_handoff_run_on(
+            &mut tx,
+            StartHandoffRun {
+                company_id: command.company_id,
+                thread_id: command.thread_id,
+                task_id: task.id,
+                command_id: command.command_id,
+                actor,
+                request,
+            },
+        )
+        .await?;
+    }
     tx.commit().await.map_err(AppError::from)?;
     Ok(task)
 }
@@ -603,4 +664,109 @@ pub(crate) async fn claim_agent_instruction_notes(
             body: row.body,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ask(handoff: Option<HandoffRunRequest>) -> String {
+        with_handoff(
+            serde_json::json!({
+                "company_id": Uuid::nil(),
+                "channel_id": Uuid::nil(),
+                "thread_id": Uuid::nil(),
+                "task_id": Uuid::nil(),
+                "expected_ownership_version": 1,
+                "note_ids": [Uuid::nil()],
+                "actor": Uuid::nil(),
+            }),
+            handoff,
+        )
+    }
+
+    fn start(handoff: Option<HandoffRunRequest>) -> String {
+        with_handoff(
+            serde_json::json!({
+                "company_id": Uuid::nil(),
+                "channel_id": Uuid::nil(),
+                "thread_id": Uuid::nil(),
+                "note_ids": [Uuid::nil()],
+                "actor": Uuid::nil(),
+            }),
+            handoff,
+        )
+    }
+
+    fn request(generation: Uuid) -> HandoffRunRequest {
+        HandoffRunRequest {
+            handoff_id: Uuid::nil(),
+            generation,
+            expected_version: 1,
+        }
+    }
+
+    /// Case 2. Two presses of **Generate draft** sharing a command id but naming different
+    /// generations are different commands, and the replay check has to see that.
+    #[test]
+    fn the_handoff_generation_is_part_of_both_commands_fingerprints() {
+        let first = Uuid::from_u128(1);
+        let second = Uuid::from_u128(2);
+        assert_ne!(ask(Some(request(first))), ask(Some(request(second))));
+        assert_ne!(start(Some(request(first))), start(Some(request(second))));
+        assert_ne!(
+            ask(Some(request(first))),
+            ask(None),
+            "a handoff run is not the same command as an ordinary one"
+        );
+        assert_ne!(start(Some(request(first))), start(None));
+        // The expected version is a fence, so it is part of what was asked too.
+        assert_ne!(
+            ask(Some(request(first))),
+            ask(Some(HandoffRunRequest {
+                expected_version: 2,
+                ..request(first)
+            }))
+        );
+    }
+
+    /// Case 2, the half that protects everything already recorded: a `None` handoff must hash to
+    /// exactly what it hashed to before this field existed, or every stored ask and start command
+    /// replays as "same id, different parameters" -- a `Conflict` on a retry that used to work.
+    /// The literal is the guard: a future field added to either `json!` cannot pass this quietly.
+    #[test]
+    fn an_ordinary_command_hashes_exactly_as_it_did_before_handoffs_existed() {
+        assert_eq!(
+            ask(None),
+            "0a3db2a5a3c9f9d51d3570b7308b17ea8257f8f30820f72407f996c14f69c3b5"
+        );
+        assert_eq!(
+            start(None),
+            "6411b42a9530f7756148a94a6796e4304a9a82696287d6016857937749c59ce0"
+        );
+        // And the property the literals stand for, stated directly: a `None` adds no key at all,
+        // so the hash is the one the pre-Phase-4 `fingerprint` call produced from the same fields.
+        assert_eq!(
+            ask(None),
+            fingerprint(serde_json::json!({
+                "company_id": Uuid::nil(),
+                "channel_id": Uuid::nil(),
+                "thread_id": Uuid::nil(),
+                "task_id": Uuid::nil(),
+                "expected_ownership_version": 1,
+                "note_ids": [Uuid::nil()],
+                "actor": Uuid::nil(),
+            }))
+        );
+        assert_eq!(
+            start(None),
+            fingerprint(serde_json::json!({
+                "company_id": Uuid::nil(),
+                "channel_id": Uuid::nil(),
+                "thread_id": Uuid::nil(),
+                "note_ids": [Uuid::nil()],
+                "actor": Uuid::nil(),
+            }))
+        );
+    }
 }

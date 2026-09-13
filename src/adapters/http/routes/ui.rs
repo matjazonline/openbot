@@ -22,6 +22,7 @@ use axum::{
     },
     routing::get,
 };
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use tokio_stream::{Stream, StreamExt};
 use tracing::{instrument, warn};
@@ -39,10 +40,13 @@ use crate::{
         delegation::{DelegationActor, DelegationAuthority, DelegationCommand, DelegationReason},
         message::CanonicalMessageId,
         task::{
-            BackgroundTask, TaskOwner, TaskOwnershipActor, TaskOwnershipAuthority,
-            TaskOwnershipCommand, TaskOwnershipOperation, TaskOwnershipReason, ThreadActivity,
+            BackgroundTask, TaskOwner, TaskOwnerCandidate, TaskOwnershipActor,
+            TaskOwnershipAuthority, TaskOwnershipCommand, TaskOwnershipOperation,
+            TaskOwnershipReason, ThreadActivity,
         },
         thread::Thread,
+        thread_handoff::{ThreadHandoff, ThreadHandoffDraft, ThreadHandoffState},
+        transport::PrincipalId,
         user::{User, Viewer},
         value_objects::EmailAddress,
     },
@@ -59,13 +63,14 @@ use crate::{
             CanonicalMessageIngress, HumanCompletionDraft, IngressOrigin, ReplyDelivery,
             ThreadUseCases, qualified_email_identity,
         },
+        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
 
 use super::{
     channel::{ThreadListQuery, ThreadListResponse, load_thread_page},
-    live_updates::{Wake, channel_wake_ups, thread_wake_ups},
+    live_updates::{Wake, mailbox_channel_wake_ups, mailbox_thread_wake_ups},
 };
 
 pub fn router() -> Router<AppState> {
@@ -339,6 +344,26 @@ async fn page_activity(
         .collect())
 }
 
+/// The held customer reply each thread in a rendered page is waiting on, in one batched lookup.
+///
+/// `visible_channel_ids` is passed through rather than derived from the thread list: the page
+/// handler proved channel visibility for the *selected* channel, and this query must prove it for
+/// every row it answers.
+async fn page_handoffs(
+    handoffs: &ThreadHandoffUseCases,
+    company_id: Uuid,
+    visible_channel_ids: &[Uuid],
+    threads: &[Thread],
+) -> AppResult<HashMap<Uuid, pages::ThreadHandoffMark>> {
+    let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
+    Ok(handoffs
+        .thread_handoffs_for_threads(company_id, &ids, visible_channel_ids)
+        .await?
+        .iter()
+        .map(|(thread_id, handoff)| (*thread_id, pages::ThreadHandoffMark::of(handoff)))
+        .collect())
+}
+
 /// Thread ids whose activity badges a newly connected column may already be displaying.
 async fn first_page_thread_ids(
     thread_use_cases: &ThreadUseCases,
@@ -404,8 +429,150 @@ pub(super) async fn channel_agent(
         .await
 }
 
+/// Which thread's held reply to load, and for whom.
+///
+/// A named struct rather than three bare `Uuid`s and a `bool`: a transposed company and channel
+/// would compile and would then answer for the wrong tenant.
+#[derive(Clone, Copy)]
+struct HeldReplyScope {
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    /// Whether the reader may hand the reply to somebody else, which decides whether the roster
+    /// behind that control is worth loading at all.
+    viewer_manages_tasks: bool,
+}
+
+/// Who is reading, and when, for the banner the load feeds.
+#[derive(Clone, Copy)]
+struct HeldReplyViewer {
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    viewer_principal_id: Option<PrincipalId>,
+    viewer_manages_tasks: bool,
+    as_of: DateTime<Utc>,
+}
+
+/// One thread's held customer reply, with everything the banner says about it.
+struct HeldReply {
+    handoff: ThreadHandoff,
+    draft: Option<ThreadHandoffDraft>,
+    /// Every principal this channel lets in, which is where both the responsible name and the
+    /// hand-over roster come from. Empty when neither is needed.
+    principals: Vec<TaskOwnerCandidate>,
+}
+
+impl HeldReply {
+    /// The banner's whole view, built in exactly one place.
+    ///
+    /// The page render and the live stream both come through here and then through
+    /// [`pages::thread_handoff_banner`], which is what makes a banner that streams in
+    /// indistinguishable from one that came with the page.
+    fn banner_view(&self, viewer: HeldReplyViewer) -> pages::ThreadHandoffBannerView<'_> {
+        pages::ThreadHandoffBannerView {
+            company_id: viewer.company_id,
+            channel_id: viewer.channel_id,
+            thread_id: viewer.thread_id,
+            handoff: &self.handoff,
+            responsible_label: self.responsible_label(),
+            viewer_principal_id: viewer.viewer_principal_id,
+            viewer_manages_tasks: viewer.viewer_manages_tasks,
+            draft: self.draft,
+            // Only a manager is offered the hand-over, so only they are given the roster.
+            reassign_candidates: if viewer.viewer_manages_tasks {
+                &self.principals
+            } else {
+                &[]
+            },
+            as_of: viewer.as_of,
+            error: None,
+        }
+    }
+
+    /// The responsible principal's display name. `None` for an unclaimed reply, which the banner
+    /// words as the channel team.
+    fn responsible_label(&self) -> Option<&str> {
+        let responsible = self.handoff.responsible_principal_id?;
+        self.principals
+            .iter()
+            .find(|candidate| candidate.owner.principal_id() == Some(responsible))
+            .map(|candidate| candidate.label.as_str())
+    }
+}
+
+/// The held reply on one thread, or `None` when it has none.
+///
+/// Three reads rather than one join, and each one paid for only when it is needed: the
+/// overwhelmingly common case is a thread with no handoff at all, which pays for none of them; the
+/// draft exists only for a `draft_ready` handoff; and the roster is loaded only when somebody is
+/// named on the reply or the reader could hand it over.
+async fn load_held_reply(
+    thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
+    scope: HeldReplyScope,
+) -> AppResult<Option<HeldReply>> {
+    let visible = [scope.channel_id];
+    let Some(handoff) = handoff_use_cases
+        .thread_handoffs_for_threads(scope.company_id, &[scope.thread_id], &visible)
+        .await?
+        .remove(&scope.thread_id)
+    else {
+        return Ok(None);
+    };
+    let draft = if handoff.state == ThreadHandoffState::DraftReady {
+        handoff_use_cases
+            .thread_handoff_draft(scope.company_id, handoff.id, handoff.generation, &visible)
+            .await?
+    } else {
+        None
+    };
+    let principals = if handoff.responsible_principal_id.is_some() || scope.viewer_manages_tasks {
+        thread_use_cases
+            .get_task_persistence()
+            .await
+            .list_task_owner_candidates(scope.company_id, scope.channel_id)
+            .await?
+    } else {
+        Vec::new()
+    };
+    Ok(Some(HeldReply {
+        handoff,
+        draft,
+        principals,
+    }))
+}
+
+/// The open thread's held-reply banner as the live stream sends it: the empty string when the
+/// thread has no open handoff, which is what clears the banner after a send or a dismissal.
+async fn thread_handoff_banner_html(
+    thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
+    viewer: HeldReplyViewer,
+) -> AppResult<String> {
+    let held = load_held_reply(
+        thread_use_cases,
+        handoff_use_cases,
+        HeldReplyScope {
+            company_id: viewer.company_id,
+            channel_id: viewer.channel_id,
+            thread_id: viewer.thread_id,
+            viewer_manages_tasks: viewer.viewer_manages_tasks,
+        },
+    )
+    .await?;
+    Ok(held.map_or_else(String::new, |held| {
+        pages::thread_handoff_banner(&held.banner_view(viewer))
+    }))
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the pane is assembled from every port it reads, each named rather than bundled"
+)]
 pub(super) async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
     company_id: Uuid,
     channel: &Channel,
     thread: &Thread,
@@ -475,6 +642,17 @@ pub(super) async fn render_message_pane(
             .collect(),
         _ => Vec::new(),
     };
+    let held_reply = load_held_reply(
+        thread_use_cases,
+        handoff_use_cases,
+        HeldReplyScope {
+            company_id,
+            channel_id: channel.id,
+            thread_id: thread.id,
+            viewer_manages_tasks,
+        },
+    )
+    .await?;
     Ok(pages::message_pane(&pages::MessagePane {
         company_id,
         channel,
@@ -490,11 +668,22 @@ pub(super) async fn render_message_pane(
         ownership_error,
         owner_candidates: &owner_candidates,
         collaboration: collaboration.as_ref(),
+        handoff: held_reply.as_ref().map(|held| {
+            held.banner_view(HeldReplyViewer {
+                company_id,
+                channel_id: channel.id,
+                thread_id: thread.id,
+                viewer_principal_id,
+                viewer_manages_tasks,
+                as_of: chrono::Utc::now(),
+            })
+        }),
     }))
 }
 
 /// GET /ui - The full mailbox shell for the selected company / channel / thread (Protected).
 #[instrument(skip(
+    handoff_use_cases,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
@@ -511,6 +700,7 @@ async fn mailbox_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
@@ -560,6 +750,7 @@ async fn mailbox_page(
             let agent = channel_agent(&agent_use_cases, &viewer, channel).await?;
             render_message_pane(
                 &thread_use_cases,
+                &handoff_use_cases,
                 company.id,
                 channel,
                 thread,
@@ -590,15 +781,28 @@ async fn mailbox_page(
         next_cursor: thread_page.next_cursor.as_deref(),
         selected_thread_id: selected_thread.as_ref().map(|thread| thread.id),
         activity: &page_activity(&thread_use_cases, &thread_page.threads).await?,
+        handoffs: &match selected_channel {
+            Some(channel) => {
+                page_handoffs(
+                    &handoff_use_cases,
+                    company.id,
+                    &[channel.id],
+                    &thread_page.threads,
+                )
+                .await?
+            }
+            None => HashMap::new(),
+        },
         detail_html: &detail_html,
     })))
 }
 
 /// GET /ui/threads - The thread column for a channel, clearing the detail pane (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, config, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, handoff_use_cases, config, viewer))]
 async fn thread_column_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ChannelQuery>,
@@ -611,6 +815,13 @@ async fn thread_column_fragment(
     let page = load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
 
     let activity = page_activity(&thread_use_cases, &page.threads).await?;
+    let handoffs = page_handoffs(
+        &handoff_use_cases,
+        query.company_id,
+        &[channel.id],
+        &page.threads,
+    )
+    .await?;
     let column = pages::thread_column(&pages::ThreadColumn {
         company_id: query.company_id,
         channel: &channel,
@@ -619,6 +830,7 @@ async fn thread_column_fragment(
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: None,
         activity: &activity,
+        handoffs: &handoffs,
     });
     let detail = pages::empty_detail_pane(
         "Select a thread, or use New Thread to start a new one.",
@@ -634,10 +846,11 @@ async fn thread_column_fragment(
 }
 
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, config, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, handoff_use_cases, config, viewer))]
 async fn thread_page_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ThreadPageQuery>,
@@ -658,6 +871,13 @@ async fn thread_page_fragment(
     .await?;
 
     let activity = page_activity(&thread_use_cases, &page.threads).await?;
+    let handoffs = page_handoffs(
+        &handoff_use_cases,
+        query.company_id,
+        &[channel.id],
+        &page.threads,
+    )
+    .await?;
     Ok(Html(pages::thread_list_fragment(
         &pages::ThreadColumn {
             company_id: query.company_id,
@@ -667,16 +887,24 @@ async fn thread_page_fragment(
             next_cursor: page.next_cursor.as_deref(),
             selected_thread_id: None,
             activity: &activity,
+            handoffs: &handoffs,
         },
         pages::FragmentSwap::OutOfBand,
     )))
 }
 
 /// GET /ui/messages - The messages of one thread (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, agent_use_cases, viewer))]
+#[instrument(skip(
+    handoff_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    agent_use_cases,
+    viewer
+))]
 async fn message_pane_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     viewer: Viewer,
     Query(query): Query<ThreadQuery>,
@@ -694,6 +922,7 @@ async fn message_pane_fragment(
     Ok(Html(
         render_message_pane(
             &thread_use_cases,
+            &handoff_use_cases,
             query.company_id,
             &channel,
             &thread,
@@ -732,14 +961,20 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
 #[instrument(skip(
     channel_use_cases,
     thread_use_cases,
+    handoff_use_cases,
     agent_use_cases,
     events,
     viewer,
     headers
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn thread_message_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(events): State<MailboxEvents>,
     viewer: Viewer,
@@ -760,17 +995,60 @@ async fn thread_message_stream(
     // change under it, so every bubble it renders can borrow this rather than re-query.
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
 
+    // Resolved once, up here, for the same reason as the agent: the stream is authorized already
+    // and neither of these changes under it, so every banner it renders can reuse them.
+    let access = thread_use_cases
+        .principal_access_for_user(query.company_id, viewer.user_id)
+        .await?;
+    let viewer_principal_id = access.and_then(|context| context.principal_id);
+    let viewer_manages_tasks =
+        access.is_some_and(|context| context.membership.manages_company_operations());
+
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let thread_id = thread.id;
-    let mut wake_ups = Box::pin(thread_wake_ups(&events, "messages", thread_id));
+    let mut wake_ups = Box::pin(mailbox_thread_wake_ups(
+        &events, "messages", thread_id, channel.id,
+    ));
 
     let stream = async_stream::stream! {
         // Both start true so a connect emits the reader's backlog and the current activity, rather
         // than leaving a freshly opened thread blank until something happens to change.
         let mut pending_messages = true;
         let mut pending_activity = true;
+        // Starts true for the same reason: a reconnecting reader must be handed the banner as it
+        // stands now, not left looking at the one their last connection rendered.
+        let mut pending_handoff = true;
 
         loop {
+            if pending_handoff {
+                pending_handoff = false;
+                match thread_handoff_banner_html(
+                    &thread_use_cases,
+                    &handoff_use_cases,
+                    HeldReplyViewer {
+                        company_id: query.company_id,
+                        channel_id: channel.id,
+                        thread_id,
+                        viewer_principal_id,
+                        viewer_manages_tasks,
+                        as_of: Utc::now(),
+                    },
+                )
+                .await
+                {
+                    // State, not an append: no `id:` and no cursor, exactly as the activity event
+                    // below. A thread whose handoff closed renders the empty string, which clears
+                    // the banner.
+                    Ok(banner) => {
+                        yield Ok(Event::default().event("handoff").data(banner));
+                    }
+                    Err(error) => {
+                        warn!(%error, %thread_id, "Thread handoff query failed");
+                        return;
+                    }
+                }
+            }
+
             if pending_activity {
                 pending_activity = false;
                 match thread_collaboration(
@@ -841,14 +1119,18 @@ async fn thread_message_stream(
                 Some(Wake::Event(MailboxEvent::ActivityChanged(_))) => pending_activity = true,
                 // Thread-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
-                // Thread-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
+                // Channel-scoped, deliberately: the payload names the handoff, not the thread, so
+                // this stream cannot tell whether the change was its own without re-reading. See
+                // `mailbox_thread_wake_ups`. A change on another thread costs one query and an
+                // identical swap.
+                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => pending_handoff = true,
                 // Thread-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
-                // Something was missed and there is no telling what, so redo both.
+                // Something was missed and there is no telling what, so redo all three.
                 Some(Wake::Lagged) => {
                     pending_messages = true;
                     pending_activity = true;
+                    pending_handoff = true;
                 }
                 None => return,
             }
@@ -866,10 +1148,23 @@ async fn thread_message_stream(
 /// receives a message is bumped to the top of the column, so "insert at top, drop the stale copy"
 /// is the whole reordering — and it leaves any older pages the reader loaded on demand in place,
 /// which re-rendering the first page would not.
-#[instrument(skip(channel_use_cases, thread_use_cases, events, config, viewer, headers))]
+#[instrument(skip(
+    channel_use_cases,
+    thread_use_cases,
+    handoff_use_cases,
+    events,
+    config,
+    viewer,
+    headers
+))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn thread_column_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(events): State<MailboxEvents>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -887,11 +1182,12 @@ async fn thread_column_stream(
     let app_domain_name = config.app_domain_name.clone();
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let channel_id = channel.id;
-    let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
-    // Subscribe first, then snapshot every badge that can already be on screen. An activity
-    // change during this query stays buffered; one before the connection is recovered by the
-    // snapshot itself.
+    let mut wake_ups = Box::pin(mailbox_channel_wake_ups(&events, "threads", channel_id));
+    // Subscribe first, then snapshot every badge that can already be on screen. An activity or
+    // handoff change during this query stays buffered; one before the connection is recovered by
+    // the snapshot itself.
     let initial_stale_badges = first_page_thread_ids(&thread_use_cases, channel_id).await?;
+    let initial_stale_handoffs = initial_stale_badges.clone();
 
     let stream = async_stream::stream! {
         let mut pending_rows = true;
@@ -899,8 +1195,35 @@ async fn thread_column_stream(
         // status change must redraw *only* that badge: re-sending the row would insert it at the
         // top of the column and move a thread for no reason a reader could see.
         let mut stale_badges = initial_stale_badges;
+        // The held-reply badges, kept as their own set for the same reason: a claim must redraw
+        // only that badge, not move the row it is on.
+        let mut stale_handoffs = initial_stale_handoffs;
 
         loop {
+            if !stale_handoffs.is_empty() {
+                let ids: Vec<Uuid> = stale_handoffs.drain().collect();
+                match handoff_use_cases
+                    .thread_handoffs_for_threads(company_id, &ids, &[channel_id])
+                    .await
+                {
+                    Ok(handoffs) => {
+                        for id in ids {
+                            // A thread absent from the map has no open handoff, and an empty
+                            // payload is what clears its badge after a send or a dismissal.
+                            yield Ok(Event::default()
+                                .event(pages::thread_handoff_event(id))
+                                .data(pages::thread_handoff_mark(
+                                    handoffs.get(&id).map(pages::ThreadHandoffMark::of),
+                                )));
+                        }
+                    }
+                    Err(error) => {
+                        warn!(%error, %channel_id, "Thread handoff query failed");
+                        return;
+                    }
+                }
+            }
+
             if !stale_badges.is_empty() {
                 let ids: Vec<Uuid> = stale_badges.drain().collect();
                 match thread_use_cases.thread_work_summary(&ids).await {
@@ -928,9 +1251,24 @@ async fn thread_column_stream(
                     .await
                 {
                     Ok(threads) => {
-                        // A streamed row must arrive with its badge already on it, or a thread
-                        // bumped mid-run would blink back to "idle" until its next status change.
+                        // A streamed row must arrive with its badges already on it, or a thread
+                        // bumped mid-run would blink back to "idle" -- and a held one back to
+                        // plain -- until its next status change.
                         let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
+                        let handoffs = match page_handoffs(
+                            &handoff_use_cases,
+                            company_id,
+                            &[channel_id],
+                            &threads,
+                        )
+                        .await
+                        {
+                            Ok(handoffs) => handoffs,
+                            Err(error) => {
+                                warn!(%error, %channel_id, "Thread handoff query failed");
+                                return;
+                            }
+                        };
                         let activity: HashMap<Uuid, ThreadActivity> = match thread_use_cases
                             .thread_work_summary(&ids)
                             .await
@@ -971,6 +1309,7 @@ async fn thread_column_stream(
                                     false,
                                     pages::ThreadRowMarks {
                                         activity: activity.get(&thread.id).copied(),
+                                        handoff: handoffs.get(&thread.id).copied(),
                                         last_role: last_roles.get(&thread.id).copied(),
                                         from_other_channel: pages::opened_by_another_channel(
                                             thread,
@@ -998,16 +1337,29 @@ async fn thread_column_stream(
                 }
                 // Channel-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
-                // Channel-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {}
+                // The payload names the handoff, not the thread, so every first-page badge is
+                // re-sent. Bounded by `STREAM_BATCH_LIMIT`, one query, and an idempotent swap --
+                // cheaper than the per-connection memory a diff would need.
+                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {
+                    match first_page_thread_ids(&thread_use_cases, channel_id).await {
+                        Ok(ids) => stale_handoffs.extend(ids),
+                        Err(error) => {
+                            warn!(%error, %channel_id, "Thread column catch-up query failed");
+                            return;
+                        }
+                    }
+                }
                 // Channel-scoped wake_ups filters these out before they reach this stream.
                 Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
                 // What was missed is unknown, so redraw the rows and every badge the column is
-                // likely to be showing rather than leave a stale spinner behind.
+                // likely to be showing rather than leave a stale spinner or a stale badge behind.
                 Some(Wake::Lagged) => {
                     pending_rows = true;
                     match first_page_thread_ids(&thread_use_cases, channel_id).await {
-                        Ok(ids) => stale_badges.extend(ids),
+                        Ok(ids) => {
+                            stale_badges.extend(ids.iter().copied());
+                            stale_handoffs.extend(ids);
+                        }
                         Err(error) => {
                             warn!(%error, %channel_id, "Thread column catch-up query failed");
                             return;
@@ -1062,6 +1414,7 @@ async fn compose_form(
 /// is not the company's owner composes from the mailbox exactly as they would by email, and the
 /// channel's own participant rules still decide whether the message lands.
 #[instrument(skip(
+    handoff_use_cases,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
@@ -1079,6 +1432,7 @@ async fn create_thread(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
@@ -1147,6 +1501,7 @@ async fn create_thread(
 
     sent_message_response(
         &thread_use_cases,
+        &handoff_use_cases,
         company.id,
         &channel,
         &config.app_domain_name,
@@ -1205,6 +1560,7 @@ async fn reply_form(
 /// Like Compose, the message takes the inbound path a real email would; the threading headers are
 /// what keep it in this conversation instead of starting a new one.
 #[instrument(skip(
+    handoff_use_cases,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
@@ -1222,6 +1578,7 @@ async fn send_reply(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
@@ -1299,6 +1656,7 @@ async fn send_reply(
 
     sent_message_response(
         &thread_use_cases,
+        &handoff_use_cases,
         company.id,
         &channel,
         &config.app_domain_name,
@@ -1309,10 +1667,15 @@ async fn send_reply(
     .await
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn complete_human_task(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1363,6 +1726,7 @@ async fn complete_human_task(
         Err(error) => {
             return render_mailbox_pane_error(
                 &thread_use_cases,
+                &handoff_use_cases,
                 &agent_use_cases,
                 &viewer,
                 &company,
@@ -1383,6 +1747,7 @@ async fn complete_human_task(
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
     sent_message_response(
         &thread_use_cases,
+        &handoff_use_cases,
         company.id,
         &channel,
         &config.app_domain_name,
@@ -1401,6 +1766,7 @@ async fn change_visible_task_ownership(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1499,6 +1865,7 @@ async fn change_visible_task_ownership(
     if let Err(error) = outcome {
         return render_mailbox_pane_error(
             &thread_use_cases,
+            &handoff_use_cases,
             &agent_use_cases,
             &viewer,
             &company,
@@ -1511,6 +1878,7 @@ async fn change_visible_task_ownership(
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
     sent_message_response(
         &thread_use_cases,
+        &handoff_use_cases,
         company.id,
         &channel,
         &config.app_domain_name,
@@ -1604,6 +1972,7 @@ async fn control_visible_task_delegation(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1669,6 +2038,7 @@ async fn control_visible_task_delegation(
         };
         return render_mailbox_pane_error(
             &thread_use_cases,
+            &handoff_use_cases,
             &agent_use_cases,
             &viewer,
             &visible.company,
@@ -1681,6 +2051,7 @@ async fn control_visible_task_delegation(
     let agent = channel_agent(&agent_use_cases, &viewer, &visible.channel).await?;
     sent_message_response(
         &thread_use_cases,
+        &handoff_use_cases,
         visible.company.id,
         &visible.channel,
         &config.app_domain_name,
@@ -1691,8 +2062,13 @@ async fn control_visible_task_delegation(
     .await
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the pane is assembled from every port it reads, each named rather than bundled"
+)]
 async fn render_mailbox_pane_error(
     thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
     agent_use_cases: &AgentUseCases,
     viewer: &Viewer,
     company: &Company,
@@ -1704,6 +2080,7 @@ async fn render_mailbox_pane_error(
     Ok(Html(
         render_message_pane(
             thread_use_cases,
+            handoff_use_cases,
             company.id,
             channel,
             thread,
@@ -1717,8 +2094,13 @@ async fn render_mailbox_pane_error(
 }
 
 /// What both send forms return: the thread's messages, with its column refreshed beside them.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the pane is assembled from every port it reads, each named rather than bundled"
+)]
 async fn sent_message_response(
     thread_use_cases: &ThreadUseCases,
+    handoff_use_cases: &ThreadHandoffUseCases,
     company_id: Uuid,
     channel: &Channel,
     app_domain_name: &str,
@@ -1728,6 +2110,7 @@ async fn sent_message_response(
 ) -> AppResult<Response> {
     let pane = render_message_pane(
         thread_use_cases,
+        handoff_use_cases,
         company_id,
         channel,
         thread,
@@ -1738,6 +2121,8 @@ async fn sent_message_response(
     .await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
     let activity = page_activity(thread_use_cases, &page.threads).await?;
+    let handoffs =
+        page_handoffs(handoff_use_cases, company_id, &[channel.id], &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,
         channel,
@@ -1746,6 +2131,7 @@ async fn sent_message_response(
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: Some(thread.id),
         activity: &activity,
+        handoffs: &handoffs,
     });
 
     Ok((
@@ -1797,3 +2183,7 @@ pub(super) async fn load_account(user_use_cases: &UserUseCases, user_id: Uuid) -
 async fn sender_email(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<String> {
     Ok(load_account(user_use_cases, user_id).await?.email)
 }
+
+#[cfg(test)]
+#[path = "ui_stream_tests.rs"]
+mod stream_tests;

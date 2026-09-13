@@ -15,8 +15,8 @@ use crate::{
     adapters::persistence::{
         PostgresPersistence,
         attention::{
-            actor_is_manager, command_fingerprint, lock_attention_source, require_channel_principal,
-            require_human_principal,
+            actor_is_manager, command_fingerprint, lock_attention_source,
+            require_channel_principal, require_human_principal,
         },
     },
     app_error::{AppError, AppResult},
@@ -25,8 +25,9 @@ use crate::{
         attention::BusinessPriority,
         message::CanonicalMessageId,
         thread_handoff::{
-            ExternalReplyHandling, ExternalReplyHandlingPolicy, ThreadHandoff, ThreadHandoffCommand,
-            ThreadHandoffOperation, ThreadHandoffState, thread_handoff_operation_name,
+            ExternalReplyHandling, ExternalReplyHandlingPolicy, HandoffRunRequest, ThreadHandoff,
+            ThreadHandoffCommand, ThreadHandoffDismiss, ThreadHandoffDraft, ThreadHandoffOperation,
+            ThreadHandoffState, thread_handoff_operation_name, truncate_failure_reason,
         },
         transport::PrincipalId,
     },
@@ -93,6 +94,22 @@ pub(crate) async fn open_handoff_generation_on(
     .bind(open.generation)
     .bind(open.source_message_id.as_uuid())
     .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+
+    // Any drafting run for the generation this reply just replaced is now answering a message that
+    // is no longer the newest one. Marking it here, in the transaction that moves the generation,
+    // is what makes the run's own outcome legible without joining the task: its completion is
+    // refused by the generation predicate in `complete_handoff_run_on` either way.
+    sqlx::query(
+        r#"UPDATE thread_handoff_runs
+           SET state = 'superseded', updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND handoff_id = $2 AND generation <> $3 AND state = 'running'"#,
+    )
+    .bind(open.company_id)
+    .bind(handoff_id)
+    .bind(generation)
+    .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
 
@@ -250,6 +267,681 @@ fn handoff_command_fingerprint<T: Serialize>(value: &T) -> AppResult<String> {
     Ok(format!("{:x}", Sha256::digest(encoded)))
 }
 
+/// One row of the audit log, with every optional column stated rather than defaulted.
+///
+/// A struct because the insert below binds sixteen values of which eleven are `uuid` or `text`:
+/// every transposed pair in a positional call would compile and then record a lie.
+struct HandoffEventWrite<'a> {
+    company_id: Uuid,
+    handoff_id: Uuid,
+    generation: Uuid,
+    command_id: Uuid,
+    command_fingerprint: &'a str,
+    operation: &'a str,
+    actor_kind: &'a str,
+    actor_principal_id: Option<Uuid>,
+    from_state: &'a str,
+    to_state: &'a str,
+    from_version: i64,
+    to_version: i64,
+    previous_priority: Option<&'a str>,
+    new_priority: Option<&'a str>,
+    previous_due_at: Option<DateTime<Utc>>,
+    new_due_at: Option<DateTime<Utc>>,
+    previous_responsible_principal_id: Option<Uuid>,
+    new_responsible_principal_id: Option<Uuid>,
+    task_id: Option<Uuid>,
+    draft_id: Option<Uuid>,
+    draft_version: Option<i32>,
+    failure_reason: Option<&'a str>,
+}
+
+impl<'a> HandoffEventWrite<'a> {
+    /// A state transition with no attribute or responsibility change, which is every event this
+    /// phase adds.
+    #[allow(clippy::too_many_arguments)]
+    const fn transition(
+        company_id: Uuid,
+        handoff_id: Uuid,
+        generation: Uuid,
+        command_id: Uuid,
+        command_fingerprint: &'a str,
+        operation: &'a str,
+        from_state: &'a str,
+        to_state: &'a str,
+        to_version: i64,
+    ) -> Self {
+        Self {
+            company_id,
+            handoff_id,
+            generation,
+            command_id,
+            command_fingerprint,
+            operation,
+            actor_kind: "system",
+            actor_principal_id: None,
+            from_state,
+            to_state,
+            from_version: to_version - 1,
+            to_version,
+            previous_priority: None,
+            new_priority: None,
+            previous_due_at: None,
+            new_due_at: None,
+            previous_responsible_principal_id: None,
+            new_responsible_principal_id: None,
+            task_id: None,
+            draft_id: None,
+            draft_version: None,
+            failure_reason: None,
+        }
+    }
+
+    const fn by(mut self, actor_kind: &'a str, actor: PrincipalId) -> Self {
+        self.actor_kind = actor_kind;
+        self.actor_principal_id = Some(actor.as_uuid());
+        self
+    }
+}
+
+/// Append one immutable audit row. Every transition in this module goes through here, so a new
+/// state change cannot quietly skip the trail.
+async fn insert_handoff_event(
+    tx: &mut Transaction<'_, Postgres>,
+    event: HandoffEventWrite<'_>,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"INSERT INTO thread_handoff_events (
+               company_id, handoff_id, generation, command_id, command_fingerprint, operation,
+               actor_kind, actor_principal_id, from_state, to_state, from_version, to_version,
+               previous_priority, new_priority, previous_due_at, new_due_at,
+               previous_responsible_principal_id, new_responsible_principal_id, task_id,
+               draft_id, draft_version, failure_reason
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                     $18, $19, $20, $21, $22)"#,
+    )
+    .bind(event.company_id)
+    .bind(event.handoff_id)
+    .bind(event.generation)
+    .bind(event.command_id)
+    .bind(event.command_fingerprint)
+    .bind(event.operation)
+    .bind(event.actor_kind)
+    .bind(event.actor_principal_id)
+    .bind(event.from_state)
+    .bind(event.to_state)
+    .bind(event.from_version)
+    .bind(event.to_version)
+    .bind(event.previous_priority)
+    .bind(event.new_priority)
+    .bind(event.previous_due_at)
+    .bind(event.new_due_at)
+    .bind(event.previous_responsible_principal_id)
+    .bind(event.new_responsible_principal_id)
+    .bind(event.task_id)
+    .bind(event.draft_id)
+    .bind(event.draft_version)
+    .bind(event.failure_reason)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+/// The identity and both fences of one command, shared by every operation that takes them.
+struct HandoffCommandScope<'a> {
+    company_id: Uuid,
+    handoff_id: Uuid,
+    command_id: Uuid,
+    expected_version: u64,
+    expected_generation: Uuid,
+    actor: PrincipalId,
+    visible_channel_ids: &'a [Uuid],
+}
+
+/// What the shared preamble concluded: this command already ran, or the row is locked and fenced.
+enum AcceptedCommand {
+    Replayed(u64),
+    Fenced {
+        locked: LockedHandoff,
+        manager: bool,
+    },
+}
+
+/// Lock, replay, load, fence -- the half of every handoff command that does not depend on which
+/// command it is.
+///
+/// One copy rather than one per operation: the fence is the whole safety argument of this feature,
+/// and three transcriptions of it would be three places for it to drift.
+async fn accept_handoff_command(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: &HandoffCommandScope<'_>,
+    fingerprint: &str,
+) -> AppResult<AcceptedCommand> {
+    // The advisory key carries the kind, so a `thread_handoffs` row and a `manual_handoffs` row
+    // that happened to share a UUID cannot serialise against each other.
+    lock_attention_source(tx, scope.company_id, "thread_handoff", scope.handoff_id).await?;
+    if let Some(version) = existing_handoff_event(
+        tx,
+        scope.company_id,
+        scope.handoff_id,
+        scope.command_id,
+        fingerprint,
+    )
+    .await?
+    {
+        return Ok(AcceptedCommand::Replayed(version));
+    }
+    require_human_principal(tx, scope.company_id, scope.actor).await?;
+    let manager = actor_is_manager(tx, scope.company_id, scope.actor).await?;
+
+    // `visible_channel_ids` is in the predicate rather than checked afterwards, so a handoff
+    // in another company, one on a channel the caller cannot view, and one that is already
+    // terminal all answer with the same sentence. Never a message that distinguishes them.
+    let locked = sqlx::query_as::<_, LockedHandoff>(&format!(
+        r#"SELECT state, generation, responsible_principal_id, business_priority,
+                  business_due_at, version, channel_id
+           FROM thread_handoffs
+           WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)
+             AND state IN {OPEN_STATES}
+             FOR UPDATE"#
+    ))
+    .bind(scope.company_id)
+    .bind(scope.handoff_id)
+    .bind(scope.visible_channel_ids)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let locked = locked.ok_or_else(|| AppError::NotFound("Thread handoff not found.".into()))?;
+    fence_handoff(
+        locked.generation,
+        locked.version,
+        scope.expected_generation,
+        scope.expected_version,
+    )?;
+    Ok(AcceptedCommand::Fenced { locked, manager })
+}
+
+/// Both fences, in the order that gives the most useful answer when both are stale.
+///
+/// Generation first: it says *why* the version moved, which is the sentence the user needs.
+fn fence_handoff(
+    generation: Uuid,
+    version: i64,
+    expected_generation: Uuid,
+    expected_version: u64,
+) -> AppResult<()> {
+    if generation != expected_generation {
+        return Err(AppError::Conflict(format!(
+            "This thread received a newer reply; the current handoff generation is {generation}. \
+             Refresh and try again."
+        )));
+    }
+    let current = u64::try_from(version)
+        .map_err(|_| AppError::Internal("Invalid thread handoff version".into()))?;
+    if current != expected_version {
+        return Err(AppError::Conflict(format!(
+            "Thread handoff changed from version {expected_version} to {current}; refresh and \
+             try again."
+        )));
+    }
+    Ok(())
+}
+
+/// Who may act on this row, as one rule over already-loaded values.
+///
+/// `NotFound`, never `Forbidden`: a teammate must not learn that a handoff they cannot act on
+/// exists on a channel they cannot see. `unclaimed_is_open` is the self-claim exception -- an
+/// unclaimed item is takeable by any teammate who can see the channel, which is what makes the
+/// unassigned queue work at all.
+fn authorize_handoff_actor(
+    manager: bool,
+    responsible: Option<Uuid>,
+    actor: PrincipalId,
+    unclaimed_is_open: bool,
+) -> AppResult<()> {
+    if manager
+        || responsible == Some(actor.as_uuid())
+        || (unclaimed_is_open && responsible.is_none())
+    {
+        return Ok(());
+    }
+    Err(AppError::NotFound("Thread handoff not found.".into()))
+}
+
+/// One **Generate draft**, as the instruction command states it.
+///
+/// A named struct rather than five positional `Uuid`s, for the reason [`OpenHandoffGeneration`]
+/// gives: every one of these is a `uuid` and a transposed pair would compile.
+pub(crate) struct StartHandoffRun {
+    pub company_id: Uuid,
+    pub thread_id: Uuid,
+    pub task_id: Uuid,
+    pub command_id: Uuid,
+    pub actor: PrincipalId,
+    pub request: HandoffRunRequest,
+}
+
+/// Fence the handoff, record the run, and move the handoff to `drafting` -- all inside the
+/// instruction command's own transaction.
+///
+/// Sharing that transaction is the whole point: the task row, the run row and the handoff state
+/// commit together or not at all, so the existing idempotency records (`task_agent_instructions`
+/// and `start_agent_task_commands`) cover this write too and a replay cannot produce a second run.
+///
+/// The claim precondition is not ceremony. `create_review_draft_on` fixes the assigned reviewer at
+/// draft time, and the review machinery authorizes only that reviewer, so pinning the reviewer to
+/// the responsible principal here is exactly what lets **Send** work later with no change to the
+/// review path at all.
+pub(crate) async fn start_handoff_run_on(
+    tx: &mut Transaction<'_, Postgres>,
+    start: StartHandoffRun,
+) -> AppResult<()> {
+    let locked = sqlx::query_as::<_, LockedHandoff>(
+        r#"SELECT state, generation, responsible_principal_id, business_priority,
+                  business_due_at, version, channel_id
+           FROM thread_handoffs
+           WHERE company_id = $1 AND id = $2 AND thread_id = $3
+             FOR UPDATE"#,
+    )
+    .bind(start.company_id)
+    .bind(start.request.handoff_id)
+    .bind(start.thread_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let locked = locked.ok_or_else(|| AppError::NotFound("Thread handoff not found.".into()))?;
+    fence_handoff(
+        locked.generation,
+        locked.version,
+        start.request.generation,
+        start.request.expected_version,
+    )?;
+    if locked.state != ThreadHandoffState::NeedsInstruction.as_str() {
+        return Err(AppError::Conflict(format!(
+            "This reply is {}, not waiting for an instruction; refresh and try again.",
+            locked.state
+        )));
+    }
+    // An unclaimed handoff is refused rather than claimed implicitly: the reviewer of the draft
+    // this run will write is the responsible principal, so "who owns the answer" must already have
+    // an answer before the agent starts writing one.
+    if locked.responsible_principal_id.is_none() {
+        // Answered before the authorization check, and as a `Conflict` rather than a `NotFound`:
+        // an unclaimed reply is already visible to everyone who can see the channel, so the useful
+        // answer is the next step -- claim it -- not a pretence that it does not exist.
+        return Err(AppError::Conflict(
+            "Claim this reply before asking the agent to draft an answer.".into(),
+        ));
+    }
+    let manager = actor_is_manager(tx, start.company_id, start.actor).await?;
+    authorize_handoff_actor(manager, locked.responsible_principal_id, start.actor, false)?;
+
+    let inserted = sqlx::query(
+        r#"INSERT INTO thread_handoff_runs (
+               company_id, task_id, handoff_id, generation, requested_by_principal_id, command_id
+           ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+    )
+    .bind(start.company_id)
+    .bind(start.task_id)
+    .bind(start.request.handoff_id)
+    .bind(start.request.generation)
+    .bind(start.actor.as_uuid())
+    .bind(start.command_id)
+    .execute(&mut **tx)
+    .await;
+    if let Err(error) = inserted {
+        // Mapped on the constraint name rather than absorbed with `ON CONFLICT DO NOTHING`, which
+        // would leave a task running for a handoff that never learned about it. The loser's whole
+        // transaction -- task row included -- rolls back.
+        if error
+            .as_database_error()
+            .and_then(sqlx::error::DatabaseError::constraint)
+            == Some("thread_handoff_runs_generation_key")
+        {
+            return Err(AppError::Conflict(
+                "A draft is already being prepared for this reply.".into(),
+            ));
+        }
+        return Err(AppError::from(error));
+    }
+
+    let new_version = locked
+        .version
+        .checked_add(1)
+        .ok_or_else(|| AppError::Conflict("Thread handoff version exhausted.".into()))?;
+    let written = sqlx::query(
+        r#"UPDATE thread_handoffs
+           SET state = 'drafting', version = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND id = $2 AND version = $3 AND generation = $4
+             AND state = 'needs_instruction'"#,
+    )
+    .bind(start.company_id)
+    .bind(start.request.handoff_id)
+    .bind(locked.version)
+    .bind(locked.generation)
+    .bind(new_version)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if written.rows_affected() != 1 {
+        // Unreachable behind the `FOR UPDATE` above, and checked anyway: an unreachable fence that
+        // fires is how a lost one gets discovered rather than tolerated.
+        return Err(AppError::Conflict(
+            "Thread handoff changed while the draft was being requested; refresh and try again."
+                .into(),
+        ));
+    }
+    let fingerprint = handoff_command_fingerprint(&start.command_id)?;
+    insert_handoff_event(
+        tx,
+        HandoffEventWrite {
+            task_id: Some(start.task_id),
+            ..HandoffEventWrite::transition(
+                start.company_id,
+                start.request.handoff_id,
+                locked.generation,
+                start.command_id,
+                &fingerprint,
+                "draft_requested",
+                ThreadHandoffState::NeedsInstruction.as_str(),
+                ThreadHandoffState::Drafting.as_str(),
+                new_version,
+            )
+            .by("human", start.actor)
+        },
+    )
+    .await
+}
+
+/// The drafting run this task is executing, in whatever state it has reached.
+///
+/// Keyed by task because that is the only identifier a durable payload carries -- nothing about a
+/// handoff goes into `InboundTaskPayloadV1`, precisely so a worker cannot hold a snapshotted
+/// generation and fail to notice that a newer customer message replaced it. The responsible
+/// principal comes back in the same read because the completion needs it as the draft's reviewer.
+///
+/// **Deliberately not filtered to `running`.** A run the inbound path marked `superseded`, or one
+/// that already produced a draft, must still be *found* here: a task that was ever a drafting run
+/// answers a customer message somebody was asked to instruct, so if its outcome can no longer be
+/// stored it has to be refused. Filtering to `running` would instead route it to the publish
+/// branch and send that answer as mail. `complete_handoff_run_on` is what refuses the ones that
+/// are no longer current, and its `state = 'running'` predicate is the single place that decides.
+pub(crate) async fn handoff_run_for_task_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    task_id: Uuid,
+) -> AppResult<Option<RunningHandoff>> {
+    sqlx::query_as::<_, RunningHandoff>(
+        r#"SELECT run.handoff_id, run.generation, handoff.responsible_principal_id
+           FROM thread_handoff_runs AS run
+           JOIN thread_handoffs AS handoff
+             ON (handoff.company_id, handoff.id) = (run.company_id, run.handoff_id)
+           WHERE run.company_id = $1 AND run.task_id = $2"#,
+    )
+    .bind(company_id)
+    .bind(task_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)
+}
+
+/// A drafting run and the handoff it answers, as the dispatch commit needs them.
+#[derive(Debug, Clone, Copy, sqlx::FromRow)]
+pub(crate) struct RunningHandoff {
+    pub handoff_id: Uuid,
+    pub generation: Uuid,
+    /// `NULL` when a manager released the handoff while the agent worked. The draft then falls
+    /// back to `resolve_reviewer_on`, exactly as an ordinary review draft does.
+    pub responsible_principal_id: Option<Uuid>,
+}
+
+/// The draft this run produced, in the transaction that produced it.
+pub(crate) struct DraftedHandoffRun {
+    pub company_id: Uuid,
+    pub task_id: Uuid,
+    pub run: RunningHandoff,
+    pub agent: PrincipalId,
+    pub draft_id: Uuid,
+    pub draft_version: i32,
+}
+
+/// Mark the run `drafted` and the handoff `draft_ready`, or refuse the whole commit.
+///
+/// The generation predicate on the handoff update is the fence that matters: a zero-row update
+/// means a newer customer reply replaced the generation while the agent was writing, so the reply
+/// in hand answers a message that is no longer the latest one. That is a `Conflict` which rolls
+/// the entire dispatch transaction back -- no draft, no delivery, no message -- and leaves the new
+/// generation exactly where the inbound commit put it.
+pub(crate) async fn complete_handoff_run_on(
+    tx: &mut Transaction<'_, Postgres>,
+    drafted: DraftedHandoffRun,
+) -> AppResult<()> {
+    let written = sqlx::query(
+        r#"UPDATE thread_handoff_runs
+           SET state = 'drafted', draft_id = $3, draft_version = $4,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND task_id = $2 AND state = 'running'"#,
+    )
+    .bind(drafted.company_id)
+    .bind(drafted.task_id)
+    .bind(drafted.draft_id)
+    .bind(drafted.draft_version)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if written.rows_affected() != 1 {
+        // Superseded by a newer customer reply, or already drafted by an earlier execution of this
+        // task. Either way the answer in hand cannot be stored, and the `Conflict` rolls the whole
+        // dispatch back rather than letting it publish.
+        return Err(AppError::Conflict(
+            "This drafting run is no longer the one this reply is waiting for.".into(),
+        ));
+    }
+
+    let version: Option<i64> = sqlx::query_scalar(
+        r#"UPDATE thread_handoffs
+           SET state = 'draft_ready', version = version + 1, updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND id = $2 AND generation = $3 AND state = 'drafting'
+           RETURNING version"#,
+    )
+    .bind(drafted.company_id)
+    .bind(drafted.run.handoff_id)
+    .bind(drafted.run.generation)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let Some(version) = version else {
+        return Err(AppError::Conflict(
+            "This thread received a newer reply while the draft was being written; the draft was \
+             discarded."
+                .into(),
+        ));
+    };
+    let fingerprint = handoff_command_fingerprint(&drafted.draft_id)?;
+    insert_handoff_event(
+        tx,
+        HandoffEventWrite {
+            task_id: Some(drafted.task_id),
+            draft_id: Some(drafted.draft_id),
+            draft_version: Some(drafted.draft_version),
+            ..HandoffEventWrite::transition(
+                drafted.company_id,
+                drafted.run.handoff_id,
+                drafted.run.generation,
+                // The draft is the command: one draft per run, one run per generation, so this is
+                // unique under `thread_handoff_events_command_key` without inventing an id.
+                drafted.draft_id,
+                &fingerprint,
+                "draft_ready",
+                ThreadHandoffState::Drafting.as_str(),
+                ThreadHandoffState::DraftReady.as_str(),
+                version,
+            )
+            .by("agent", drafted.agent)
+        },
+    )
+    .await
+}
+
+/// Why a drafting run is ending with no reply sent.
+///
+/// An enum rather than a state parameter because the two cases catch a run at different points of
+/// its life, and matching the wrong pair of states would silently do nothing -- which is exactly
+/// what a `failed` write that quietly matched no row looks like.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HandoffRunEnd {
+    /// The task died before the run produced a draft.
+    TaskFailed,
+    /// The run produced a draft, and the review holding it expired before anybody sent it.
+    DraftExpired,
+}
+
+impl HandoffRunEnd {
+    /// The run state this ending may act on.
+    const fn run_state(self) -> &'static str {
+        match self {
+            Self::TaskFailed => "running",
+            Self::DraftExpired => "drafted",
+        }
+    }
+
+    /// The handoff state this ending may act on, which is also the event's `from_state`.
+    const fn handoff_state(self) -> &'static str {
+        match self {
+            Self::TaskFailed => "drafting",
+            Self::DraftExpired => "draft_ready",
+        }
+    }
+}
+
+/// End a drafting run without a sent reply and hand the reply back to the team.
+///
+/// `AND generation = $3` is the whole point. An ending belonging to a generation the thread has
+/// moved past must not drag a newer `needs_instruction` handoff backwards, nor overwrite a
+/// `draft_ready` one that a later run produced. When it matches nothing the run is still recorded
+/// as `failed` and no event is written, because nothing about the handoff changed.
+pub(crate) async fn fail_handoff_run_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    task_id: Uuid,
+    end: HandoffRunEnd,
+    reason: &str,
+) -> AppResult<()> {
+    let failed: Option<(Uuid, Uuid)> = sqlx::query_as(&format!(
+        r#"UPDATE thread_handoff_runs
+           SET state = 'failed', updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND task_id = $2 AND state = '{run_state}'
+           RETURNING handoff_id, generation"#,
+        run_state = end.run_state(),
+    ))
+    .bind(company_id)
+    .bind(task_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let Some((handoff_id, generation)) = failed else {
+        return Ok(());
+    };
+
+    let version: Option<i64> = sqlx::query_scalar(&format!(
+        r#"UPDATE thread_handoffs
+           SET state = 'needs_instruction', version = version + 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE company_id = $1 AND id = $2 AND generation = $3
+             AND state = '{handoff_state}'
+           RETURNING version"#,
+        handoff_state = end.handoff_state(),
+    ))
+    .bind(company_id)
+    .bind(handoff_id)
+    .bind(generation)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let Some(version) = version else {
+        return Ok(());
+    };
+    let fingerprint = handoff_command_fingerprint(&task_id)?;
+    insert_handoff_event(
+        tx,
+        HandoffEventWrite {
+            task_id: Some(task_id),
+            // Truncated here rather than at the `CHECK`: letting the constraint do it is not
+            // truncation, it is a failed insert inside the transaction recording a failure.
+            failure_reason: Some(truncate_failure_reason(reason)).filter(|text| !text.is_empty()),
+            ..HandoffEventWrite::transition(
+                company_id,
+                handoff_id,
+                generation,
+                // The task is the command: one drafting run per task, so a second failure write
+                // for the same task is refused by `thread_handoff_events_command_key`.
+                task_id,
+                &fingerprint,
+                "draft_failed",
+                end.handoff_state(),
+                ThreadHandoffState::NeedsInstruction.as_str(),
+                version,
+            )
+        },
+    )
+    .await
+}
+
+/// Resolve the handoff generation a published draft answered, inside the publication transaction.
+///
+/// Matches nothing -- and so changes nothing -- when the draft is not a handoff draft, because the
+/// join finds no run: every pre-existing review approval is byte-for-byte unaffected. And it
+/// matches only the generation the draft belongs to, so a draft written for a superseded
+/// generation could not resolve the current one even if it could somehow be approved.
+pub(crate) async fn resolve_handoff_for_draft_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    draft_id: Uuid,
+    actor: PrincipalId,
+    command_id: Uuid,
+) -> AppResult<()> {
+    let resolved: Option<(Uuid, Uuid, i64)> = sqlx::query_as(
+        r#"UPDATE thread_handoffs AS handoff
+           SET state = 'resolved', closed_at = CURRENT_TIMESTAMP, version = handoff.version + 1,
+               updated_at = CURRENT_TIMESTAMP
+           FROM thread_handoff_runs AS run
+           WHERE run.company_id = handoff.company_id AND run.handoff_id = handoff.id
+             AND run.generation = handoff.generation
+             AND (run.company_id, run.draft_id) = ($1, $2)
+             AND handoff.state = 'draft_ready'
+           RETURNING handoff.id, handoff.generation, handoff.version"#,
+    )
+    .bind(company_id)
+    .bind(draft_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    let Some((handoff_id, generation, version)) = resolved else {
+        return Ok(());
+    };
+    let fingerprint = handoff_command_fingerprint(&command_id)?;
+    insert_handoff_event(
+        tx,
+        HandoffEventWrite {
+            draft_id: Some(draft_id),
+            ..HandoffEventWrite::transition(
+                company_id,
+                handoff_id,
+                generation,
+                command_id,
+                &fingerprint,
+                "resolved",
+                ThreadHandoffState::DraftReady.as_str(),
+                ThreadHandoffState::Resolved.as_str(),
+                version,
+            )
+            .by("human", actor)
+        },
+    )
+    .await
+}
+
 /// Resolve the effective policy inside a transaction, without copying it into any durable payload.
 ///
 /// The transaction-scoped twin of `effective_review_required_on`. Phase 1 only stores the policy,
@@ -363,80 +1055,27 @@ impl ThreadHandoffPolicyPersistence for PostgresPersistence {
         command.validate().map_err(AppError::BadRequest)?;
         let fingerprint = command_fingerprint(&command)?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        // The advisory key carries the kind, so a `thread_handoffs` row and a `manual_handoffs`
-        // row that happened to share a UUID cannot serialise against each other.
-        lock_attention_source(
-            &mut tx,
-            command.company_id,
-            "thread_handoff",
-            command.handoff_id,
-        )
-        .await?;
-        if let Some(version) = existing_handoff_event(
-            &mut tx,
-            command.company_id,
-            command.handoff_id,
-            command.command_id,
-            &fingerprint,
-        )
-        .await?
-        {
-            return Ok(version);
-        }
-        require_human_principal(&mut tx, command.company_id, command.actor_principal_id).await?;
-        let manager =
-            actor_is_manager(&mut tx, command.company_id, command.actor_principal_id).await?;
-
-        // `visible_channel_ids` is in the predicate rather than checked afterwards, so a handoff
-        // in another company, one on a channel the caller cannot view, and one that is already
-        // terminal all answer with the same sentence. Never a message that distinguishes them.
-        let locked = sqlx::query_as::<_, LockedHandoff>(&format!(
-            r#"SELECT state, generation, responsible_principal_id, business_priority,
-                      business_due_at, version, channel_id
-               FROM thread_handoffs
-               WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)
-                 AND state IN {OPEN_STATES}
-                 FOR UPDATE"#
-        ))
-        .bind(command.company_id)
-        .bind(command.handoff_id)
-        .bind(&command.visible_channel_ids)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        let locked = locked.ok_or_else(|| AppError::NotFound("Thread handoff not found.".into()))?;
-
-        // Generation first: when both fences are stale it is the more useful answer, because it
-        // says *why* the version moved.
-        if locked.generation != command.expected_generation {
-            return Err(AppError::Conflict(format!(
-                "This thread received a newer reply; the current handoff generation is {}. \
-                 Refresh and try again.",
-                locked.generation
-            )));
-        }
-        let old_version = u64::try_from(locked.version)
-            .map_err(|_| AppError::Internal("Invalid thread handoff version".into()))?;
-        if old_version != command.expected_version {
-            return Err(AppError::Conflict(format!(
-                "Thread handoff changed from version {} to {old_version}; refresh and try again.",
-                command.expected_version
-            )));
-        }
+        let scope = HandoffCommandScope {
+            company_id: command.company_id,
+            handoff_id: command.handoff_id,
+            command_id: command.command_id,
+            expected_version: command.expected_version,
+            expected_generation: command.expected_generation,
+            actor: command.actor_principal_id,
+            visible_channel_ids: &command.visible_channel_ids,
+        };
+        let (locked, manager) = match accept_handoff_command(&mut tx, &scope, &fingerprint).await? {
+            AcceptedCommand::Replayed(version) => return Ok(version),
+            AcceptedCommand::Fenced { locked, manager } => (locked, manager),
+        };
 
         let actor_id = command.actor_principal_id.as_uuid();
-        if !manager && locked.responsible_principal_id != Some(actor_id) {
-            // The one exception to "only the responsible principal may act": an unclaimed handoff
-            // is claimable by any teammate who can see the channel, which is what makes the
-            // unassigned queue work at all.
-            let self_claim = matches!(command.operation, ThreadHandoffOperation::Claim)
-                && locked.responsible_principal_id.is_none();
-            if !self_claim {
-                // `NotFound`, never `Forbidden`: a teammate must not learn that a handoff they
-                // cannot act on exists.
-                return Err(AppError::NotFound("Thread handoff not found.".into()));
-            }
-        }
+        authorize_handoff_actor(
+            manager,
+            locked.responsible_principal_id,
+            command.actor_principal_id,
+            matches!(command.operation, ThreadHandoffOperation::Claim),
+        )?;
         if let ThreadHandoffOperation::Reassign { to } = command.operation {
             // A handoff cannot be assigned to somebody who could not open the thread.
             require_channel_principal(&mut tx, command.company_id, locked.channel_id, to).await?;
@@ -488,34 +1127,104 @@ impl ThreadHandoffPolicyPersistence for PostgresPersistence {
         // `from_state` and `to_state` are both the row's state: a responsibility command never
         // changes it, and recording that explicitly is what makes a state change with no state
         // event detectable.
-        sqlx::query(
-            r#"INSERT INTO thread_handoff_events (
-                   company_id, handoff_id, generation, command_id, command_fingerprint, operation,
-                   actor_kind, actor_principal_id, from_state, to_state, from_version, to_version,
-                   previous_priority, new_priority, previous_due_at, new_due_at,
-                   previous_responsible_principal_id, new_responsible_principal_id
-               ) VALUES ($1, $2, $3, $4, $5, $6, 'human', $7, $8, $8, $9, $10, $11, $12, $13, $14,
-                         $15, $16)"#,
+        insert_handoff_event(
+            &mut tx,
+            HandoffEventWrite {
+                previous_priority: Some(&locked.business_priority),
+                new_priority: Some(command.priority.as_str()),
+                previous_due_at: locked.business_due_at,
+                new_due_at: command.due_at,
+                previous_responsible_principal_id: locked.responsible_principal_id,
+                new_responsible_principal_id: new_responsible,
+                ..HandoffEventWrite::transition(
+                    command.company_id,
+                    command.handoff_id,
+                    locked.generation,
+                    command.command_id,
+                    &fingerprint,
+                    operation,
+                    &locked.state,
+                    &locked.state,
+                    new_version,
+                )
+                .by("human", command.actor_principal_id)
+            },
+        )
+        .await?;
+        tx.commit().await.map_err(AppError::from)?;
+        u64::try_from(new_version)
+            .map_err(|_| AppError::Internal("Invalid thread handoff version".into()))
+    }
+
+    async fn dismiss_thread_handoff(&self, command: ThreadHandoffDismiss) -> AppResult<u64> {
+        command.validate().map_err(AppError::BadRequest)?;
+        let fingerprint = command_fingerprint(&command)?;
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let scope = HandoffCommandScope {
+            company_id: command.company_id,
+            handoff_id: command.handoff_id,
+            command_id: command.command_id,
+            expected_version: command.expected_version,
+            expected_generation: command.expected_generation,
+            actor: command.actor_principal_id,
+            visible_channel_ids: &command.visible_channel_ids,
+        };
+        let (locked, manager) = match accept_handoff_command(&mut tx, &scope, &fingerprint).await? {
+            AcceptedCommand::Replayed(version) => return Ok(version),
+            AcceptedCommand::Fenced { locked, manager } => (locked, manager),
+        };
+        // Dismissing unclaimed work is open to the same teammates who could have claimed it:
+        // requiring a claim first would make "not through this queue" a two-step ceremony.
+        authorize_handoff_actor(
+            manager,
+            locked.responsible_principal_id,
+            command.actor_principal_id,
+            true,
+        )?;
+
+        let new_version = locked
+            .version
+            .checked_add(1)
+            .ok_or_else(|| AppError::Conflict("Thread handoff version exhausted.".into()))?;
+        // `state IN ('needs_instruction', 'draft_ready')` rather than the wider `OPEN_STATES` the
+        // load used: a `drafting` handoff has a run in flight, and the answer to "stop it" is to
+        // let it finish or let it fail, not to leave a run writing into a dismissed handoff.
+        let written = sqlx::query(
+            r#"UPDATE thread_handoffs
+               SET state = 'dismissed', closed_at = CURRENT_TIMESTAMP, version = $5,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE company_id = $1 AND id = $2 AND version = $3 AND generation = $4
+                 AND state IN ('needs_instruction', 'draft_ready')"#,
         )
         .bind(command.company_id)
         .bind(command.handoff_id)
-        .bind(locked.generation)
-        .bind(command.command_id)
-        .bind(fingerprint)
-        .bind(operation)
-        .bind(actor_id)
-        .bind(&locked.state)
         .bind(locked.version)
+        .bind(locked.generation)
         .bind(new_version)
-        .bind(&locked.business_priority)
-        .bind(command.priority.as_str())
-        .bind(locked.business_due_at)
-        .bind(command.due_at)
-        .bind(locked.responsible_principal_id)
-        .bind(new_responsible)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        if written.rows_affected() != 1 {
+            return Err(AppError::Conflict(
+                "A drafting run is in flight for this reply; wait for it to finish.".into(),
+            ));
+        }
+        insert_handoff_event(
+            &mut tx,
+            HandoffEventWrite::transition(
+                command.company_id,
+                command.handoff_id,
+                locked.generation,
+                command.command_id,
+                &fingerprint,
+                "dismissed",
+                &locked.state,
+                ThreadHandoffState::Dismissed.as_str(),
+                new_version,
+            )
+            .by("human", command.actor_principal_id),
+        )
+        .await?;
         tx.commit().await.map_err(AppError::from)?;
         u64::try_from(new_version)
             .map_err(|_| AppError::Internal("Invalid thread handoff version".into()))
@@ -542,6 +1251,61 @@ impl ThreadHandoffPolicyPersistence for PostgresPersistence {
         .map_err(AppError::from)?
         .map(TryInto::try_into)
         .transpose()
+    }
+
+    async fn thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        handoff_id: Uuid,
+        generation: Uuid,
+        visible_channel_ids: &[Uuid],
+    ) -> AppResult<Option<ThreadHandoffDraft>> {
+        // The channel list is in the predicate, through the handoff, for the same reason every
+        // other read here has it: an id from another company or an invisible channel must answer
+        // exactly as an id that produced no draft.
+        let row: Option<(Uuid, Uuid, i32)> = sqlx::query_as(
+            r#"SELECT run.task_id, run.draft_id, run.draft_version
+               FROM thread_handoff_runs AS run
+               JOIN thread_handoffs AS handoff
+                 ON (handoff.company_id, handoff.id) = (run.company_id, run.handoff_id)
+               WHERE run.company_id = $1 AND run.handoff_id = $2 AND run.generation = $3
+                 AND run.state = 'drafted' AND run.draft_id IS NOT NULL
+                 AND handoff.channel_id = ANY($4)"#,
+        )
+        .bind(company_id)
+        .bind(handoff_id)
+        .bind(generation)
+        .bind(visible_channel_ids)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        row.map(|(task_id, draft_id, draft_version)| {
+            Ok(ThreadHandoffDraft {
+                task_id,
+                draft_id,
+                draft_version: u32::try_from(draft_version)
+                    .map_err(|_| AppError::Internal("Invalid draft version".into()))?,
+            })
+        })
+        .transpose()
+    }
+
+    async fn expire_thread_handoff_draft(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+        reason: &str,
+    ) -> AppResult<()> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        fail_handoff_run_on(
+            &mut tx,
+            company_id,
+            task_id,
+            HandoffRunEnd::DraftExpired,
+            reason,
+        )
+        .await?;
+        tx.commit().await.map_err(AppError::from)
     }
 
     async fn thread_handoffs_for_threads(

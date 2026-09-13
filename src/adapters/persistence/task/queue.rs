@@ -11,12 +11,13 @@ use uuid::Uuid;
 
 use super::*;
 use crate::{
+    adapters::persistence::thread_handoff::{HandoffRunEnd, fail_handoff_run_on},
     app_error::{AppError, AppResult},
     entities::{
         message::CanonicalMessageId,
         task::{
-            BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskSource,
-            TaskStopReason, TaskTarget, TaskTransitionReason, TransitionActor,
+            BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskFailureOutcome,
+            TaskSource, TaskStopReason, TaskTarget, TaskTransitionReason, TransitionActor,
         },
         transport::PrincipalId,
     },
@@ -139,7 +140,10 @@ pub(crate) async fn mark_task_failed_on(
     // The lease names the run that failed, so the failure cannot be attributed to anyone else.
     let attribution =
         TransitionAttribution::new(reason, TransitionActor::Worker(failure.lease.worker_id));
-    let result = sqlx::query(&format!(
+    // A transaction rather than a bare statement because a terminal failure also hands any
+    // drafting run's reply back to the team, and the two must not be able to disagree.
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let company_id = sqlx::query_scalar::<_, Uuid>(&format!(
         r#"UPDATE background_tasks
            SET status = $1, retry_count = retry_count + 1, last_error = $2,
                run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
@@ -147,7 +151,8 @@ pub(crate) async fn mark_task_failed_on(
            WHERE id = $4 AND status = 'processing' AND worker_id = $5
              AND execution_generation = $6
              AND owner_principal_id = $7 AND ownership_version = $8
-             AND lock_expires_at > CURRENT_TIMESTAMP"#,
+             AND lock_expires_at > CURRENT_TIMESTAMP
+           RETURNING company_id"#,
         attribution = attribution.set_clause(),
     ))
     .bind(failure.outcome.status().as_str())
@@ -167,10 +172,27 @@ pub(crate) async fn mark_task_failed_on(
         i64::try_from(failure.lease.ownership_version)
             .map_err(|_| AppError::Conflict("Ownership version exhausted.".into()))?,
     )
-    .execute(pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(AppError::from)?;
-    Ok(result.rows_affected() == 1)
+    let Some(company_id) = company_id else {
+        tx.commit().await.map_err(AppError::from)?;
+        return Ok(false);
+    };
+    // A retry leaves the handoff `drafting`: the run has not ended, it is going to be attempted
+    // again. Only a task that has run out of road gives the reply back to the team.
+    if failure.outcome == TaskFailureOutcome::DeadLetter {
+        fail_handoff_run_on(
+            &mut tx,
+            company_id,
+            failure.lease.task_id,
+            HandoffRunEnd::TaskFailed,
+            failure.error,
+        )
+        .await?;
+    }
+    tx.commit().await.map_err(AppError::from)?;
+    Ok(true)
 }
 
 /// Which states each stop cause may act on.
@@ -265,6 +287,16 @@ pub(crate) async fn stop_task_on(
     )
     .bind(id)
     .execute(&mut *tx)
+    .await?;
+    // A stopped task is terminal for anything waiting on it, so a drafting run stops too and its
+    // reply goes back to the team rather than waiting for an agent that will never run again.
+    fail_handoff_run_on(
+        &mut tx,
+        db.company_id,
+        id,
+        HandoffRunEnd::TaskFailed,
+        "the task drafting this reply was stopped",
+    )
     .await?;
     tx.commit().await.map_err(AppError::from)?;
     db.try_into()

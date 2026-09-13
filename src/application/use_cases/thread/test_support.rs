@@ -1621,6 +1621,40 @@ impl ThreadHandoffPolicyPersistence for InMemoryThreads {
         ))
     }
 
+    /// Dismissal, the drafted answer and a run's failure are the same story as the commands above:
+    /// modelled against the real database, and loudly absent here.
+    async fn dismiss_thread_handoff(
+        &self,
+        _command: crate::entities::thread_handoff::ThreadHandoffDismiss,
+    ) -> AppResult<u64> {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff dismissal".into(),
+        ))
+    }
+
+    async fn thread_handoff_draft(
+        &self,
+        _company_id: Uuid,
+        _handoff_id: Uuid,
+        _generation: Uuid,
+        _visible_channel_ids: &[Uuid],
+    ) -> AppResult<Option<crate::entities::thread_handoff::ThreadHandoffDraft>> {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff drafting runs".into(),
+        ))
+    }
+
+    async fn expire_thread_handoff_draft(
+        &self,
+        _company_id: Uuid,
+        _task_id: Uuid,
+        _reason: &str,
+    ) -> AppResult<()> {
+        Err(AppError::Internal(
+            "InMemoryThreads does not model thread handoff drafting runs".into(),
+        ))
+    }
+
     async fn get_thread_handoff(
         &self,
         _company_id: Uuid,

@@ -256,6 +256,13 @@ fn no_activity() -> &'static HashMap<Uuid, ThreadActivity> {
     EMPTY.get_or_init(HashMap::new)
 }
 
+/// A column whose threads are all answering for themselves: nothing is held.
+fn no_handoffs() -> &'static HashMap<Uuid, ThreadHandoffMark> {
+    static EMPTY: std::sync::OnceLock<HashMap<Uuid, ThreadHandoffMark>> =
+        std::sync::OnceLock::new();
+    EMPTY.get_or_init(HashMap::new)
+}
+
 /// The domain the fixtures' channel addresses are built on, so a participant that is another
 /// channel is distinguishable from one that is a person.
 const MAILBOX_APP_DOMAIN: &str = "mailagents.test";
@@ -354,6 +361,7 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -394,6 +402,7 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -518,6 +527,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -560,6 +570,7 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline),
     });
 
@@ -600,6 +611,7 @@ fn a_detail_column_with_nothing_open_says_so() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
     assert!(!occupied.contains("data-pane-empty"));
 }
@@ -622,6 +634,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     // Without a channel there is no thread column, so there is nowhere for Compose to sit.
@@ -639,6 +652,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     assert!(with_channel.contains("id=\"compose-button\""));
@@ -658,6 +672,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
     assert!(column.contains("id=\"compose-button\""));
 }
@@ -680,6 +695,7 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
+            handoffs: no_handoffs(),
             detail_html: &detail,
         })
     };
@@ -737,6 +753,7 @@ fn the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
+            handoffs: no_handoffs(),
             detail_html: &detail,
         })
     };
@@ -921,6 +938,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -2329,6 +2347,7 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
+            handoffs: no_handoffs(),
         },
         FragmentSwap::OutOfBand,
     );
@@ -2397,6 +2416,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     assert!(html.contains("chat chat-start"));
@@ -2554,6 +2574,7 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     // The connection lives on the pane, so every existing pane swap tears it down and rebuilds it
@@ -2594,6 +2615,7 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     assert!(html.contains(&format!(
@@ -2625,6 +2647,7 @@ fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
 
     assert!(html.contains("hx-ext=\"sse\""));
@@ -2657,6 +2680,7 @@ fn the_out_of_band_thread_list_stays_live() {
         next_cursor: None,
         selected_thread_id: Some(thread.id),
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
 
     assert!(oob.contains("hx-swap-oob=\"outerHTML\""));
@@ -2678,6 +2702,7 @@ fn thread_column_omits_the_resume_cursor_for_an_empty_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
 
     assert!(html.contains(&format!(
@@ -2704,6 +2729,7 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
 
     assert!(
@@ -2896,6 +2922,7 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
@@ -2953,6 +2980,7 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     assert!(html.contains(
@@ -3161,6 +3189,7 @@ fn the_column_marks_a_delegated_thread_without_being_told() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
     });
 
     assert!(column.contains(&icon(Icon::Hubot, BUTTON_ICON)));
@@ -3189,6 +3218,7 @@ fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -3301,6 +3331,7 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     assert!(html.contains(&format!(
@@ -3486,6 +3517,7 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         ownership_error: None,
         owner_candidates: &[],
         collaboration: None,
+        handoff: None,
     });
 
     // Rendered with the scope the pane itself uses, so the comparison is of the markup rather
@@ -4075,6 +4107,7 @@ fn the_mailbox_offers_delegation_controls_to_the_task_owner_and_to_a_manager() {
             ownership_error: None,
             owner_candidates: &[],
             collaboration: Some(&summary),
+            handoff: None,
         })
     };
 
@@ -4149,6 +4182,7 @@ fn a_settled_outreach_draws_no_delegation_controls_in_either_surface() {
             ownership_error: None,
             owner_candidates: &[],
             collaboration: Some(&summary),
+            handoff: None,
         });
         assert!(!html.contains("Delegation controls"), "{status:?}");
     }
@@ -5885,6 +5919,7 @@ fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -5977,6 +6012,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: "",
     });
     assert!(mailbox_html.contains(
@@ -6351,6 +6387,7 @@ fn the_agent_library_reaches_the_account_menu_only_for_an_operator() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
+        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     assert!(with_rail.contains(entry));
@@ -6807,4 +6844,668 @@ fn a_truncated_chain_pane_says_so_and_a_complete_one_does_not() {
         )
         .contains(notice)
     );
+}
+
+/// One held reply on the open thread, in the state under test.
+fn held_reply(
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    state: ThreadHandoffState,
+    responsible: Option<PrincipalId>,
+) -> ThreadHandoff {
+    let now = chrono::Utc::now();
+    ThreadHandoff {
+        id: Uuid::new_v4(),
+        company_id,
+        channel_id,
+        thread_id,
+        generation: Uuid::new_v4(),
+        state,
+        source_message_id: crate::entities::message::CanonicalMessageId::new(Uuid::new_v4()),
+        responsible_principal_id: responsible,
+        priority: crate::entities::attention::BusinessPriority::Normal,
+        due_at: None,
+        version: 4,
+        generation_opened_at: now,
+        created_at: now,
+        updated_at: now,
+    }
+}
+
+/// A held reply's banner view, fixed at a known instant so the age it states is an assertion
+/// rather than a race with the clock.
+fn banner_view<'a>(
+    handoff: &'a ThreadHandoff,
+    viewer_principal_id: Option<PrincipalId>,
+    viewer_manages_tasks: bool,
+) -> ThreadHandoffBannerView<'a> {
+    ThreadHandoffBannerView {
+        company_id: handoff.company_id,
+        channel_id: handoff.channel_id,
+        thread_id: handoff.thread_id,
+        handoff,
+        responsible_label: None,
+        viewer_principal_id,
+        viewer_manages_tasks,
+        draft: None,
+        reassign_candidates: &[],
+        as_of: handoff.generation_opened_at + chrono::Duration::minutes(17),
+        error: None,
+    }
+}
+
+/// Just the handoff banner out of the rendered pane: the composer below it has a Send button of
+/// its own, and this banner's rules are about *its* buttons.
+fn handoff_pane_html(view: &ThreadHandoffBannerView<'_>) -> String {
+    let company = mailbox_company();
+    // The pane's own ids, so the banner the pane renders is addressed exactly as a banner built
+    // straight from this view would be -- which is what case 9 compares.
+    let channel = Channel {
+        id: view.channel_id,
+        ..mailbox_channel(company.id)
+    };
+    let thread = Thread {
+        id: view.thread_id,
+        ..mailbox_thread(channel.id)
+    };
+    banner_out_of(&message_pane(&MessagePane {
+        company_id: view.company_id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        agent: None,
+        viewer_email: &mailbox_account_email(),
+        activity: None,
+        work: None,
+        viewer_principal_id: view.viewer_principal_id,
+        viewer_manages_tasks: view.viewer_manages_tasks,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
+        collaboration: None,
+        handoff: Some(copy_view(view)),
+    }))
+}
+
+/// The banner as it sits inside the rendered pane, container excluded.
+fn banner_out_of(pane: &str) -> String {
+    let after = pane
+        .split_once(
+            r#"<div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML">"#,
+        )
+        .expect("the pane always carries the banner's container")
+        .1;
+    after
+        .split_once(r#"<div id="thread-activity""#)
+        .expect("the activity strip follows it")
+        .0
+        .trim_end()
+        .trim_end_matches("</div>")
+        .to_string()
+}
+
+/// `ThreadHandoffBannerView` is deliberately not `Clone` -- it is built once, at its call site --
+/// so the tests restate it field by field.
+fn copy_view<'a>(view: &ThreadHandoffBannerView<'a>) -> ThreadHandoffBannerView<'a> {
+    ThreadHandoffBannerView {
+        company_id: view.company_id,
+        channel_id: view.channel_id,
+        thread_id: view.thread_id,
+        handoff: view.handoff,
+        responsible_label: view.responsible_label,
+        viewer_principal_id: view.viewer_principal_id,
+        viewer_manages_tasks: view.viewer_manages_tasks,
+        draft: view.draft,
+        reassign_candidates: view.reassign_candidates,
+        as_of: view.as_of,
+        error: view.error,
+    }
+}
+
+/// Case 5 and case 22's rendering half: the state machine the banner's buttons are driven by.
+///
+/// Send is offered to the assigned reviewer -- the responsible principal -- and to nobody else,
+/// because the review machinery answers a manager who is not the reviewer with `NotFound`. A
+/// button that can only produce an error must not be drawn.
+#[test]
+fn the_handoff_banner_follows_the_state_and_offers_send_only_to_the_reviewer() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+    let bo = PrincipalId::random();
+    let manager = PrincipalId::random();
+    let draft = ThreadHandoffDraft {
+        task_id: Uuid::new_v4(),
+        draft_id: Uuid::new_v4(),
+        draft_version: 2,
+    };
+
+    // Unclaimed: the channel team owns it, the next step is claiming it, and Generate draft is not
+    // rendered at all because the command behind it refuses an unclaimed handoff.
+    let unclaimed = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::NeedsInstruction,
+        None,
+    );
+    let html = handoff_pane_html(&banner_view(&unclaimed, Some(bo), false));
+    assert!(html.contains("Channel team"));
+    assert!(html.contains("Age 17m"));
+    // The queue's own word for the priority, so the two surfaces read as one thing.
+    assert!(html.contains(">normal<"));
+    assert!(html.contains("No due time"));
+    assert!(html.contains(">Claim<"));
+    assert!(html.contains(">Dismiss<"));
+    assert!(html.contains("Claim this reply before drafting an answer."));
+    assert!(!html.contains(">Generate draft<"));
+
+    // Claimed by the viewer: draft or dismiss.
+    let claimed = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::NeedsInstruction,
+        Some(bo),
+    );
+    let html = handoff_pane_html(&banner_view(&claimed, Some(bo), false));
+    assert!(html.contains(">Generate draft<"));
+    assert!(html.contains(">Dismiss<"));
+    assert!(!html.contains(">Claim<"));
+
+    // Drafting: visible progress, the quietest of the three state words, and nothing to press.
+    let drafting = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::Drafting,
+        Some(bo),
+    );
+    let html = handoff_pane_html(&banner_view(&drafting, Some(bo), false));
+    assert!(html.contains("Drafting…"));
+    assert!(!html.contains("<button"));
+
+    // Draft ready, viewed by its reviewer: send, edit and send, dismiss.
+    let ready = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::DraftReady,
+        Some(bo),
+    );
+    let html = handoff_pane_html(&ThreadHandoffBannerView {
+        draft: Some(draft),
+        ..banner_view(&ready, Some(bo), false)
+    });
+    assert!(html.contains(">Send<"));
+    assert!(html.contains(">Edit and send<"));
+    assert!(html.contains(">Dismiss<"));
+    assert!(
+        html.contains(r#"data-handoff-draft-version="2""#),
+        "the draft's own version is the fence Send carries"
+    );
+
+    // The same draft, viewed by a manager who is not the reviewer: no Send, no Edit and send.
+    let html = handoff_pane_html(&ThreadHandoffBannerView {
+        draft: Some(draft),
+        ..banner_view(&ready, Some(manager), true)
+    });
+    assert!(
+        !html.contains(">Send<"),
+        "only the assigned reviewer can publish, so only they are offered the button"
+    );
+    assert!(!html.contains(">Edit and send<"));
+    assert!(
+        html.contains(">Dismiss<"),
+        "a manager can still close the reply"
+    );
+}
+
+/// Case 6. A teammate who is neither responsible nor a manager would be answered `NotFound` by
+/// every one of these commands, so the banner tells them what is happening and offers nothing.
+#[test]
+fn a_reply_claimed_by_somebody_else_is_read_only_unless_the_reader_manages_the_company() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+    let bo = PrincipalId::random();
+    let ana = PrincipalId::random();
+    let claimed = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::NeedsInstruction,
+        Some(bo),
+    );
+
+    let onlooker = handoff_pane_html(&ThreadHandoffBannerView {
+        responsible_label: Some("Bo Diaz"),
+        ..banner_view(&claimed, Some(ana), false)
+    });
+    assert!(onlooker.contains("Bo Diaz"), "who has it is still stated");
+    assert!(onlooker.contains("Needs instruction"));
+    assert!(onlooker.contains("Age 17m"));
+    assert!(
+        !onlooker.contains("<button"),
+        "every command would answer this reader NotFound"
+    );
+
+    let roster = [
+        TaskOwnerCandidate {
+            owner: TaskOwner::Human(ana),
+            label: "Ana Reyes".to_string(),
+        },
+        // An agent is not somebody a reply can be handed to.
+        TaskOwnerCandidate {
+            owner: TaskOwner::Agent(PrincipalId::random()),
+            label: "Support agent".to_string(),
+        },
+    ];
+    let manager = handoff_pane_html(&ThreadHandoffBannerView {
+        responsible_label: Some("Bo Diaz"),
+        reassign_candidates: &roster,
+        ..banner_view(&claimed, Some(PrincipalId::random()), true)
+    });
+    assert!(manager.contains(">Reassign<"));
+    assert!(manager.contains("Ana Reyes"));
+    assert!(
+        !manager.contains("Support agent"),
+        "a reply is handed to a person, never to an agent"
+    );
+    assert!(!manager.contains(">Send<"));
+    assert!(!manager.contains(">Generate draft<"));
+}
+
+/// Case 7. The assertion that fails if somebody "simplifies" the request the buttons build.
+#[test]
+fn every_handoff_button_carries_both_fences_and_the_whole_attribute_pair() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+    let bo = PrincipalId::random();
+    let due = chrono::Utc::now() + chrono::Duration::hours(6);
+    let handoff = ThreadHandoff {
+        priority: crate::entities::attention::BusinessPriority::High,
+        due_at: Some(due),
+        version: 9,
+        ..held_reply(
+            company_id,
+            channel.id,
+            thread.id,
+            ThreadHandoffState::NeedsInstruction,
+            Some(bo),
+        )
+    };
+
+    let html = handoff_pane_html(&banner_view(&handoff, Some(bo), false));
+    assert!(html.contains(r#"data-handoff-version="9""#));
+    assert!(html.contains(&format!(
+        r#"data-handoff-generation="{}""#,
+        handoff.generation
+    )));
+    // Restated on every command, so a claim cannot silently drop what somebody else set.
+    assert!(html.contains(r#"data-handoff-priority="high""#));
+    assert!(html.contains(&format!(r#"data-handoff-due-at="{}""#, due.to_rfc3339())));
+    assert!(html.contains(&format!(r#"data-handoff-id="{}""#, handoff.id)));
+    assert!(html.contains(&format!("/thread-handoffs/{}", handoff.id)));
+    assert!(html.contains("badge-warning"), "High is a warning badge");
+    assert!(html.contains(&format!("Due {}", due.format("%Y-%m-%d %H:%M UTC"))));
+}
+
+/// Case 8. The container is present whether or not there is a banner in it, and it sits outside
+/// the scroll area.
+#[test]
+fn the_message_pane_has_a_slot_for_the_held_reply_banner() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        agent: None,
+        viewer_email: &mailbox_account_email(),
+        activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
+        collaboration: None,
+        handoff: None,
+    });
+
+    assert!(html.contains(
+        r#"<div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML"></div>"#
+    ));
+    assert!(!html.contains("Held customer reply"));
+
+    // `#message-scroll` appends with `beforeend`, so a banner inside it would end up above every
+    // later message instead of below all of them -- and it must precede the activity strip, which
+    // is the order the two are read in.
+    let scroll_start = html.find(r#"id="message-scroll""#).unwrap();
+    let banner = html.find(r#"id="thread-handoff""#).unwrap();
+    let activity = html.find(r#"id="thread-activity""#).unwrap();
+    assert!(scroll_start < banner);
+    assert!(banner < activity);
+    assert!(html[scroll_start..banner].contains("</div>"));
+}
+
+/// Case 9. A banner that streams in is indistinguishable from one that came with the page, which
+/// is the rule `message_bubble_chat` established for bubbles and this banner inherits.
+#[test]
+fn the_streamed_banner_and_the_rendered_banner_are_one_string() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+    let bo = PrincipalId::random();
+    let handoff = held_reply(
+        company_id,
+        channel.id,
+        thread.id,
+        ThreadHandoffState::NeedsInstruction,
+        Some(bo),
+    );
+    let view = ThreadHandoffBannerView {
+        channel_id: channel.id,
+        thread_id: thread.id,
+        ..banner_view(&handoff, Some(bo), false)
+    };
+
+    assert_eq!(handoff_pane_html(&view), thread_handoff_banner(&view));
+}
+
+/// Case 10. The queue and the banner say the same thing about the same handoff, because they call
+/// the same two functions. This fails the moment somebody writes a second age formatter.
+#[test]
+fn the_queue_and_the_banner_word_age_priority_and_due_time_identically() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+    let due = chrono::Utc::now() + chrono::Duration::hours(30);
+    let handoff = ThreadHandoff {
+        priority: crate::entities::attention::BusinessPriority::Urgent,
+        due_at: Some(due),
+        ..held_reply(
+            company_id,
+            channel.id,
+            thread.id,
+            ThreadHandoffState::NeedsInstruction,
+            None,
+        )
+    };
+    let as_of = handoff.generation_opened_at + chrono::Duration::hours(5);
+
+    let item = crate::entities::attention::AttentionItem {
+        company_id,
+        channel_id: channel.id,
+        source_kind: crate::entities::attention::AttentionSourceKind::ThreadHandoff,
+        source_id: handoff.id,
+        thread_id: Some(thread.id),
+        task_id: None,
+        correlation_id: None,
+        state: "needs_instruction".to_string(),
+        responsibility: crate::entities::attention::AttentionResponsibility::ChannelTeam,
+        version: handoff.version,
+        title: thread.subject.clone(),
+        next_action: "Tell the agent what to do".to_string(),
+        responsibility_label: "Channel team".to_string(),
+        priority: handoff.priority,
+        due_at: handoff.due_at,
+        expires_at: None,
+        created_at: handoff.generation_opened_at,
+        updated_at: handoff.updated_at,
+        href: None,
+    };
+    let email = mailbox_account_email();
+    let company = mailbox_company();
+    let queue = attention_page(&AttentionPageView {
+        user: &mailbox_user(&email),
+        companies: std::slice::from_ref(&company),
+        company: &company,
+        view: crate::entities::attention::AttentionView::Unassigned,
+        all_owned: false,
+        page: &crate::entities::attention::AttentionPage {
+            items: vec![item],
+            next_cursor: None,
+            as_of,
+            working_set_size: 1,
+            truncated: false,
+        },
+        manager: false,
+    });
+    let banner = thread_handoff_banner(&ThreadHandoffBannerView {
+        as_of,
+        ..banner_view(&handoff, None, false)
+    });
+
+    for fact in [
+        "Age 5h".to_string(),
+        ">urgent<".to_string(),
+        format!("Due {}", due.format("%Y-%m-%d %H:%M UTC")),
+        "badge-error".to_string(),
+        "Channel team".to_string(),
+    ] {
+        assert!(queue.contains(&fact), "the queue says {fact}");
+        assert!(banner.contains(&fact), "the banner says {fact}");
+    }
+}
+
+/// A thread with no held reply renders exactly as it did before this banner existed.
+#[test]
+fn a_thread_without_a_held_reply_renders_no_handoff_actions() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        agent: None,
+        viewer_email: &mailbox_account_email(),
+        activity: None,
+        work: None,
+        viewer_principal_id: None,
+        viewer_manages_tasks: false,
+        private_handoff: None,
+        ownership_error: None,
+        owner_candidates: &[],
+        collaboration: None,
+        handoff: None,
+    });
+    assert!(!html.contains("thread-handoff-actions"));
+    assert!(!html.contains("Held customer reply"));
+}
+
+/// Case 1. The one mark that carries a word rather than a glyph, because it is the only one that
+/// asks the reader to do something.
+#[test]
+fn the_row_badge_says_which_of_the_three_states_a_held_reply_is_in() {
+    assert_eq!(thread_handoff_mark(None), "");
+
+    let needs = thread_handoff_mark(Some(ThreadHandoffMark {
+        state: ThreadHandoffState::NeedsInstruction,
+        claimed: false,
+    }));
+    assert!(needs.contains("badge-warning"));
+    assert!(needs.contains(">Needs input<"), "{needs}");
+    assert!(
+        needs.contains(r#"title="Needs instruction""#),
+        "the long form survives a narrow column as the tooltip"
+    );
+
+    let ready = thread_handoff_mark(Some(ThreadHandoffMark {
+        state: ThreadHandoffState::DraftReady,
+        claimed: true,
+    }));
+    assert!(ready.contains("badge-info"));
+    assert!(ready.contains(">Draft ready<"));
+
+    // Out of the attention queue and waiting on nobody: the quietest of the three, and it never
+    // pulses -- a handoff is durable, and a badge that pulses forever is noise.
+    let drafting = thread_handoff_mark(Some(ThreadHandoffMark {
+        state: ThreadHandoffState::Drafting,
+        claimed: true,
+    }));
+    assert!(drafting.contains("badge-ghost"));
+    assert!(drafting.contains(">Drafting<"));
+    assert!(!drafting.contains("animate-pulse"));
+    assert!(!needs.contains("animate-pulse"));
+    assert!(!ready.contains("animate-pulse"));
+
+    // A closed handoff never reaches a row, and renders nothing if one ever did.
+    for state in [ThreadHandoffState::Resolved, ThreadHandoffState::Dismissed] {
+        assert_eq!(
+            thread_handoff_mark(Some(ThreadHandoffMark {
+                state,
+                claimed: true
+            })),
+            ""
+        );
+    }
+}
+
+/// Case 2. Its own event name, its own slot, and no mention of any other thread.
+#[test]
+fn the_handoff_slot_names_only_its_own_thread() {
+    let thread_id = Uuid::new_v4();
+    let other = Uuid::new_v4();
+    let slot = thread_handoff_slot(
+        thread_id,
+        Some(ThreadHandoffMark {
+            state: ThreadHandoffState::NeedsInstruction,
+            claimed: false,
+        }),
+    );
+
+    assert!(slot.contains(&format!(r#"sse-swap="handoff-{thread_id}""#)));
+    assert_eq!(
+        thread_handoff_event(thread_id),
+        format!("handoff-{thread_id}")
+    );
+    assert!(slot.contains(r#"hx-target="this""#));
+    assert!(slot.contains(r#"hx-swap="innerHTML""#));
+    assert!(!slot.contains(&other.to_string()));
+
+    // An empty slot is still a slot: it is where the first streamed badge lands.
+    let cleared = thread_handoff_slot(thread_id, None);
+    assert!(cleared.contains(&format!(r#"sse-swap="handoff-{thread_id}""#)));
+    assert!(!cleared.contains("badge"));
+}
+
+/// Case 3. Both marks, in the order they are read: what the team must do, then what the machine is
+/// doing, then the timestamp.
+#[test]
+fn a_thread_row_carries_the_handoff_mark_before_the_activity_mark() {
+    let company_id = mailbox_company().id;
+    let channel = mailbox_channel(company_id);
+    let thread = mailbox_thread(channel.id);
+
+    let both = thread_row_fragment(
+        company_id,
+        &channel,
+        &thread,
+        false,
+        ThreadRowMarks {
+            activity: Some(ThreadActivity::Working),
+            handoff: Some(ThreadHandoffMark {
+                state: ThreadHandoffState::NeedsInstruction,
+                claimed: false,
+            }),
+            ..ThreadRowMarks::default()
+        },
+    );
+    let handoff_at = both.find("thread-handoff-mark").expect("the handoff slot");
+    let activity_at = both.find("thread-activity").expect("the activity slot");
+    assert!(handoff_at < activity_at);
+    assert!(both.contains(">Needs input<"));
+
+    // Either one absent still renders the row and the other slot.
+    let held_only = thread_row_fragment(
+        company_id,
+        &channel,
+        &thread,
+        false,
+        ThreadRowMarks {
+            handoff: Some(ThreadHandoffMark {
+                state: ThreadHandoffState::DraftReady,
+                claimed: true,
+            }),
+            ..ThreadRowMarks::default()
+        },
+    );
+    assert!(held_only.contains(">Draft ready<"));
+    assert!(held_only.contains("thread-activity"));
+
+    let plain = thread_row_fragment(
+        company_id,
+        &channel,
+        &thread,
+        false,
+        ThreadRowMarks::default(),
+    );
+    assert!(plain.contains("thread-handoff-mark"));
+    assert!(!plain.contains("badge-warning"));
+}
+
+/// Case 4. A thread in the map gets the badge; one absent from it gets an empty slot.
+#[test]
+fn the_column_and_the_page_badge_only_the_threads_the_map_names() {
+    let email = mailbox_account_email();
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let held = mailbox_thread(channel.id);
+    let quiet = mailbox_thread(channel.id);
+    let threads = vec![held.clone(), quiet.clone()];
+    let handoffs: HashMap<Uuid, ThreadHandoffMark> = [(
+        held.id,
+        ThreadHandoffMark {
+            state: ThreadHandoffState::NeedsInstruction,
+            claimed: false,
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    for html in [
+        thread_column(&ThreadColumn {
+            company_id: company.id,
+            channel: &channel,
+            app_domain_name: "example.com",
+            threads: &threads,
+            next_cursor: None,
+            selected_thread_id: None,
+            activity: no_activity(),
+            handoffs: &handoffs,
+        }),
+        mailbox_page(&MailboxPage {
+            user: &mailbox_user(&email),
+            company: &company,
+            companies: std::slice::from_ref(&company),
+            app_domain_name: "example.com",
+            channels: std::slice::from_ref(&channel),
+            selected_channel: Some(&channel),
+            threads: &threads,
+            next_cursor: None,
+            selected_thread_id: None,
+            activity: no_activity(),
+            handoffs: &handoffs,
+            detail_html: "",
+        }),
+    ] {
+        assert_eq!(
+            html.matches(">Needs input<").count(),
+            1,
+            "exactly the one held thread is badged"
+        );
+        assert!(html.contains(&format!(r#"sse-swap="handoff-{}""#, held.id)));
+        assert!(
+            html.contains(&format!(r#"sse-swap="handoff-{}""#, quiet.id)),
+            "a thread with nothing held still has the slot a badge would land in"
+        );
+    }
 }

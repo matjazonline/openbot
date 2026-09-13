@@ -39,6 +39,7 @@ use crate::entities::{
         ThreadWorkSummary,
     },
     thread::Thread,
+    thread_handoff::{ThreadHandoff, ThreadHandoffDraft, ThreadHandoffState},
     transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, PrincipalId, TransportKind},
     user::User,
     value_objects::{AvatarUrl, EmailAddress, ModelName},
@@ -93,6 +94,7 @@ mod task_monitor;
 mod tasks;
 mod team_settings;
 mod thread_activity;
+mod thread_handoff_marks;
 mod thread_handoffs;
 
 pub use agent_library_multi_select::*;
@@ -132,6 +134,7 @@ pub use task_monitor::*;
 pub use tasks::*;
 pub use team_settings::*;
 pub use thread_activity::*;
+pub use thread_handoff_marks::*;
 pub use thread_handoffs::*;
 
 /// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic

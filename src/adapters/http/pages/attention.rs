@@ -144,10 +144,7 @@ pub fn attention_list(
 
 fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) -> String {
     let href = item.href.as_deref().unwrap_or("#");
-    let due = item.due_at.map_or_else(
-        || "No due time".to_string(),
-        |due| format!("Due {}", due.format("%Y-%m-%d %H:%M UTC")),
-    );
+    let due = due_label(item.due_at);
     let source = match item.source_kind {
         AttentionSourceKind::Task => "Task",
         AttentionSourceKind::Handoff => "Handoff",
@@ -193,7 +190,23 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
     )
 }
 
-fn age_label(
+/// When an item is due, in the queue's own words.
+///
+/// `pub(crate)` for the same reason as [`age_label`]: the thread-handoff banner says this about
+/// the very handoff the queue lists beside it, and two wordings for one fact is how a support
+/// conversation goes wrong.
+pub(crate) fn due_label(due_at: Option<chrono::DateTime<chrono::Utc>>) -> String {
+    due_at.map_or_else(
+        || "No due time".to_string(),
+        |due| format!("Due {}", due.format("%Y-%m-%d %H:%M UTC")),
+    )
+}
+
+/// How long an item has waited, in the queue's own words.
+///
+/// `pub(crate)` because the thread-handoff banner says the same thing about the same handoff the
+/// queue is listing. A second formatter would drift from this one within a month.
+pub(crate) fn age_label(
     created_at: chrono::DateTime<chrono::Utc>,
     as_of: chrono::DateTime<chrono::Utc>,
 ) -> String {
@@ -206,7 +219,7 @@ fn age_label(
     }
 }
 
-const fn priority_class(priority: BusinessPriority) -> &'static str {
+pub(crate) const fn priority_class(priority: BusinessPriority) -> &'static str {
     match priority {
         BusinessPriority::Normal => "badge-ghost",
         BusinessPriority::High => "badge-warning",

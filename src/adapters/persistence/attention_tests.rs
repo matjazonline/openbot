@@ -1257,6 +1257,732 @@ async fn insert_delivery_failure(
     delivery_id
 }
 
+// ---------------------------------------------------------------------------------------------
+// The seventh `raw` branch: `thread_handoffs`, the inbound-triggered one-per-thread handoff.
+//
+// A different feature from the `manual_handoffs` rows above, sharing no table, state machine or
+// version with them -- so every assertion below names the `source_id` the test created rather
+// than counting a page, which the shared test database would make racy anyway.
+// ---------------------------------------------------------------------------------------------
+
+/// What a fixture hold should look like where a test cares.
+///
+/// Everything left alone is a freshly held reply: `needs_instruction`, nobody's, `Normal`, with no
+/// due time -- which is exactly what Phase 2's inbound commit writes.
+#[derive(Clone, Copy)]
+struct HeldShape {
+    state: ThreadHandoffState,
+    responsible: Option<PrincipalId>,
+    priority: BusinessPriority,
+    due_at: Option<DateTime<Utc>>,
+}
+
+impl HeldShape {
+    const fn fresh() -> Self {
+        Self {
+            state: ThreadHandoffState::NeedsInstruction,
+            responsible: None,
+            priority: BusinessPriority::Normal,
+            due_at: None,
+        }
+    }
+}
+
+/// One held reply, and the thread whose subject titles it.
+#[derive(Clone, Copy)]
+struct HeldReply {
+    thread_id: Uuid,
+    handoff_id: Uuid,
+    generation: Uuid,
+}
+
+/// A company with one channel and its owner's principal, and the holds a test puts on it.
+///
+/// A struct with methods rather than free functions taking `(company_id, channel_id, ...)`: they
+/// are both `Uuid`, so a transposed pair would compile and then read a channel as a company.
+struct HandoffScope {
+    company_id: Uuid,
+    channel_id: Uuid,
+    owner: PrincipalId,
+}
+
+impl HandoffScope {
+    async fn new(persistence: &PostgresPersistence) -> Self {
+        let (company_id, channel_id, owner) = fixture(persistence).await;
+        Self {
+            company_id,
+            channel_id,
+            owner,
+        }
+    }
+
+    /// A held reply on a thread of its own.
+    ///
+    /// Its own thread because `thread_handoffs_thread_key` allows exactly one handoff per thread,
+    /// so a test that wants two holds needs two threads rather than two rows.
+    async fn hold(
+        &self,
+        persistence: &PostgresPersistence,
+        subject: &str,
+        shape: HeldShape,
+    ) -> HeldReply {
+        self.hold_on(persistence, self.channel_id, subject, shape)
+            .await
+    }
+
+    async fn hold_on(
+        &self,
+        persistence: &PostgresPersistence,
+        channel_id: Uuid,
+        subject: &str,
+        shape: HeldShape,
+    ) -> HeldReply {
+        let thread = persistence
+            .create_thread(channel_id, subject, &[])
+            .await
+            .unwrap();
+        let held = thread_handoff_fixture(
+            persistence,
+            ThreadHandoffFixtureRequest {
+                state: shape.state,
+                responsible_principal_id: shape.responsible,
+                priority: shape.priority,
+                due_at: shape.due_at,
+                ..ThreadHandoffFixtureRequest::new(self.company_id, channel_id, thread.id)
+            },
+        )
+        .await;
+        HeldReply {
+            thread_id: thread.id,
+            handoff_id: held.handoff_id,
+            generation: held.generation,
+        }
+    }
+}
+
+/// The thread handoffs a view lists, by id.
+///
+/// Never the page's length: the branches above put other kinds in the same page, and a test that
+/// counted them would break the moment a sibling fixture changed.
+async fn held_ids(persistence: &PostgresPersistence, request: AttentionQuery<'_>) -> Vec<Uuid> {
+    persistence
+        .list_attention(request)
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .filter(|item| item.source_kind == AttentionSourceKind::ThreadHandoff)
+        .map(|item| item.source_id)
+        .collect()
+}
+
+/// The one item a view lists for `handoff_id`, or `None` if that view does not hold it.
+async fn held_item(
+    persistence: &PostgresPersistence,
+    request: AttentionQuery<'_>,
+    handoff_id: Uuid,
+) -> Option<AttentionItem> {
+    persistence
+        .list_attention(request)
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .find(|item| {
+            item.source_kind == AttentionSourceKind::ThreadHandoff && item.source_id == handoff_id
+        })
+}
+
+/// Case 4. The regression guard for `#[serde(skip)] visible_channel_ids`: an authorization context
+/// inside the fingerprint would make a replay by somebody with a different channel list look like
+/// a *different* command, and return a `Conflict` where the caller is owed the recorded outcome.
+#[test]
+fn the_fingerprint_ignores_who_was_allowed_to_ask() {
+    let command = ThreadHandoffCommand {
+        company_id: Uuid::new_v4(),
+        handoff_id: Uuid::new_v4(),
+        command_id: Uuid::new_v4(),
+        expected_version: 3,
+        expected_generation: Uuid::new_v4(),
+        operation: ThreadHandoffOperation::Claim,
+        priority: BusinessPriority::High,
+        due_at: Some(Utc::now()),
+        actor_principal_id: PrincipalId::random(),
+        visible_channel_ids: vec![Uuid::new_v4()],
+    };
+    let widened = ThreadHandoffCommand {
+        visible_channel_ids: vec![Uuid::new_v4(), Uuid::new_v4()],
+        ..command.clone()
+    };
+    assert_eq!(
+        command_fingerprint(&command).unwrap(),
+        command_fingerprint(&widened).unwrap(),
+        "the channel list is authorization context, not what was asked"
+    );
+
+    // A semantic field still moves it, so the equality above is a skipped field and not a
+    // fingerprint that hashes nothing.
+    let repriced = ThreadHandoffCommand {
+        priority: BusinessPriority::Urgent,
+        ..command.clone()
+    };
+    assert_ne!(
+        command_fingerprint(&command).unwrap(),
+        command_fingerprint(&repriced).unwrap()
+    );
+}
+
+/// Case 5.
+#[tokio::test]
+async fn a_held_reply_is_unassigned_team_work_titled_by_its_thread() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let teammate = add_teammate(&persistence, scope.company_id, "Bo").await;
+    let held = scope
+        .hold(&persistence, "Invoice 4471", HeldShape::fresh())
+        .await;
+    let visible = [scope.channel_id];
+    let request = |principal, view| query(scope.company_id, &visible, principal, view);
+
+    let item = held_item(
+        &persistence,
+        request(scope.owner, AttentionView::Unassigned),
+        held.handoff_id,
+    )
+    .await
+    .expect("an unclaimed hold is the channel team's work");
+    assert_eq!(
+        item.title, "Invoice 4471",
+        "the title is the thread's subject"
+    );
+    assert_eq!(
+        item.next_action,
+        "Tell the agent what to do, reply, or dismiss"
+    );
+    assert_eq!(item.state, "needs_instruction");
+    assert_eq!(item.responsibility, AttentionResponsibility::ChannelTeam);
+    assert_eq!(item.responsibility_label, "Channel team");
+    assert_eq!(item.priority, BusinessPriority::Normal);
+    assert_eq!(item.due_at, None);
+    assert_eq!(
+        item.task_id, None,
+        "a hold has no task until Phase 4 runs one"
+    );
+    assert_eq!(item.correlation_id, None);
+    assert_eq!(item.expires_at, None, "nothing expires a handoff");
+    assert_eq!(item.version, 1);
+    assert_eq!(item.thread_id, Some(held.thread_id));
+    assert_eq!(
+        item.href.as_deref(),
+        Some(
+            format!(
+                "/ui?company_id={}&channel_id={}&thread_id={}",
+                scope.company_id, scope.channel_id, held.thread_id
+            )
+            .as_str()
+        )
+    );
+
+    assert!(
+        held_ids(&persistence, request(scope.owner, AttentionView::TeamWork))
+            .await
+            .contains(&held.handoff_id)
+    );
+    for principal in [scope.owner, teammate] {
+        assert!(
+            !held_ids(&persistence, request(principal, AttentionView::MyWork))
+                .await
+                .contains(&held.handoff_id),
+            "an unclaimed hold is nobody's own work yet"
+        );
+    }
+}
+
+/// Case 6.
+#[tokio::test]
+async fn a_claimed_hold_leaves_the_team_queue_for_its_claimant_alone() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let bo = add_teammate(&persistence, scope.company_id, "Bo Okonkwo").await;
+    let cleo = add_teammate(&persistence, scope.company_id, "Cleo Marsh").await;
+    let held = scope
+        .hold(
+            &persistence,
+            "Invoice 4471",
+            HeldShape {
+                responsible: Some(bo),
+                ..HeldShape::fresh()
+            },
+        )
+        .await;
+    let visible = [scope.channel_id];
+    let request = |principal, view| query(scope.company_id, &visible, principal, view);
+
+    assert!(
+        !held_ids(
+            &persistence,
+            request(scope.owner, AttentionView::Unassigned)
+        )
+        .await
+        .contains(&held.handoff_id),
+        "a claimed hold is no longer the channel team's"
+    );
+    let item = held_item(
+        &persistence,
+        request(bo, AttentionView::MyWork),
+        held.handoff_id,
+    )
+    .await
+    .expect("the claimant's own work");
+    assert_eq!(item.responsibility, AttentionResponsibility::Principal(bo));
+    assert_eq!(item.responsibility_label, "Bo Okonkwo");
+    assert!(
+        !held_ids(&persistence, request(cleo, AttentionView::MyWork))
+            .await
+            .contains(&held.handoff_id),
+        "somebody else's claim is not my work"
+    );
+    assert!(
+        held_ids(&persistence, request(cleo, AttentionView::TeamWork))
+            .await
+            .contains(&held.handoff_id),
+        "the team still sees work one of them took"
+    );
+}
+
+/// Case 7. `drafting` is visible progress rather than work, and the two terminal states are gone
+/// for good -- the SQL predicate and `ThreadHandoffState::is_actionable` being two spellings of
+/// one rule is what this pins.
+#[tokio::test]
+async fn only_the_two_actionable_states_reach_the_queue() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let mut held = Vec::new();
+    for state in [
+        ThreadHandoffState::NeedsInstruction,
+        ThreadHandoffState::Drafting,
+        ThreadHandoffState::DraftReady,
+        ThreadHandoffState::Resolved,
+        ThreadHandoffState::Dismissed,
+    ] {
+        held.push((
+            state,
+            scope
+                .hold(
+                    &persistence,
+                    state.as_str(),
+                    HeldShape {
+                        state,
+                        ..HeldShape::fresh()
+                    },
+                )
+                .await,
+        ));
+    }
+    let visible = [scope.channel_id];
+    let request = |view| query(scope.company_id, &visible, scope.owner, view);
+
+    for view in [
+        AttentionView::Unassigned,
+        AttentionView::TeamWork,
+        AttentionView::MyWork,
+    ] {
+        let listed = held_ids(&persistence, request(view)).await;
+        for (state, hold) in &held {
+            let expected = state.is_actionable() && view != AttentionView::MyWork;
+            assert_eq!(
+                listed.contains(&hold.handoff_id),
+                expected,
+                "{state:?} in {view:?}"
+            );
+        }
+    }
+
+    let ready = held
+        .iter()
+        .find(|(state, _)| *state == ThreadHandoffState::DraftReady)
+        .map(|(_, hold)| *hold)
+        .expect("the draft_ready fixture");
+    let item = held_item(
+        &persistence,
+        request(AttentionView::TeamWork),
+        ready.handoff_id,
+    )
+    .await
+    .expect("a ready draft is work again");
+    assert_eq!(item.next_action, "Review the drafted reply and send it");
+}
+
+/// Case 8.
+#[tokio::test]
+async fn a_hold_outside_the_visible_channels_or_the_company_is_not_listed() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let restricted_channel = add_channel(&persistence, scope.company_id).await;
+    let visible_hold = scope
+        .hold(&persistence, "Visible", HeldShape::fresh())
+        .await;
+    let hidden_hold = scope
+        .hold_on(
+            &persistence,
+            restricted_channel,
+            "Hidden",
+            HeldShape::fresh(),
+        )
+        .await;
+    let elsewhere = HandoffScope::new(&persistence).await;
+    let foreign_hold = elsewhere
+        .hold(&persistence, "Another company", HeldShape::fresh())
+        .await;
+
+    let visible = [scope.channel_id];
+    for view in [
+        AttentionView::Unassigned,
+        AttentionView::TeamWork,
+        AttentionView::MyWork,
+    ] {
+        let listed = held_ids(
+            &persistence,
+            query(scope.company_id, &visible, scope.owner, view),
+        )
+        .await;
+        assert!(
+            !listed.contains(&hidden_hold.handoff_id),
+            "a channel the caller cannot view is invisible in {view:?}"
+        );
+        assert!(
+            !listed.contains(&foreign_hold.handoff_id),
+            "another company's hold is invisible in {view:?}"
+        );
+    }
+
+    // The same two rows, read the way their own callers would, so the refusals above are the
+    // scope under test and not a hold that was never written.
+    let both = [scope.channel_id, restricted_channel];
+    let listed = held_ids(
+        &persistence,
+        query(
+            scope.company_id,
+            &both,
+            scope.owner,
+            AttentionView::Unassigned,
+        ),
+    )
+    .await;
+    assert!(listed.contains(&visible_hold.handoff_id));
+    assert!(listed.contains(&hidden_hold.handoff_id));
+    assert!(
+        held_ids(
+            &persistence,
+            query(
+                elsewhere.company_id,
+                std::slice::from_ref(&elsewhere.channel_id),
+                elsewhere.owner,
+                AttentionView::Unassigned,
+            ),
+        )
+        .await
+        .contains(&foreign_hold.handoff_id)
+    );
+}
+
+/// Case 9. The whole argument for joining `threads` rather than storing a title.
+#[tokio::test]
+async fn renaming_the_thread_retitles_the_item_with_no_write_to_the_handoff() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let held = scope
+        .hold(&persistence, "Invoice 4471", HeldShape::fresh())
+        .await;
+    let visible = [scope.channel_id];
+    let request = || {
+        query(
+            scope.company_id,
+            &visible,
+            scope.owner,
+            AttentionView::Unassigned,
+        )
+    };
+    let stamp = || handoff_stamp(&persistence, scope.company_id, held.handoff_id);
+    let before = stamp().await;
+
+    sqlx::query("UPDATE threads SET subject = $2 WHERE id = $1")
+        .bind(held.thread_id)
+        .bind("Invoice 4471 (reissued)")
+        .execute(persistence.pool())
+        .await
+        .unwrap();
+
+    let item = held_item(&persistence, request(), held.handoff_id)
+        .await
+        .expect("the hold is still queued");
+    assert_eq!(item.title, "Invoice 4471 (reissued)");
+    assert_eq!(item.version, 1);
+    assert_eq!(
+        stamp().await,
+        before,
+        "a renamed thread must not write to the handoff at all"
+    );
+}
+
+/// Case 10. A thread held three times in a month is not a month-old item.
+#[tokio::test]
+async fn the_queue_ages_the_generation_rather_than_the_row() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let held_again = scope
+        .hold(&persistence, "Held for the third time", HeldShape::fresh())
+        .await;
+    let held_once = scope
+        .hold(&persistence, "Held once, an hour ago", HeldShape::fresh())
+        .await;
+
+    // An old row whose current generation opened a minute ago, and a younger row that has been
+    // waiting an hour. On the row's own `created_at` the order would be the other way around.
+    let opened_recently = Utc::now() - chrono::Duration::minutes(1);
+    let opened_earlier = Utc::now() - chrono::Duration::hours(1);
+    sqlx::query(
+        r#"UPDATE thread_handoffs
+           SET created_at = CURRENT_TIMESTAMP - interval '30 days', generation_opened_at = $2
+           WHERE id = $1"#,
+    )
+    .bind(held_again.handoff_id)
+    .bind(opened_recently)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+    sqlx::query("UPDATE thread_handoffs SET generation_opened_at = $2 WHERE id = $1")
+        .bind(held_once.handoff_id)
+        .bind(opened_earlier)
+        .execute(persistence.pool())
+        .await
+        .unwrap();
+
+    let visible = [scope.channel_id];
+    let request = query(
+        scope.company_id,
+        &visible,
+        scope.owner,
+        AttentionView::Unassigned,
+    );
+    assert_eq!(
+        held_ids(&persistence, request).await,
+        vec![held_once.handoff_id, held_again.handoff_id],
+        "the item that has waited longest at this generation sorts first"
+    );
+    let item = held_item(&persistence, request, held_again.handoff_id)
+        .await
+        .expect("the regenerated hold is queued");
+    assert_eq!(
+        item.created_at, opened_recently,
+        "the item's age is this wait, not the first time the thread was ever held"
+    );
+}
+
+/// Case 11.
+#[tokio::test]
+async fn holds_and_tasks_page_together_in_one_priority_order() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let urgent = scope
+        .hold(
+            &persistence,
+            "Urgent hold",
+            HeldShape {
+                priority: BusinessPriority::Urgent,
+                ..HeldShape::fresh()
+            },
+        )
+        .await;
+    let normal = scope
+        .hold(&persistence, "Normal hold", HeldShape::fresh())
+        .await;
+    let thread = persistence
+        .create_thread(scope.channel_id, "High task", &[])
+        .await
+        .unwrap();
+    let task = insert_task(
+        &persistence,
+        FeedScope {
+            company_id: scope.company_id,
+            channel_id: scope.channel_id,
+            thread_id: thread.id,
+        },
+        None,
+        "pending",
+    )
+    .await;
+    // Ownerless, so it is channel-team work the moment it exists rather than an agent's run in
+    // progress, and `high`, so it sorts between the two holds.
+    sqlx::query(
+        r#"UPDATE background_tasks
+           SET owner_principal_id = NULL, owner_principal_kind = NULL, business_priority = 'high'
+           WHERE company_id = $1 AND id = $2"#,
+    )
+    .bind(scope.company_id)
+    .bind(task)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+
+    let visible = [scope.channel_id];
+    let mut paged = Vec::new();
+    let mut cursor = None;
+    loop {
+        let page = persistence
+            .list_attention(AttentionQuery {
+                limit: 1,
+                cursor: cursor.as_ref(),
+                ..query(
+                    scope.company_id,
+                    &visible,
+                    scope.owner,
+                    AttentionView::Unassigned,
+                )
+            })
+            .await
+            .unwrap();
+        paged.extend(
+            page.items
+                .iter()
+                .map(|item| (item.source_kind, item.source_id)),
+        );
+        let Some(next) = page.next_cursor else {
+            break;
+        };
+        cursor = Some(next.parse::<AttentionCursor>().unwrap());
+    }
+    assert_eq!(
+        paged,
+        vec![
+            (AttentionSourceKind::ThreadHandoff, urgent.handoff_id),
+            (AttentionSourceKind::Task, task),
+            (AttentionSourceKind::ThreadHandoff, normal.handoff_id),
+        ],
+        "one priority order across both kinds, and the cursor carries it page to page"
+    );
+}
+
+/// Case 12. The round trip a client actually performs: read the item, act on its version.
+#[tokio::test]
+async fn the_version_in_the_queue_is_the_one_a_command_fences_on() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let scope = HandoffScope::new(&persistence).await;
+    let held = scope
+        .hold(&persistence, "Invoice 4471", HeldShape::fresh())
+        .await;
+    let visible = [scope.channel_id];
+    let request = |principal, view| query(scope.company_id, &visible, principal, view);
+
+    let item = held_item(
+        &persistence,
+        request(scope.owner, AttentionView::Unassigned),
+        held.handoff_id,
+    )
+    .await
+    .expect("the hold is queued");
+    assert_eq!(
+        item.version,
+        stored_handoff_version(&persistence, held.handoff_id).await
+    );
+
+    let claimed = persistence
+        .change_thread_handoff(ThreadHandoffCommand {
+            company_id: scope.company_id,
+            handoff_id: held.handoff_id,
+            command_id: Uuid::new_v4(),
+            expected_version: item.version,
+            expected_generation: held.generation,
+            operation: ThreadHandoffOperation::Claim,
+            priority: item.priority,
+            due_at: item.due_at,
+            actor_principal_id: scope.owner,
+            visible_channel_ids: visible.to_vec(),
+        })
+        .await
+        .expect("the version the queue handed out is the one the command wants");
+    assert_eq!(claimed, item.version + 1);
+
+    let after = held_item(
+        &persistence,
+        request(scope.owner, AttentionView::MyWork),
+        held.handoff_id,
+    )
+    .await
+    .expect("the claimant's own work");
+    assert_eq!(after.version, claimed);
+    assert_eq!(
+        after.responsibility,
+        AttentionResponsibility::Principal(scope.owner)
+    );
+}
+
+/// A second channel in `company_id`, which a caller may or may not be given sight of.
+async fn add_channel(persistence: &PostgresPersistence, company_id: Uuid) -> Uuid {
+    ChannelPersistence::create(
+        persistence,
+        company_id,
+        ChannelWrite {
+            name: "Second".into(),
+            slug: format!("attention-second-{}", Uuid::new_v4().simple()),
+            enabled: false,
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id
+}
+
+/// Everything a write to a handoff would move, so a test can assert that nothing did.
+async fn handoff_stamp(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    handoff_id: Uuid,
+) -> (i64, DateTime<Utc>) {
+    sqlx::query_as(
+        "SELECT version, updated_at FROM thread_handoffs WHERE company_id = $1 AND id = $2",
+    )
+    .bind(company_id)
+    .bind(handoff_id)
+    .fetch_one(persistence.pool())
+    .await
+    .unwrap()
+}
+
+async fn stored_handoff_version(persistence: &PostgresPersistence, handoff_id: Uuid) -> u64 {
+    let version: i64 = sqlx::query_scalar("SELECT version FROM thread_handoffs WHERE id = $1")
+        .bind(handoff_id)
+        .fetch_one(persistence.pool())
+        .await
+        .unwrap();
+    u64::try_from(version).unwrap()
+}
+
 /// `ATTENTION_SQL` exactly as it stood before the responsibility filter was pushed into the union
 /// branches: `raw` builds the rows of every responsibility and `ranked` alone discards them.
 ///

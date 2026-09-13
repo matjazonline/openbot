@@ -365,7 +365,10 @@ mod tests {
     /// other and neither may be reached by a near miss.
     #[test]
     fn the_thread_handoff_kind_is_its_own_vocabulary() {
-        assert_eq!(AttentionSourceKind::ThreadHandoff.as_str(), "thread_handoff");
+        assert_eq!(
+            AttentionSourceKind::ThreadHandoff.as_str(),
+            "thread_handoff"
+        );
         assert_eq!(
             "thread_handoff".parse::<AttentionSourceKind>(),
             Ok(AttentionSourceKind::ThreadHandoff)

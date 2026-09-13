@@ -48,6 +48,12 @@ const ACTIONABLE_NOTIFICATION_CHANNEL: &str = "actionable_notification_changed";
 /// so this only needs to be large enough that lag is rare.
 const BROADCAST_CAPACITY: usize = 256;
 
+/// [`BROADCAST_CAPACITY`], for a test that has to produce a lag on purpose.
+#[cfg(test)]
+pub const fn broadcast_capacity_for_tests() -> usize {
+    BROADCAST_CAPACITY
+}
+
 /// How long to wait before reopening a listener connection that failed outright.
 const RECONNECT_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -184,6 +190,20 @@ impl MailboxEvent {
     /// True for a task status change anywhere in `channel_id`.
     pub fn is_activity_in_channel(&self, channel_id: Uuid) -> bool {
         matches!(self, MailboxEvent::ActivityChanged(scope) if scope.channel_id == channel_id)
+    }
+
+    /// True for a thread-handoff change anywhere in `channel_id`.
+    ///
+    /// Matched on [`AttentionWakeSource::ThreadHandoff`] alone: [`AttentionWakeSource::Handoff`] is
+    /// `manual_handoffs`, a different feature that shares this channel, and a mailbox that redrew
+    /// its held-reply badges for one of those would be reading another feature's news.
+    pub fn is_thread_handoff_in_channel(&self, channel_id: Uuid) -> bool {
+        matches!(
+            self,
+            MailboxEvent::AttentionChanged(scope)
+                if scope.channel_id == channel_id
+                    && matches!(scope.source_kind, AttentionWakeSource::ThreadHandoff)
+        )
     }
 
     pub fn is_task_chain_in_company(&self, company_id: Uuid) -> bool {
@@ -478,6 +498,56 @@ mod tests {
         assert!(chain.is_task_chain_in_company(id(3)));
         assert!(chain.is_task_chain(id(4)));
         assert!(!chain.is_message_in_channel(id(2)));
+
+        // Case 12. A held reply is a third kind, and no predicate above may answer for it.
+        let handoff = MailboxEvent::AttentionChanged(attention(AttentionWakeSource::ThreadHandoff));
+        assert!(handoff.is_thread_handoff_in_channel(id(2)));
+        assert!(!handoff.is_message_in_channel(id(2)));
+        assert!(!handoff.is_activity_in_channel(id(2)));
+        assert!(!message.is_thread_handoff_in_channel(id(2)));
+        assert!(!activity.is_thread_handoff_in_channel(id(2)));
+        assert!(!chain.is_thread_handoff_in_channel(id(2)));
+    }
+
+    fn attention(source_kind: AttentionWakeSource) -> AttentionScope {
+        AttentionScope {
+            company_id: id(3),
+            channel_id: id(2),
+            source_kind,
+            source_id: id(7),
+        }
+    }
+
+    /// Case 11, including the collision the naming table warns about: `manual_handoffs` publishes
+    /// on this very channel as `handoff`, and the mailbox must not redraw a held-reply badge for
+    /// it.
+    #[test]
+    fn only_a_thread_handoff_change_in_this_channel_wakes_the_held_reply_badges() {
+        let event = MailboxEvent::AttentionChanged(attention(AttentionWakeSource::ThreadHandoff));
+        assert!(event.is_thread_handoff_in_channel(id(2)));
+        assert!(
+            !event.is_thread_handoff_in_channel(id(9)),
+            "another channel's held reply is not this mailbox's news"
+        );
+
+        for source_kind in [
+            AttentionWakeSource::Handoff,
+            AttentionWakeSource::Task,
+            AttentionWakeSource::ResponseReview,
+            AttentionWakeSource::Delegation,
+            AttentionWakeSource::Delivery,
+        ] {
+            assert!(
+                !MailboxEvent::AttentionChanged(attention(source_kind))
+                    .is_thread_handoff_in_channel(id(2)),
+                "{source_kind:?} is not this feature's source kind"
+            );
+        }
+
+        assert!(
+            !MailboxEvent::MessageCommitted(scope()).is_thread_handoff_in_channel(id(2)),
+            "a message in the same channel is not a handoff change"
+        );
     }
 
     #[tokio::test]
