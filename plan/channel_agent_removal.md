@@ -1,6 +1,7 @@
 # Stop an agent's channel work when its assignment is removed
 
-Status: proposed, not implemented. Written against the implementation on 2026-09-12.
+Status: implemented 2026-09-13. Written against the implementation on 2026-09-12; see
+"Implementation notes" at the end for where the code differs from this text.
 
 ## Outcome
 
@@ -261,3 +262,52 @@ Record structured duration/count metrics and timeout/overflow outcomes without l
 bodies or addresses. Completion means that cancellation intent, execution fencing, publication
 guards, and the channel edit ship together; a successful UI save followed by eventual best-effort
 cleanup is not this feature.
+
+## Implementation notes
+
+Where the shipped code lives, and where it deliberately departs from the text above.
+
+| Piece | Code |
+|---|---|
+| Edit transaction, assignment diff, working set, budgets | `src/adapters/persistence/channel_assignment.rs` |
+| Channel gate (shared admit / exclusive change) | `src/adapters/persistence/channel_gate.rs` |
+| Set-based stop, attempt closing, publication withdrawal | `stop_tasks_on`, `withdraw_pending_work_on` in `task/queue.rs` |
+| Delivery intent and settling | `delivery/cancellation.rs`; guards in `delivery/queue.rs` |
+| Port and result | `ChannelUpdate`, `ChannelUpdateOutcome`, `AssignmentRemoval` in `use_cases/channel.rs` |
+
+- **Schema edited in place, not additively.** The project resets its databases (see the persistence
+  memory note), so the columns, CHECKs and reason values went into the squashed init migration.
+  Step 4's "additive migrations and drain old writers" does not apply until there is deployed data.
+- **Delivery invariants are constraints.** `message_deliveries_cancellation_check` makes a cancelled
+  row unclaimable, and the `message_deliveries_preserve_cancellation` trigger refuses clearing or
+  replacing the intent. Every worker path also checks it explicitly under the parent row lock
+  (parent before part everywhere), so the constraint is a backstop, not the mechanism.
+- **Cancelled settle rule.** `cancelled_parent_status` lets ambiguity outrank buried parts, unlike
+  `aggregate_parent_status`, so a cancellation never relabels a possibly-sent request as unsent.
+- **Gate participants.** Shared gate: `enqueue_task`, the inbound commit (all primary channels in one
+  ordered call), `start_agent_task`, ownership changes, resume, final dispatch, outreach creation
+  and review commands. Resume also re-checks the owner's assignment and returns a `Conflict` naming
+  the cause. Recording an outreach reply takes no gate: its task wake is fenced on the waiting
+  status and it locks outreach before task, the removal's order.
+- **An omitted agent list keeps the assignments.** `ChannelWrite.agent_ids = None` on update (a JSON
+  PUT without `agent_ids`, or a form without the field) removes nobody; only an explicit list, `[]`
+  included, can remove an agent and so stop work.
+- **Timeouts.** A statement cancelled at `lock_timeout` or `statement_timeout` (SQLSTATE `55P03` /
+  `57014`) converts to `AppError::DatabaseTimeout`, which workers treat as retryable and HTTP maps
+  to 503. The channel edit turns it, and its own deadline, into `AppError::Timeout` saying nothing
+  changed. `AppError::Timeout` itself was not reused lower down, because the task worker treats it
+  as a final execution deadline.
+- **Races covered by tests.** Removal against task creation, claim, resume, final dispatch, outreach
+  creation and outreach reply, each in both orders where the competitor can hold its lock first; a
+  5,000-unsettled / 20,000-settled backlog removed inside the default budget (about 12 s including
+  seeding, on a dev machine) with the task bound checked one past the edge.
+- **Operator stops share the helpers.** They now also close the interrupted attempt with a typed
+  reason, supersede pending review drafts, expire pending human approvals, and set the delivery
+  cancellation intent. The lock order is outreach, then task, then dependents. A review approval
+  locks draft before task, so an operator stop racing an approval of the same task can deadlock;
+  PostgreSQL aborts one of them. Channel removal avoids this through the gate.
+- **Not done here.**
+  - No `EXPLAIN (ANALYZE, BUFFERS)` capture of `affected_tasks_on` against representative data, and no
+    new index; the three arms are written to use existing partial indexes. The backlog test bounds
+    the time but does not assert a plan. Tracked in `plan/db_improve/05-deferred-until-traffic.md`
+    §8, with what to capture and what would close it.

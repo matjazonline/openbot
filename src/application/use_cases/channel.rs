@@ -39,6 +39,9 @@ pub struct ChannelWrite {
     /// Extra local parts the channel also answers on. Replaced wholesale by every write.
     pub alias_slugs: Vec<String>,
     pub participant_emails: Option<Vec<String>>,
+    /// The channel's agents in position order. On create, `None` assigns none. On update, `None`
+    /// keeps the current assignments and `Some(vec![])` removes them all -- an agent's removal
+    /// stops its work, so only an explicit list may cause one.
     pub agent_ids: Option<Vec<Uuid>>,
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
@@ -164,12 +167,87 @@ pub(crate) enum ActiveAgent {
     /// `agent_ids` is not yet a missing agent. The database's deferred
     /// `enabled_channel_active_agent_check` is what holds the invariant on this path.
     SuppliedByCaller,
+    /// An update that leaves `agent_ids` out keeps the assignments the use case has just read and
+    /// found non-empty. A concurrent edit emptying them in between still meets the same deferred
+    /// constraint.
+    AlreadyAssigned,
 }
 
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
     AppError::NotFound("Channel not found in this company.".into())
+}
+
+/// One authorized channel edit, as persistence receives it.
+///
+/// The tenant and the manager travel with the write rather than beside it: persistence re-checks
+/// the channel against `company_id` under its row lock, and records `actor_user_id` on every task
+/// the edit stops.
+#[derive(Debug, Clone)]
+pub struct ChannelUpdate {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub actor_user_id: Uuid,
+    pub write: ChannelWrite,
+}
+
+/// What removing agents from a channel took back with them, committed with the edit itself.
+///
+/// Empty whenever the edit removed nobody -- reordering, adding an agent and changing any other
+/// field all leave every task and delivery exactly as they were.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct AssignmentRemoval {
+    pub removed_agent_ids: Vec<Uuid>,
+    pub stopped_tasks: u64,
+    /// Queued deliveries known never to have been sent.
+    pub cancelled_deliveries: u64,
+    pub superseded_reviews: u64,
+    /// Deliveries a provider may already hold: in flight, or unconfirmed, when the edit committed.
+    /// They will send nothing further, but what was sent cannot be recalled.
+    pub potentially_sent_delivery_ids: Vec<Uuid>,
+}
+
+impl AssignmentRemoval {
+    /// One short line for the edit flow, or `None` when the edit removed nobody.
+    pub fn summary(&self) -> Option<String> {
+        if self.removed_agent_ids.is_empty() {
+            return None;
+        }
+        let mut summary = format!(
+            "Removed {}: stopped {}, cancelled {} and withdrew {}.",
+            count(self.removed_agent_ids.len() as u64, "agent", "agents"),
+            count(self.stopped_tasks, "task", "tasks"),
+            count(
+                self.cancelled_deliveries,
+                "queued delivery",
+                "queued deliveries"
+            ),
+            count(self.superseded_reviews, "pending review", "pending reviews"),
+        );
+        let in_flight = self.potentially_sent_delivery_ids.len() as u64;
+        if in_flight > 0 {
+            summary.push_str(&format!(
+                " {} already being sent and may have gone out.",
+                match in_flight {
+                    1 => "1 delivery was".to_string(),
+                    n => format!("{n} deliveries were"),
+                }
+            ));
+        }
+        Some(summary)
+    }
+}
+
+fn count(value: u64, singular: &str, plural: &str) -> String {
+    format!("{value} {}", if value == 1 { singular } else { plural })
+}
+
+/// A saved channel edit.
+#[derive(Debug, Clone)]
+pub struct ChannelUpdateOutcome {
+    pub channel: Channel,
+    pub removal: AssignmentRemoval,
 }
 
 #[async_trait]
@@ -198,7 +276,9 @@ pub trait ChannelPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
 
-    async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
+    /// Save one channel edit. An agent the edit removes has its work in this channel stopped and
+    /// its unsent output withdrawn in the same transaction; any failure leaves all of it unchanged.
+    async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -422,7 +502,7 @@ impl ChannelUseCases {
         channel_id: Uuid,
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
-    ) -> AppResult<Channel> {
+    ) -> AppResult<ChannelUpdateOutcome> {
         self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
@@ -437,19 +517,29 @@ impl ChannelUseCases {
 
         if let Some(owner_agent_id) = channel.owner_agent_id {
             write.slug = channel.slug.to_string();
-            let mut agents = vec![owner_agent_id];
-            agents.extend(
-                write
-                    .agent_ids
-                    .take()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|agent_id| *agent_id != owner_agent_id),
-            );
-            write.agent_ids = Some(agents);
+            // An omitted list stays omitted: the kept assignments already start with the owner.
+            write.agent_ids = write.agent_ids.take().map(|requested| {
+                std::iter::once(owner_agent_id)
+                    .chain(
+                        requested
+                            .into_iter()
+                            .filter(|agent_id| *agent_id != owner_agent_id),
+                    )
+                    .collect()
+            });
         }
 
-        write.normalize()?;
+        let active_agent = if write.agent_ids.is_none()
+            && channel
+                .agent_ids
+                .as_ref()
+                .is_some_and(|agent_ids| !agent_ids.is_empty())
+        {
+            ActiveAgent::AlreadyAssigned
+        } else {
+            ActiveAgent::InWrite
+        };
+        write.normalize_with(active_agent)?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
         info!(
@@ -457,7 +547,14 @@ impl ChannelUseCases {
             channel_id, company_id, write.name, write.slug, write.enabled
         );
 
-        self.channel_persistence.update(channel_id, write).await
+        self.channel_persistence
+            .update(ChannelUpdate {
+                company_id,
+                channel_id,
+                actor_user_id: user_id,
+                write,
+            })
+            .await
     }
 
     #[instrument(skip(self))]
@@ -763,6 +860,25 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_removal_summary_says_what_stopped_and_what_may_have_gone_out() {
+        assert_eq!(AssignmentRemoval::default().summary(), None);
+        let removal = AssignmentRemoval {
+            removed_agent_ids: vec![Uuid::new_v4()],
+            stopped_tasks: 3,
+            cancelled_deliveries: 1,
+            superseded_reviews: 0,
+            potentially_sent_delivery_ids: vec![Uuid::new_v4()],
+        };
+        assert_eq!(
+            removal.summary().as_deref(),
+            Some(
+                "Removed 1 agent: stopped 3 tasks, cancelled 1 queued delivery and withdrew \
+                 0 pending reviews. 1 delivery was already being sent and may have gone out."
+            )
+        );
+    }
     use crate::adapters::protocols::email::EmailChannelSelectorParser;
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::{Company, CompanyAccess};
@@ -973,19 +1089,38 @@ mod tests {
                 .collect())
         }
 
-        async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+        async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome> {
             let mut list = self.channels.lock().unwrap();
             let existing = list
                 .iter_mut()
-                .find(|w| w.id == id)
+                .find(|w| w.id == request.channel_id && w.company_id == request.company_id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
+            // The double owns no tasks, so a removal withdraws nothing -- but it still reports
+            // which agents left, which is the part of the contract a caller can observe here.
+            // An omitted list keeps the assignments, as the real adapter does.
+            let mut write = request.write;
+            write.agent_ids = write.agent_ids.or_else(|| existing.agent_ids.clone());
+            let kept = write.agent_ids.clone().unwrap_or_default();
+            let removed_agent_ids = existing
+                .agent_ids
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|agent_id| !kept.contains(agent_id))
+                .collect();
             *existing = Channel {
                 owner_agent_id: None,
                 created_at: existing.created_at,
-                ..channel_from_write(id, existing.company_id, write)
+                ..channel_from_write(request.channel_id, existing.company_id, write)
             };
-            Ok(existing.clone())
+            Ok(ChannelUpdateOutcome {
+                channel: existing.clone(),
+                removal: AssignmentRemoval {
+                    removed_agent_ids,
+                    ..AssignmentRemoval::default()
+                },
+            })
         }
 
         async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -1261,7 +1396,8 @@ mod tests {
                 false,
             )
             .await
-            .expect("an admin updates a channel");
+            .expect("an admin updates a channel")
+            .channel;
         assert_eq!(channel.name, "Managed Channel");
         use_cases
             .delete_channel(admin_id, company_id, channel.id)
@@ -1379,11 +1515,38 @@ mod tests {
                 false,
             )
             .await
-            .unwrap();
+            .unwrap()
+            .channel;
         assert_eq!(updated.name, "Updated Flow");
         assert_eq!(updated.slug, "updated-flow");
         assert_eq!(updated.participant_emails, None);
-        assert_eq!(updated.agent_ids, None);
+        assert_eq!(
+            updated.agent_ids,
+            Some(vec![agent_id1, agent_id2]),
+            "an update that leaves the agent list out keeps it"
+        );
+        let emptied = use_cases
+            .update_channel(
+                owner_id,
+                company_id,
+                channel.id,
+                ChannelWrite {
+                    name: "Updated Flow".into(),
+                    slug: "updated-flow".into(),
+                    agent_ids: Some(Vec::new()),
+                    enabled: false,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(emptied.channel.agent_ids, Some(Vec::new()));
+        assert_eq!(
+            emptied.removal.removed_agent_ids,
+            vec![agent_id1, agent_id2],
+            "only an explicit empty list removes them"
+        );
 
         // 5. Delete channel
         use_cases

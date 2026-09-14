@@ -24,7 +24,7 @@ use crate::{
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
-        channel::{ChannelPersistence, ChannelWrite},
+        channel::{ChannelPersistence, ChannelUpdate, ChannelUpdateOutcome, ChannelWrite},
         participant::{IdentityObservation, IdentityResolution},
     },
 };
@@ -163,7 +163,7 @@ async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<
 ///
 /// One statement per slug so a `UNIQUE (company_id, slug)` violation can name the address that
 /// actually collided; the caller's transaction rolls the partial write back.
-async fn insert_channel_slugs(
+pub(super) async fn insert_channel_slugs(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     channel_id: Uuid,
@@ -204,7 +204,9 @@ fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
 
 /// Turn the form's email allowlist into the channel's stored access mode and the addresses that
 /// become principal grants. `@public` selects a mode; it is never a participant of its own.
-fn channel_access(participant_emails: Option<Vec<String>>) -> (ChannelAccessMode, Vec<String>) {
+pub(super) fn channel_access(
+    participant_emails: Option<Vec<String>>,
+) -> (ChannelAccessMode, Vec<String>) {
     let mut seen = HashSet::new();
     let mut participants = Vec::new();
     let mut is_public = false;
@@ -279,7 +281,7 @@ pub(crate) async fn insert_email_allowlist_grants(
 ///
 /// The three creation paths and the update path all route through here rather than each building
 /// their own binding: the endpoint key, access policy and delivery policy are one decision.
-async fn write_channel_email_binding(
+pub(super) async fn write_channel_email_binding(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     channel_id: Uuid,
@@ -519,15 +521,61 @@ impl ChannelPersistence for PostgresPersistence {
         db_list.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
-        // The `COALESCE` on the two override columns below makes `None` mean "leave it alone", so
-        // neither override can be cleared back to "inherit" through this statement. The sibling
-        // reply-handling override deliberately does not join them: it is written only through
-        // `ThreadHandoffPolicyPersistence::set_channel_reply_handling_override`, which binds its
-        // `Option` directly. See `plan/manual_handoff/phase1.md` §1.5 before editing this.
-        let (access_mode, participants) = channel_access(write.participant_emails.clone());
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let result = sqlx::query(
+    async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome> {
+        let channel_id = request.channel_id;
+        let removal = crate::adapters::persistence::channel_assignment::update_channel_within(
+            &self.pool,
+            request,
+            crate::adapters::persistence::channel_assignment::RemovalBudget::DEFAULT,
+        )
+        .await?;
+        let channel = load_channel(self, channel_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))?;
+        Ok(ChannelUpdateOutcome { channel, removal })
+    }
+
+    async fn delete(&self, id: Uuid) -> AppResult<()> {
+        sqlx::query("DELETE FROM channels WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|error| {
+                if error
+                    .as_database_error()
+                    .and_then(|db| db.code())
+                    .as_deref()
+                    == Some("23503")
+                {
+                    AppError::Conflict(
+                        "This is an agent-owned personal channel. Delete the owning agent instead."
+                            .into(),
+                    )
+                } else {
+                    AppError::from(error)
+                }
+            })?;
+        Ok(())
+    }
+}
+
+/// Every setting one channel edit writes except its agent assignments, on the caller's transaction.
+///
+/// The caller holds the channel's row lock and has checked its tenant; assignments are
+/// `channel_assignment`'s, because changing them can stop work and this cannot.
+pub(super) async fn write_channel_settings_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    id: Uuid,
+    write: &ChannelWrite,
+) -> AppResult<()> {
+    // The `COALESCE` on the two override columns below makes `None` mean "leave it alone", so
+    // neither override can be cleared back to "inherit" through this statement. The sibling
+    // reply-handling override deliberately does not join them: it is written only through
+    // `ThreadHandoffPolicyPersistence::set_channel_reply_handling_override`, which binds its
+    // `Option` directly. See `plan/manual_handoff/phase1.md` §1.5 before editing this.
+    let (access_mode, participants) = channel_access(write.participant_emails.clone());
+    let result = sqlx::query(
             r#"UPDATE channels
                SET name = $1, description = $2, access_mode = $3, enabled = $4,
                    add_3rd_party = $5, retrieve_company_memory = $6,
@@ -536,7 +584,7 @@ impl ChannelPersistence for PostgresPersistence {
                    persist_user_memory = $11,
                    external_response_review_override = COALESCE($12, external_response_review_override),
                    preferred_reviewer_principal_id = COALESCE($13, preferred_reviewer_principal_id)
-               WHERE id = $14"#,
+               WHERE id = $14 AND company_id = $15"#,
         )
         .bind(&write.name)
         .bind(&write.description)
@@ -560,90 +608,38 @@ impl ChannelPersistence for PostgresPersistence {
                 .map(crate::entities::transport::PrincipalId::as_uuid),
         )
         .bind(id)
-        .execute(&mut *tx)
+        .bind(company_id)
+        .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
 
-        if result.rows_affected() == 0 {
-            return Err(AppError::Internal("Channel not found".into()));
-        }
+    if result.rows_affected() == 0 {
+        return Err(AppError::Internal("Channel not found".into()));
+    }
 
-        // Only the grants this form owns: a grant written by another provenance is not the email
-        // allowlist's to replace.
-        sqlx::query(
-            r#"DELETE FROM channel_principal_grants
+    // Only the grants this form owns: a grant written by another provenance is not the email
+    // allowlist's to replace.
+    sqlx::query(
+        r#"DELETE FROM channel_principal_grants
                WHERE channel_id = $1 AND provenance = 'configured_allowlist'"#,
-        )
+    )
+    .bind(id)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    sqlx::query("DELETE FROM channel_slugs WHERE channel_id = $1")
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
-        sqlx::query("DELETE FROM channel_agents WHERE channel_id = $1")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        sqlx::query("DELETE FROM channel_slugs WHERE channel_id = $1")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+    insert_channel_slugs(tx, company_id, id, &write.slug, &write.alias_slugs).await?;
 
-        let company_id: Uuid = sqlx::query_scalar("SELECT company_id FROM channels WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        insert_channel_slugs(&mut tx, company_id, id, &write.slug, &write.alias_slugs).await?;
+    // A renamed address moves the channel's canonical email interface rather than replacing
+    // it, so the binding's audit history survives the rename.
+    write_channel_email_binding(tx, company_id, id, write).await?;
 
-        // A renamed address moves the channel's canonical email interface rather than replacing
-        // it, so the binding's audit history survives the rename.
-        write_channel_email_binding(&mut tx, company_id, id, &write).await?;
-
-        insert_email_allowlist_grants(&mut tx, company_id, id, participants).await?;
-
-        for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
-            sqlx::query(
-                r#"INSERT INTO channel_agents (company_id, channel_id, agent_id, position)
-                   SELECT company_id, id, $2, $3 FROM channels WHERE id = $1"#,
-            )
-            .bind(id)
-            .bind(agent_id)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        }
-
-        tx.commit().await.map_err(AppError::from)?;
-        load_channel(self, id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))
-    }
-
-    async fn delete(&self, id: Uuid) -> AppResult<()> {
-        sqlx::query("DELETE FROM channels WHERE id = $1")
-            .bind(id)
-            .execute(&self.pool)
-            .await
-            .map_err(|error| {
-                if error
-                    .as_database_error()
-                    .and_then(|db| db.code())
-                    .as_deref()
-                    == Some("23503")
-                {
-                    AppError::Conflict(
-                        "This is an agent-owned personal channel. Delete the owning agent instead."
-                            .into(),
-                    )
-                } else {
-                    AppError::from(error)
-                }
-            })?;
-
-        Ok(())
-    }
+    insert_email_allowlist_grants(tx, company_id, id, participants).await?;
+    Ok(())
 }
 
 #[async_trait]
@@ -836,6 +832,16 @@ mod tests {
     use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
 
+    /// An edit made by a manager these tests do not otherwise need.
+    fn test_update(company_id: Uuid, channel_id: Uuid, write: ChannelWrite) -> ChannelUpdate {
+        ChannelUpdate {
+            company_id,
+            channel_id,
+            actor_user_id: Uuid::new_v4(),
+            write,
+        }
+    }
+
     #[tokio::test]
     async fn postgres_channel_persistence_works() {
         let Some(pool) = test_pool().await else {
@@ -964,25 +970,29 @@ mod tests {
         // 4. Update
         let updated = ChannelPersistence::update(
             &persistence,
-            channel.id,
-            ChannelWrite {
-                name: "Inbound Email V2".into(),
-                description: Some("Now also handles refund requests.".into()),
-                slug: "inbound-email-v2".into(),
-                enabled: false,
-                add_3rd_party: true,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
-                created_by: None,
-                ..ChannelWrite::default()
-            },
+            test_update(
+                company.id,
+                channel.id,
+                ChannelWrite {
+                    name: "Inbound Email V2".into(),
+                    description: Some("Now also handles refund requests.".into()),
+                    slug: "inbound-email-v2".into(),
+                    enabled: false,
+                    add_3rd_party: true,
+                    retrieve_company_memory: false,
+                    retrieve_agent_memory: false,
+                    retrieve_user_memory: false,
+                    persist_company_memory: false,
+                    persist_agent_memory: false,
+                    persist_user_memory: false,
+                    created_by: None,
+                    ..ChannelWrite::default()
+                },
+            ),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .channel;
         assert_eq!(updated.name, "Inbound Email V2");
         assert_eq!(
             updated.description.as_deref(),
@@ -1210,10 +1220,13 @@ mod tests {
             .unwrap();
 
         // An update replaces the alias set wholesale, freeing the names it drops.
-        let updated =
-            ChannelPersistence::update(&persistence, support.id, write("support", &["contact"]))
-                .await
-                .unwrap();
+        let updated = ChannelPersistence::update(
+            &persistence,
+            test_update(company.id, support.id, write("support", &["contact"])),
+        )
+        .await
+        .unwrap()
+        .channel;
         assert_eq!(updated.alias_slugs, ["contact"]);
         ChannelPersistence::create(&persistence, company.id, write("sales", &[]))
             .await
@@ -1573,18 +1586,22 @@ mod tests {
         // Editing the list replaces the grants rather than accumulating them.
         let updated = ChannelPersistence::update(
             &persistence,
-            channel.id,
-            ChannelWrite {
-                name: "Front Desk".into(),
-                slug: "front-desk".into(),
-                participant_emails: Some(vec!["sam@partner.test".to_string()]),
-                agent_ids: Some(vec![agent.id]),
-                enabled: true,
-                ..ChannelWrite::default()
-            },
+            test_update(
+                company.id,
+                channel.id,
+                ChannelWrite {
+                    name: "Front Desk".into(),
+                    slug: "front-desk".into(),
+                    participant_emails: Some(vec!["sam@partner.test".to_string()]),
+                    agent_ids: Some(vec![agent.id]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+            ),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .channel;
         assert_eq!(updated.access_mode, ChannelAccessMode::Allowlist);
         assert_eq!(
             updated.participant_emails,
@@ -1595,15 +1612,18 @@ mod tests {
         // A malformed address is a form error, not a silent "not authorized".
         let malformed = ChannelPersistence::update(
             &persistence,
-            channel.id,
-            ChannelWrite {
-                name: "Front Desk".into(),
-                slug: "front-desk".into(),
-                participant_emails: Some(vec!["not-an-address".to_string()]),
-                agent_ids: Some(vec![agent.id]),
-                enabled: true,
-                ..ChannelWrite::default()
-            },
+            test_update(
+                company.id,
+                channel.id,
+                ChannelWrite {
+                    name: "Front Desk".into(),
+                    slug: "front-desk".into(),
+                    participant_emails: Some(vec!["not-an-address".to_string()]),
+                    agent_ids: Some(vec![agent.id]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+            ),
         )
         .await;
         assert!(matches!(malformed, Err(AppError::BadRequest(_))));

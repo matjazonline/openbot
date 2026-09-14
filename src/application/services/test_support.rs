@@ -277,7 +277,10 @@ impl ChannelPersistence for ChannelDirectoryStub {
         Ok(self.channels.clone())
     }
 
-    async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+    async fn update(
+        &self,
+        _request: crate::use_cases::channel::ChannelUpdate,
+    ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
         unimplemented!()
     }
 

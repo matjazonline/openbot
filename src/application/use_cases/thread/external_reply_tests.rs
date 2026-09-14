@@ -206,6 +206,7 @@ impl Fixture {
                 .expect("a stored delivery key is within its bound"),
             attempt_count: 0,
             max_attempts: crate::transport::MAX_DELIVERY_ATTEMPTS,
+            cancellation: None,
         };
         let part = self.stored_part(delivery).await;
 

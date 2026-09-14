@@ -27,7 +27,7 @@ pub(crate) use collaboration::*;
 pub(crate) use harness_runs::{
     lock_task_execution_on, park_harness_approval_on, park_harness_outreach_on,
     record_harness_result_on, resolve_harness_approval_on, resolve_harness_outreach_on,
-    supersede_harness_runs_on,
+    supersede_harness_runs_for_tasks_on, supersede_harness_runs_on,
 };
 pub(crate) use operations::{cancel_unsent_outreach_questions, record_outreach_reply_on};
 pub(crate) use outreach::*;

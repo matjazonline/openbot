@@ -1194,9 +1194,8 @@ mod tests {
         }
         async fn update(
             &self,
-            _id: Uuid,
-            _write: crate::use_cases::channel::ChannelWrite,
-        ) -> AppResult<Channel> {
+            _request: crate::use_cases::channel::ChannelUpdate,
+        ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {

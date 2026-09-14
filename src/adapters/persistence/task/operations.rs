@@ -24,6 +24,9 @@ use super::*;
 use crate::{
     adapters::persistence::{
         PostgresPersistence,
+        channel_gate::{
+            ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on, task_gate_key_on,
+        },
         delivery::enqueue::insert_delivery_on,
         response_review::{create_review_draft_on, effective_review_required_on},
         thread::insert_message_on,
@@ -521,6 +524,12 @@ impl TaskPersistence for PostgresPersistence {
         request: CreateOutreachRequest,
     ) -> AppResult<OutreachProgress> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // Asking outreach queues mail on the task's behalf, which is publishing through its channel
+        // assignment. The gate comes before every row lock; the lease fence in the insert below is
+        // then what refuses a task a removal has stopped.
+        if let Some(key) = task_gate_key_on(&mut tx, request.lease.task_id).await? {
+            acquire_channel_gate_on(&mut tx, key, ChannelGateAccess::Admit).await?;
+        }
         let outreach = sqlx::query_as::<_, OutreachDb>(
             r#"INSERT INTO task_outreaches (
                     id, task_id, company_id, outreach_key, status, required_threshold_percent,
@@ -1179,6 +1188,14 @@ impl TaskPersistence for PostgresPersistence {
 
     async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // The insert resolves its owner from the channel's current assignments, so it holds the
+        // admission gate: a removal either commits first and is what the insert reads, or waits.
+        acquire_channel_gate_on(
+            &mut tx,
+            ChannelGateKey::new(new_task.company_id, new_task.channel_id),
+            ChannelGateAccess::Admit,
+        )
+        .await?;
         let task = insert_task(&mut tx, new_task).await?;
         tx.commit().await.map_err(AppError::from)?;
         Ok(task)
@@ -1472,6 +1489,12 @@ impl TaskPersistence for PostgresPersistence {
         commit: AgentDispatchCommit<'_>,
     ) -> AppResult<DispatchCommit> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+
+        // Publishing is admission through the task's channel assignment. The gate comes before
+        // every row lock; the lease fence below is what then refuses a task a removal has stopped.
+        if let Some(key) = task_gate_key_on(&mut tx, commit.lease.task_id).await? {
+            acquire_channel_gate_on(&mut tx, key, ChannelGateAccess::Admit).await?;
+        }
 
         // Delegation controls and reply recording lock outreach before task. Keep the final
         // dispatch in that order too, so stop-versus-dispatch cannot deadlock under contention.

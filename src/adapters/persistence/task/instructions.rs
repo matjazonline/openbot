@@ -516,6 +516,16 @@ pub(crate) async fn start_agent_task(
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     advisory_lock(&mut tx, command.company_id, command.command_id).await?;
     advisory_lock(&mut tx, command.company_id, command.thread_id).await?;
+    // The started task takes its owner from the channel's assignments: admission, so the gate.
+    crate::adapters::persistence::channel_gate::acquire_channel_gate_on(
+        &mut tx,
+        crate::adapters::persistence::channel_gate::ChannelGateKey::new(
+            command.company_id,
+            command.channel_id,
+        ),
+        crate::adapters::persistence::channel_gate::ChannelGateAccess::Admit,
+    )
+    .await?;
     if let Some((stored_fingerprint, task_id)) = sqlx::query_as::<_, (String, Uuid)>(
         "SELECT command_fingerprint, task_id FROM start_agent_task_commands WHERE company_id = $1 AND command_id = $2",
     )

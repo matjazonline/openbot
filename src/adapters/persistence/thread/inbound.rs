@@ -29,6 +29,7 @@ use super::{email_metadata, external, message};
 use crate::{
     adapters::persistence::{
         PostgresPersistence,
+        channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gates_on},
         delivery::enqueue::insert_delivery_on,
         task::{insert_task, record_outreach_reply_on},
         thread_handoff::{OpenHandoffGeneration, open_handoff_generation_on},
@@ -89,6 +90,18 @@ async fn commit_on(
         ));
     }
     each_channel_in_one_task(&request.tasks)?;
+    // Each task created below takes its owner from its primary channel's assignments, so the
+    // admission gates come before every row lock this commit takes, all of them in one ordered call.
+    acquire_channel_gates_on(
+        tx,
+        request.tasks.iter().filter_map(|task| {
+            task.targets
+                .first()
+                .map(|primary| ChannelGateKey::new(request.company_id, primary.channel_id))
+        }),
+        ChannelGateAccess::Admit,
+    )
+    .await?;
     let binding_ids = verify_association_bindings(tx, request).await?;
     lock_provider_keys(tx, request, &binding_ids).await?;
 

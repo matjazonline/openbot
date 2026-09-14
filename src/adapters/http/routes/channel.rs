@@ -239,15 +239,17 @@ pub fn slugify(input: &str) -> String {
     result.trim_matches('-').to_string()
 }
 
+/// The agents a form submitted, in order.
+///
+/// `None` only when the form has no `agent_ids` field at all. A present but empty field is
+/// `Some(vec![])`: on an update that removes every agent, where `None` keeps them.
 pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
-    input.and_then(|s| {
-        let list: Vec<Uuid> = s
-            .split(&[',', ' ', ';', '\n'][..])
+    input.map(|s| {
+        s.split(&[',', ' ', ';', '\n'][..])
             .map(|e| e.trim())
             .filter(|e| !e.is_empty())
             .filter_map(|e| Uuid::parse_str(e).ok())
-            .collect();
-        if list.is_empty() { None } else { Some(list) }
+            .collect()
     })
 }
 
@@ -260,6 +262,9 @@ pub struct ChannelJsonPayload {
     pub alias_slugs: Option<Vec<String>>,
     pub system_prompt: Option<String>,
     pub participant_emails: Option<Vec<String>>,
+    /// The one field a PUT patches: omitted or `null` keeps the channel's current agents, and `[]`
+    /// removes them all. Removing an agent stops its work in the channel, so it has to be asked for
+    /// rather than implied by a field the client left out. On create, omitted assigns none.
     pub agent_ids: Option<Vec<Uuid>>,
     pub confirm_spam_disabled: Option<bool>,
     /// Omitted means enabled: like every other field here, a PUT replaces rather than patches.
@@ -291,6 +296,15 @@ pub struct ChannelJsonPayload {
 pub struct ChannelResponse {
     pub success: bool,
     pub channel: Channel,
+}
+
+/// A saved edit, with what removing agents from the channel stopped. `assignment_removal` is
+/// empty-valued when the edit removed nobody.
+#[derive(Debug, Clone, Serialize)]
+pub struct ChannelUpdateResponse {
+    pub success: bool,
+    pub channel: Channel,
+    pub assignment_removal: crate::use_cases::channel::AssignmentRemoval,
 }
 
 const DEFAULT_THREAD_PAGE_SIZE: usize = 50;
@@ -790,9 +804,15 @@ async fn update_channel_handler(
         )
         .await
     {
-        Ok(updated) => updated,
+        Ok(outcome) => outcome,
         Err(err) => return Html(pages::error_alert(&format!("Update failed: {err}"))),
     };
+    let removal_notice = updated
+        .removal
+        .summary()
+        .map(|summary| pages::success_alert(&summary, None))
+        .unwrap_or_default();
+    let updated = updated.channel;
     if let SubmittedReplyHandling::Write(policy_override) = reply_handling
         && let Err(err) = thread_handoff_use_cases
             .set_channel_reply_handling_override(company_id, channel_id, policy_override)
@@ -802,11 +822,9 @@ async fn update_channel_handler(
             "Channel saved, but reply handling failed: {err}"
         )));
     }
-    Html(pages::channel_row_fragment(
-        &company,
-        &config.app_domain_name,
-        &updated,
-        &agents,
+    Html(format!(
+        "{removal_notice}{}",
+        pages::channel_row_fragment(&company, &config.app_domain_name, &updated, &agents)
     ))
 }
 
@@ -1671,7 +1689,7 @@ pub(super) async fn update_channel_json(
         created_by: None,
     };
 
-    let channel = channel_use_cases
+    let outcome = channel_use_cases
         .update_channel(
             user.id,
             company_id,
@@ -1687,9 +1705,10 @@ pub(super) async fn update_channel_json(
 
     Ok((
         StatusCode::OK,
-        Json(ChannelResponse {
+        Json(ChannelUpdateResponse {
             success: true,
-            channel,
+            channel: outcome.channel,
+            assignment_removal: outcome.removal,
         }),
     ))
 }
@@ -2122,13 +2141,32 @@ mod tests {
         let req_omitted = Request::builder()
             .method("PUT")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from("name=My+Channel&slug=my-channel&agent_ids="))
+            .body(Body::from("name=My+Channel&slug=my-channel"))
             .unwrap();
         let form_omitted = Form::<ChannelForm>::from_request(req_omitted, &())
             .await
             .unwrap()
             .0;
-        assert_eq!(parse_agent_ids_form(form_omitted.agent_ids), None);
+        assert_eq!(
+            parse_agent_ids_form(form_omitted.agent_ids),
+            None,
+            "no field keeps the channel's agents"
+        );
+
+        let req_emptied = Request::builder()
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("name=My+Channel&slug=my-channel&agent_ids="))
+            .unwrap();
+        let form_emptied = Form::<ChannelForm>::from_request(req_emptied, &())
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(
+            parse_agent_ids_form(form_emptied.agent_ids),
+            Some(Vec::new()),
+            "an empty field removes them"
+        );
 
         let req_single = Request::builder()
             .method("PUT")

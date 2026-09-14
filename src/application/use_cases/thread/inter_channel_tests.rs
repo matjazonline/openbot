@@ -505,6 +505,7 @@ impl Fixture {
                 .expect("a short key"),
             attempt_count: 0,
             max_attempts: crate::transport::MAX_DELIVERY_ATTEMPTS,
+            cancellation: None,
         }
     }
 

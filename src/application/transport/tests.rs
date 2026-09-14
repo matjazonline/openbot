@@ -319,6 +319,7 @@ fn record(transport: TransportKind) -> DeliveryRecord {
         ),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,
+        cancellation: None,
     }
 }
 

@@ -23,8 +23,9 @@ use crate::{
         correlation::CorrelationId,
         message::{CanonicalMessageId, MessageAudience},
         transport::{
-            ChannelBindingId, DeliveryId, DeliveryPartId, DeliveryPartStatus, DeliveryPurpose,
-            DeliveryStatus, ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
+            ChannelBindingId, DeliveryCancellation, DeliveryId, DeliveryPartId, DeliveryPartStatus,
+            DeliveryPurpose, DeliveryStatus, ExternalDestination, ExternalMessageKey, FailureClass,
+            TransportKind,
         },
     },
     transport::{
@@ -202,6 +203,9 @@ pub struct DeliveryRecord {
     pub idempotency_key: DeliveryKey,
     pub attempt_count: i32,
     pub max_attempts: i32,
+    /// Set once somebody cancels the delivery, and never cleared. A claim never returns a row that
+    /// carries one; a worker that already holds the row finds it on its next fenced write.
+    pub cancellation: Option<DeliveryCancellation>,
 }
 
 /// The canonical rows an ordinary delivery is attributed to.
@@ -300,9 +304,15 @@ pub enum Disposition {
 /// `LeaseLost` is not an error: it is the fence working. A run that finds it must stop touching
 /// the row and must not treat its own provider call as unreported -- the replacement execution
 /// owns the outcome now.
+///
+/// `Cancelled` is the fence working too, from the other side: the delivery carries a cancellation
+/// intent, so instead of the requested transition the write settled the row with what its parts
+/// prove and released the lease. The run stops without sending anything more and has nothing to
+/// report as a failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeliveryOutcome {
     Applied(DeliveryStatus),
+    Cancelled(DeliveryStatus),
     LeaseLost,
 }
 
@@ -473,6 +483,7 @@ mod tests {
             idempotency_key: DeliveryKey::parse("notification:key").unwrap(),
             attempt_count: 0,
             max_attempts: MAX_DELIVERY_ATTEMPTS,
+            cancellation: None,
         }
     }
 

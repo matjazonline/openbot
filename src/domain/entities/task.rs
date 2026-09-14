@@ -378,6 +378,12 @@ pub enum TaskStopReason {
     OwnershipTransferred,
     AgentInstruction,
     DelegationCancelled,
+    /// An operator stopped the task while this attempt was running.
+    OperatorStopped,
+    /// A rejected approval stopped the task this attempt belonged to.
+    ApprovalRejected,
+    /// A manager removed the owning agent from the task's channel while this attempt was running.
+    ChannelAgentRemoved,
 }
 
 impl TaskStopReason {
@@ -392,6 +398,9 @@ impl TaskStopReason {
             Self::OwnershipTransferred => "ownership_transferred",
             Self::AgentInstruction => "agent_instruction",
             Self::DelegationCancelled => "delegation_cancelled",
+            Self::OperatorStopped => "operator_stopped",
+            Self::ApprovalRejected => "approval_rejected",
+            Self::ChannelAgentRemoved => "channel_agent_removed",
         }
     }
 }
@@ -416,6 +425,9 @@ impl FromStr for TaskStopReason {
             "ownership_transferred" => Ok(Self::OwnershipTransferred),
             "agent_instruction" => Ok(Self::AgentInstruction),
             "delegation_cancelled" => Ok(Self::DelegationCancelled),
+            "operator_stopped" => Ok(Self::OperatorStopped),
+            "approval_rejected" => Ok(Self::ApprovalRejected),
+            "channel_agent_removed" => Ok(Self::ChannelAgentRemoved),
             other => Err(format!("Unknown task stop reason: {other}")),
         }
     }
@@ -938,6 +950,8 @@ pub enum TaskTransitionReason {
     DelegationCancelled,
     DelegationReassigned,
     DelegationPartial,
+    /// A manager removed the owning agent from the task's primary channel.
+    ChannelAgentRemoved,
     /// The transition happened, but nothing on the write said why.
     ///
     /// Every caller that knows its cause states it, so this reason means a status changed through
@@ -977,6 +991,7 @@ impl TaskTransitionReason {
             Self::DelegationCancelled => "delegation_cancelled",
             Self::DelegationReassigned => "delegation_reassigned",
             Self::DelegationPartial => "delegation_partial",
+            Self::ChannelAgentRemoved => "channel_agent_removed",
             Self::Unknown => "unknown",
         }
     }
@@ -1010,6 +1025,7 @@ impl FromStr for TaskTransitionReason {
             "delegation_cancelled" => Ok(Self::DelegationCancelled),
             "delegation_reassigned" => Ok(Self::DelegationReassigned),
             "delegation_partial" => Ok(Self::DelegationPartial),
+            "channel_agent_removed" => Ok(Self::ChannelAgentRemoved),
             "unknown" => Ok(Self::Unknown),
             other => Err(format!("Unknown task transition reason: {other}")),
         }
@@ -1065,13 +1081,15 @@ impl FromStr for TaskTransitionActorKind {
     }
 }
 
-/// Who is stopping a task, and therefore why. A stop is never anonymous: the two callers that can
-/// order one are an operator pressing the button and a rejected approval, and the ledger has to
-/// tell them apart afterwards.
+/// Who is stopping a task, and therefore why. A stop is never anonymous: an operator pressing the
+/// button, a rejected approval, and a manager removing the owning agent from its channel all end in
+/// `stopped`, and the ledger has to tell them apart afterwards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StopActor {
     Operator(Uuid),
     Approval(Uuid),
+    /// The manager (a user id) whose channel edit removed the owning agent's assignment.
+    ChannelAgentRemoved(Uuid),
 }
 
 impl StopActor {
@@ -1079,13 +1097,32 @@ impl StopActor {
         match self {
             Self::Operator(_) => TaskTransitionReason::OperatorStopped,
             Self::Approval(_) => TaskTransitionReason::ApprovalRejected,
+            Self::ChannelAgentRemoved(_) => TaskTransitionReason::ChannelAgentRemoved,
         }
     }
 
     pub fn transition_actor(self) -> TransitionActor {
         match self {
-            Self::Operator(id) => TransitionActor::Operator(id),
+            Self::Operator(id) | Self::ChannelAgentRemoved(id) => TransitionActor::Operator(id),
             Self::Approval(id) => TransitionActor::Approval(id),
+        }
+    }
+
+    /// What the attempt the stop interrupted is closed with.
+    pub fn attempt_stop_reason(self) -> TaskStopReason {
+        match self {
+            Self::Operator(_) => TaskStopReason::OperatorStopped,
+            Self::Approval(_) => TaskStopReason::ApprovalRejected,
+            Self::ChannelAgentRemoved(_) => TaskStopReason::ChannelAgentRemoved,
+        }
+    }
+
+    /// Why the stopped task's unsent deliveries are cancelled.
+    pub fn delivery_cancellation(self) -> super::transport::DeliveryCancellationReason {
+        use super::transport::DeliveryCancellationReason;
+        match self {
+            Self::Operator(_) | Self::Approval(_) => DeliveryCancellationReason::TaskStopped,
+            Self::ChannelAgentRemoved(_) => DeliveryCancellationReason::ChannelAgentRemoved,
         }
     }
 }

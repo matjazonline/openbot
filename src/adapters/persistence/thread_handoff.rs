@@ -795,6 +795,8 @@ pub(crate) enum HandoffRunEnd {
     TaskFailed,
     /// The run produced a draft, and the review holding it expired before anybody sent it.
     DraftExpired,
+    /// The run produced a draft, and the work that owned it was stopped before anybody sent it.
+    DraftWithdrawn,
 }
 
 impl HandoffRunEnd {
@@ -802,7 +804,7 @@ impl HandoffRunEnd {
     const fn run_state(self) -> &'static str {
         match self {
             Self::TaskFailed => "running",
-            Self::DraftExpired => "drafted",
+            Self::DraftExpired | Self::DraftWithdrawn => "drafted",
         }
     }
 
@@ -810,7 +812,7 @@ impl HandoffRunEnd {
     const fn handoff_state(self) -> &'static str {
         match self {
             Self::TaskFailed => "drafting",
-            Self::DraftExpired => "draft_ready",
+            Self::DraftExpired | Self::DraftWithdrawn => "draft_ready",
         }
     }
 }

@@ -648,9 +648,10 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         | AppError::NotFound(_)
         | AppError::Conflict(_) => (InboundEventErrorClass::Routing, true),
         AppError::Timeout(_) => (InboundEventErrorClass::Deadline, false),
-        AppError::Database(_) | AppError::Internal(_) | AppError::InvalidCredentials => {
-            (InboundEventErrorClass::Internal, false)
-        }
+        AppError::Database(_)
+        | AppError::DatabaseTimeout(_)
+        | AppError::Internal(_)
+        | AppError::InvalidCredentials => (InboundEventErrorClass::Internal, false),
     }
 }
 

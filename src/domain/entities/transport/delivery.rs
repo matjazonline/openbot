@@ -220,6 +220,60 @@ stored_enum! {
     }
 }
 
+stored_enum! {
+    /// Why somebody asked for a delivery not to go out.
+    ///
+    /// Recorded once, beside `cancellation_requested_at`, and never cleared: a delivery that is in
+    /// flight when it is cancelled keeps the intent through whatever its provider says, so no retry,
+    /// release or lease sweep can hand it back to the queue.
+    DeliveryCancellationReason as "delivery cancellation reason" {
+        /// The owning agent was removed from the channel its task belongs to.
+        ChannelAgentRemoved => "channel_agent_removed",
+        /// The task that produced the delivery was stopped.
+        TaskStopped => "task_stopped",
+    }
+}
+
+/// A cancellation somebody recorded on a delivery: why, and when it was first asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeliveryCancellation {
+    pub reason: DeliveryCancellationReason,
+    pub requested_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// The parent's status once a cancelled delivery stops sending: what its parts prove, and no more.
+///
+/// It differs from [`aggregate_parent_status`] in which fact outranks which. The cancellation has
+/// just marked every unsent part dead, so a dead part no longer means the provider refused
+/// something -- and letting it outrank an ambiguous part would relabel a request the provider may
+/// hold as definitely unsent. So:
+///
+/// - any part whose request may have reached the provider keeps the parent
+///   [`DeliveryStatus::OutcomeUnknown`] -- including one still marked `sending`, which is a request
+///   that went out and never reported;
+/// - a delivery every part of which was accepted is [`DeliveryStatus::Delivered`]; the
+///   cancellation came too late to matter;
+/// - anything else is [`DeliveryStatus::DeadLetter`], with its delivered parts kept as the record
+///   of a partial send.
+pub fn cancelled_parent_status(parts: &[DeliveryPartStatus]) -> DeliveryStatus {
+    if parts.iter().any(|part| {
+        matches!(
+            part,
+            DeliveryPartStatus::OutcomeUnknown | DeliveryPartStatus::Sending
+        )
+    }) {
+        return DeliveryStatus::OutcomeUnknown;
+    }
+    if !parts.is_empty()
+        && parts
+            .iter()
+            .all(|part| *part == DeliveryPartStatus::Delivered)
+    {
+        return DeliveryStatus::Delivered;
+    }
+    DeliveryStatus::DeadLetter
+}
+
 impl FailureClass {
     /// Whether re-sending the same bytes could ever succeed.
     ///
@@ -242,6 +296,35 @@ impl FailureClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_cancelled_parent_never_relabels_uncertainty_as_unsent() {
+        use DeliveryPartStatus::{Dead, Delivered, OutcomeUnknown, Sending};
+
+        assert_eq!(
+            cancelled_parent_status(&[Delivered, OutcomeUnknown, Dead]),
+            DeliveryStatus::OutcomeUnknown
+        );
+        assert_eq!(
+            cancelled_parent_status(&[Sending, Dead]),
+            DeliveryStatus::OutcomeUnknown
+        );
+        assert_eq!(
+            cancelled_parent_status(&[Delivered, Delivered]),
+            DeliveryStatus::Delivered
+        );
+        assert_eq!(
+            cancelled_parent_status(&[Delivered, Dead]),
+            DeliveryStatus::DeadLetter
+        );
+        assert_eq!(cancelled_parent_status(&[]), DeliveryStatus::DeadLetter);
+        for reason in DeliveryCancellationReason::ALL {
+            assert_eq!(
+                Ok(*reason),
+                DeliveryCancellationReason::from_str(reason.as_str())
+            );
+        }
+    }
 
     #[test]
     fn every_vocabulary_round_trips_through_its_stored_string() {

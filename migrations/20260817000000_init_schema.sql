@@ -628,7 +628,11 @@ BEGIN
            AND source_id = OLD.id AND state = 'active';
     ELSIF OLD.status IS DISTINCT FROM NEW.status
           AND (OLD.status IN ('dead_letter', 'outcome_unknown')
-               OR NEW.status IN ('dead_letter', 'outcome_unknown')) THEN
+               OR NEW.status IN ('dead_letter', 'outcome_unknown'))
+          -- Work somebody deliberately cancelled is not presented as a delivery that failed. An
+          -- ambiguous outcome still notifies: the provider may hold it, and a human must know.
+          AND NOT (NEW.status = 'dead_letter' AND NEW.last_error_class = 'superseded'
+                   AND NEW.cancellation_requested_at IS NOT NULL) THEN
         PERFORM enqueue_actionable_notification_event(
             event_company, 'delivery', NEW.id, 'delivery_failure', NULL
         );
@@ -1318,6 +1322,28 @@ $$;
 
 
 --
+-- Name: preserve_delivery_cancellation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- The first cancellation intent is the one that stands. Retry, completion, release and reaping
+-- statements never name these columns; this makes a statement that does fail loudly rather than
+-- silently re-enable a delivery somebody cancelled.
+CREATE FUNCTION public.preserve_delivery_cancellation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.cancellation_requested_at IS NOT NULL
+       AND (NEW.cancellation_requested_at IS DISTINCT FROM OLD.cancellation_requested_at
+            OR NEW.cancellation_reason IS DISTINCT FROM OLD.cancellation_reason) THEN
+        RAISE EXCEPTION 'a delivery cancellation intent cannot be cleared or replaced'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: prevent_message_audience_widening(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1442,7 +1468,8 @@ BEGIN
             WHEN transition_reason IN ('approval_requested', 'approval_accepted') THEN 'approval'
             WHEN transition_reason IN ('outreach_started', 'outreach_reply_received',
                                        'outreach_timed_out', 'outreach_extended') THEN 'outreach'
-            WHEN transition_reason IN ('operator_stopped', 'operator_resumed') THEN 'operator'
+            WHEN transition_reason IN ('operator_stopped', 'operator_resumed',
+                                       'channel_agent_removed') THEN 'operator'
             ELSE 'system'
         END;
     END IF;
@@ -1967,7 +1994,7 @@ CREATE TABLE public.background_tasks (
     CONSTRAINT background_tasks_single_source_check CHECK (((source_message_uuid IS NULL) OR (source_schedule_run_id IS NULL))),
     CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text]))),
     CONSTRAINT background_tasks_transition_actor_kind_check CHECK (((transition_actor_kind IS NULL) OR (transition_actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text])))),
-    CONSTRAINT background_tasks_transition_reason_check CHECK (((transition_reason IS NULL) OR (transition_reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'unknown'::text])))),
+    CONSTRAINT background_tasks_transition_reason_check CHECK (((transition_reason IS NULL) OR (transition_reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'channel_agent_removed'::text, 'unknown'::text])))),
     CONSTRAINT background_tasks_transition_shape_check CHECK ((((transition_reason IS NULL) AND (transition_actor_kind IS NULL) AND (transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL)) OR ((transition_reason IS NOT NULL) AND
 CASE transition_actor_kind
     WHEN 'system'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
@@ -2660,8 +2687,15 @@ CREATE TABLE public.message_deliveries (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     message_audience text,
+    cancellation_requested_at timestamp with time zone,
+    cancellation_reason text,
     CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
     CONSTRAINT message_deliveries_attribution_check CHECK ((((company_id IS NOT NULL) AND (channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((company_id IS NULL) AND (channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (task_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+    -- A cancellation intent is both columns or neither, names a known cause, and can never sit on a
+    -- claimable row: whatever path ends an attempt on a cancelled delivery must settle it rather than
+    -- hand it back to the queue. `outcome_unknown`, `sending`, `delivered` and `dead_letter` may all
+    -- carry it, because a cancellation cannot recall a request the provider may already hold.
+    CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['channel_agent_removed'::text, 'task_stopped'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT message_deliveries_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
     CONSTRAINT message_deliveries_external_destination_check CHECK (((external_destination IS NULL) OR ((btrim(external_destination) <> ''::text) AND (octet_length(external_destination) <= 998)))),
@@ -3195,7 +3229,7 @@ CREATE TABLE public.task_attempts (
     machine_region text,
     CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
-    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text]))),
+    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text]))),
     CONSTRAINT task_attempts_token_check CHECK ((((prompt_tokens IS NULL) OR (prompt_tokens >= 0)) AND ((completion_tokens IS NULL) OR (completion_tokens >= 0))))
 );
 
@@ -3423,7 +3457,7 @@ CREATE TABLE public.task_status_events (
     transitioned_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT task_status_events_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text]))),
     CONSTRAINT task_status_events_from_status_check CHECK (((from_status IS NULL) OR (from_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))),
-    CONSTRAINT task_status_events_reason_check CHECK ((reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'unknown'::text]))),
+    CONSTRAINT task_status_events_reason_check CHECK ((reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'channel_agent_removed'::text, 'unknown'::text]))),
     CONSTRAINT task_status_events_related_source_check CHECK (((related_approval_id IS NULL) OR (related_outreach_id IS NULL))),
     CONSTRAINT task_status_events_retry_count_check CHECK ((retry_count >= 0)),
     CONSTRAINT task_status_events_sequence_check CHECK ((sequence > 0)),
@@ -6059,6 +6093,13 @@ CREATE TRIGGER message_deliveries_notify_attention AFTER INSERT OR DELETE OR UPD
 --
 
 CREATE TRIGGER message_deliveries_notify_chain AFTER INSERT OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
+
+
+--
+-- Name: message_deliveries message_deliveries_preserve_cancellation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_deliveries_preserve_cancellation BEFORE UPDATE OF cancellation_requested_at, cancellation_reason ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.preserve_delivery_cancellation();
 
 
 --

@@ -7,6 +7,9 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
+    adapters::persistence::channel_gate::{
+        ChannelGateAccess, acquire_channel_gate_on, task_gate_key_on,
+    },
     app_error::{AppError, AppResult},
     entities::{
         task::{
@@ -263,6 +266,16 @@ pub(crate) async fn change_task_ownership_on(
     let fingerprint = command_fingerprint(&command)?;
     let mut tx = pool.begin().await.map_err(AppError::from)?;
 
+    // A transfer to an agent admits work through the task's channel assignment, so it takes the
+    // channel gate before any row lock; `principal_facts` below then reads the assignment after an
+    // assignment change that raced it has either committed or not started.
+    let gate = task_gate_key_on(&mut tx, command.task_id)
+        .await?
+        .filter(|key| key.company_id == command.company_id);
+    if let Some(key) = gate {
+        acquire_channel_gate_on(&mut tx, key, ChannelGateAccess::Admit).await?;
+    }
+
     if let Some(lease) = command.execution {
         if lease.task_id != command.task_id
             || lease.ownership_version != command.expected_version
@@ -291,6 +304,11 @@ pub(crate) async fn change_task_ownership_on(
     .await
     .map_err(AppError::from)?
     .ok_or_else(|| AppError::NotFound("Task not found.".into()))?;
+    if gate.map(|key| key.channel_id) != Some(task.channel_id) {
+        return Err(AppError::Conflict(
+            "The task changed while ownership was being updated; refresh and try again.".into(),
+        ));
+    }
 
     let existing_query = format!(
         "SELECT {EVENT_COLUMNS} FROM task_ownership_events \

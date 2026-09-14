@@ -17,7 +17,11 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    DeliveryDb, attempt_failed_set, claimable_statuses_sql,
+    DeliveryDb, attempt_failed_set,
+    cancellation::{
+        HeldDelivery, lock_held_delivery_on, settle_cancelled_on, settle_stranded_cancellations_on,
+    },
+    claimable_statuses_sql,
     enqueue::{insert_standalone_delivery_on, load_parts_on},
     qualified_delivery_columns, retry_delay_sql, sql_status_list,
 };
@@ -71,11 +75,15 @@ impl DeliveryQueue for PostgresPersistence {
         // whose predecessor is not yet delivered is simply not claimable. A predecessor that has
         // gone terminal is not skipped for ever either -- `reap_expired_deliveries` dead-letters
         // its descendants with a typed causal reason.
+        //
+        // `message_deliveries_cancellation_check` already makes a cancelled row unclaimable; the
+        // predicate is repeated so the claim states the rule it depends on.
         let rows = sqlx::query_as::<_, DeliveryDb>(&format!(
             r#"WITH claimable AS (
                    SELECT delivery.id
                      FROM message_deliveries AS delivery
                     WHERE delivery.status IN ({claimable})
+                      AND delivery.cancellation_requested_at IS NULL
                       AND delivery.available_at <= CURRENT_TIMESTAMP
                       AND (
                           delivery.depends_on_delivery_id IS NULL
@@ -161,6 +169,22 @@ impl DeliveryQueue for PostgresPersistence {
         let sending_part = DeliveryPartStatus::Sending.as_str();
         let claimable_part =
             sql_part_list(&[DeliveryPartStatus::Prepared, DeliveryPartStatus::Retryable]);
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // The parent's row lock first. A cancellation that won it has already recorded its
+        // intent, and no further provider request may start; one that has not yet won it waits
+        // for this commit and then reports the part as potentially sent.
+        match lock_held_delivery_on(&mut tx, fence).await? {
+            HeldDelivery::Lost => {
+                tx.rollback().await.map_err(AppError::from)?;
+                return Ok(DeliveryOutcome::LeaseLost);
+            }
+            HeldDelivery::Cancelled(reason) => {
+                let outcome = settle_cancelled_on(&mut tx, fence, reason, None).await?;
+                tx.commit().await.map_err(AppError::from)?;
+                return Ok(outcome);
+            }
+            HeldDelivery::Live => {}
+        }
         // Joined to the parent and fenced on its execution: the part has no lease of its own, so
         // "may I send this?" is answered entirely by whether this run still owns the delivery.
         let result = sqlx::query(&format!(
@@ -179,19 +203,28 @@ impl DeliveryQueue for PostgresPersistence {
         .bind(fence.row.as_uuid())
         .bind(fence.execution.as_uuid())
         .bind(fence.owner.as_uuid())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
         if result.rows_affected() == 1 {
+            tx.commit().await.map_err(AppError::from)?;
             return Ok(DeliveryOutcome::Applied(DeliveryStatus::Sending));
         }
+        tx.rollback().await.map_err(AppError::from)?;
         Ok(DeliveryOutcome::LeaseLost)
     }
 
     async fn complete_part(&self, result: PartResult<'_>) -> AppResult<DeliveryOutcome> {
         let transition = PartTransition::of(result.outcome);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // Parent before part, the order `begin_part` and a cancellation take. What the provider
+        // said is recorded either way: a cancellation cannot recall a request already made.
+        let held = lock_held_delivery_on(&mut tx, result.fence).await?;
+        if held == HeldDelivery::Lost {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Ok(DeliveryOutcome::LeaseLost);
+        }
 
         let updated = sqlx::query(&format!(
             r#"UPDATE message_delivery_parts AS part
@@ -233,12 +266,34 @@ impl DeliveryQueue for PostgresPersistence {
             return Ok(DeliveryOutcome::LeaseLost);
         }
 
-        let outcome = aggregate_parent_on(&mut tx, result.fence, &transition).await?;
+        let outcome = match held {
+            HeldDelivery::Cancelled(reason) => {
+                settle_cancelled_on(&mut tx, result.fence, reason, Some(&transition)).await?
+            }
+            HeldDelivery::Live | HeldDelivery::Lost => {
+                aggregate_parent_on(&mut tx, result.fence, &transition).await?
+            }
+        };
         tx.commit().await.map_err(AppError::from)?;
         Ok(outcome)
     }
 
     async fn fail_delivery(&self, failure: DeliveryFailure<'_>) -> AppResult<DeliveryOutcome> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // A cancelled delivery that failed before its provider spoke is known unsent: it is
+        // settled as superseded, never charged back into the retry queue.
+        match lock_held_delivery_on(&mut tx, failure.fence).await? {
+            HeldDelivery::Lost => {
+                tx.rollback().await.map_err(AppError::from)?;
+                return Ok(DeliveryOutcome::LeaseLost);
+            }
+            HeldDelivery::Cancelled(reason) => {
+                let outcome = settle_cancelled_on(&mut tx, failure.fence, reason, None).await?;
+                tx.commit().await.map_err(AppError::from)?;
+                return Ok(outcome);
+            }
+            HeldDelivery::Live => {}
+        }
         let sql = match failure.disposition {
             // A payload that will not decode, or a dependency that can never land, comes out the
             // same way on the fifth attempt as on the first. Going terminal now rather than after
@@ -272,9 +327,10 @@ impl DeliveryQueue for PostgresPersistence {
             .bind(failure.fence.owner.as_uuid())
             .bind(failure.class.as_str())
             .bind(failure.detail.as_str())
-            .fetch_optional(&self.pool)
+            .fetch_optional(&mut *tx)
             .await
             .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
 
         let Some(settled) = settled else {
             return Ok(DeliveryOutcome::LeaseLost);
@@ -298,6 +354,22 @@ impl DeliveryQueue for PostgresPersistence {
         // `request_started_at`, so a part in `sending` is by construction a request that went out.
         // The delivery worker's shutdown path awaits such a call and records its real outcome
         // instead of releasing.
+        //
+        // A cancelled delivery is not released: handing it back would make it claimable again. It
+        // is settled with what its parts prove instead.
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        match lock_held_delivery_on(&mut tx, fence).await? {
+            HeldDelivery::Lost => {
+                tx.rollback().await.map_err(AppError::from)?;
+                return Ok(DeliveryOutcome::LeaseLost);
+            }
+            HeldDelivery::Cancelled(reason) => {
+                let outcome = settle_cancelled_on(&mut tx, fence, reason, None).await?;
+                tx.commit().await.map_err(AppError::from)?;
+                return Ok(outcome);
+            }
+            HeldDelivery::Live => {}
+        }
         let result = sqlx::query(&format!(
             r#"UPDATE message_deliveries
                   SET status = '{pending}',
@@ -311,9 +383,10 @@ impl DeliveryQueue for PostgresPersistence {
         .bind(fence.row.as_uuid())
         .bind(fence.execution.as_uuid())
         .bind(fence.owner.as_uuid())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
 
         if result.rows_affected() != 1 {
             return Ok(DeliveryOutcome::LeaseLost);
@@ -553,8 +626,13 @@ async fn reap_expired_leases_on(tx: &mut Transaction<'_, Postgres>) -> AppResult
     .await
     .map_err(AppError::from)?;
 
+    // A cancelled delivery whose worker vanished is finished here rather than retried: the
+    // cancellation check would refuse the retry anyway, and loudly.
+    let cancelled = settle_stranded_cancellations_on(tx, &stranded, &expired).await?;
+
     let retried = sqlx::query(&format!(
-        "UPDATE message_deliveries {set} WHERE id = ANY($1) AND {expired}",
+        "UPDATE message_deliveries {set} WHERE id = ANY($1) AND {expired}
+            AND cancellation_requested_at IS NULL",
         set = attempt_failed_set(
             &format!("'{}'", FailureClass::LeaseExpired.as_str()),
             "'The delivery lease expired without a result'",
@@ -565,7 +643,7 @@ async fn reap_expired_leases_on(tx: &mut Transaction<'_, Postgres>) -> AppResult
     .await
     .map_err(AppError::from)?;
 
-    Ok(unknown.rows_affected() + retried.rows_affected())
+    Ok(unknown.rows_affected() + cancelled + retried.rows_affected())
 }
 
 /// Dead-letter the descendants of a dependency that can never be delivered.
@@ -625,7 +703,7 @@ fn live_fence_sql() -> String {
 /// than its lease allowed still has to be able to record what the provider said, and the reaper
 /// cannot have taken the row while this execution id is still on it. Checking expiry would throw
 /// away exactly the outcome that matters most.
-fn own_row_fence_sql() -> String {
+pub(super) fn own_row_fence_sql() -> String {
     format!(
         r#"id = $1 AND status = '{sending}' AND execution_id = $2 AND owner_worker_id = $3"#,
         sending = DeliveryStatus::Sending.as_str(),

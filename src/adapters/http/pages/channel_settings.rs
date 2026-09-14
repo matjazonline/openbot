@@ -190,6 +190,21 @@ pub struct ChannelEditPane<'a> {
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
     pub error: Option<&'a str>,
+    /// What a successful save changed beyond the form itself -- today, the work removing an agent
+    /// stopped. `None` shows nothing.
+    pub notice: Option<&'a str>,
+}
+
+/// A success banner for a saved pane, the counterpart of `form_error_banner`.
+fn form_notice_banner(notice: Option<&str>) -> String {
+    notice
+        .map(|message| {
+            format!(
+                r##"<div class="alert alert-success mb-4 text-sm" role="status">{}</div>"##,
+                escape_html_text(message)
+            )
+        })
+        .unwrap_or_default()
 }
 
 /// The pane for a channel that does not exist yet.
@@ -396,7 +411,7 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
             pane.app_domain_name
         )),
         creator = escape_html_text(&pane.channel.created_by.label()),
-        error_html = form_error_banner(pane.error),
+        error_html = form_error_banner(pane.error) + &form_notice_banner(pane.notice),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
             app_domain_name: pane.app_domain_name,

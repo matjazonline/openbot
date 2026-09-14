@@ -492,6 +492,60 @@ pub(crate) async fn supersede_harness_runs_on(
     Ok(())
 }
 
+/// How many checkpoints one stop decodes per round trip.
+const SUPERSEDE_BATCH: i64 = 100;
+
+/// [`supersede_harness_runs_on`] for a set of tasks a stop has just locked, each at the ownership
+/// version it holds.
+///
+/// Checkpoints are decoded in bounded batches rather than all at once, and every one still goes
+/// through the checkpoint transition, so the projected SQL state and the stored document cannot
+/// disagree. A run that came back after being superseded would loop forever, so it is an error.
+pub(crate) async fn supersede_harness_runs_for_tasks_on(
+    tx: &mut PgConnection,
+    company_id: Uuid,
+    tasks: &[(Uuid, i64)],
+) -> AppResult<()> {
+    if tasks.is_empty() {
+        return Ok(());
+    }
+    let (task_ids, versions): (Vec<Uuid>, Vec<i64>) = tasks.iter().copied().unzip();
+    let mut superseded = std::collections::HashSet::new();
+    loop {
+        let rows = sqlx::query_as::<_, (Uuid, Uuid, serde_json::Value)>(
+            r#"SELECT run.id, run.task_id, run.checkpoint
+                 FROM task_harness_runs AS run
+                 JOIN unnest($2::uuid[], $3::bigint[]) AS stopped(task_id, ownership_version)
+                   ON run.task_id = stopped.task_id
+                  AND run.ownership_version = stopped.ownership_version
+                WHERE run.company_id = $1 AND run.state <> 'superseded'
+                ORDER BY run.id
+                LIMIT $4
+                  FOR UPDATE OF run"#,
+        )
+        .bind(company_id)
+        .bind(&task_ids)
+        .bind(&versions)
+        .bind(SUPERSEDE_BATCH)
+        .fetch_all(&mut *tx)
+        .await?;
+        let fetched = rows.len();
+        for (run_id, task_id, value) in rows {
+            if !superseded.insert(run_id) {
+                return Err(AppError::Internal(format!(
+                    "Harness run {run_id} was still live after being superseded"
+                )));
+            }
+            let run = decode(value)?;
+            let next = run.supersede()?;
+            persist_checkpoint_on(tx, company_id, task_id, &run, &next).await?;
+        }
+        if (fetched as i64) < SUPERSEDE_BATCH {
+            return Ok(());
+        }
+    }
+}
+
 pub(crate) async fn park_harness_outreach_on(
     tx: &mut PgConnection,
     company_id: Uuid,

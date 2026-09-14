@@ -357,3 +357,65 @@ async fn reviewed_reply_is_cross_filed_only_on_approval_and_once() {
         2
     );
 }
+
+/// A removed agent's reply waiting for review is withdrawn with the removal, and an approval sent
+/// afterwards is refused rather than publishing it.
+#[tokio::test]
+async fn a_removed_agents_pending_review_cannot_be_approved_afterwards() {
+    use crate::adapters::persistence::channel_assignment::{RemovalBudget, update_channel_within};
+    use crate::use_cases::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
+
+    let Some(fixture) = PublicationFixture::new().await else {
+        return;
+    };
+    let command = submit_support_for_review(&fixture).await;
+    let draft_id = command.draft_id;
+    let channel_id = fixture.support.task.channel_id;
+    let channel = ChannelPersistence::get_by_id(&fixture.persistence, channel_id)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let removal = update_channel_within(
+        fixture.persistence.pool(),
+        ChannelUpdate {
+            company_id: fixture.company_id,
+            channel_id,
+            actor_user_id: Uuid::new_v4(),
+            write: ChannelWrite {
+                name: channel.name.clone(),
+                slug: channel.slug.to_string(),
+                agent_ids: Some(Vec::new()),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        },
+        RemovalBudget::DEFAULT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(removal.superseded_reviews, 1);
+
+    let refused = fixture.persistence.execute_review_command(command).await;
+    assert!(matches!(refused, Err(AppError::Conflict(_))), "{refused:?}");
+    let status: String = sqlx::query_scalar(
+        "SELECT status FROM response_drafts WHERE company_id = $1 AND id = $2 ORDER BY version DESC LIMIT 1",
+    )
+    .bind(fixture.company_id)
+    .bind(draft_id.as_uuid())
+    .fetch_one(fixture.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(status, "superseded");
+    let queued: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM message_deliveries WHERE task_id = $1 AND status IN ('pending', 'retryable', 'sending')",
+    )
+    .bind(fixture.support.task.id)
+    .fetch_one(fixture.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        queued, 0,
+        "nothing of the removed agent's reply is left to go out"
+    );
+}

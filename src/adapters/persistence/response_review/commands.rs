@@ -30,6 +30,33 @@ pub(super) async fn execute_command(
     }
     let version = i32::try_from(command.expected_draft_version)
         .map_err(|_| AppError::BadRequest("Draft version is out of range.".into()))?;
+    // A draft an agent's task wrote publishes through that task's channel assignment, so the
+    // command takes the task channel's admission gate before locking the draft. After a removal
+    // commits, the draft it superseded fails the `pending_review` check below.
+    let task_channel: Option<Uuid> = sqlx::query_scalar(
+        r#"SELECT task.channel_id
+             FROM response_drafts AS draft
+             JOIN background_tasks AS task
+               ON task.company_id = draft.company_id AND task.id = draft.task_id
+            WHERE draft.company_id = $1 AND draft.id = $2 AND draft.version = $3"#,
+    )
+    .bind(command.company_id)
+    .bind(command.draft_id.as_uuid())
+    .bind(version)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    if let Some(channel_id) = task_channel {
+        crate::adapters::persistence::channel_gate::acquire_channel_gate_on(
+            &mut tx,
+            crate::adapters::persistence::channel_gate::ChannelGateKey::new(
+                command.company_id,
+                channel_id,
+            ),
+            crate::adapters::persistence::channel_gate::ChannelGateAccess::Admit,
+        )
+        .await?;
+    }
     let current: Option<LockedReview> = sqlx::query_as(
         r#"SELECT draft.status AS draft_status, review.status AS review_status, draft.channel_id,
                       review.reviewer_principal_id, review.expires_at,

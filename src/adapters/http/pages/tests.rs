@@ -1909,6 +1909,7 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
 
     assert!(html.contains(&format!(
@@ -1962,6 +1963,7 @@ fn owned_channel_locks_owner_and_primary_address_and_hides_delete() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
 
     assert!(html.contains("name=\"slug\" required readonly"));
@@ -2008,6 +2010,7 @@ fn library_agents_are_picked_from_a_modal_of_cards() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
 
     // The button names the current pick and opens the modal; the choice itself rides a hidden
@@ -2051,6 +2054,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
     assert!(open.contains(
         r#"name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
@@ -2071,6 +2075,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
     assert!(
         closed
@@ -2100,6 +2105,7 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         spam_scan_enabled: false,
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
+        notice: None,
     });
 
     assert!(html.contains("alert alert-error"));
@@ -2142,6 +2148,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
             spam_scan_enabled,
             draft: Some(&draft),
             error: None,
+            notice: None,
         })
     };
 
@@ -2182,6 +2189,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
         spam_scan_enabled: true,
         draft: None,
         error: None,
+        notice: None,
     });
     assert!(edit.contains(&close));
 

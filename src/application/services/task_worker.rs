@@ -288,7 +288,9 @@ impl From<crate::app_error::AppError> for RunFailure {
             | AppError::NotFound(message)
             | AppError::Conflict(message) => Self::Terminal(message),
             AppError::InvalidCredentials => Self::Terminal("Invalid credentials".into()),
-            AppError::Database(message) | AppError::Internal(message) => Self::Retryable(message),
+            AppError::Database(message)
+            | AppError::DatabaseTimeout(message)
+            | AppError::Internal(message) => Self::Retryable(message),
         }
     }
 }
@@ -1561,7 +1563,10 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(vec![])
         }
-        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+        async fn update(
+            &self,
+            _request: crate::use_cases::channel::ChannelUpdate,
+        ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {

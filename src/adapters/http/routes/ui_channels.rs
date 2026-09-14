@@ -455,7 +455,14 @@ async fn update_channel(
         .await;
 
     match saved {
-        Ok(channel) => view.saved_response(&channel, &agents).await,
+        Ok(outcome) => {
+            view.saved_response_with_notice(
+                &outcome.channel,
+                &agents,
+                outcome.removal.summary().as_deref(),
+            )
+            .await
+        }
         Err(err) => rejected(format!("Failed to save channel: {err}")),
     }
 }
@@ -573,6 +580,18 @@ impl ChannelSettingsView<'_> {
         draft: Option<&pages::ChannelDraft<'_>>,
         error: Option<&str>,
     ) -> String {
+        self.edit_pane_with_notice(channel, agents, automation, draft, error, None)
+    }
+
+    fn edit_pane_with_notice(
+        &self,
+        channel: &Channel,
+        agents: &[Agent],
+        automation: &ChannelAutomation,
+        draft: Option<&pages::ChannelDraft<'_>>,
+        error: Option<&str>,
+        notice: Option<&str>,
+    ) -> String {
         pages::channel_edit_pane_with_memory(
             &pages::ChannelEditPane {
                 company: self.company,
@@ -584,6 +603,7 @@ impl ChannelSettingsView<'_> {
                 spam_scan_enabled: self.config.is_spam_scan_enabled(),
                 draft,
                 error,
+                notice,
             },
             self.memory_ready,
         )
@@ -605,8 +625,18 @@ impl ChannelSettingsView<'_> {
     /// What every successful write returns: the saved channel's pane, with the sidebar list
     /// refreshed beside it so a create, rename or slug change shows up immediately.
     async fn saved_response(&self, channel: &Channel, agents: &[Agent]) -> AppResult<Response> {
+        self.saved_response_with_notice(channel, agents, None).await
+    }
+
+    /// [`Self::saved_response`], with a banner saying what the save changed beyond the form.
+    async fn saved_response_with_notice(
+        &self,
+        channel: &Channel,
+        agents: &[Agent],
+        notice: Option<&str>,
+    ) -> AppResult<Response> {
         let automation = self.automation(channel.id).await?;
-        let pane = self.edit_pane(channel, agents, &automation, None, None);
+        let pane = self.edit_pane_with_notice(channel, agents, &automation, None, None, notice);
         let channels = self.channels().await?;
         let list = pages::channel_settings_list(
             &self.list(&channels, Some(channel.id)),

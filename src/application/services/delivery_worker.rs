@@ -178,6 +178,10 @@ impl DeliveryWorker {
                     self.record_settled(&record, status);
                     return;
                 }
+                PartProgress::Cancelled(status) => {
+                    self.record_cancelled(&record, status);
+                    return;
+                }
                 PartProgress::LeaseLost => {
                     warn!(
                         delivery_id = %record.id,
@@ -202,6 +206,7 @@ impl DeliveryWorker {
         // is how one message becomes two.
         match self.queue.begin_part(lease, part.id).await {
             Ok(DeliveryOutcome::Applied(_)) => {}
+            Ok(DeliveryOutcome::Cancelled(status)) => return PartProgress::Cancelled(status),
             Ok(DeliveryOutcome::LeaseLost) => return PartProgress::LeaseLost,
             Err(error) => {
                 warn!(delivery_id = %record.id, %error, "Could not start a delivery part");
@@ -225,6 +230,7 @@ impl DeliveryWorker {
                 PartProgress::Continue(part_status_after(&outcome))
             }
             Ok(DeliveryOutcome::Applied(status)) => PartProgress::Finished(status),
+            Ok(DeliveryOutcome::Cancelled(status)) => PartProgress::Cancelled(status),
             Ok(DeliveryOutcome::LeaseLost) => PartProgress::LeaseLost,
             // The provider has already acted and this run cannot say what it did. Reported rather
             // than retried: the lease will lapse and the reaper classifies the part from its
@@ -281,6 +287,7 @@ impl DeliveryWorker {
                 delivery_id = %record.id,
                 "Released a claimed delivery on shutdown; it is immediately claimable again"
             ),
+            Ok(DeliveryOutcome::Cancelled(status)) => self.record_cancelled(record, status),
             Ok(DeliveryOutcome::LeaseLost) => {}
             Err(error) => warn!(
                 delivery_id = %record.id,
@@ -317,6 +324,39 @@ impl DeliveryWorker {
         if let Some(monitoring) = self.monitoring.as_ref() {
             monitoring.increment_counter(
                 "delivery_settled_total",
+                1,
+                &[
+                    ("transport", record.transport.as_str()),
+                    ("status", status.as_str()),
+                ],
+            );
+        }
+    }
+
+    /// A delivery somebody cancelled while this worker held it: settled, and not a failure.
+    ///
+    /// Counted apart from `delivery_settled_total` so a removal that supersedes a backlog does not
+    /// read as a spike of dead letters. An ambiguous settle is still worth a warning: the provider
+    /// may hold a part the cancellation arrived too late to stop.
+    fn record_cancelled(&self, record: &DeliveryRecord, status: DeliveryStatus) {
+        if status == DeliveryStatus::OutcomeUnknown {
+            warn!(
+                delivery_id = %record.id,
+                correlation_id = %record.correlation_id,
+                transport = %record.transport,
+                "A cancelled delivery may already have been accepted by its provider"
+            );
+        } else {
+            info!(
+                delivery_id = %record.id,
+                correlation_id = %record.correlation_id,
+                status = %status,
+                "Stopped sending a delivery that was cancelled while in flight"
+            );
+        }
+        if let Some(monitoring) = self.monitoring.as_ref() {
+            monitoring.increment_counter(
+                "delivery_cancelled_total",
                 1,
                 &[
                     ("transport", record.transport.as_str()),
@@ -365,6 +405,8 @@ enum PartProgress {
     Continue(crate::entities::transport::DeliveryPartStatus),
     /// The delivery reached a terminal state and released its lease.
     Finished(DeliveryStatus),
+    /// The delivery was cancelled; the queue settled it and released the lease.
+    Cancelled(DeliveryStatus),
     /// This run no longer owns the delivery. Stop touching it.
     LeaseLost,
 }

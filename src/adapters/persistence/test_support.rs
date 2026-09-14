@@ -550,6 +550,35 @@ pub async fn thread_handoff_fixture(
     fixture
 }
 
+/// Wait until some backend of this test's database is blocked on a lock.
+///
+/// The barrier for a concurrency test: hold a lock in one transaction, start the competing
+/// operation, and only then release it -- which proves the competitor actually waited on that lock
+/// rather than happening to run afterwards. Use it with `own_database`, where every waiting backend
+/// is one the test started.
+pub async fn wait_until_a_backend_is_blocked(pool: &PgPool) {
+    wait_until_backends_are_blocked(pool, 1).await;
+}
+
+/// [`wait_until_a_backend_is_blocked`] for a queue: at least `count` backends are waiting at once,
+/// so a test can line up two competitors behind one held lock before releasing it.
+pub async fn wait_until_backends_are_blocked(pool: &PgPool, count: i64) {
+    for _ in 0..500 {
+        let waiting: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pg_stat_activity
+              WHERE datname = current_database() AND wait_event_type = 'Lock'",
+        )
+        .fetch_one(pool)
+        .await
+        .expect("pg_stat_activity is readable");
+        if waiting >= count {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("fewer than {count} backends ever blocked on the locks this test holds");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

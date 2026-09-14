@@ -1150,7 +1150,10 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
-        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+        async fn update(
+            &self,
+            _request: crate::use_cases::channel::ChannelUpdate,
+        ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {

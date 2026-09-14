@@ -5,6 +5,7 @@
 //! [`read`]. Everything shared between them lives here so a column added to the table is one edit
 //! per statement rather than one per file.
 
+pub(crate) mod cancellation;
 pub mod enqueue;
 pub mod queue;
 pub mod read;
@@ -25,8 +26,9 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, DeliveryId, DeliveryPartId, DeliveryPartStatus, DeliveryPurpose,
-            DeliveryStatus, ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
+            ChannelBindingId, DeliveryCancellation, DeliveryCancellationReason, DeliveryId,
+            DeliveryPartId, DeliveryPartStatus, DeliveryPurpose, DeliveryStatus,
+            ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
         },
     },
     transport::{
@@ -43,7 +45,7 @@ pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, message
     depends_on_delivery_id, correlation_id, transport, purpose, idempotency_key, status,
     attempt_count, max_attempts, available_at, last_error_class, last_error_detail,
     execution_id, owner_worker_id, locked_at, lock_expires_at, delivered_at,
-    created_at, updated_at"#;
+    created_at, updated_at, cancellation_requested_at, cancellation_reason"#;
 
 /// The same list, qualified by a table alias.
 ///
@@ -164,9 +166,31 @@ pub(crate) struct DeliveryDb {
     pub delivered_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub cancellation_requested_at: Option<DateTime<Utc>>,
+    pub cancellation_reason: Option<String>,
 }
 
 impl DeliveryDb {
+    /// The cancellation intent, both columns or neither -- `message_deliveries_cancellation_check`
+    /// says the same, so a half-written one is a row this build must not guess about.
+    pub(crate) fn cancellation(&self) -> AppResult<Option<DeliveryCancellation>> {
+        match (
+            self.cancellation_requested_at,
+            self.cancellation_reason.as_deref(),
+        ) {
+            (None, None) => Ok(None),
+            (Some(requested_at), Some(reason)) => Ok(Some(DeliveryCancellation {
+                reason: DeliveryCancellationReason::from_str(reason)
+                    .map_err(row_error("message_deliveries.cancellation_reason"))?,
+                requested_at,
+            })),
+            _ => Err(AppError::Internal(format!(
+                "Delivery {} has a partial cancellation intent",
+                self.id
+            ))),
+        }
+    }
+
     pub(crate) fn status(&self) -> AppResult<DeliveryStatus> {
         DeliveryStatus::from_str(&self.status).map_err(row_error("message_deliveries.status"))
     }
@@ -237,6 +261,7 @@ impl DeliveryDb {
                 .map_err(row_error("message_deliveries.idempotency_key"))?,
             attempt_count: self.attempt_count,
             max_attempts: self.max_attempts,
+            cancellation: self.cancellation()?,
         })
     }
 

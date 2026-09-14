@@ -48,6 +48,7 @@ const DELIVERY_VIEW_SELECT: &str = r#"
            delivery.last_error_detail, delivery.execution_id, delivery.owner_worker_id,
            delivery.locked_at, delivery.lock_expires_at, delivery.delivered_at,
            delivery.created_at, delivery.updated_at,
+           delivery.cancellation_requested_at, delivery.cancellation_reason,
            message.subject AS subject,
            binding.display_label AS destination_label
       FROM message_deliveries AS delivery

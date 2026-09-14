@@ -554,6 +554,7 @@ fn sanitize_error(error: AppError, api_key: &str) -> AppError {
     match error {
         AppError::Execution(kind) => AppError::Execution(kind),
         AppError::Database(message) => AppError::Database(clean(message)),
+        AppError::DatabaseTimeout(message) => AppError::DatabaseTimeout(clean(message)),
         AppError::InvalidCredentials => AppError::InvalidCredentials,
         AppError::BadRequest(message) => AppError::BadRequest(clean(message)),
         AppError::NotFound(message) => AppError::NotFound(clean(message)),
@@ -567,6 +568,7 @@ fn error_type(error: &AppError) -> &'static str {
     match error {
         AppError::Execution(_) => "execution_terminal",
         AppError::Database(_) => "database",
+        AppError::DatabaseTimeout(_) => "database_timeout",
         AppError::InvalidCredentials => "invalid_credentials",
         AppError::BadRequest(_) => "bad_request",
         AppError::NotFound(_) => "not_found",

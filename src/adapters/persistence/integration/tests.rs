@@ -781,15 +781,20 @@ async fn a_channel_gets_exactly_one_canonical_email_binding() {
     for _ in 0..6 {
         let persistence = persistence.clone();
         let channel_id = support.id;
+        let company_id = acme.id;
         racers.spawn(async move {
             ChannelPersistence::update(
                 persistence.as_ref(),
-                channel_id,
-                ChannelWrite {
-                    name: "Support".into(),
-                    slug: "support".into(),
-                    enabled: false,
-                    ..ChannelWrite::default()
+                crate::use_cases::channel::ChannelUpdate {
+                    company_id,
+                    channel_id,
+                    actor_user_id: Uuid::new_v4(),
+                    write: ChannelWrite {
+                        name: "Support".into(),
+                        slug: "support".into(),
+                        enabled: false,
+                        ..ChannelWrite::default()
+                    },
                 },
             )
             .await
@@ -831,12 +836,16 @@ async fn renaming_a_channel_address_moves_its_binding_and_records_the_move() {
 
     ChannelPersistence::update(
         &persistence,
-        support.id,
-        ChannelWrite {
-            name: "Helpdesk".into(),
-            slug: "helpdesk".into(),
-            enabled: false,
-            ..ChannelWrite::default()
+        crate::use_cases::channel::ChannelUpdate {
+            company_id: acme.id,
+            channel_id: support.id,
+            actor_user_id: Uuid::new_v4(),
+            write: ChannelWrite {
+                name: "Helpdesk".into(),
+                slug: "helpdesk".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
         },
     )
     .await

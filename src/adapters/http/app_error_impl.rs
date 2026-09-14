@@ -16,6 +16,11 @@ impl IntoResponse for AppError {
             AppError::Database(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
             }
+            AppError::DatabaseTimeout(_) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "The database is busy. Try again shortly.",
+            )
+                .into_response(),
             AppError::InvalidCredentials => {
                 (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
             }

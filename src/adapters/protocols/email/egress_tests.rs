@@ -551,6 +551,7 @@ fn record() -> DeliveryRecord {
         idempotency_key: DeliveryKey::parse("reply:task:abc:email:customer@example.com").unwrap(),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,
+        cancellation: None,
     }
 }
 

@@ -1153,3 +1153,6 @@ fn a_stored_destination_is_read_through_its_own_transport() {
         .is_err()
     );
 }
+
+#[path = "cancellation_tests.rs"]
+mod cancellation;

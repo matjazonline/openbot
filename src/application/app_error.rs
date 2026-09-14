@@ -8,6 +8,13 @@ pub enum AppError {
     Execution(ExecutionFailure),
     #[error("Database error: {0}")]
     Database(String),
+    /// PostgreSQL cancelled a statement at its `lock_timeout` or `statement_timeout`. Transient:
+    /// the same work can succeed once the contention clears. Kept apart from [`Self::Timeout`],
+    /// which is an execution deadline the task worker treats as final, so a busy database never
+    /// ends a task for good. A caller that bounded its own transaction turns this into a
+    /// `Timeout` that says what did not happen.
+    #[error("Database timed out: {0}")]
+    DatabaseTimeout(String),
 
     #[error("Invalid credentials")]
     InvalidCredentials,

@@ -11,6 +11,8 @@ pub mod agent_channel;
 pub mod approval;
 pub mod attention;
 pub mod channel;
+pub(crate) mod channel_assignment;
+pub(crate) mod channel_gate;
 pub mod company;
 pub mod company_invite;
 pub mod company_resend_api;
@@ -111,9 +113,22 @@ impl PostgresPersistence {
     }
 }
 
+/// `lock_not_available`: a lock wait reached `lock_timeout`.
+const LOCK_NOT_AVAILABLE: &str = "55P03";
+/// `query_canceled`: a statement reached `statement_timeout`, or was cancelled from outside.
+const QUERY_CANCELED: &str = "57014";
+
 impl From<sqlx::Error> for AppError {
     fn from(value: sqlx::Error) -> Self {
-        AppError::Database(value.to_string())
+        let gave_up_waiting = value
+            .as_database_error()
+            .and_then(|error| error.code())
+            .is_some_and(|code| matches!(code.as_ref(), LOCK_NOT_AVAILABLE | QUERY_CANCELED));
+        if gave_up_waiting {
+            AppError::DatabaseTimeout(value.to_string())
+        } else {
+            AppError::Database(value.to_string())
+        }
     }
 }
 
@@ -333,6 +348,37 @@ mod tests {
         tx.rollback()
             .await
             .expect("the probe row leaves nothing behind");
+    }
+
+    /// A statement the server cancels at its bound is a transient timeout; any other failure stays
+    /// a database error. Lock waits reaching `lock_timeout` are covered by the channel edit.
+    #[tokio::test]
+    async fn a_statement_cancelled_at_its_timeout_is_a_database_timeout() {
+        use crate::app_error::AppError;
+
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+
+        let mut tx = pool.begin().await.expect("a transaction to bound");
+        sqlx::query("SELECT set_config('statement_timeout', '20ms', true)")
+            .execute(&mut *tx)
+            .await
+            .expect("the bound is settable");
+        let cancelled = sqlx::query("SELECT pg_sleep(1)")
+            .execute(&mut *tx)
+            .await
+            .expect_err("the sleep outlives its bound");
+        assert!(
+            matches!(AppError::from(cancelled), AppError::DatabaseTimeout(_)),
+            "a cancelled statement is a timeout"
+        );
+
+        let broken = sqlx::query("SELECT no_such_column FROM users")
+            .execute(&pool)
+            .await
+            .expect_err("the column does not exist");
+        assert!(matches!(AppError::from(broken), AppError::Database(_)));
     }
 }
 

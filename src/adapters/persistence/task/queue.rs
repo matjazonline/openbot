@@ -11,6 +11,9 @@ use uuid::Uuid;
 
 use super::*;
 use crate::{
+    adapters::persistence::channel_gate::{
+        ChannelGateAccess, acquire_channel_gate_on, task_gate_key_on,
+    },
     adapters::persistence::thread_handoff::{HandoffRunEnd, fail_handoff_run_on},
     app_error::{AppError, AppResult},
     entities::{
@@ -136,6 +139,9 @@ pub(crate) async fn mark_task_failed_on(
         TaskStopReason::OwnershipTransferred => TaskTransitionReason::OwnershipTransferred,
         TaskStopReason::AgentInstruction => TaskTransitionReason::AgentInstruction,
         TaskStopReason::DelegationCancelled => TaskTransitionReason::DelegationCancelled,
+        TaskStopReason::OperatorStopped => TaskTransitionReason::OperatorStopped,
+        TaskStopReason::ApprovalRejected => TaskTransitionReason::ApprovalRejected,
+        TaskStopReason::ChannelAgentRemoved => TaskTransitionReason::ChannelAgentRemoved,
     };
     // The lease names the run that failed, so the failure cannot be attributed to anyone else.
     let attribution =
@@ -197,12 +203,13 @@ pub(crate) async fn mark_task_failed_on(
 
 /// Which states each stop cause may act on.
 ///
-/// An operator may stop anything still in flight or recoverable. A rejected approval may only stop
-/// the task that approval parked -- a rejection is an answer to one question, not a licence to end
-/// unrelated work that has since moved on.
+/// An operator may stop anything still in flight or recoverable, and so may removing the owning
+/// agent from the task's channel. A rejected approval may only stop the task that approval parked
+/// -- a rejection is an answer to one question, not a licence to end unrelated work that has since
+/// moved on.
 pub(crate) fn stoppable_statuses(actor: StopActor) -> &'static str {
     match actor {
-        StopActor::Operator(_) => {
+        StopActor::Operator(_) | StopActor::ChannelAgentRemoved(_) => {
             "'pending', 'processing', 'pending_approval', \
              'waiting_for_third_party_reply', 'failed', 'dead_letter'"
         }
@@ -216,90 +223,312 @@ pub(crate) async fn stop_task_on(
     actor: StopActor,
 ) -> AppResult<BackgroundTask> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
-    // Delegation commands and final dispatches lock outreach before task. Keep this generic stop
-    // in the same order so an operator action cannot deadlock a command racing on the same task.
-    sqlx::query_scalar::<_, Uuid>(
-        "SELECT id FROM task_outreaches WHERE task_id = $1 ORDER BY id FOR UPDATE",
+    let company_id: Uuid =
+        sqlx::query_scalar("SELECT company_id FROM background_tasks WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+    lock_task_outreaches_on(&mut tx, &[id]).await?;
+    if stop_tasks_on(&mut tx, company_id, &[id], actor)
+        .await?
+        .is_empty()
+    {
+        // The same answer the single-row `UPDATE ... RETURNING` this replaced gave a task that
+        // was not stoppable by this actor, so callers keep telling the two apart as before.
+        return Err(AppError::from(sqlx::Error::RowNotFound));
+    }
+    withdraw_pending_work_on(&mut tx, company_id, &[id], actor.delivery_cancellation()).await?;
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+        r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status,
+                  payload, retry_count, max_retries, last_error, business_priority,
+                  business_due_at, attention_version, owner_principal_id,
+                  owner_principal_kind, ownership_version, worker_id,
+                  execution_generation, locked_at, lock_expires_at, run_at, created_at,
+                  updated_at
+             FROM background_tasks WHERE id = $1"#,
     )
-    .bind(id)
-    .fetch_all(&mut *tx)
-    .await
-    .map_err(AppError::from)?;
-    let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
-        r#"UPDATE background_tasks
-           SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-           WHERE id = $1
-             AND status IN ({statuses})
-           RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
-                     payload, retry_count, max_retries, last_error, business_priority,
-                     business_due_at, attention_version, owner_principal_id,
-                     owner_principal_kind, ownership_version, worker_id,
-                     execution_generation, locked_at, lock_expires_at, run_at, created_at,
-                     updated_at"#,
-        attribution = TransitionAttribution::stopped(actor).set_clause(),
-        statuses = stoppable_statuses(actor),
-    ))
     .bind(id)
     .fetch_one(&mut *tx)
     .await
     .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+    db.try_into()
+}
+
+/// Lock these tasks' outreaches, in id order.
+///
+/// Delegation commands and final dispatches lock outreach before task. Every stop takes the same
+/// order, so an operator action or a channel edit cannot deadlock a command racing on the same task.
+pub(crate) async fn lock_task_outreaches_on(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    task_ids: &[Uuid],
+) -> AppResult<()> {
+    sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM task_outreaches WHERE task_id = ANY($1) ORDER BY id FOR UPDATE",
+    )
+    .bind(task_ids)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+/// A task a stop has just moved to `stopped`, with what it was doing beforehand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::FromRow)]
+pub(crate) struct StoppedTask {
+    pub(crate) id: Uuid,
+    pub(crate) ownership_version: i64,
+    /// The execution the stop interrupted, when the task was running. Exactly that attempt is
+    /// closed; older generations are history and stay as they are.
+    pub(crate) interrupted_generation: Option<Uuid>,
+}
+
+/// Stop every one of these tasks that `actor` may stop, and end the work each was doing.
+///
+/// The caller holds the outreach locks ([`lock_task_outreaches_on`]); the task rows are locked here
+/// in id order. A task already outside the actor's stoppable states is left exactly as it is, so a
+/// repeated stop writes no second ledger event. Queued publications are a separate step,
+/// [`withdraw_pending_work_on`], because a completed task has those and nothing to stop.
+pub(crate) async fn stop_tasks_on(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    company_id: Uuid,
+    task_ids: &[Uuid],
+    actor: StopActor,
+) -> AppResult<Vec<StoppedTask>> {
+    if task_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    // The pre-stop generation comes from the locking read, because `RETURNING` sees the row after
+    // the lease columns were cleared.
+    let stopped = sqlx::query_as::<_, StoppedTask>(&format!(
+        r#"WITH interrupted AS (
+               SELECT id, execution_generation
+                 FROM background_tasks
+                WHERE company_id = $1 AND id = ANY($2) AND status IN ({statuses})
+                ORDER BY id
+                  FOR UPDATE
+           )
+           UPDATE background_tasks AS task
+              SET status = 'stopped', worker_id = NULL, execution_generation = NULL,
+                  locked_at = NULL, lock_expires_at = NULL, wait_expires_at = NULL,
+                  updated_at = CURRENT_TIMESTAMP, {attribution}
+             FROM interrupted
+            WHERE task.id = interrupted.id
+        RETURNING task.id, task.ownership_version,
+                  interrupted.execution_generation AS interrupted_generation"#,
+        attribution = TransitionAttribution::stopped(actor).set_clause(),
+        statuses = stoppable_statuses(actor),
+    ))
+    .bind(company_id)
+    .bind(task_ids)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if stopped.is_empty() {
+        return Ok(stopped);
+    }
+    let ids: Vec<Uuid> = stopped.iter().map(|task| task.id).collect();
+
+    close_interrupted_attempts_on(tx, &stopped, actor).await?;
     sqlx::query(
         r#"UPDATE task_outreaches
            SET status = 'cancelled', version = version + 1, updated_at = CURRENT_TIMESTAMP
-           WHERE task_id = $1 AND status IN (
+           WHERE task_id = ANY($1) AND status IN (
                'waiting', 'threshold_met', 'timeout_pending_approval', 'proceed_partial'
            )"#,
     )
-    .bind(id)
-    .execute(&mut *tx)
+    .bind(&ids)
+    .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
     sqlx::query(
         r#"UPDATE task_outreach_targets AS target SET status = 'cancelled'
            FROM task_outreaches AS outreach
-           WHERE outreach.task_id = $1 AND target.outreach_id = outreach.id
+           WHERE outreach.task_id = ANY($1) AND target.outreach_id = outreach.id
              AND target.status = 'active'"#,
     )
-    .bind(id)
-    .execute(&mut *tx)
+    .bind(&ids)
+    .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
-    // Stopping a task cancels the mail it queued and has not sent. Only *claimable* rows: one
-    // already in flight belongs to a worker holding a live lease, and reaching past that fence
-    // here would let a stop overwrite an outcome the provider had already given.
+    let versions: Vec<(Uuid, i64)> = stopped
+        .iter()
+        .map(|task| (task.id, task.ownership_version))
+        .collect();
+    super::supersede_harness_runs_for_tasks_on(tx, company_id, &versions).await?;
     sqlx::query(
-        r#"UPDATE message_deliveries
-              SET status = 'dead_letter', attempt_count = max_attempts,
-                  last_error_class = 'superseded',
-                  last_error_detail = 'The task that produced this delivery was stopped',
-                  updated_at = CURRENT_TIMESTAMP
-            WHERE task_id = $1 AND status IN ('pending', 'retryable')"#,
+        r#"UPDATE task_approval_waits SET state = 'expired'
+            WHERE company_id = $1 AND task_id = ANY($2) AND state = 'waiting'"#,
     )
-    .bind(id)
-    .execute(&mut *tx)
+    .bind(company_id)
+    .bind(&ids)
+    .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
-    super::supersede_harness_runs_on(&mut tx, db.company_id, id, db.ownership_version as u64)
-        .await?;
-    sqlx::query(
-        "UPDATE task_approval_waits SET state = 'expired' WHERE task_id = $1 AND state = 'waiting'",
-    )
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
     // A stopped task is terminal for anything waiting on it, so a drafting run stops too and its
     // reply goes back to the team rather than waiting for an agent that will never run again.
-    fail_handoff_run_on(
-        &mut tx,
-        db.company_id,
-        id,
-        HandoffRunEnd::TaskFailed,
-        "the task drafting this reply was stopped",
+    for task_id in handoff_runs_in_state_on(tx, company_id, &ids, "running").await? {
+        fail_handoff_run_on(
+            tx,
+            company_id,
+            task_id,
+            HandoffRunEnd::TaskFailed,
+            "the task drafting this reply was stopped",
+        )
+        .await?;
+    }
+    Ok(stopped)
+}
+
+/// Close exactly the attempt each stop interrupted, with the stop's typed reason.
+///
+/// Fenced on the captured generation and on `processing`: a worker that already recorded its own
+/// ending keeps it, and when the interrupted run later tries to finish, its write matches nothing.
+async fn close_interrupted_attempts_on(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    stopped: &[StoppedTask],
+    actor: StopActor,
+) -> AppResult<()> {
+    let (task_ids, generations): (Vec<Uuid>, Vec<Uuid>) = stopped
+        .iter()
+        .filter_map(|task| {
+            task.interrupted_generation
+                .map(|generation| (task.id, generation))
+        })
+        .unzip();
+    if task_ids.is_empty() {
+        return Ok(());
+    }
+    let error = match actor {
+        StopActor::Operator(_) => "An operator stopped the task during this attempt",
+        StopActor::Approval(_) => "A rejected approval stopped the task during this attempt",
+        StopActor::ChannelAgentRemoved(_) => {
+            "The owning agent was removed from the task's channel during this attempt"
+        }
+    };
+    sqlx::query(
+        r#"UPDATE task_attempts AS attempt
+              SET status = 'failed', stop_reason = $3, error = $4,
+                  finished_at = CURRENT_TIMESTAMP
+             FROM unnest($1::uuid[], $2::uuid[]) AS interrupted(task_id, execution_generation)
+            WHERE attempt.task_id = interrupted.task_id
+              AND attempt.execution_generation = interrupted.execution_generation
+              AND attempt.status = 'processing'"#,
     )
-    .await?;
-    tx.commit().await.map_err(AppError::from)?;
-    db.try_into()
+    .bind(&task_ids)
+    .bind(&generations)
+    .bind(actor.attempt_stop_reason().as_str())
+    .bind(error)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+/// What withdrawing a set of tasks' pending work took back.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct WithdrawnWork {
+    pub(crate) deliveries:
+        crate::adapters::persistence::delivery::cancellation::CancelledDeliveries,
+    pub(crate) superseded_reviews: u64,
+}
+
+/// Withdraw everything these tasks could still publish or be released by: queued and in-flight
+/// deliveries, pending review drafts, and pending human approvals.
+///
+/// Applies to stopped and completed tasks alike. A final dispatch can commit a reply to the outbox
+/// the instant before its task is stopped, and a review draft outlives the run that wrote it -- so
+/// "the task is no longer running" is not the same fact as "nothing of it can still go out".
+pub(crate) async fn withdraw_pending_work_on(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    company_id: Uuid,
+    task_ids: &[Uuid],
+    reason: crate::entities::transport::DeliveryCancellationReason,
+) -> AppResult<WithdrawnWork> {
+    if task_ids.is_empty() {
+        return Ok(WithdrawnWork::default());
+    }
+    let deliveries =
+        crate::adapters::persistence::delivery::cancellation::cancel_task_deliveries_on(
+            tx, company_id, task_ids, reason,
+        )
+        .await?;
+
+    // A superseded draft can no longer be approved: the review command requires `pending_review`
+    // under the draft's row lock, so an approval racing this either commits first -- and its
+    // delivery is cancelled above, being task-linked -- or finds the draft gone.
+    let (superseded_reviews, drafting_tasks): (i64, Vec<Uuid>) = sqlx::query_as(
+        r#"WITH superseded AS (
+               UPDATE response_drafts AS draft
+                  SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
+                WHERE draft.company_id = $1 AND draft.status = 'pending_review'
+                  AND draft.task_id = ANY($2)
+            RETURNING draft.company_id, draft.id, draft.version, draft.task_id
+           ),
+           reviews AS (
+               UPDATE response_reviews AS review
+                  SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
+                 FROM superseded
+                WHERE (review.company_id, review.draft_id, review.draft_version)
+                      = (superseded.company_id, superseded.id, superseded.version)
+                  AND review.status = 'pending'
+            RETURNING review.draft_id
+           )
+           SELECT (SELECT count(*) FROM reviews),
+                  ARRAY(SELECT DISTINCT task_id FROM superseded WHERE task_id IS NOT NULL)"#,
+    )
+    .bind(company_id)
+    .bind(task_ids)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    for task_id in drafting_tasks {
+        fail_handoff_run_on(
+            tx,
+            company_id,
+            task_id,
+            HandoffRunEnd::DraftWithdrawn,
+            "the work that drafted this reply was stopped",
+        )
+        .await?;
+    }
+
+    sqlx::query(
+        r#"UPDATE human_approvals SET status = 'expired', updated_at = CURRENT_TIMESTAMP
+            WHERE company_id = $1 AND task_id = ANY($2) AND status = 'pending'"#,
+    )
+    .bind(company_id)
+    .bind(task_ids)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(WithdrawnWork {
+        deliveries,
+        superseded_reviews: u64::try_from(superseded_reviews).unwrap_or_default(),
+    })
+}
+
+/// The tasks among these that have a drafting run in `state`, so a per-run ending is written only
+/// where one exists rather than attempted once per task.
+async fn handoff_runs_in_state_on(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    company_id: Uuid,
+    task_ids: &[Uuid],
+    state: &str,
+) -> AppResult<Vec<Uuid>> {
+    sqlx::query_scalar(
+        r#"SELECT DISTINCT task_id FROM thread_handoff_runs
+            WHERE company_id = $1 AND task_id = ANY($2) AND state = $3
+            ORDER BY task_id"#,
+    )
+    .bind(company_id)
+    .bind(task_ids)
+    .bind(state)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)
 }
 
 /// Which states each resume cause may act on.
@@ -343,11 +572,36 @@ pub(crate) fn retry_budget_clause(actor: ResumeActor) -> &'static str {
     }
 }
 
+/// Whether a task's owner may still run it: a person, nobody, or an agent still assigned to the
+/// task's primary channel. The same assignment join the claim requires, so a resume can never make
+/// runnable a task no worker would be allowed to take.
+const OWNER_STILL_ASSIGNED_SQL: &str = r#"(
+    background_tasks.owner_principal_kind IS DISTINCT FROM 'agent'
+    OR EXISTS (
+        SELECT 1 FROM principals AS owner
+        JOIN channel_agents AS assignment
+          ON assignment.company_id = owner.company_id
+         AND assignment.agent_id = owner.agent_id
+        WHERE owner.company_id = background_tasks.company_id
+          AND owner.id = background_tasks.owner_principal_id
+          AND owner.kind = 'agent'
+          AND assignment.channel_id = background_tasks.channel_id
+    )
+)"#;
+
 pub(crate) async fn resume_task_on(
     pool: &sqlx::PgPool,
     id: Uuid,
     actor: ResumeActor,
 ) -> AppResult<BackgroundTask> {
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    // A resume re-admits an agent's work through its channel assignment. The gate is held before
+    // the `UPDATE` starts, so the assignment that statement reads is the one a concurrent removal
+    // left behind rather than the one it replaced.
+    let Some(key) = task_gate_key_on(&mut tx, id).await? else {
+        return Err(AppError::from(sqlx::Error::RowNotFound));
+    };
+    acquire_channel_gate_on(&mut tx, key, ChannelGateAccess::Admit).await?;
     let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"UPDATE background_tasks
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
@@ -355,6 +609,7 @@ pub(crate) async fn resume_task_on(
                updated_at = CURRENT_TIMESTAMP, {attribution}{retry_budget}
            WHERE id = $1
              AND status IN ({statuses})
+             AND {OWNER_STILL_ASSIGNED_SQL}
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
                      payload, retry_count, max_retries, last_error, business_priority,
                      business_due_at, attention_version, owner_principal_id,
@@ -366,9 +621,32 @@ pub(crate) async fn resume_task_on(
         statuses = resumable_statuses(actor),
     ))
     .bind(id)
-    .fetch_one(pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(AppError::from)?;
+    let Some(db) = db else {
+        // Tell "its agent was removed from the channel" apart from "not resumable by this actor",
+        // which keeps the not-found answer it always had.
+        let unassigned: bool = sqlx::query_scalar(&format!(
+            "SELECT EXISTS (SELECT 1 FROM background_tasks WHERE id = $1 \
+             AND status IN ({statuses}) AND NOT {OWNER_STILL_ASSIGNED_SQL})",
+            statuses = resumable_statuses(actor),
+        ))
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        return Err(if unassigned {
+            AppError::Conflict(
+                "The agent that owns this task is no longer assigned to its channel. \
+                 Transfer the task to an assigned agent or a teammate before resuming it."
+                    .into(),
+            )
+        } else {
+            AppError::from(sqlx::Error::RowNotFound)
+        });
+    };
+    tx.commit().await.map_err(AppError::from)?;
     db.try_into()
 }
 /// The SQL half of enqueueing: the task row and its channel-target fan-out, which have to commit

@@ -40,6 +40,7 @@ fn record(company_id: uuid::Uuid) -> DeliveryRecord {
         idempotency_key: DeliveryKey::parse("reply:test").expect("a short key"),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,
+        cancellation: None,
     }
 }
 

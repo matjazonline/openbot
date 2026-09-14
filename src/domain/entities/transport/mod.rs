@@ -8,7 +8,8 @@ mod inbound;
 mod integration;
 
 pub use delivery::{
-    DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, FailureClass, aggregate_parent_status,
+    DeliveryCancellation, DeliveryCancellationReason, DeliveryPartStatus, DeliveryPurpose,
+    DeliveryStatus, FailureClass, aggregate_parent_status, cancelled_parent_status,
 };
 pub use inbound::{InboundEventErrorClass, InboundEventIgnoreReason, InboundEventStatus};
 pub use integration::{

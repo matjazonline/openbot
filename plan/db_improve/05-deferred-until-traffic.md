@@ -716,6 +716,116 @@ rows, the open-to-resolved ratio, and a before/after plan of the feed's handoff 
 cardinality. If handoffs turn out to be created by automation rather than by people, the write-rate
 argument above collapses and this reverts to an ordinary trade-off.
 
+## 8. Channel Agent Removal: Working-Set Plans Never Captured
+
+Recorded 2026-09-14 from `plan/channel_agent_removal.md` ("Implementation notes"). The feature
+shipped with no `EXPLAIN` of its own reads and **no new index**. Its queries were written to fit
+the existing indexes, but that was never checked against a plan.
+
+**What runs.** A channel edit that removes an agent runs one transaction in
+`src/adapters/persistence/channel_assignment.rs`, bounded by `RemovalBudget::DEFAULT`:
+
+- 10,000 tasks;
+- 100,000 dependent rows;
+- 2 s `lock_timeout`;
+- a 30 s deadline, which is also the `statement_timeout`.
+
+Every read below runs while the channel's exclusive assignment gate is held. Their duration is
+therefore also how long task creation, dispatch, outreach and review for that channel are held back.
+
+- **`affected_tasks_on`**: three `UNION` arms, `LIMIT` budget + 1. Each arm was written to fit an
+  index:
+  - **Arm 1, unsettled work of the removed agents' principals:**
+    - intended path: `background_tasks_unsettled_owner_idx (company_id, owner_principal_id) WHERE
+      status IN (…)`, with its status list repeated verbatim so the partial index applies;
+    - `channel_id` is a filter, not an index key;
+    - a `stopped` row survives only through three `EXISTS` probes:
+      - deliveries by `task_id`, through `message_deliveries_task_idx`;
+      - `human_approvals` by `task_id`, through `human_approvals_task_idx`;
+      - `response_drafts` by `(company_id, task_id)`, which has **no index on `task_id`**. The
+        likely path is a company-prefixed scan of `response_drafts_reviewer_pending_idx`.
+  - **Arm 2, completed tasks with live deliveries:**
+    - driven from `message_deliveries_company_status_idx (company_id, status)`;
+    - reads every live delivery in the company, from any channel, before joining to the task.
+  - **Arm 3, completed tasks with a pending review draft:**
+    - driven from `response_drafts` `WHERE company_id = $1 AND status = 'pending_review'`;
+    - intended path: a company-prefixed scan of `response_drafts_reviewer_pending_idx`, then a join
+      to the task.
+- **`ensure_dependent_work_within_on`**: eight capped counts, one per dependent relation. Each is
+  bounded by `LIMIT cap + 1` and matched on the candidate ids (`task_id = ANY($2)`).
+  - Obvious paths exist for these relations:
+    - deliveries: `message_deliveries_task_idx`;
+    - outreaches: `task_outreaches_task_status_idx`;
+    - harness runs: `task_harness_runs_task`;
+    - human approvals: `human_approvals_task_idx`.
+  - The `CREATE INDEX` list shows none for `task_approval_waits`, or for `task_outreach_targets` by
+    `outreach_id`. Constraint-backed keys were not checked, so confirm them in the catalog before
+    calling them missing.
+- **The set-based writes**: `stop_tasks_on`, `withdraw_pending_work_on`, `cancel_task_deliveries_on`
+  (`task/queue.rs`, `delivery/cancellation.rs`).
+  - Each is one statement over up to 10,000 ids in an `ANY($n)` array.
+  - They fire `background_tasks`' eight row triggers once per stopped task.
+
+**What exists instead of a plan.** `a_five_thousand_task_backlog_is_removed_inside_the_default_budget`
+(`channel_assignment_tests.rs`) uses its own database with:
+
+- 5,000 unsettled tasks and 20,000 completed tasks for one agent;
+- 60 queued deliveries.
+
+It asserts that:
+
+- exactly the 5,000 tasks are stopped, inside the default deadline;
+- a task limit of one below the affected count refuses the edit;
+- after the removal, all 25,000 settled tasks leave the working set empty, so the removal still fits
+  a budget of zero tasks.
+
+The whole test took about 12 s on a dev machine, including database creation, migrations and
+seeding. That is a **correctness and bound check**. It is evidence neither about plan shape nor
+about a production-like distribution. It has one channel and one company, and nothing competes with
+it.
+
+**What to capture.** Use the "Plan capture" recipe below: custom and generic plans, since the ids
+arrive as arrays. Capture each of these statements:
+
+- `affected_tasks_on`;
+- `ensure_dependent_work_within_on`;
+- the `stop_tasks_on` CTE;
+- the delivery cancellation.
+
+Take them at three selectivities for the removed agent:
+
+- a handful of unsettled tasks;
+- thousands of unsettled tasks;
+- thousands of settled tasks with almost no unsettled ones.
+
+The last case is what arm 1's `stopped` handling and arm 2's company-wide delivery scan must keep
+cheap. For arms 2 and 3, also vary how much of the company's live delivery and pending-draft volume
+belongs to *other* channels. Neither arm can narrow by channel before its join.
+
+**Candidates, not proposals.**
+
+- An index on `response_drafts (company_id, task_id) WHERE status = 'pending_review'`, if the arm 1
+  probe and arm 3 show a company-wide scan.
+- A narrower access path for arm 2, if a large company's live delivery volume dominates.
+
+Both tables take writes at queue rate, so §2's write-amplification argument applies. The removal
+is a rare, human-initiated operation, which argues for accepting a scan unless its gate hold time
+is visibly long.
+
+**Sensitive to:**
+
+- live deliveries and pending drafts per company, especially across channels;
+- unsettled tasks per agent;
+- stopped tasks that still hold cancellable work.
+
+**What would close it:** plans for the four statements at the three selectivities above, plus the
+edit's measured gate hold time. The edit already logs its duration: `info!` on commit, `warn!` on
+refusal, both with `duration_ms`. Close without an index if the hold stays well under the 2 s
+`lock_timeout` that competing admissions would otherwise hit. The skewed seeder below needs:
+
+- unsettled and settled task history per agent per channel;
+- live deliveries and pending drafts spread across several channels of the same company.
+
 ## Message-to-task correctness fix (2026-09-12)
 
 The explicitly authorized replacement for the global 800-candidate task lookup ships with a
@@ -758,7 +868,7 @@ companies/threads plus window selectivity.
 ### Workload runner
 
 Seeding alone is insufficient. Add a runner that executes the actual application query shapes over a
-fixed matrix, scoped to the four items in this file:
+fixed matrix, scoped to the deferred items in this file:
 
 - small, median, and large companies;
 - short and long dashboard windows, in both company and System scope;
