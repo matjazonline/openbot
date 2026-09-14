@@ -46,6 +46,7 @@ pub struct ChannelWrite {
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
+    pub response_trigger: crate::entities::channel::ChannelResponseTrigger,
     pub external_response_review_override:
         Option<crate::entities::response_draft::ExternalResponseReview>,
     pub preferred_reviewer_principal_id: Option<crate::entities::transport::PrincipalId>,
@@ -1138,6 +1139,7 @@ mod tests {
         let (access_mode, principal_grants) =
             email_allowlist_policy(company_id, participant_emails.as_deref());
         Channel {
+            response_trigger: write.response_trigger,
             owner_agent_id: None,
             id,
             company_id,
@@ -1709,6 +1711,7 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,
@@ -1732,6 +1735,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,

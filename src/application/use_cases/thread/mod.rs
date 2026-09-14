@@ -740,7 +740,17 @@ impl ThreadUseCases {
         let author = qualified_email_identity(mail.from.clone())?;
         let recipient_handle = qualified_email_identity(mail.recipient_to.clone())?;
 
+        let quiet_body = crate::entities::channel::strip_quiet_prefix(mail.body_text);
+        let disposition = if quiet_body.is_some() {
+            MessageDisposition::FileOnly
+        } else {
+            MessageDisposition::Answer
+        };
         let draft = InboundDraft {
+            direct_parent_message_key: metadata
+                .direct_parent_id()
+                .map(external_message_key)
+                .transpose()?,
             // No durable inbound event: the relay hands the message over in-process, and this
             // ingest is the only claim on it.
             event_key: None,
@@ -766,12 +776,12 @@ impl ThreadUseCases {
                     recipient_handle.clone(),
                 )],
             )?,
-            content: CanonicalContent::parse(mail.subject, mail.body_text)?,
+            content: CanonicalContent::parse(mail.subject, quiet_body.unwrap_or(mail.body_text))?,
             attachments: BoundedVec::empty(),
             directives: IngressDirectives {
                 hop_count: mail.hop_count,
                 trace_channels: BoundedVec::parse("trace channels", mail.trace.clone())?,
-                disposition: MessageDisposition::Answer,
+                disposition,
                 source_channel_id: Some(mail.source_channel_id),
                 target_thread_id: None,
                 reply_to_message_id: None,
@@ -792,7 +802,7 @@ impl ThreadUseCases {
             role: RecipientRole::To,
             handle: recipient_handle,
             target: AddressedTarget::Channels(vec![selector.clone()]),
-            disposition: MessageDisposition::Answer,
+            disposition,
         }])?;
 
         Ok(InboundMessage::arriving(
@@ -1111,6 +1121,10 @@ impl ThreadUseCases {
                 .in_reply_to(Some(parent_rfc.clone()))
                 .references(vec![parent_rfc.clone()]);
         }
+        let direct_parent_message_key = metadata
+            .direct_parent_id()
+            .map(external_message_key)
+            .transpose()?;
         let extension = ProtocolExtension::email(metadata);
 
         let message_key = external_message_key(&rfc_message_id)?;
@@ -1133,6 +1147,7 @@ impl ThreadUseCases {
         };
 
         let draft = InboundDraft {
+            direct_parent_message_key,
             event_key: None,
             message_key,
             thread_key,

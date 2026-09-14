@@ -133,6 +133,7 @@ pub struct ChannelDraft<'a> {
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
+    pub response_trigger: crate::entities::channel::ChannelResponseTrigger,
     pub retrieve_company_memory: bool,
     pub retrieve_agent_memory: bool,
     pub retrieve_user_memory: bool,
@@ -154,6 +155,7 @@ impl Default for ChannelDraft<'_> {
             advanced: false,
             enabled: true,
             add_3rd_party: true,
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
@@ -718,6 +720,7 @@ pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </span>
                         </label>
                     </div>
+                    {response_trigger_field}
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
@@ -732,6 +735,7 @@ pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
         memory_fields = memory_fields(fields.memory_ready, draft),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
+        response_trigger_field = response_trigger_field(draft.response_trigger),
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
     )
 }
@@ -979,6 +983,7 @@ pub(super) fn stored_channel_draft<'a>(
         advanced: true,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
+        response_trigger: channel.response_trigger,
         retrieve_company_memory: channel.retrieve_company_memory,
         retrieve_agent_memory: channel.retrieve_agent_memory,
         retrieve_user_memory: channel.retrieve_user_memory,
@@ -986,6 +991,37 @@ pub(super) fn stored_channel_draft<'a>(
         persist_agent_memory: channel.persist_agent_memory,
         persist_user_memory: channel.persist_user_memory,
     }
+}
+
+fn response_trigger_field(selected: crate::entities::channel::ChannelResponseTrigger) -> String {
+    use crate::entities::channel::ChannelResponseTrigger;
+    let options: String = [
+        (
+            ChannelResponseTrigger::Always,
+            "Always (To, or when mentioned in Cc)",
+        ),
+        (ChannelResponseTrigger::Mentioned, "Only when @mentioned"),
+        (
+            ChannelResponseTrigger::MentionedOrReplyToAgent,
+            "When @mentioned or replying to an agent message",
+        ),
+    ]
+    .into_iter()
+    .map(|(trigger, label)| {
+        format!(
+            "<option value=\"{}\"{}>{label}</option>",
+            trigger.as_str(),
+            if trigger == selected { " selected" } else { "" },
+        )
+    })
+    .collect();
+    format!(
+        r#"<label class="form-control w-full">
+        <div class="label"><span class="text-xs opacity-70">When the agent responds</span></div>
+        <select name="response_trigger" class="select w-full">{options}</select>
+        <div class="label"><span class="text-[11px] opacity-60">This rule also applies to messages from other agents. Reply mode requires a direct reply to an agent message in this channel's thread.</span></div>
+    </label>"#
+    )
 }
 
 fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {

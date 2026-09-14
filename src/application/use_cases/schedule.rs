@@ -1409,6 +1409,7 @@ mod tests {
     /// the company team, which is the path the run-as member is added on top of.
     fn channel_of(id: Uuid, company_id: Uuid) -> Channel {
         Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             id,
             company_id,
@@ -1566,6 +1567,7 @@ mod tests {
         };
 
         let channel = Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             id: channel_id,
             company_id,

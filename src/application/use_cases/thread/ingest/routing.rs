@@ -13,9 +13,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        channel::Channel,
+        channel::{AnswerFacts, Channel, ChannelResponseTrigger},
         company::Company,
         email_message::EmailMessageMetadata,
+        message::MessageRole,
         outreach::OutreachReplyMatch,
         participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
@@ -604,10 +605,9 @@ impl ThreadUseCases {
                 ));
             }
 
-            let answers = candidate.role == RecipientRole::To
-                || self
-                    .cc_was_mentioned(candidate, &body_text, directory)
-                    .await?;
+            let answers = self
+                .candidate_answers(candidate, &target, draft, &body_text, directory)
+                .await?;
 
             let hold = self
                 .hold_decision(
@@ -739,11 +739,64 @@ impl ThreadUseCases {
         ))))
     }
 
-    /// Whether a copied channel was actually named in the body.
-    ///
-    /// A `To` recipient is asked something; a `Cc` is only copied, and a copy runs the agent only
-    /// when the writer named the channel, one of its aliases, its address, or one of its agents.
-    async fn cc_was_mentioned(
+    async fn candidate_answers(
+        &self,
+        candidate: &ChannelCandidate,
+        target: &ThreadTarget,
+        draft: &InboundDraft,
+        body: &str,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<bool> {
+        let trigger = candidate.channel.response_trigger;
+        let mut facts = AnswerFacts {
+            role: candidate.role,
+            mentioned: false,
+            replies_to_agent: false,
+        };
+        if trigger.answers(facts) {
+            return Ok(true);
+        }
+        facts.mentioned = self
+            .channel_was_mentioned(candidate, body, directory)
+            .await?;
+        if trigger == ChannelResponseTrigger::MentionedOrReplyToAgent && !facts.mentioned {
+            facts.replies_to_agent = self.replies_to_agent(candidate, target, draft).await?;
+        }
+        Ok(trigger.answers(facts))
+    }
+
+    async fn replies_to_agent(
+        &self,
+        candidate: &ChannelCandidate,
+        target: &ThreadTarget,
+        draft: &InboundDraft,
+    ) -> AppResult<bool> {
+        let ThreadTarget::Existing(thread_id) = target else {
+            return Ok(false);
+        };
+        let parent = match draft.directives.reply_to_message_id {
+            Some(id) => Some(id),
+            None => match &draft.direct_parent_message_key {
+                Some(key) => {
+                    self.correlation_store
+                        .message_for_external_key(candidate.binding_id, key)
+                        .await?
+                }
+                None => None,
+            },
+        };
+        let Some(parent) = parent else {
+            return Ok(false);
+        };
+        Ok(self
+            .thread_persistence
+            .get_thread_message(*thread_id, parent)
+            .await?
+            .is_some_and(|message| message.role == MessageRole::Agent))
+    }
+
+    /// Whether the body names the channel, an alias, its address, or one of its agents.
+    async fn channel_was_mentioned(
         &self,
         candidate: &ChannelCandidate,
         body: &str,

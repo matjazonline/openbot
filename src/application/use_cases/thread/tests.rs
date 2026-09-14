@@ -3,7 +3,7 @@ use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
-use crate::entities::channel::{Channel, ChannelAccessMode};
+use crate::entities::channel::{Channel, ChannelAccessMode, ChannelResponseTrigger};
 use crate::entities::company::CompanyAccess;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
@@ -853,6 +853,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -876,6 +877,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -990,6 +992,7 @@ async fn test_spf_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1098,6 +1101,7 @@ async fn test_high_spam_score_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1204,6 +1208,7 @@ async fn test_dmarc_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1310,6 +1315,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1417,6 +1423,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1525,6 +1532,7 @@ async fn test_channel_in_cc_resolves_properly() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -1639,6 +1647,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1662,6 +1671,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1796,6 +1806,7 @@ async fn test_pipeline_address_chaining_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1819,6 +1830,7 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1842,6 +1854,7 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1960,6 +1973,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1983,6 +1997,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2140,6 +2155,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -2301,6 +2317,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2324,6 +2341,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2347,6 +2365,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2504,6 +2523,7 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -2698,6 +2718,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2721,6 +2742,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2894,6 +2916,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2917,6 +2940,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -2995,6 +3019,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -3018,6 +3043,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_at: Utc::now(),
             },
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -3097,6 +3123,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -3316,6 +3343,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -3438,6 +3466,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 /// Named fields rather than positional arguments: `enabled` and `add_3rd_party` are same-typed
 /// switches that a positional call could silently transpose.
 struct TestChannel {
+    response_trigger: ChannelResponseTrigger,
     enabled: bool,
     add_3rd_party: bool,
     alias_slugs: Vec<ChannelSlug>,
@@ -3450,6 +3479,7 @@ impl Default for TestChannel {
     /// what every channel is until someone changes it.
     fn default() -> Self {
         Self {
+            response_trigger: ChannelResponseTrigger::Always,
             enabled: true,
             add_3rd_party: true,
             alias_slugs: Vec::new(),
@@ -3480,6 +3510,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
 }
 
 struct ChannelFixture {
+    channels: Arc<MockChannelPersistence>,
     use_cases: ThreadUseCases,
     company_id: Uuid,
     channel_id: Uuid,
@@ -3507,6 +3538,7 @@ fn channel_fixture(spec: TestChannel) -> ChannelFixture {
 
 fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> ChannelFixture {
     let TestChannel {
+        response_trigger,
         enabled,
         add_3rd_party,
         alias_slugs,
@@ -3535,6 +3567,7 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger,
             owner_agent_id: None,
             enabled,
             add_3rd_party,
@@ -3565,7 +3598,7 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
     let tasks = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::for_test(
         threads.clone(),
-        channel_persistence,
+        channel_persistence.clone(),
         company_persistence,
         participants.clone(),
         tasks.clone(),
@@ -3573,6 +3606,7 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
     );
 
     ChannelFixture {
+        channels: channel_persistence,
         use_cases,
         company_id,
         channel_id,
@@ -4376,6 +4410,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
             let (access_mode, principal_grants) =
                 email_allowlist_policy(company_id, spec.participant_emails.as_deref());
             Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 id: Uuid::new_v4(),
                 company_id,
@@ -4908,6 +4943,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -5034,6 +5070,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -5143,6 +5180,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -5232,6 +5270,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
@@ -5675,3 +5714,6 @@ async fn a_second_outside_reply_opens_another_generation_on_the_same_thread() {
         "each held message opens a generation of its own"
     );
 }
+
+#[path = "response_trigger_tests.rs"]
+mod response_trigger_tests;

@@ -1547,6 +1547,7 @@ mod tests {
 
     fn owned(company_id: Uuid, agent_id: Option<Uuid>) -> Channel {
         Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: agent_id,
             id: Uuid::new_v4(),
             company_id,

@@ -44,6 +44,7 @@ pub struct ChannelDb {
     pub agent_ids: Option<Vec<Uuid>>,
     pub enabled: bool,
     pub add_3rd_party: bool,
+    pub response_trigger: String,
     pub retrieve_company_memory: bool,
     pub retrieve_agent_memory: bool,
     pub retrieve_user_memory: bool,
@@ -80,6 +81,7 @@ impl TryFrom<ChannelDb> for Channel {
             agent_ids: db.agent_ids,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
+            response_trigger: db.response_trigger.parse().map_err(AppError::Internal)?,
             retrieve_company_memory: db.retrieve_company_memory,
             retrieve_agent_memory: db.retrieve_agent_memory,
             retrieve_user_memory: db.retrieve_user_memory,
@@ -141,7 +143,7 @@ const CHANNEL_SELECT: &str = r#"
                '[]'::jsonb) AS principal_grants,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.enabled, ch.add_3rd_party,
+           ch.enabled, ch.add_3rd_party, ch.response_trigger,
            ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
            ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
            ch.created_by, ch.created_at
@@ -324,9 +326,9 @@ impl ChannelPersistence for PostgresPersistence {
                     id, company_id, name, description, access_mode, enabled, add_3rd_party, created_by,
                     retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
                     persist_company_memory, persist_agent_memory, persist_user_memory,
-                    external_response_review_override, preferred_reviewer_principal_id
+                    external_response_review_override, preferred_reviewer_principal_id, response_trigger
                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                         $9, $10, $11, $12, $13, $14, $15, $16)"#,
+                         $9, $10, $11, $12, $13, $14, $15, $16, $17)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -352,6 +354,7 @@ impl ChannelPersistence for PostgresPersistence {
                 .preferred_reviewer_principal_id
                 .map(crate::entities::transport::PrincipalId::as_uuid),
         )
+        .bind(write.response_trigger.as_str())
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -411,9 +414,9 @@ impl ChannelPersistence for PostgresPersistence {
                     created_by, retrieve_company_memory, retrieve_agent_memory,
                     retrieve_user_memory, persist_company_memory, persist_agent_memory,
                     persist_user_memory, external_response_review_override,
-                    preferred_reviewer_principal_id)
+                    preferred_reviewer_principal_id, response_trigger)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                       $15, $16)"#,
+                       $15, $16, $17)"#,
         )
         .bind(channel_id)
         .bind(company_id)
@@ -439,6 +442,7 @@ impl ChannelPersistence for PostgresPersistence {
                 .preferred_reviewer_principal_id
                 .map(crate::entities::transport::PrincipalId::as_uuid),
         )
+        .bind(channel.response_trigger.as_str())
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -583,7 +587,8 @@ pub(super) async fn write_channel_settings_on(
                    persist_company_memory = $9, persist_agent_memory = $10,
                    persist_user_memory = $11,
                    external_response_review_override = COALESCE($12, external_response_review_override),
-                   preferred_reviewer_principal_id = COALESCE($13, preferred_reviewer_principal_id)
+                   preferred_reviewer_principal_id = COALESCE($13, preferred_reviewer_principal_id),
+                   response_trigger = $16
                WHERE id = $14 AND company_id = $15"#,
         )
         .bind(&write.name)
@@ -609,6 +614,7 @@ pub(super) async fn write_channel_settings_on(
         )
         .bind(id)
         .bind(company_id)
+        .bind(write.response_trigger.as_str())
         .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
@@ -754,9 +760,9 @@ async fn create_owned_agent_channel(
                     add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
                     retrieve_user_memory, persist_company_memory, persist_agent_memory,
                     persist_user_memory, external_response_review_override,
-                    preferred_reviewer_principal_id)
+                    preferred_reviewer_principal_id, response_trigger)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-                       $16, $17)"#,
+                       $16, $17, $18)"#,
     )
     .bind(channel_id)
     .bind(company_id)
@@ -783,6 +789,7 @@ async fn create_owned_agent_channel(
             .preferred_reviewer_principal_id
             .map(crate::entities::transport::PrincipalId::as_uuid),
     )
+    .bind(channel.response_trigger.as_str())
     .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
@@ -909,6 +916,7 @@ mod tests {
             &persistence,
             company.id,
             ChannelWrite {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Mentioned,
                 name: "Inbound Email".into(),
                 description: Some("Takes support mail from the website form.".into()),
                 slug: "inbound-email".into(),
@@ -960,6 +968,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(fetched.id, channel.id);
+        assert_eq!(
+            fetched.response_trigger,
+            crate::entities::channel::ChannelResponseTrigger::Mentioned
+        );
 
         // 3. List by company ID
         let list = ChannelPersistence::list_by_company_id(&persistence, company.id)
@@ -975,6 +987,8 @@ mod tests {
                 channel.id,
                 ChannelWrite {
                     name: "Inbound Email V2".into(),
+                    response_trigger:
+                        crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent,
                     description: Some("Now also handles refund requests.".into()),
                     slug: "inbound-email-v2".into(),
                     enabled: false,
@@ -1011,6 +1025,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(!reread.enabled);
+        assert_eq!(
+            reread.response_trigger,
+            crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent
+        );
         assert!(reread.add_3rd_party);
         assert_eq!(
             reread.description.as_deref(),
@@ -1273,6 +1291,7 @@ mod tests {
             ChannelWrite {
                 name: "Personal agent".into(),
                 slug: "personal-agent".into(),
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Mentioned,
                 participant_emails: Some(vec!["outside@example.com".into()]),
                 enabled: true,
                 add_3rd_party: false,
@@ -1284,6 +1303,44 @@ mod tests {
         )
         .await
         .unwrap();
+
+        assert_eq!(
+            channel.response_trigger,
+            crate::entities::channel::ChannelResponseTrigger::Mentioned
+        );
+        let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(fetched.response_trigger, channel.response_trigger);
+        ChannelPersistence::update(
+            &persistence,
+            test_update(
+                company.id,
+                channel.id,
+                ChannelWrite {
+                    name: channel.name.clone(),
+                    slug: channel.slug.to_string(),
+                    enabled: true,
+                    participant_emails: Some(vec!["outside@example.com".into()]),
+                    retrieve_user_memory: true,
+                    persist_user_memory: true,
+                    response_trigger:
+                        crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent,
+                    ..Default::default()
+                },
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            ChannelPersistence::get_by_id(&persistence, channel.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .response_trigger,
+            crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent
+        );
 
         assert_eq!(channel.owner_agent_id, Some(agent.id));
         assert_eq!(channel.agent_ids, Some(vec![agent.id]));

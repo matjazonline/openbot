@@ -450,6 +450,7 @@ mod tests {
             company_membership: CompanyMembership::Owner,
         };
         let channel = Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,

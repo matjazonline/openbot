@@ -357,6 +357,7 @@ impl EmailIngressAdapter {
         };
 
         Ok(InboundDraft {
+            direct_parent_message_key: metadata.direct_parent_id().map(message_key).transpose()?,
             // Mail has no delivery-event identity of its own: the SMTP transaction is the event,
             // and it is gone by the time this returns. A transport with a durable inbox names its
             // event row here instead.

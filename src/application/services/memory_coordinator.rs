@@ -599,6 +599,7 @@ mod tests {
 
     fn memory_channel(company_id: Uuid) -> Channel {
         Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id,

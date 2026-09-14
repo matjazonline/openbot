@@ -113,6 +113,7 @@ pub struct ChannelForm {
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
+    pub response_trigger: Option<String>,
     pub external_response_review_override: Option<String>,
     /// `"inherit"` and the empty string clear the override; an unrecognised value is refused.
     ///
@@ -142,6 +143,17 @@ impl ChannelForm {
     /// reasoning as [`ChannelForm::enabled`].
     pub fn add_3rd_party(&self) -> bool {
         checkbox_ticked(self.add_3rd_party.as_deref())
+    }
+
+    /// Forms replace settings; omission selects the product creation default.
+    pub fn response_trigger(
+        &self,
+    ) -> Result<crate::entities::channel::ChannelResponseTrigger, String> {
+        self.response_trigger
+            .as_deref()
+            .map(str::parse)
+            .transpose()
+            .map(Option::unwrap_or_default)
     }
 
     pub fn confirm_spam_disabled(&self) -> bool {
@@ -271,6 +283,7 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
+    pub response_trigger: Option<crate::entities::channel::ChannelResponseTrigger>,
     pub external_response_review_override:
         Option<crate::entities::response_draft::ExternalResponseReview>,
     /// Omitted or `null` returns the channel to inheriting the company default: like every other
@@ -496,6 +509,10 @@ async fn create_channel_handler(
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
+    let response_trigger = match form.response_trigger() {
+        Ok(trigger) => trigger,
+        Err(error) => return view.render(Some(error)).await,
+    };
     let add_3rd_party = form.add_3rd_party();
     let memory = match form.memory_settings() {
         Ok(memory) => memory,
@@ -510,6 +527,7 @@ async fn create_channel_handler(
     let write = ChannelWrite {
         enabled,
         add_3rd_party,
+        response_trigger,
         external_response_review_override: parse_review_override(
             form.external_response_review_override.as_deref(),
         ),
@@ -757,6 +775,10 @@ async fn update_channel_handler(
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
+    let response_trigger = match form.response_trigger() {
+        Ok(trigger) => trigger,
+        Err(error) => return Html(pages::error_alert(&error)),
+    };
     let add_3rd_party = form.add_3rd_party();
     let memory = match form.memory_settings() {
         Ok(memory) => memory,
@@ -779,6 +801,7 @@ async fn update_channel_handler(
         agent_ids,
         enabled,
         add_3rd_party,
+        response_trigger,
         external_response_review_override: parse_review_override(
             form.external_response_review_override.as_deref(),
         ),
@@ -1596,6 +1619,7 @@ async fn create_channel_json(
         agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        response_trigger: payload.response_trigger.unwrap_or_default(),
         external_response_review_override: payload.external_response_review_override,
         preferred_reviewer_principal_id: payload
             .preferred_reviewer_principal_id
@@ -1676,6 +1700,7 @@ pub(super) async fn update_channel_json(
         agent_ids: payload.agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        response_trigger: payload.response_trigger.unwrap_or_default(),
         external_response_review_override: payload.external_response_review_override,
         preferred_reviewer_principal_id: payload
             .preferred_reviewer_principal_id
@@ -1835,6 +1860,7 @@ mod tests {
         };
 
         let channel = Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,

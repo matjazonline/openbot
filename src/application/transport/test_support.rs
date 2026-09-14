@@ -35,6 +35,7 @@ pub fn draft_from(sender: &str, subject: &str, body: &str) -> InboundDraft {
     let rfc_id = MessageId::from(format!("<{}@example.test>", uuid::Uuid::new_v4()));
     let metadata = EmailMessageMetadata::new(rfc_id.clone());
     InboundDraft {
+        direct_parent_message_key: None,
         event_key: None,
         message_key: ExternalMessageKey::parse(rfc_id.as_str()).expect("a valid message key"),
         thread_key: ExternalThreadKey::parse(rfc_id.as_str()).expect("a valid thread key"),

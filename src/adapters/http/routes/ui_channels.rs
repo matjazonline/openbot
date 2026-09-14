@@ -384,6 +384,7 @@ async fn create_easy_channels(
     let mut created = Vec::new();
     for agent in selected {
         let write = ChannelWrite {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             name: agent.name.clone(),
             slug: agent.slug.clone(),
             agent_ids: Some(vec![agent.id]),
@@ -701,6 +702,7 @@ impl SubmittedChannel {
             advanced: self.form.form_mode.as_deref() != Some("simple"),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
+            response_trigger: self.form.response_trigger().unwrap_or_default(),
             retrieve_company_memory: self.form.retrieve_company_memory.is_some(),
             retrieve_agent_memory: self.form.retrieve_agent_memory.is_some(),
             retrieve_user_memory: self.form.retrieve_user_memory.is_some(),
@@ -730,6 +732,7 @@ impl SubmittedChannel {
             agent_ids,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
+            response_trigger: self.form.response_trigger()?,
             external_response_review_override: super::channel::parse_review_override(
                 self.form.external_response_review_override.as_deref(),
             ),
@@ -777,3 +780,7 @@ mod tests {
         assert_eq!(submitted.draft().name, "Support");
     }
 }
+
+#[cfg(test)]
+#[path = "channel_response_trigger_tests.rs"]
+mod response_trigger_tests;

@@ -386,6 +386,7 @@ impl OwnedAgentChannelPersistence for MockAgentPersistence {
         let (access_mode, principal_grants) =
             email_allowlist_policy(company_id, participant_emails.as_deref());
         let channel = Channel {
+            response_trigger: channel.response_trigger,
             id: Uuid::new_v4(),
             company_id,
             owner_agent_id: Some(agent.id),

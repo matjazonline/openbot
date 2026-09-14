@@ -41,18 +41,25 @@ impl EmailMessageMetadata {
         }
     }
 
+    /// The direct parent, never an older ancestor when this id is unresolved.
+    pub fn direct_parent_id(&self) -> Option<&MessageId> {
+        self.in_reply_to.as_ref().or_else(|| self.references.last())
+    }
+
     pub fn in_reply_to(mut self, in_reply_to: Option<MessageId>) -> Self {
         self.in_reply_to = in_reply_to;
         self
     }
 
-    /// Sets the `References` chain, dropping anything past [`MAX_RETAINED_REFERENCES`].
+    /// Bounds the `References` chain while retaining its root and direct parent.
     ///
     /// Truncated rather than rejected: a client with a pathological chain still has a deliverable
-    /// message, and the entries that matter for threading are the ones nearest the root.
+    /// message. Keep the root for correlation and the last entry for response eligibility.
     pub fn references(mut self, references: Vec<MessageId>) -> Self {
         let mut references = references;
-        references.truncate(MAX_RETAINED_REFERENCES);
+        if references.len() > MAX_RETAINED_REFERENCES {
+            references.drain(MAX_RETAINED_REFERENCES - 1..references.len() - 1);
+        }
         self.references = references;
         self
     }
@@ -114,6 +121,26 @@ impl EmailMessageMetadata {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn direct_parent_prefers_in_reply_to_otherwise_the_last_reference() {
+        let metadata = super::EmailMessageMetadata::new("<new>".into())
+            .references(vec!["<root>".into(), "<last>".into()]);
+        assert_eq!(
+            metadata.direct_parent_id().map(|id| id.as_str()),
+            Some("<last>")
+        );
+        let metadata = metadata.in_reply_to(Some("<direct>".into()));
+        assert_eq!(
+            metadata.direct_parent_id().map(|id| id.as_str()),
+            Some("<direct>")
+        );
+        assert!(
+            super::EmailMessageMetadata::new("<new>".into())
+                .direct_parent_id()
+                .is_none()
+        );
+    }
+
     use super::*;
 
     #[test]
@@ -176,5 +203,10 @@ mod tests {
                 .collect(),
         );
         assert_eq!(metadata.references.len(), MAX_RETAINED_REFERENCES);
+        assert_eq!(metadata.conversation_root_key().as_str(), "<0@example.com>");
+        assert_eq!(
+            metadata.direct_parent_id().unwrap().as_str(),
+            format!("<{}@example.com>", MAX_RETAINED_REFERENCES + 49)
+        );
     }
 }

@@ -587,6 +587,7 @@ mod tests {
         };
 
         let channel = crate::entities::channel::Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,

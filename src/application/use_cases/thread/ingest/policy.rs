@@ -325,6 +325,7 @@ mod tests {
 
     fn draft(policy: IngressPolicyFacts, directives: IngressDirectives) -> InboundDraft {
         InboundDraft {
+            direct_parent_message_key: None,
             event_key: None,
             message_key: ExternalMessageKey::parse("<m@example.com>").unwrap(),
             thread_key: ExternalThreadKey::parse("<m@example.com>").unwrap(),

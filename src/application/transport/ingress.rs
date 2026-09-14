@@ -338,6 +338,8 @@ impl ReplyCandidates {
 /// own.
 #[derive(Debug, Clone)]
 pub struct InboundDraft {
+    /// Direct parent used for response eligibility before binding and commit.
+    pub direct_parent_message_key: Option<ExternalMessageKey>,
     pub event_key: Option<ExternalEventKey>,
     pub message_key: ExternalMessageKey,
     pub thread_key: ExternalThreadKey,

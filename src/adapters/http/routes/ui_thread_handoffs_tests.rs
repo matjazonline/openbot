@@ -217,6 +217,7 @@ impl Harness {
             },
             Path((self.company_id, self.channel_id)),
             Json(channel::ChannelJsonPayload {
+                response_trigger: None,
                 name: "Support".into(),
                 description: None,
                 slug: None,

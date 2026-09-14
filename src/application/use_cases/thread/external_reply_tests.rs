@@ -488,6 +488,9 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
     let mut llm = scripted_llm(vec![LlmTurn::text(AGENT_ANSWER)]).await;
     let fx = fixture(pool, &llm.base_url).await;
 
+    sqlx::query("UPDATE channels SET response_trigger = 'mentioned_or_reply' WHERE company_id = $1 AND id = $2")
+        .bind(fx.company.id).bind(fx.channel.id).execute(&fx.pool).await.unwrap();
+
     // The customer writes in.
     let first = fx
         .threads
@@ -495,7 +498,7 @@ async fn an_agent_reply_is_sent_and_the_customer_s_reply_rejoins_its_thread() {
             &fx,
             CUSTOMER_FIRST_MESSAGE_ID,
             "Invoice question",
-            "My invoice looks wrong.",
+            "@billing My invoice looks wrong.",
         ))
         .await
         .expect("the inbound message is ingested");

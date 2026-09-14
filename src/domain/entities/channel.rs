@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::entities::{
     creation::CreationProvenance,
     participant::{ChannelPrincipalGrant, PrincipalAccessContext, PrincipalCapability},
-    transport::PrincipalId,
+    transport::{PrincipalId, RecipientRole},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 use std::str::FromStr;
@@ -20,6 +20,23 @@ pub const RESERVED_SLUG_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "ms
 
 /// The separators a transport may put between a slug and one of [`RESERVED_SLUG_SUFFIXES`].
 pub const RESERVED_SUFFIX_SEPARATORS: &[char] = &['.', '+', '-', '_'];
+
+/// Removes a leading quiet directive shared by email ingress and internal mail relays.
+/// A match is a request to file the message without running an agent.
+pub fn strip_quiet_prefix(body: &str) -> Option<&str> {
+    let trimmed = body.trim_start();
+    for suffix in RESERVED_SLUG_SUFFIXES {
+        for prefix in [format!("[[{suffix}]]"), format!("[{suffix}]")] {
+            if trimmed
+                .get(..prefix.len())
+                .is_some_and(|start| start.eq_ignore_ascii_case(&prefix))
+            {
+                return Some(trimmed[prefix.len()..].trim_start());
+            }
+        }
+    }
+    None
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Channel {
@@ -66,6 +83,8 @@ pub struct Channel {
     /// Defaulted on deserialize for the same reason as `enabled`.
     #[serde(default = "default_true")]
     pub add_3rd_party: bool,
+    /// Eligibility evaluated when a message enters this channel.
+    pub response_trigger: ChannelResponseTrigger,
     #[serde(default)]
     pub retrieve_company_memory: bool,
     #[serde(default)]
@@ -116,6 +135,55 @@ impl FromStr for ChannelAccessMode {
             "allowlist" => Ok(Self::Allowlist),
             "public" => Ok(Self::Public),
             _ => Err(format!("invalid channel access mode '{value}'")),
+        }
+    }
+}
+
+/// When an accepted message should run this channel's agent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelResponseTrigger {
+    #[default]
+    Always,
+    Mentioned,
+    #[serde(rename = "mentioned_or_reply")]
+    MentionedOrReplyToAgent,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AnswerFacts {
+    pub role: RecipientRole,
+    pub mentioned: bool,
+    pub replies_to_agent: bool,
+}
+
+impl ChannelResponseTrigger {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Always => "always",
+            Self::Mentioned => "mentioned",
+            Self::MentionedOrReplyToAgent => "mentioned_or_reply",
+        }
+    }
+
+    pub fn answers(self, facts: AnswerFacts) -> bool {
+        match self {
+            Self::Always => facts.role == RecipientRole::To || facts.mentioned,
+            Self::Mentioned => facts.mentioned,
+            Self::MentionedOrReplyToAgent => facts.mentioned || facts.replies_to_agent,
+        }
+    }
+}
+
+impl FromStr for ChannelResponseTrigger {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "always" => Ok(Self::Always),
+            "mentioned" => Ok(Self::Mentioned),
+            "mentioned_or_reply" => Ok(Self::MentionedOrReplyToAgent),
+            _ => Err(format!("invalid channel response trigger '{value}'")),
         }
     }
 }
@@ -275,6 +343,7 @@ mod tests {
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
@@ -532,3 +601,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "channel_response_trigger_tests.rs"]
+mod response_trigger_tests;

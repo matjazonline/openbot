@@ -82,8 +82,8 @@ impl AgentChannelProvisioning for PostgresPersistence {
                (id, company_id, owner_agent_id, name, description, access_mode, enabled,
                 add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
                 retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                persist_user_memory)
-               VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, $9, $10, $11, $12, $13, $14)"#,
+                persist_user_memory, response_trigger)
+               VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
         )
         .bind(channel_id)
         .bind(request.company_id)
@@ -101,6 +101,7 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .bind(request.channel.persist_company_memory)
         .bind(request.channel.persist_agent_memory)
         .bind(request.channel.persist_user_memory)
+        .bind(crate::entities::channel::ChannelResponseTrigger::Always.as_str())
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;

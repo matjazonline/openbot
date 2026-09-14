@@ -303,6 +303,7 @@ mod tests {
 
     fn channel(company_id: Uuid, slug: &str) -> Channel {
         Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             owner_agent_id: None,
             enabled: true,
             add_3rd_party: false,
@@ -337,6 +338,7 @@ mod tests {
 
     fn draft(disposition: MessageDisposition) -> InboundDraft {
         InboundDraft {
+            direct_parent_message_key: None,
             event_key: None,
             message_key: ExternalMessageKey::parse("<hold@example.com>").unwrap(),
             thread_key: ExternalThreadKey::parse("<hold@example.com>").unwrap(),
@@ -545,6 +547,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
         let channel = Channel {
+            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
             id: Uuid::new_v4(),
             company_id: company.id,
             owner_agent_id: None,

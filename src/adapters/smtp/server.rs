@@ -1396,6 +1396,7 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
@@ -1632,6 +1633,7 @@ regis";
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
                 owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,

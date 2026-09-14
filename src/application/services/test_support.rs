@@ -293,6 +293,7 @@ impl ChannelPersistence for ChannelDirectoryStub {
 /// classify it as a callable sibling.
 pub fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
     Channel {
+        response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
         owner_agent_id: None,
         id: Uuid::new_v4(),
         company_id,
