@@ -401,7 +401,7 @@ Inbound Email (SMTP / Webhook)
 To start the local PostgreSQL database:
 
 ```bash
-LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var/postgresql@16
+LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 ```
 
 ### Database Migrations
@@ -417,3 +417,20 @@ To run migrations manually with SQLx migration tracking:
 cargo install sqlx-cli --no-default-features --features postgres
 sqlx migrate run
 ```
+
+### Running Checks
+
+`scripts/check.sh` runs every CI gate locally, in CI's order: generated CSS, frontend and
+deployment script tests, formatting, the transport boundary, offline compilation, Clippy, SQLx
+metadata, the network-isolated database-backed test suite and the stack budget. It ends with a
+pass/fail summary; add `--fail-fast` to stop at the first failure.
+
+```bash
+./scripts/check.sh
+```
+
+It needs the local database running, `sqlx-cli` installed and `npm ci` run once. `DATABASE_URL`
+defaults to `postgres://$(whoami)@localhost:5432/mail_agents`, which migrations are applied to. The
+test suites run against a database the script creates for the run and drops on exit, so a
+`cargo test` started elsewhere against the shared `mail_agents_test` cannot truncate fixtures out
+from under it.

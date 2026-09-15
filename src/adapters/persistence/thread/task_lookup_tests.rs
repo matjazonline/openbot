@@ -351,7 +351,12 @@ async fn a_full_message_page_uses_bounded_index_probes_on_skewed_history() {
     }
     assert_eq!(matched[&messages[THREAD_HISTORY_LIMIT - 1]], None);
     let explained = explain_lookup(&fixture, &messages, &correlations).await;
-    assert_eq!(explained[0]["Plan"]["Actual Rows"], THREAD_HISTORY_LIMIT);
+    // PostgreSQL 18 reports row counts as fractions (`200.00`), earlier releases as integers.
+    assert_eq!(
+        explained[0]["Plan"]["Actual Rows"].as_f64(),
+        Some(THREAD_HISTORY_LIMIT as f64),
+        "{explained}"
+    );
     let mut nodes = Vec::new();
     plan_nodes(&explained[0]["Plan"], &mut nodes);
     assert!(
