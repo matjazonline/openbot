@@ -25,11 +25,7 @@ use tracing::{instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::http::{
-        app_state::AppState,
-        auth::{AuthError, AuthenticatedUser},
-        pages,
-    },
+    adapters::http::{app_state::AppState, auth::AuthError, pages},
     app_error::{AppError, AppResult},
     domain::monitoring::{MonitoringService, record_pagination_observation},
     entities::{
@@ -154,6 +150,7 @@ struct Workspace {
     config: Arc<AppConfig>,
     monitoring: Arc<dyn MonitoringService>,
     user_id: Uuid,
+    viewer: crate::entities::user::Viewer,
 }
 
 impl FromRequestParts<AppState> for Workspace {
@@ -163,7 +160,7 @@ impl FromRequestParts<AppState> for Workspace {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+        let viewer = crate::entities::user::Viewer::from_request_parts(parts, state).await?;
 
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
@@ -173,7 +170,8 @@ impl FromRequestParts<AppState> for Workspace {
             deliveries: state.deliveries.clone(),
             config: state.config.clone(),
             monitoring: state.monitoring.clone(),
-            user_id: user.id,
+            user_id: viewer.user_id,
+            viewer,
         })
     }
 }
@@ -196,6 +194,7 @@ impl Workspace {
             monitoring: self.monitoring.as_ref(),
             user_id: self.user_id,
             company,
+            viewer: &self.viewer,
         }
     }
 }
@@ -855,6 +854,7 @@ struct TaskMonitorView<'a> {
     monitoring: &'a dyn MonitoringService,
     user_id: Uuid,
     company: &'a Company,
+    viewer: &'a crate::entities::user::Viewer,
 }
 
 fn authorize_collaboration_links(summary: &mut CollaborationSummary, company_id: Uuid) {
@@ -885,21 +885,9 @@ fn authorize_collaboration_links(summary: &mut CollaborationSummary, company_id:
 
 impl TaskMonitorView<'_> {
     async fn channels(&self) -> AppResult<Vec<Channel>> {
-        let channels = self
-            .channel_use_cases
-            .list_company_channels(self.user_id, self.company.id)
-            .await?;
-        let access = self
-            .thread_use_cases
-            .principal_access_for_user(self.company.id, self.user_id)
-            .await?;
-        Ok(match access {
-            Some(access) => channels
-                .into_iter()
-                .filter(|channel| channel.viewer_access(access))
-                .collect(),
-            None => Vec::new(),
-        })
+        self.channel_use_cases
+            .list_managed_readable_channels(self.viewer, self.company.id)
+            .await
     }
 
     /// One filtered page of tasks, plus whether another follows it.

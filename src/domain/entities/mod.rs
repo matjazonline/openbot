@@ -31,6 +31,7 @@ pub mod schedule;
 pub mod skill;
 pub mod stuck_work;
 pub mod task;
+pub mod task_counts;
 pub mod thread;
 pub mod thread_handoff;
 pub mod tool_catalogue;

@@ -38,6 +38,10 @@ jobs:
         run: npm ci
       - name: Generated CSS is current
         run: npm run check:css
+      - name: Install browser for protocol tests
+        run: npx playwright install --with-deps chromium
+      - name: Task counts browser protocol
+        run: npm run test:task-counts
       - name: SSE navigation lifecycle
         run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs
       - name: Deployment script tests

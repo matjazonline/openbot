@@ -1,0 +1,144 @@
+Pager usage is off.
+Timing is on.
+CREATE TABLE
+Time: 158.991 ms
+CREATE TABLE
+Time: 30.162 ms
+INSERT 0 6500
+Time: 53.498 ms
+INSERT 0 416000
+Time: 9025.723 ms (00:09.026)
+ANALYZE
+Time: 457.046 ms
+ANALYZE
+Time: 12.760 ms
+                                                            version                                                            
+-------------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.1.1.101), 64-bit
+(1 row)
+
+Time: 0.178 ms
+                             relname                             | reltuples | relpages | relation_size 
+-----------------------------------------------------------------+-----------+----------+---------------
+ background_tasks                                                |    416000 |    10435 | 82 MB
+ background_tasks_company_id_channel_id_created_at_id_idx        |    416000 |     5045 | 39 MB
+ background_tasks_company_id_channel_id_idx                      |    316077 |      293 | 2344 kB
+ background_tasks_company_id_created_at_id_idx                   |    416000 |     3966 | 31 MB
+ background_tasks_company_id_id_key                              |    416000 |     3226 | 25 MB
+ background_tasks_company_id_owner_principal_id_idx              |    316077 |      285 | 2280 kB
+ background_tasks_company_id_run_at_created_at_id_idx            |      1928 |       22 | 176 kB
+ background_tasks_company_id_source_message_uuid_channel_id_key  |    416000 |      390 | 3120 kB
+ background_tasks_company_id_source_schedule_run_id_key          |    416000 |      337 | 2696 kB
+ background_tasks_company_id_status_created_at_id_idx            |    416000 |     4808 | 38 MB
+ background_tasks_company_id_thread_id_correlation_id_expr_c_idx |         0 |        1 | 8192 bytes
+ background_tasks_company_id_updated_at_idx                      |    416000 |      337 | 2696 kB
+ background_tasks_correlation_id_created_at_idx                  |    416000 |     2546 | 20 MB
+ background_tasks_expr_idx                                       |         0 |        1 | 8192 bytes
+ background_tasks_lock_expires_at_id_idx                         |      4271 |       28 | 224 kB
+ background_tasks_pkey                                           |    416000 |     2167 | 17 MB
+ background_tasks_thread_id_idx                                  |         0 |        1 | 8192 bytes
+ background_tasks_wait_expires_at_id_idx                         |         0 |        1 | 8192 bytes
+ principals                                                      |      6500 |       93 | 744 kB
+ principals_company_id_agent_id_idx                              |      6400 |       57 | 456 kB
+ principals_company_id_id_key                                    |      6500 |       57 | 456 kB
+ principals_company_id_id_kind_key                               |      6500 |       69 | 552 kB
+ principals_company_id_idx                                       |         0 |        1 | 8192 bytes
+ principals_company_id_user_id_idx                               |       100 |        2 | 16 kB
+ principals_pkey                                                 |      6500 |       39 | 312 kB
+(25 rows)
+
+Time: 3.411 ms
+       attname        | n_distinct |                                  most_common_freqs                                   
+----------------------+------------+--------------------------------------------------------------------------------------
+ company_id           |          4 | {0.2515,0.24993333,0.24956666,0.249}
+ channel_id           |        128 | 
+ status               |          8 | {0.24623333,0.2402,0.23746666,0.23583333,0.010666667,0.010266666,0.0097,0.009633333}
+ owner_principal_kind |          2 | {0.49946666,0.24936667}
+(4 rows)
+
+Time: 6.383 ms
+Visible channels: 32
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=8383.15..8406.61 rows=1043 width=49) (actual time=4.846..5.331 rows=1025.00 loops=1)
+   Group Key: task.channel_id, principal.agent_id, task.status
+   Buffers: local hit=66 read=172 written=172
+   ->  Sort  (cost=8383.15..8385.75 rows=1043 width=41) (actual time=4.831..4.943 rows=4000.00 loops=1)
+         Sort Key: task.channel_id, principal.agent_id, task.status
+         Sort Method: quicksort  Memory: 331kB
+         Buffers: local hit=66 read=172 written=172
+         ->  Hash Left Join  (cost=347.46..8330.86 rows=1043 width=41) (actual time=1.033..3.726 rows=4000.00 loops=1)
+               Hash Cond: (task.owner_principal_id = principal.id)
+               Join Filter: (task.owner_principal_kind = 'agent'::text)
+               Rows Removed by Join Filter: 1023
+               Buffers: local hit=66 read=172 written=172
+               ->  Bitmap Heap Scan on background_tasks task  (cost=251.75..8232.41 rows=1043 width=63) (actual time=0.912..2.691 rows=4000.00 loops=1)
+                     Recheck Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (status = ANY ('{pending,processing,pending_approval,waiting_for_third_party_reply}'::text[])))
+                     Filter: (channel_id = ANY ('{2536fd92-1d1c-d800-e455-ee677a27e852,2ffb5b0c-07bd-0d53-a96c-dc90464e4138,e4f82e39-5be6-9801-a4b2-bbef6fb8faf7,6c61cf6f-c081-8669-e41a-a99cb37aa423,41e79c15-7490-cccf-4c03-ae066228472c,c5cb0000-b74a-898c-a506-62dbfc3b433d,03057428-cfe9-4324-4ea3-d8281e07f5a0,827122b0-7242-0baf-bae9-e04bb9731bd8,8120db31-8350-7164-6262-a74052ccd6ee,68750445-e403-2457-f28c-f52520efa575,e9b13f25-d81f-51de-8df7-75be75fe2aab,a171a0eb-5aa8-7bd1-b130-4080d001696a,ece84df5-e38d-5023-6fd3-06bb9000f065,634f9438-9541-8c87-dc52-7236f871a93e,63501fd2-5aee-97be-cf79-b5713adc3424,f6e98c14-b452-1cca-ce0d-3bca6bb013c8,dcd4dec6-f596-832c-6cbf-1aba3408810a,1775771b-4a40-9b6a-f43b-1ebe90c37e61,509afcd3-6d85-4c92-854e-661249020c5b,4b0875eb-77d5-6b9f-26a2-e0aa87ada11f,e69efdb3-3732-628d-b3d5-0293149495ae,db265a9b-8341-800d-5cf6-af5472db8587,38f9c299-a61a-e678-ae06-f84d93e7b255,809bf46f-cb80-846e-0c4b-04c4931f4f2b,b46f5f27-2419-95c7-551b-a52c892ddedc,bf79404c-20b0-ca31-d11f-d168998580d0,4d53d22f-f55c-9f2b-cf60-79443152d27f,b2200d6d-ac54-1f03-087a-9a230c2cc00b,8e724efd-4412-038a-ab0a-3c16a6c3f0fd,10cafa57-cea7-7531-261e-9f84f6d256b4,586dd18e-77b1-4d9d-2a97-60aab66b080d,87b68e6f-2d1d-b44c-93d9-9f31102a64f0}'::uuid[]))
+                     Heap Blocks: exact=111
+                     Buffers: local hit=1 read=170 written=170
+                     ->  Bitmap Index Scan on background_tasks_company_id_status_created_at_id_idx  (cost=0.00..251.41 rows=4171 width=0) (actual time=0.861..0.861 rows=4000.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (status = ANY ('{pending,processing,pending_approval,waiting_for_third_party_reply}'::text[])))
+                           Index Searches: 2
+                           Buffers: local hit=1 read=59 written=59
+               ->  Hash  (cost=94.90..94.90 rows=65 width=48) (actual time=0.108..0.108 rows=65.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 14kB
+                     Buffers: local hit=65 read=2 written=2
+                     ->  Bitmap Heap Scan on principals principal  (cost=4.79..94.90 rows=65 width=48) (actual time=0.045..0.095 rows=65.00 loops=1)
+                           Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Heap Blocks: exact=65
+                           Buffers: local hit=65 read=2 written=2
+                           ->  Bitmap Index Scan on principals_company_id_id_kind_key  (cost=0.00..4.77 rows=65 width=0) (actual time=0.034..0.034 rows=65.00 loops=1)
+                                 Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                                 Index Searches: 1
+                                 Buffers: local read=2 written=2
+ Planning:
+   Buffers: shared hit=129, local hit=3 read=26 written=26
+ Planning Time: 1.534 ms
+ Execution Time: 5.391 ms
+(36 rows)
+
+Time: 7.418 ms
+Visible channels: 8
+                                                                                                                                                                              QUERY PLAN                                                                                                                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=8359.86..8365.73 rows=261 width=49) (actual time=1.194..1.429 rows=257.00 loops=1)
+   Group Key: task.channel_id, principal.agent_id, task.status
+   Buffers: local hit=238
+   ->  Sort  (cost=8359.86..8360.51 rows=261 width=41) (actual time=1.189..1.238 rows=1000.00 loops=1)
+         Sort Key: task.channel_id, principal.agent_id, task.status
+         Sort Method: quicksort  Memory: 83kB
+         Buffers: local hit=238
+         ->  Hash Left Join  (cost=347.18..8349.39 rows=261 width=41) (actual time=0.274..0.887 rows=1000.00 loops=1)
+               Hash Cond: (task.owner_principal_id = principal.id)
+               Join Filter: (task.owner_principal_kind = 'agent'::text)
+               Rows Removed by Join Filter: 255
+               Buffers: local hit=238
+               ->  Bitmap Heap Scan on background_tasks task  (cost=251.48..8252.99 rows=261 width=63) (actual time=0.204..0.610 rows=1000.00 loops=1)
+                     Recheck Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (status = ANY ('{pending,processing,pending_approval,waiting_for_third_party_reply}'::text[])))
+                     Filter: (channel_id = ANY ('{2536fd92-1d1c-d800-e455-ee677a27e852,2ffb5b0c-07bd-0d53-a96c-dc90464e4138,e4f82e39-5be6-9801-a4b2-bbef6fb8faf7,6c61cf6f-c081-8669-e41a-a99cb37aa423,41e79c15-7490-cccf-4c03-ae066228472c,c5cb0000-b74a-898c-a506-62dbfc3b433d,03057428-cfe9-4324-4ea3-d8281e07f5a0,827122b0-7242-0baf-bae9-e04bb9731bd8}'::uuid[]))
+                     Rows Removed by Filter: 3000
+                     Heap Blocks: exact=111
+                     Buffers: local hit=171
+                     ->  Bitmap Index Scan on background_tasks_company_id_status_created_at_id_idx  (cost=0.00..251.41 rows=4171 width=0) (actual time=0.184..0.184 rows=4000.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (status = ANY ('{pending,processing,pending_approval,waiting_for_third_party_reply}'::text[])))
+                           Index Searches: 2
+                           Buffers: local hit=60
+               ->  Hash  (cost=94.90..94.90 rows=65 width=48) (actual time=0.066..0.066 rows=65.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 14kB
+                     Buffers: local hit=67
+                     ->  Bitmap Heap Scan on principals principal  (cost=4.79..94.90 rows=65 width=48) (actual time=0.018..0.054 rows=65.00 loops=1)
+                           Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Heap Blocks: exact=65
+                           Buffers: local hit=67
+                           ->  Bitmap Index Scan on principals_company_id_id_kind_key  (cost=0.00..4.77 rows=65 width=0) (actual time=0.007..0.007 rows=65.00 loops=1)
+                                 Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                                 Index Searches: 1
+                                 Buffers: local hit=2
+ Planning:
+   Buffers: local hit=11
+ Planning Time: 0.295 ms
+ Execution Time: 1.462 ms
+(37 rows)
+
+Time: 2.040 ms

@@ -13,6 +13,7 @@ use crate::{
 mod board;
 mod collaboration;
 mod controls;
+mod counts;
 mod harness_runs;
 mod instructions;
 mod mcp_journal;
@@ -46,3 +47,6 @@ mod claim_tests;
 #[cfg(test)]
 #[path = "release_tests.rs"]
 mod release_tests;
+
+#[cfg(test)]
+pub(crate) mod counts_test_support;

@@ -227,6 +227,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         r##"
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
+            {task_counts}
             {list_html}
         </aside>
         {pane_html}
@@ -243,6 +244,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
+        task_counts = super::task_counts::task_counts_bar(company.id),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -303,13 +305,14 @@ fn channel_settings_entry(
                         hx-sync="#channel-pane:replace"
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                         data-action="select-sidebar-item">
-                        <span class="flex w-full min-w-0 items-center gap-2">
-                            <span class="min-w-0 truncate">{name}</span>{disabled_badge}
+                        <span class="flex w-full min-w-0 flex-wrap items-center gap-2">
+                            <span class="min-w-0 truncate">{name}</span>{task_counts}{disabled_badge}
                         </span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
                     </a>
                 </li>
         "##,
+        task_counts = super::task_counts_slot(super::TaskCountKey::Channel(channel.id)),
         active = if selected { "menu-active" } else { "" },
         channel_id = channel.id,
         name = escape_html_text(&channel.name),

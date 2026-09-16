@@ -41,6 +41,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub task_counts: Arc<dyn crate::application::task_counts::TaskCountsReader>,
     pub db: PgPool,
     pub config: Arc<AppConfig>,
     pub monitoring: Arc<dyn MonitoringService>,

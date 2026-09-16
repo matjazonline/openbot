@@ -2186,4 +2186,4 @@ async fn sender_email(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult
 
 #[cfg(test)]
 #[path = "ui_stream_tests.rs"]
-mod stream_tests;
+pub(super) mod stream_tests;

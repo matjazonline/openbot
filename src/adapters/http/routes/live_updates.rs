@@ -104,10 +104,45 @@ pub(super) fn task_chain_wake_ups(
     })
 }
 
+pub(super) fn task_count_wake_ups(
+    events: &MailboxEvents,
+    label: &'static str,
+    company_id: Uuid,
+) -> impl Stream<Item = Wake> + Send + use<> {
+    wake_ups(events, label, move |event| {
+        event.is_task_attention_in_company(company_id)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::infra::events::{AttentionScope, AttentionWakeSource, ThreadScope};
+
+    #[test]
+    fn counts_only_wake_for_task_attention_in_the_same_company() {
+        let company_id = Uuid::new_v4();
+        for source_kind in [
+            AttentionWakeSource::Task,
+            AttentionWakeSource::ThreadHandoff,
+            AttentionWakeSource::Handoff,
+            AttentionWakeSource::Delivery,
+            AttentionWakeSource::ResponseReview,
+            AttentionWakeSource::Delegation,
+        ] {
+            let event = MailboxEvent::AttentionChanged(AttentionScope {
+                company_id,
+                channel_id: Uuid::new_v4(),
+                source_kind,
+                source_id: Uuid::new_v4(),
+            });
+            assert_eq!(
+                event.is_task_attention_in_company(company_id),
+                source_kind == AttentionWakeSource::Task
+            );
+            assert!(!event.is_task_attention_in_company(Uuid::new_v4()));
+        }
+    }
 
     fn held_reply_changed(company_id: Uuid, channel_id: Uuid) -> MailboxEvent {
         MailboxEvent::AttentionChanged(AttentionScope {

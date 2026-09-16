@@ -100,7 +100,7 @@ pub trait MonitoringService: Send + Sync {
     /// runaway failure that is not happening. A gauge also *clears*, which is what lets an alert
     /// on it stop firing once the work is dealt with.
     fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]);
-    fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]);
+    fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]);
     fn get_stats_json(&self) -> serde_json::Value;
 }
 

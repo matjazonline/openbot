@@ -90,6 +90,7 @@ mod schedules;
 mod simulation;
 mod skeleton;
 mod task_board;
+mod task_counts;
 mod task_monitor;
 mod tasks;
 mod team_settings;
@@ -130,6 +131,7 @@ pub(crate) use skeleton::{
     panels_placeholder, skeleton_script,
 };
 pub use task_board::*;
+pub use task_counts::*;
 pub use task_monitor::*;
 pub use tasks::*;
 pub use team_settings::*;

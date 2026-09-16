@@ -7,7 +7,8 @@
   },
   "scripts": {
     "build:css": "tailwindcss -i assets/app.css.in -o assets/app.css --minify",
-    "check:css": "npm run build:css && git diff --exit-code -- assets/app.css"
+    "check:css": "npm run build:css && git diff --exit-code -- assets/app.css",
+    "test:task-counts": "node --test scripts/tests/task-counts.mjs"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
   },
   "homepage": "https://github.com/matjazonline/mail-agents#readme",
   "devDependencies": {
+    "@playwright/test": "1.55.1",
     "@tailwindcss/cli": "^4.1.12",
     "daisyui": "^5.0.50",
     "tailwindcss": "^4.1.12"

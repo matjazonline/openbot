@@ -24,6 +24,28 @@ fn counter_key(name: &str, labels: &[(&str, &str)]) -> String {
     gauge_key(name, labels)
 }
 
+/// Fixed buckets retain fractional measurements without storing individual samples.
+#[derive(Clone, Default, serde::Serialize)]
+struct Histogram {
+    count: u64,
+    sum: f64,
+    /// Cumulative buckets, with units supplied by the metric name.
+    buckets: std::collections::BTreeMap<String, u64>,
+}
+
+impl Histogram {
+    fn observe(&mut self, value: f64) {
+        self.count += 1;
+        self.sum += value;
+        for bound in [
+            0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0, 5.0, 30.0, 60.0,
+        ] {
+            *self.buckets.entry(bound.to_string()).or_default() += u64::from(value <= bound);
+        }
+        self.buckets.insert("+Inf".into(), self.count);
+    }
+}
+
 pub struct InMemoryMonitor {
     // AI Metrics
     ai_total_executions: AtomicU64,
@@ -56,6 +78,7 @@ pub struct InMemoryMonitor {
 
     // Custom Counters
     custom_counters: RwLock<HashMap<String, u64>>,
+    histograms: RwLock<HashMap<String, Histogram>>,
     /// Latest value per labelled gauge. Overwritten rather than accumulated -- see
     /// [`MonitoringService::record_gauge`].
     gauges: RwLock<HashMap<String, f64>>,
@@ -91,6 +114,7 @@ impl InMemoryMonitor {
             task_total_duration_ms: AtomicU64::new(0),
 
             custom_counters: RwLock::new(HashMap::new()),
+            histograms: RwLock::new(HashMap::new()),
             gauges: RwLock::new(HashMap::new()),
         }
     }
@@ -168,8 +192,16 @@ impl MonitoringService for InMemoryMonitor {
         }
     }
 
-    fn record_histogram(&self, name: &str, duration_ms: f64, _labels: &[(&str, &str)]) {
-        self.increment_counter(&format!("{}_ms", name), duration_ms as u64, &[]);
+    fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        if !value.is_finite() {
+            return;
+        }
+        if let Ok(mut histograms) = self.histograms.write() {
+            histograms
+                .entry(gauge_key(name, labels))
+                .or_default()
+                .observe(value);
+        }
     }
 
     fn get_stats_json(&self) -> serde_json::Value {
@@ -203,6 +235,13 @@ impl MonitoringService for InMemoryMonitor {
             .map(|gauges| gauges.clone())
             .unwrap_or_default();
 
+        let histograms = self
+            .histograms
+            .read()
+            .ok()
+            .map(|values| values.clone())
+            .unwrap_or_default();
+
         serde_json::json!({
             "ai_executions": {
                 "total": ai_total,
@@ -234,7 +273,8 @@ impl MonitoringService for InMemoryMonitor {
                 "avg_latency_ms": task_avg_latency_ms
             },
             "custom_counters": custom,
-            "gauges": gauges
+            "gauges": gauges,
+            "histograms": histograms
         })
     }
 }

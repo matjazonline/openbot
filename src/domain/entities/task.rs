@@ -101,6 +101,13 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    pub const OPEN: [Self; 4] = [
+        Self::Pending,
+        Self::Processing,
+        Self::PendingApproval,
+        Self::WaitingForThirdPartyReply,
+    ];
+
     /// Is the task parked waiting on someone outside the queue?
     ///
     /// A suspended task is neither finished nor failed: it set its own status during the run and

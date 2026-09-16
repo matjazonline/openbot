@@ -83,11 +83,11 @@ impl MonitoringService for TracingMonitor {
         );
     }
 
-    fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]) {
+    fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         info!(
             target: "monitoring::histogram",
             metric = %name,
-            duration_ms = duration_ms,
+            value = value,
             labels = ?labels,
             "Histogram recorded"
         );

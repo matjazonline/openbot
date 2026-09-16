@@ -847,7 +847,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{thread_handoffs}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{thread_handoffs}\n{task_counts}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -864,6 +864,7 @@ pub(crate) fn application_javascript() -> String {
         request_errors = REQUEST_ERROR_SCRIPT,
         button_busy = BUTTON_BUSY_SCRIPT,
         thread_handoffs = super::thread_handoffs::THREAD_HANDOFF_SCRIPT,
+        task_counts = super::task_counts::TASK_COUNTS_SCRIPT,
     )
 }
 

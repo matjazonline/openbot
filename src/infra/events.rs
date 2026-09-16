@@ -206,6 +206,10 @@ impl MailboxEvent {
         )
     }
 
+    pub fn is_task_attention_in_company(&self, company_id: Uuid) -> bool {
+        matches!(self, Self::AttentionChanged(scope) if scope.company_id == company_id && scope.source_kind == AttentionWakeSource::Task)
+    }
+
     pub fn is_task_chain_in_company(&self, company_id: Uuid) -> bool {
         matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.company_id == company_id)
     }

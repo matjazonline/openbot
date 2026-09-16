@@ -410,6 +410,17 @@ impl ChannelUseCases {
             .await
     }
 
+    /// Manager-only reads use the same visibility decision as the mailbox.
+    pub async fn list_managed_readable_channels(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Channel>> {
+        self.verify_company_manager(viewer.user_id, company_id)
+            .await?;
+        self.list_readable_channels(viewer, company_id).await
+    }
+
     /// Every channel of `company_id` this viewer may read.
     ///
     /// The read counterpart of [`ChannelUseCases::list_company_channels`]: that one is for the

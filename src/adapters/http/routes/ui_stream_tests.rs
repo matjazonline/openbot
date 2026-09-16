@@ -43,22 +43,24 @@ const FRAME_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// One parsed `text/event-stream` frame.
 #[derive(Debug)]
-struct Frame {
-    event: String,
-    data: String,
+pub(in crate::adapters::http::routes) struct Frame {
+    pub(in crate::adapters::http::routes) event: String,
+    pub(in crate::adapters::http::routes) data: String,
 }
 
 /// A response body being read one SSE frame at a time.
-struct Frames {
+pub(in crate::adapters::http::routes) struct Frames {
     body: axum::body::BodyDataStream,
     buffer: String,
+    timeout: Duration,
 }
 
 impl Frames {
-    fn of(response: axum::response::Response) -> Self {
+    pub(in crate::adapters::http::routes) fn of(response: axum::response::Response) -> Self {
         Self {
             body: response.into_body().into_data_stream(),
             buffer: String::new(),
+            timeout: FRAME_TIMEOUT,
         }
     }
 
@@ -69,7 +71,7 @@ impl Frames {
                 return frame;
             }
             let chunk =
-                tokio::time::timeout(FRAME_TIMEOUT, futures::StreamExt::next(&mut self.body))
+                tokio::time::timeout(self.timeout, futures::StreamExt::next(&mut self.body))
                     .await
                     .unwrap_or_else(|_| {
                         panic!("a frame within the timeout; buffered: {}", self.buffer)
@@ -81,13 +83,33 @@ impl Frames {
     }
 
     /// Frames until one whose event name matches, that one included.
-    async fn next_named(&mut self, event: &str) -> Frame {
+    pub(in crate::adapters::http::routes) async fn next_named(&mut self, event: &str) -> Frame {
         loop {
             let frame = self.next().await;
             if frame.event == event {
                 return frame;
             }
         }
+    }
+
+    pub(in crate::adapters::http::routes) async fn next_named_with_timeout(
+        &mut self,
+        event: &str,
+        timeout: Duration,
+    ) -> Frame {
+        self.timeout = timeout;
+        let frame = tokio::time::timeout(timeout, self.next_named(event))
+            .await
+            .expect("named event before deadline");
+        self.timeout = FRAME_TIMEOUT;
+        frame
+    }
+
+    pub(in crate::adapters::http::routes) async fn expect_closed(&mut self) {
+        let next = tokio::time::timeout(FRAME_TIMEOUT, futures::StreamExt::next(&mut self.body))
+            .await
+            .unwrap();
+        assert!(next.is_none(), "revoked stream must close");
     }
 
     fn take_buffered(&mut self) -> Option<Frame> {
@@ -118,7 +140,7 @@ impl Frames {
 }
 
 /// A deployment with no memory providers and no spam scanning, which is all these streams need.
-fn test_config() -> Arc<AppConfig> {
+pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),

@@ -254,6 +254,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         r##"
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
+            {task_counts}
             {list_html}
         </aside>
         {pane_html}
@@ -270,6 +271,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
+        task_counts = super::task_counts::task_counts_bar(company.id),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -331,16 +333,17 @@ fn agent_settings_entry(
                         hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}"
                         data-action="select-sidebar-item">
                         {avatar}
-                        <span class="flex min-w-0 flex-col items-start gap-0.5">
-                            <span class="flex w-full items-center gap-2">
-                                <span class="min-w-0 truncate">{name}</span>
-                                <span class="badge badge-ghost badge-sm shrink-0 font-mono">{slug}</span>
+                        <span class="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                            <span class="flex w-full min-w-0 flex-wrap items-center gap-2">
+                                <span class="min-w-0 truncate">{name}</span>{task_counts}
                             </span>
+                            <span class="w-full truncate font-mono text-[11px] opacity-60">{slug}</span>
                             <span class="w-full truncate font-mono text-[11px] opacity-60">{model}</span>
                         </span>
                     </a>
                 </li>
         "##,
+        task_counts = super::task_counts_slot(super::TaskCountKey::Agent(agent.id)),
         active = if selected { "menu-active" } else { "" },
         company_id = company.id,
         agent_id = agent.id,
@@ -429,6 +432,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
                         <div class="min-w-0">
                             <h2 class="truncate text-xl font-bold">{name}</h2>
                             <p class="truncate font-mono text-xs opacity-60">{address} · {model}</p>
+                            {task_counts}
                             <p class="truncate text-xs opacity-50">{creator}</p>
                         </div>
                     </div>
@@ -438,6 +442,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
             {body}
         </section>
         "##,
+        task_counts = super::task_counts_slot(super::TaskCountKey::Agent(agent_id)),
         header_padding = tabs.header_padding,
         strip = tabs.strip,
         avatar = avatar_bubble(
