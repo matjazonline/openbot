@@ -9,12 +9,12 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-white">Company Accounts</h2>
-                <p class="text-slate-400 text-sm mt-1">Manage your organization profiles and indexed slugs</p>
+                <h2 class="text-2xl font-bold text-base-content">Company Accounts</h2>
+                <p class="text-base-content/70 text-sm mt-1">Manage your organization profiles and indexed slugs</p>
             </div>
             <button id="company-form-toggle" type="button" aria-controls="company-form-card" aria-expanded="false"
                 data-action="toggle-form-card" data-card="company-form-card"
-                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
+                class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
                 Add Company
             </button>
         </div>
@@ -22,39 +22,39 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
         <div id="response-message" class="mb-6"></div>
 
         <!-- Create Company Card -->
-        <div id="company-form-card" class="hidden bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
-            <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                <span class="text-indigo-400">+</span> Add New Company
+        <div id="company-form-card" class="hidden bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
+            <h3 class="text-md font-semibold text-base-content mb-3 flex items-center gap-2">
+                <span class="text-primary">+</span> Add New Company
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
                 data-after-request="reset-and-collapse" data-card="company-form-card" data-toggle="company-form-toggle">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
+                        <label for="company_name" class="block text-xs font-medium text-base-content/80 mb-1">Company Name</label>
                         <input type="text" id="company_name" name="name" required
                             data-input="slugify" data-slug-target="company_slug"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-primary"
                             placeholder="Acme Corporation">
                     </div>
                     <div>
-                        <label for="company_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug (Indexed)</label>
+                        <label for="company_slug" class="block text-xs font-medium text-base-content/80 mb-1">Slug (Indexed)</label>
                         <input type="text" id="company_slug" name="slug" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                             placeholder="acme-corporation">
                     </div>
                 </div>
                 <div>
-                    <label for="company_memory_provider" class="block text-xs font-medium text-slate-300 mb-1">Long-term Memory</label>
+                    <label for="company_memory_provider" class="block text-xs font-medium text-base-content/80 mb-1">Long-term Memory</label>
                     <select id="company_memory_provider" name="memory_provider"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
                         <option value="">Disabled</option>
                         {memory_provider_options}
                     </select>
-                    <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
+                    <p class="mt-1 text-[11px] text-base-content/70">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
                 </div>
                 <div class="flex justify-end">
                     <button type="submit"
-                        class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
+                        class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
                         Create Company
                     </button>
                 </div>
@@ -63,7 +63,7 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
 
         <!-- Company List Section -->
         <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Your Companies</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Your Companies</h3>
             <div id="company-list" class="space-y-3">
                 {list_html}
             </div>
@@ -78,8 +78,8 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
 pub fn company_list_fragment(companies: &[Company]) -> String {
     if companies.is_empty() {
         return r##"
-            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">No companies registered yet. Use Add Company to create your first one.</p>
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
+                <p class="text-base-content/70 text-sm">No companies registered yet. Use Add Company to create your first one.</p>
             </div>
         "##
         .to_string();
@@ -92,39 +92,39 @@ pub fn company_row_fragment(company: &Company) -> String {
     let created_at_str = super::format_date(company.created_at);
     format!(
         r##"
-        <div id="company-{id}" data-action="select-company" data-company-id="{id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm cursor-pointer">
+        <div id="company-{id}" data-action="select-company" data-company-id="{id}" class="bg-base-100 border border-base-300 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-base-content/30 transition shadow-sm cursor-pointer">
             <div>
                 <div class="flex items-center gap-3">
-                    <h4 class="text-md font-semibold text-white">{name}</h4>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-indigo-950/90 text-indigo-300 border border-indigo-700/50">/{slug}</span>
-                    <span id="selected-badge-{id}" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-700/60 uppercase tracking-wider">Active</span>
+                    <h4 class="text-md font-semibold text-base-content">{name}</h4>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-primary/10 text-primary border border-primary/40">/{slug}</span>
+                    <span id="selected-badge-{id}" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-success/10 text-base-content border border-success/40 uppercase tracking-wider">Active</span>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Added {created_at_str}</p>
+                <p class="text-xs text-base-content/70 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
                 <a href="/companies/{id}/tasks" data-action="select-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
+                    class="px-3 py-1.5 text-xs font-medium bg-warning/10 hover:bg-warning/20 text-base-content border border-warning/40 rounded-lg transition">
                     Tasks
                 </a>
                 <a href="/companies/{id}/agents" data-action="select-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-sky-900/80 hover:bg-sky-800 text-sky-200 border border-sky-700/50 rounded-lg transition">
+                    class="px-3 py-1.5 text-xs font-medium bg-info/10 hover:bg-info/20 text-base-content border border-info/40 rounded-lg transition">
                     Agents
                 </a>
                 <a href="/companies/{id}/channels" data-action="select-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
+                    class="px-3 py-1.5 text-xs font-medium bg-success/10 hover:bg-success/20 text-base-content border border-success/40 rounded-lg transition">
                     Channels
                 </a>
                 <a href="/companies/{id}/invites" data-action="select-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
+                    class="px-3 py-1.5 text-xs font-medium bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 rounded-lg transition">
                     Invites & Team
                 </a>
                 <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML" data-action="isolate"
-                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                     Edit
                 </button>
                 <button hx-delete="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete '{name}'?" data-action="isolate"
                     data-after-request="clear-cached-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                     Delete
                 </button>
             </div>
@@ -146,38 +146,38 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
     format!(
         r##"
         <form id="company-{id}" hx-put="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML"
-            class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
+            class="bg-base-100 border border-primary/40 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
             <!-- A save sets every column, so the picture -- which is picked in `/ui`, not here --
                  rides along rather than being cleared by a rename. -->
             <input type="hidden" name="avatar_url" value="{avatar_url}">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Company Name</label>
                     <input type="text" name="name" value="{name}" required
                         data-input="slugify"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Slug (Indexed)</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Slug (Indexed)</label>
                     <input type="text" name="slug" value="{slug}" required
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono">
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Long-term Memory</label>
-                <select name="memory_provider" class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                <label class="block text-xs font-medium text-base-content/80 mb-1">Long-term Memory</label>
+                <select name="memory_provider" class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
                     <option value="" {memory_disabled_selected}>Disabled</option>
                     {memory_provider_options}
                 </select>
-                <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
+                <p class="mt-1 text-[11px] text-base-content/70">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
             </div>
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{id}/cancel" hx-target="#company-{id}" hx-swap="outerHTML"
-                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                     Cancel
                 </button>
                 <button type="submit"
-                    class="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer">
+                    class="px-4 py-1.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-content rounded-lg transition cursor-pointer">
                     Save Changes
                 </button>
             </div>
@@ -210,28 +210,28 @@ pub fn company_invites_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
-                <h2 class="text-2xl font-bold text-white">{company_name} Management</h2>
-                <p class="text-slate-400 text-sm mt-0.5">Manage email invites and view team members for <span class="font-mono text-indigo-300">/{slug}</span></p>
+                <a href="/companies" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-base-content">{company_name} Management</h2>
+                <p class="text-base-content/70 text-sm mt-0.5">Manage email invites and view team members for <span class="font-mono text-primary">/{slug}</span></p>
             </div>
         </div>
 
         <div id="response-message" class="mb-6"></div>
 
         <!-- Create Invite Card -->
-        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
-            <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                <span class="text-indigo-400">+</span> Invite User by Email
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
+            <h3 class="text-md font-semibold text-base-content mb-3 flex items-center gap-2">
+                <span class="text-primary">+</span> Invite User by Email
             </h3>
             <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
                 data-after-request="reset-form">
                 <input type="email" name="email" required placeholder="colleague@example.com"
-                    class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <select name="role" class="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                    class="flex-1 px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-primary">
+                <select name="role" class="px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
                     {role_options}
                 </select>
                 <button type="submit"
-                    class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
+                    class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
                     Send Invite
                 </button>
             </form>
@@ -239,7 +239,7 @@ pub fn company_invites_page(
 
         <!-- Invites List Section -->
         <div class="mb-10">
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Email Invites</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Email Invites</h3>
             <div id="invite-list" class="space-y-3">
                 {invites_html}
             </div>
@@ -247,7 +247,7 @@ pub fn company_invites_page(
 
         <!-- Team Members Section -->
         <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Company Team</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Company Team</h3>
             <div id="team-list" class="space-y-3">
                 {team_html}
             </div>
@@ -267,8 +267,8 @@ pub fn company_invites_page(
 pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite]) -> String {
     if invites.is_empty() {
         return r##"
-            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-6 text-center">
-                <p class="text-slate-400 text-sm">No email invites sent yet.</p>
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-6 text-center">
+                <p class="text-base-content/70 text-sm">No email invites sent yet.</p>
             </div>
         "##
         .to_string();
@@ -284,34 +284,34 @@ pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> 
     let created_at_str = super::format_date(invite.created_at);
     let status_badge = match invite.status.as_str() {
         "accepted" => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-base-content border border-success/40">Accepted</span>"#
         }
         "declined" => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-error/10 text-base-content border border-error/40">Declined</span>"#
         }
         _ => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-base-content border border-warning/40">Pending</span>"#
         }
     };
 
     format!(
         r##"
-        <div id="invite-{invite_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+        <div id="invite-{invite_id}" class="bg-base-100 border border-base-300 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-base-content/30 transition shadow-sm">
             <div>
                 <div class="flex items-center gap-3">
-                    <span class="text-md font-semibold text-white">{email}</span>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-700/50">{role}</span>
+                    <span class="text-md font-semibold text-base-content">{email}</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/40">{role}</span>
                     {status_badge}
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Invited on {created_at_str}</p>
+                <p class="text-xs text-base-content/70 mt-1">Invited on {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
                 <button hx-get="/companies/{company_id}/invites/{invite_id}/edit" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
-                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                     Edit
                 </button>
                 <button hx-delete="/companies/{company_id}/invites/{invite_id}" hx-target="#invite-{invite_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to cancel invite for '{email}'?"
-                    class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                     Delete
                 </button>
             </div>
@@ -330,19 +330,19 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
     format!(
         r##"
         <form id="invite-{invite_id}" hx-put="/companies/{company_id}/invites/{invite_id}" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
-            class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 flex items-center gap-3 shadow-lg">
+            class="bg-base-100 border border-primary/40 rounded-xl p-4 md:p-5 flex items-center gap-3 shadow-lg">
             <input type="email" name="email" value="{email}" required
-                class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <select name="role" class="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                class="flex-1 px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <select name="role" class="px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
                 {role_options}
             </select>
             <div class="flex items-center gap-2">
                 <button type="button" hx-get="/companies/{company_id}/invites/{invite_id}/cancel" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
-                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                     Cancel
                 </button>
                 <button type="submit"
-                    class="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer">
+                    class="px-4 py-1.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-content rounded-lg transition cursor-pointer">
                     Save
                 </button>
             </div>
@@ -358,8 +358,8 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
 pub fn company_team_list_fragment(company_id: Uuid, members: &[CompanyMember]) -> String {
     if members.is_empty() {
         return r##"
-            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-6 text-center">
-                <p class="text-slate-400 text-sm">No team members joined yet.</p>
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-6 text-center">
+                <p class="text-base-content/70 text-sm">No team members joined yet.</p>
             </div>
         "##
         .to_string();
@@ -378,23 +378,23 @@ pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> St
 
     format!(
         r##"
-        <div id="member-{user_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+        <div id="member-{user_id}" class="bg-base-100 border border-base-300 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-base-content/30 transition shadow-sm">
             <div>
                 <div class="flex items-center gap-3">
-                    <h4 class="text-md font-semibold text-white">{username}</h4>
-                    <span class="text-xs text-slate-400">({email})</span>
+                    <h4 class="text-md font-semibold text-base-content">{username}</h4>
+                    <span class="text-xs text-base-content/70">({email})</span>
                     <form hx-put="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" class="flex items-center gap-2">
-                        <select name="role" class="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
+                        <select name="role" class="px-2.5 py-1 bg-base-200 border border-base-300 rounded-lg text-base-content text-xs">
                             {role_options}
                         </select>
-                        <button type="submit" class="px-2.5 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Save</button>
+                        <button type="submit" class="px-2.5 py-1 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-content rounded-lg">Save</button>
                     </form>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Joined {created_at_str}</p>
+                <p class="text-xs text-base-content/70 mt-1">Joined {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
                 <button hx-delete="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" hx-confirm="Remove '{username}' from company team?"
-                    class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                    class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                     Remove
                 </button>
             </div>
@@ -430,8 +430,8 @@ pub fn user_invites_page(user_email: &str, invites: &[CompanyInvite]) -> String 
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-white">Your Invitations</h2>
-                <p class="text-slate-400 text-sm mt-1">Company invitations sent to <span class="font-mono text-indigo-300">{user_email}</span></p>
+                <h2 class="text-2xl font-bold text-base-content">Your Invitations</h2>
+                <p class="text-base-content/70 text-sm mt-1">Company invitations sent to <span class="font-mono text-primary">{user_email}</span></p>
             </div>
         </div>
 
@@ -453,8 +453,8 @@ pub fn user_invites_page(user_email: &str, invites: &[CompanyInvite]) -> String 
 pub fn user_invite_list_fragment(invites: &[CompanyInvite]) -> String {
     if invites.is_empty() {
         return r##"
-            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">You have no pending or past company invitations.</p>
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
+                <p class="text-base-content/70 text-sm">You have no pending or past company invitations.</p>
             </div>
         "##
         .to_string();
@@ -468,16 +468,16 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
     let created_at_str = super::format_date(invite.created_at);
 
     let action_buttons = match invite.status.as_str() {
-        "accepted" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#.to_string(),
-        "declined" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#.to_string(),
+        "accepted" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-base-content border border-success/40">Accepted</span>"#.to_string(),
+        "declined" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-error/10 text-base-content border border-error/40">Declined</span>"#.to_string(),
         _ => format!(
             r##"
             <button hx-post="/invites/{invite_id}/accept" hx-target="#user-invite-{invite_id}" hx-swap="outerHTML"
-                class="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer shadow-md shadow-emerald-600/30">
+                class="px-3.5 py-1.5 text-xs font-semibold bg-success hover:bg-success/90 text-success-content rounded-lg transition cursor-pointer shadow-md shadow-success/20">
                 Accept
             </button>
             <button hx-post="/invites/{invite_id}/decline" hx-target="#user-invite-{invite_id}" hx-swap="outerHTML"
-                class="px-3.5 py-1.5 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                class="px-3.5 py-1.5 text-xs font-semibold bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                 Decline
             </button>
             "##,
@@ -487,12 +487,12 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
 
     format!(
         r##"
-        <div id="user-invite-{invite_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+        <div id="user-invite-{invite_id}" class="bg-base-100 border border-base-300 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-base-content/30 transition shadow-sm">
             <div>
                 <div class="flex items-center gap-3">
-                    <h4 class="text-md font-semibold text-white">{company_name}</h4>
+                    <h4 class="text-md font-semibold text-base-content">{company_name}</h4>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Invited to {email} as {role} on {created_at_str}</p>
+                <p class="text-xs text-base-content/70 mt-1">Invited to {email} as {role} on {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
                 {action_buttons}

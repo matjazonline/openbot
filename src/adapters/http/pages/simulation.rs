@@ -22,14 +22,14 @@ fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str
     format!(
         r##"
             <div id="simulation-form-container">
-                <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                    <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-sm text-base-content/80 font-medium">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-success animate-pulse"></span>
                         <span>Thread Loaded & Active</span>
-                        <span class="text-xs text-slate-400 font-mono">({tid})</span>
+                        <span class="text-xs text-base-content/70 font-mono">({tid})</span>
                     </div>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                       class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                       class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                         <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                     </a>
                 </div>
@@ -53,64 +53,64 @@ fn simulation_compose_form(
     format!(
         r##"
             <div id="simulation-form-container">
-                <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md space-y-6">
+                <div class="bg-base-100 border border-base-300 rounded-xl p-5 mb-6 shadow-md space-y-6">
                     <div>
-                        <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
-                            <span class="text-indigo-400">{payload_glyph}</span> Simulated Webhook Payload
+                        <h3 class="text-md font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <span class="text-primary">{payload_glyph}</span> Simulated Webhook Payload
                         </h3>
                         <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                                    <label for="to" class="block text-xs font-medium text-base-content/80 mb-1">To (Recipient Address)</label>
                                     <input type="text" id="to" name="to" value="{target_recipient}" required
-                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary">
                                 </div>
                                 <div>
-                                    <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                                    <label for="from" class="block text-xs font-medium text-base-content/80 mb-1">From (Sender Address)</label>
                                     <input type="text" id="from" name="from" value="{sender_email}" data-server-sender="{sender_email}" required disabled
-                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">
+                                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed">
                                 </div>
                             </div>
                             <div>
-                                <label for="subject" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                                <label for="subject" class="block text-xs font-medium text-base-content/80 mb-1">Subject</label>
                                 <input type="text" id="subject" name="subject" value="Simulated Webhook Trigger" required
-                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                             </div>
                             <div>
-                                <label for="text_body" class="block text-xs font-medium text-slate-300 mb-1">Text Body</label>
+                                <label for="text_body" class="block text-xs font-medium text-base-content/80 mb-1">Text Body</label>
                                 <textarea id="text_body" name="text_body" rows="3"
-                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">Who are you?</textarea>
+                                    class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">Who are you?</textarea>
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                                <label class="block text-xs font-medium text-base-content/80 mb-2">Execution Mode</label>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
-                                        <input type="radio" name="simulation_mode" value="verify" data-action="simulation-mode" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                    <label class="flex items-start p-3 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-primary transition">
+                                        <input type="radio" name="simulation_mode" value="verify" data-action="simulation-mode" class="mt-0.5 text-primary focus:ring-primary">
                                         <div class="ml-2.5">
-                                            <span class="block text-xs font-bold text-white">Verify</span>
-                                            <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
+                                            <span class="block text-xs font-bold text-base-content">Verify</span>
+                                            <span class="block text-[11px] text-base-content/70 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
                                         </div>
                                     </label>
-                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run_test" checked data-action="simulation-mode" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                                    <label class="flex items-start p-3 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-warning transition">
+                                        <input type="radio" name="simulation_mode" value="run_test" checked data-action="simulation-mode" class="mt-0.5 text-base-content focus:ring-warning">
                                         <div class="ml-2.5">
-                                            <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                            <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
+                                            <span class="block text-xs font-bold text-base-content">Run_Test</span>
+                                            <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                                         </div>
                                     </label>
-                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run" data-action="simulation-mode" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                                    <label class="flex items-start p-3 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-success transition">
+                                        <input type="radio" name="simulation_mode" value="run" data-action="simulation-mode" class="mt-0.5 text-base-content focus:ring-success">
                                         <div class="ml-2.5">
-                                            <span class="block text-xs font-bold text-emerald-400">Run</span>
-                                            <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                                            <span class="block text-xs font-bold text-base-content">Run</span>
+                                            <span class="block text-[11px] text-base-content/70 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
                             <div class="flex justify-end">
                                 <button type="submit"
-                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
-                                    <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                    class="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                                    <svg class="animate-spin h-4 w-4 text-base-content hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
@@ -123,21 +123,21 @@ fn simulation_compose_form(
                     </div>
 
                     <div class="relative flex py-2 items-center">
-                        <div class="flex-grow border-t border-slate-800"></div>
-                        <span class="flex-shrink mx-4 text-xs font-semibold text-slate-500 uppercase">OR</span>
-                        <div class="flex-grow border-t border-slate-800"></div>
+                        <div class="flex-grow border-t border-base-300"></div>
+                        <span class="flex-shrink mx-4 text-xs font-semibold text-base-content/70 uppercase">OR</span>
+                        <div class="flex-grow border-t border-base-300"></div>
                     </div>
 
                     <div>
-                        <h3 class="text-md font-semibold text-white mb-2 flex items-center gap-2">
-                            <span class="text-indigo-400">{lookup_glyph}</span> Open Existing Thread by ID
+                        <h3 class="text-md font-semibold text-base-content mb-2 flex items-center gap-2">
+                            <span class="text-primary">{lookup_glyph}</span> Open Existing Thread by ID
                         </h3>
-                        <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
+                        <p class="text-base-content/70 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
                         <form hx-get="/companies/{company_id}/channels/{channel_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" hx-sync="#simulation-result:replace" class="flex flex-col sm:flex-row gap-3">
                             <input type="text" id="open_thread_id" name="thread_id" placeholder="Enter Thread ID (e.g. 550e8400-e29b-41d4-a716-446655440000)" required
-                                class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                class="flex-1 px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary">
                             <button type="submit"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span>Open Thread</span>
                                 <span>&rarr;</span>
                             </button>
@@ -176,9 +176,9 @@ pub fn channel_simulation_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies/{company_id}/channels" class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1">{back_glyph} Back to Channels</a>
-                <h2 class="text-2xl font-bold text-white">Simulate Webhook: {channel_name}</h2>
-                <p class="text-slate-400 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-emerald-300">{target_recipient}</span></p>
+                <a href="/companies/{company_id}/channels" class="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary font-medium mb-1">{back_glyph} Back to Channels</a>
+                <h2 class="text-2xl font-bold text-base-content">Simulate Webhook: {channel_name}</h2>
+                <p class="text-base-content/70 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-base-content">{target_recipient}</span></p>
             </div>
         </div>
 
@@ -216,13 +216,14 @@ pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -
         Some(_) => LlmInfo {
             provider: "Selected by agent".to_string(),
             model: "Selected by agent".to_string(),
-            api_key_status: "<span class=\"text-slate-400\">Managed in company settings</span>"
-                .to_string(),
+            api_key_status:
+                "<span class=\"text-base-content/70\">Managed in company settings</span>"
+                    .to_string(),
         },
         None => LlmInfo {
             provider: "N/A".to_string(),
             model: "N/A".to_string(),
-            api_key_status: "<span class=\"text-slate-400\">Unknown</span>".to_string(),
+            api_key_status: "<span class=\"text-base-content/70\">Unknown</span>".to_string(),
         },
     }
 }
@@ -264,13 +265,13 @@ pub fn channel_simulation_failure_fragment(failure: &ChannelSimulationFailure<'_
     let oob_form_swap = format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
-            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                    <span class="text-rose-400 font-semibold">Simulation Execution Failed</span>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-base-content/80 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-error animate-ping"></span>
+                    <span class="text-base-content font-semibold">Simulation Execution Failed</span>
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                   class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
@@ -285,52 +286,52 @@ pub fn channel_simulation_failure_fragment(failure: &ChannelSimulationFailure<'_
         r##"
         {oob_form_swap}
         <div class="space-y-4">
-            <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+            <div class="p-4 rounded-xl bg-error/10 border border-error/40 text-base-content text-sm font-semibold flex items-center gap-2">
                 {error_glyph}
                 <span>Simulation Execution Error: {error_msg}</span>
             </div>
 
-            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
-                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Failure Execution Details</h4>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-base-content border-b border-base-300 pb-2">Failure Execution Details</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
-                        <span class="text-indigo-300 font-bold">{provider_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                        <span class="text-primary font-bold">{provider_str}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
-                        <span class="text-indigo-300 font-bold">{model_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                        <span class="text-primary font-bold">{model_str}</span>
                     </div>
                     <div class="md:col-span-2">
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
                         <span>{api_key_status}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
-                        <span class="text-indigo-300">{to_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-primary">{to_str}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
-                        <span class="text-indigo-300">{from_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-primary">{from_str}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
-                        <span class="text-slate-200">{company_name}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-base-content">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
-                        <span class="text-slate-200">{channel_name}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-base-content">{channel_name}</span>
                     </div>
                 </div>
 
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
-                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                <div class="pt-2 border-t border-base-300">
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
+                    <span class="text-base-content font-sans font-medium text-sm">{subject_str}</span>
                 </div>
 
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-rose-400 font-sans block text-[11px] uppercase font-semibold mb-1">Error Message:</span>
-                    <div class="bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs">{error_msg}</div>
+                <div class="pt-2 border-t border-base-300">
+                    <span class="text-base-content font-sans block text-[11px] uppercase font-semibold mb-1">Error Message:</span>
+                    <div class="bg-base-300 p-3 rounded-lg text-base-content whitespace-pre-wrap border border-error/40 font-mono text-xs">{error_msg}</div>
                 </div>
             </div>
         </div>
@@ -354,13 +355,13 @@ fn simulation_completed_banner(company_id: Uuid, channel_id: Uuid) -> String {
     format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
-            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></span>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-base-content/80 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
                     <span>Simulation Completed</span>
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                   class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
@@ -407,52 +408,52 @@ fn simulation_routing_report(report: &SimulationRoutingReport<'_>) -> String {
         <div class="space-y-4">
             {status_banner}
 
-            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
-                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Simulation Execution Details</h4>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-base-content border-b border-base-300 pb-2">Simulation Execution Details</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
-                        <span class="text-indigo-300 font-bold">{provider_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                        <span class="text-primary font-bold">{provider_str}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
-                        <span class="text-indigo-300 font-bold">{model_str}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                        <span class="text-primary font-bold">{model_str}</span>
                     </div>
                     <div class="md:col-span-2">
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
                         <span>{api_key_status}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
-                        <span class="text-indigo-300">{to}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-primary">{to}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
-                        <span class="text-indigo-300">{from}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-primary">{from}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
-                        <span class="text-slate-200">{company_name}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-base-content">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
-                        <span class="text-slate-200">{channel_name}</span>
+                        <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-base-content">{channel_name}</span>
                     </div>
                 </div>
 
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Subject:</span>
-                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                <div class="pt-2 border-t border-base-300">
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Email Subject:</span>
+                    <span class="text-base-content font-sans font-medium text-sm">{subject_str}</span>
                 </div>
 
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Text Body:</span>
-                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{body_str}</div>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Email Text Body:</span>
+                    <div class="bg-base-300 p-3 rounded-lg text-base-content/80 whitespace-pre-wrap border border-base-300">{body_str}</div>
                 </div>
 
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
-                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{channel_config_str}</pre>
+                <div class="pt-2 border-t border-base-300">
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
+                    <pre class="bg-base-300 p-3 rounded-lg text-base-content whitespace-pre-wrap border border-base-300 text-[11px]">{channel_config_str}</pre>
                 </div>
             </div>
         </div>
@@ -500,19 +501,19 @@ pub fn channel_simulation_result_fragment(
     let status_banner = if result.resolved {
         status_banner(
             Icon::Check,
-            "bg-emerald-950/80 border-emerald-600/60 text-emerald-200",
+            "bg-success/10 border-success/40 text-base-content",
             "Webhook Triggered &amp; Channel Resolved Successfully!",
         )
     } else if !result.sender_authorized {
         status_banner(
             Icon::X,
-            "bg-rose-950/80 border-rose-600/60 text-rose-200",
+            "bg-error/10 border-error/40 text-base-content",
             "Unauthorized Sender: Email 'from' address is not listed in channel participant_emails.",
         )
     } else {
         status_banner(
             Icon::Alert,
-            "bg-amber-950/80 border-amber-600/60 text-amber-200",
+            "bg-warning/10 border-warning/40 text-base-content",
             "Channel or Company Not Found for recipient address.",
         )
     };
@@ -573,14 +574,14 @@ pub(crate) fn simulation_active_banner(
     format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
-            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-base-content/80 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-success animate-pulse"></span>
                     <span>{status_label}</span>
-                    <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
+                    <span class="text-xs text-base-content/70 font-mono">({thread_id_str})</span>
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                   class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
@@ -676,19 +677,19 @@ pub(crate) fn message_bubble(msg: &ThreadMessageView, ctx: &MessageTaskContext<'
         };
         format!(
             r##"
-                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
+                    <div class="bg-primary/10 border border-primary/40 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-primary/40 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-primary">
                                 {author_glyph}
                                 <span>AI Agent Response</span>
-                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
+                                <span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] uppercase font-mono">Outbound</span>
                             </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                            <span class="text-base-content/70 font-mono text-[11px]">{created_at}</span>
                         </div>
-                        <div class="text-xs font-mono text-slate-400">
-                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
+                        <div class="text-xs font-mono text-base-content/70">
+                            <span>Message ID: </span><span class="text-primary">{msg_id}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
+                        <div class="bg-base-200 p-3 rounded-lg text-base-content border border-base-300 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
                             {body}
                         </div>
                         {params_html}
@@ -704,23 +705,23 @@ pub(crate) fn message_bubble(msg: &ThreadMessageView, ctx: &MessageTaskContext<'
     } else {
         format!(
             r##"
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-slate-200">
+                    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-base-300 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-base-content">
                                 {author_glyph}
                                 <span>Inbound Email</span>
-                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
+                                <span class="px-1.5 py-0.5 rounded bg-base-200 text-base-content/80 text-[10px] uppercase font-mono">Inbound</span>
                             </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                            <span class="text-base-content/70 font-mono text-[11px]">{created_at}</span>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
-                            <div>From: <span class="text-indigo-300">{sender}</span></div>
-                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-base-content/70">
+                            <div>From: <span class="text-primary">{sender}</span></div>
+                            <div>Message ID: <span class="text-base-content/80">{msg_id}</span></div>
                         </div>
-                        <div class="text-xs font-medium text-slate-200 pt-1">
-                            Subject: <span class="font-normal text-slate-300">{subject}</span>
+                        <div class="text-xs font-medium text-base-content pt-1">
+                            Subject: <span class="font-normal text-base-content/80">{subject}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
+                        <div class="bg-base-300 p-3 rounded-lg text-base-content/80 whitespace-pre-wrap border border-base-300 text-xs">
                             {body}
                         </div>
                         {params_html}
@@ -761,12 +762,12 @@ pub(crate) fn thread_history_section(
 
     format!(
         r##"
-            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg{wrapper_extra_class}">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-4 shadow-lg{wrapper_extra_class}">
+                <div class="flex items-center justify-between border-b border-base-300 pb-3">
+                    <h4 class="text-sm font-sans font-bold text-base-content flex items-center gap-2">
                         {history_glyph} Thread History ({msg_count} {label})
                     </h4>
-                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
+                    <span class="text-xs font-mono text-base-content">Thread ID: {thread_id_str}</span>
                 </div>
                 <div class="space-y-3">
                     {msgs_html}
@@ -815,12 +816,12 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 
     format!(
         r##"
-        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <span class="text-indigo-400">{reply_glyph}</span> Simulate Reply Webhook Call
+        <div class="bg-base-100 border border-primary/40 rounded-xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-base-300 pb-3">
+                <h3 class="text-sm font-bold text-base-content flex items-center gap-2">
+                    <span class="text-primary">{reply_glyph}</span> Simulate Reply Webhook Call
                 </h3>
-                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
+                <span class="text-xs text-base-content/70">Simulate next message in Thread <span class="font-mono text-primary">{thread_id_str}</span></span>
             </div>
 
             <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
@@ -832,44 +833,44 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                        <label for="to_reply" class="block text-xs font-medium text-base-content/80 mb-1">To (Recipient Address)</label>
                         <input type="text" id="to_reply" name="to" value="{to_value}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary">
                     </div>
                     <div>
-                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                        <label for="from_reply" class="block text-xs font-medium text-base-content/80 mb-1">From (Sender Address)</label>
                         <input type="text" id="from_reply" name="from" value="{from_value}" disabled
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
+                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm font-mono opacity-60 cursor-not-allowed">
                     </div>
                 </div>
 
                 <div>
-                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                    <label for="subject_reply" class="block text-xs font-medium text-base-content/80 mb-1">Subject</label>
                     <input type="text" id="subject_reply" name="subject" value="{subject}" required
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
 
                 <div>
-                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
+                    <label for="text_body_reply" class="block text-xs font-medium text-base-content/80 mb-1">Reply Text Body</label>
                     <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-2">Execution Mode</label>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                            <input type="radio" name="simulation_mode" value="run_test"{run_test_checked} class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                        <label class="flex items-start p-2.5 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-warning transition">
+                            <input type="radio" name="simulation_mode" value="run_test"{run_test_checked} class="mt-0.5 text-base-content focus:ring-warning">
                             <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
+                                <span class="block text-xs font-bold text-base-content">Run_Test</span>
+                                <span class="block text-[11px] text-base-content/70 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                             </div>
                         </label>
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                            <input type="radio" name="simulation_mode" value="run"{run_checked} class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                        <label class="flex items-start p-2.5 bg-base-200 border border-base-300 rounded-lg cursor-pointer hover:border-success transition">
+                            <input type="radio" name="simulation_mode" value="run"{run_checked} class="mt-0.5 text-base-content focus:ring-success">
                             <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-emerald-400">Run</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                                <span class="block text-xs font-bold text-base-content">Run</span>
+                                <span class="block text-[11px] text-base-content/70 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
                             </div>
                         </label>
                     </div>
@@ -877,8 +878,8 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 
                 <div class="flex justify-end{submit_row_class}">
                     <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
-                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        class="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                        <svg class="animate-spin h-4 w-4 text-base-content hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -973,7 +974,7 @@ pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>
         messages,
         &thread_id_str,
         " mb-6",
-        r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#,
+        r#"<div class="bg-base-100 border border-base-300 rounded-xl p-5 shadow-lg text-base-content/70 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#,
         &MessageTaskContext {
             tasks,
             task_id: None,
@@ -1036,35 +1037,35 @@ pub(crate) fn loaded_thread_overview_card(
 
     format!(
         r##"
-        <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg mb-6">
-            <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2 flex items-center justify-between">
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg mb-6">
+            <h4 class="text-sm font-sans font-bold text-base-content border-b border-base-300 pb-2 flex items-center justify-between">
                 <span>Loaded Thread Details</span>
-                <span class="text-emerald-400 text-xs font-mono">ID: {thread_id_str}</span>
+                <span class="text-base-content text-xs font-mono">ID: {thread_id_str}</span>
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Subject:</span>
-                    <span class="text-slate-200 font-bold">{subject}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Subject:</span>
+                    <span class="text-base-content font-bold">{subject}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel Address:</span>
-                    <span class="text-indigo-300">{target_recipient}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Target Channel Address:</span>
+                    <span class="text-primary">{target_recipient}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Participants:</span>
-                    <span class="text-slate-300">{participants_str}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Participants:</span>
+                    <span class="text-base-content/80">{participants_str}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Total Messages:</span>
-                    <span class="text-emerald-300 font-bold">{msg_count}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Total Messages:</span>
+                    <span class="text-base-content font-bold">{msg_count}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Created At:</span>
-                    <span class="text-slate-400">{created_at_fmt}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Created At:</span>
+                    <span class="text-base-content/70">{created_at_fmt}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Last Updated:</span>
-                    <span class="text-slate-400">{updated_at_fmt}</span>
+                    <span class="text-base-content/70 font-sans block text-[11px] uppercase font-semibold">Last Updated:</span>
+                    <span class="text-base-content/70">{updated_at_fmt}</span>
                 </div>
             </div>
         </div>
@@ -1085,13 +1086,13 @@ pub fn channel_simulation_thread_error_fragment(
     let oob_form_swap = format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
-            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                    <span class="text-rose-400 font-semibold">Failed to Load Thread</span>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-base-content/80 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-error animate-ping"></span>
+                    <span class="text-base-content font-semibold">Failed to Load Thread</span>
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                   class="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-content text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
@@ -1105,7 +1106,7 @@ pub fn channel_simulation_thread_error_fragment(
     let error_body = format!(
         r##"
         <div class="space-y-4">
-            <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+            <div class="p-4 rounded-xl bg-error/10 border border-error/40 text-base-content text-sm font-semibold flex items-center gap-2">
                 {error_glyph}
                 <span>Error Loading Thread ({thread_id_input}): {error_msg}</span>
             </div>

@@ -17,32 +17,32 @@ pub fn render_ai_prompt_generator(
     format!(
         r#"
         <div class="flex items-center justify-between mb-1">
-            <label for="{sys_prompt_id}" class="block text-xs font-medium text-slate-300">System Prompt</label>
+            <label for="{sys_prompt_id}" class="block text-xs font-medium text-base-content/80">System Prompt</label>
             <button type="button"
                 data-action="toggle-prompt-generator" data-box="{gen_box_id}" data-focus="{gen_input_id}"
-                class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition cursor-pointer inline-flex items-center gap-1">
+                class="text-xs text-primary hover:text-primary font-medium transition cursor-pointer inline-flex items-center gap-1">
                 <span class="inline-flex items-center gap-1">{sparkle} Generate with AI</span>
             </button>
         </div>
 
-        <div id="{gen_box_id}" class="hidden my-2 p-3 bg-slate-900/90 border border-indigo-500/40 rounded-xl space-y-2.5 shadow-inner">
-            <div class="flex items-center justify-between text-xs font-semibold text-indigo-300">
+        <div id="{gen_box_id}" class="hidden my-2 p-3 bg-base-100 border border-primary/40 rounded-xl space-y-2.5 shadow-inner">
+            <div class="flex items-center justify-between text-xs font-semibold text-primary">
                 <span class="flex items-center gap-1.5">
                     {sparkle}
                     <span>Generate System Prompt with AI</span>
                 </span>
-                <button type="button" data-action="hide-element" data-target="{gen_box_id}" class="text-slate-400 hover:text-white transition cursor-pointer">&times;</button>
+                <button type="button" data-action="hide-element" data-target="{gen_box_id}" class="text-base-content/70 hover:text-base-content transition cursor-pointer">&times;</button>
             </div>
-            <p class="text-[11px] text-slate-400">Describe what you want this agent to do (e.g. role, responsibilities, rules, tone):</p>
+            <p class="text-[11px] text-base-content/70">Describe what you want this agent to do (e.g. role, responsibilities, rules, tone):</p>
             <textarea id="{gen_input_id}" name="user_instructions" rows="2"
                 placeholder="e.g. A helpful support agent that answers questions about billing and refunds politely..."
-                class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"></textarea>
+                class="w-full px-2.5 py-1.5 bg-base-300 border border-base-300 rounded-lg text-base-content text-xs placeholder-base-content/60 focus:outline-none focus:ring-1 focus:ring-primary font-sans"></textarea>
 
             <div id="{gen_status_id}" class="text-xs"></div>
 
             <div class="flex items-center justify-end gap-2 pt-0.5">
                 <button type="button" data-action="hide-element" data-target="{gen_box_id}"
-                    class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
+                    class="px-2.5 py-1 bg-base-300 hover:bg-base-content/15 text-base-content text-xs font-medium rounded transition cursor-pointer">
                     Cancel
                 </button>
                 <button type="button"
@@ -52,8 +52,8 @@ pub fn render_ai_prompt_generator(
                     hx-include="{hx_include}"
                     hx-vals='{hx_vals}'
                     hx-disabled-elt="this"
-                    class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold rounded shadow transition cursor-pointer flex items-center gap-1.5 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
-                    <svg class="animate-spin h-3.5 w-3.5 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    class="px-3 py-1 bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-primary-content text-xs font-semibold rounded shadow transition cursor-pointer flex items-center gap-1.5 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                    <svg class="animate-spin h-3.5 w-3.5 text-base-content hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -110,27 +110,27 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
     let content = format!(
         r##"
         <div>
-            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/50">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-base-300">
                 <div>
-                    <h2 class="text-2xl font-bold text-white">{company_name} Agents</h2>
-                    <p class="text-slate-400 text-sm mt-0.5">Manage AI Agents, model providers, and configurations</p>
+                    <h2 class="text-2xl font-bold text-base-content">{company_name} Agents</h2>
+                    <p class="text-base-content/70 text-sm mt-0.5">Manage AI Agents, model providers, and configurations</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition">
+                    <a href="/companies" class="text-xs text-primary hover:text-primary font-medium transition">
                         &larr; Back to Companies
                     </a>
                     <button id="agent-form-toggle" type="button" aria-controls="agent-form-card" aria-expanded="false"
                         data-action="toggle-form-card" data-card="agent-form-card"
-                        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
+                        class="px-4 py-2 bg-success hover:bg-success/90 text-success-content text-sm font-semibold rounded-lg shadow-md shadow-success/20 transition cursor-pointer">
                         Add Agent
                     </button>
                 </div>
             </div>
 
             <!-- Create Agent Card -->
-            <div id="agent-form-card" class="hidden bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 mb-8 shadow-lg">
-                <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                    <span class="text-emerald-400">+</span> Add New Agent
+            <div id="agent-form-card" class="hidden bg-base-200 border border-base-300 rounded-xl p-5 mb-8 shadow-lg">
+                <h3 class="text-sm font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <span class="text-base-content">+</span> Add New Agent
                 </h3>
                 <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
                       hx-params="not avatar_file"
@@ -138,34 +138,34 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                       data-keydown="block-enter">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="agent_name" class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
+                            <label for="agent_name" class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
                             <input type="text" id="agent_name" name="name" required
                                 data-input="slugify" data-slug-target="agent_slug"
-                                placeholder="e.g. Triage Bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                                placeholder="e.g. Triage Bot" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                         <div>
-                            <label for="agent_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
+                            <label for="agent_slug" class="block text-xs font-medium text-base-content/80 mb-1">Slug</label>
                             <input type="text" id="agent_slug" name="slug" required
-                                placeholder="triage-bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                                placeholder="triage-bot" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                         {avatar_field}
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label for="agent_provider" class="block text-xs font-medium text-slate-300 mb-1">Provider</label>
+                            <label for="agent_provider" class="block text-xs font-medium text-base-content/80 mb-1">Provider</label>
                             <input type="text" id="agent_provider" name="provider"
-                                placeholder="openai, anthropic, google" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                                placeholder="openai, anthropic, google" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                         <div>
-                            <label for="agent_model" class="block text-xs font-medium text-slate-300 mb-1">Model</label>
+                            <label for="agent_model" class="block text-xs font-medium text-base-content/80 mb-1">Model</label>
                             <input type="text" id="agent_model" name="model"
-                                placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                                placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                         <div>
-                            <label for="agent_run_timeout_secs" class="block text-xs font-medium text-slate-300 mb-1">Run Timeout</label>
+                            <label for="agent_run_timeout_secs" class="block text-xs font-medium text-base-content/80 mb-1">Run Timeout</label>
                             <input type="number" id="agent_run_timeout_secs" name="run_timeout_secs" min="1" max="3600"
-                                placeholder="Default" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                                placeholder="Default" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                     </div>
 
@@ -173,18 +173,18 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                         {prompt_gen_html}
                         <textarea id="agent_system_prompt" name="system_prompt" rows="2"
                             placeholder="You are a helpful customer support agent..."
-                            class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+                            class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition"></textarea>
                     </div>
 
                     <div>
-                        <label for="agent_config_json" class="block text-xs font-medium text-slate-300 mb-1">Config JSON (Optional)</label>
+                        <label for="agent_config_json" class="block text-xs font-medium text-base-content/80 mb-1">Config JSON (Optional)</label>
                         <textarea id="agent_config_json" name="config_json" rows="2"
                             placeholder='{{ "system_prompt": "You are a support agent." }}'
-                            class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+                            class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content font-mono placeholder-base-content/60 focus:outline-none focus:border-primary transition"></textarea>
                     </div>
 
                     <div class="flex justify-end pt-2">
-                        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm transition cursor-pointer shadow-md shadow-emerald-900/20">
+                        <button type="submit" class="px-4 py-2 bg-success hover:bg-success/90 text-success-content font-medium rounded-lg text-sm transition cursor-pointer shadow-md shadow-success/20">
                             Create Agent
                         </button>
                     </div>
@@ -209,9 +209,9 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
 pub fn agent_list_fragment(company: &Company, agents: &[Agent]) -> String {
     if agents.is_empty() {
         return format!(
-            r#"<div class="bg-slate-800/20 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
-                <p class="text-sm">No agents configured for <span class="font-semibold text-white">{}</span> yet.</p>
-                <p class="text-xs text-slate-500 mt-1">Use Add Agent to create your first one.</p>
+            r#"<div class="bg-base-200 border border-base-300 rounded-xl p-8 text-center text-base-content/70">
+                <p class="text-sm">No agents configured for <span class="font-semibold text-base-content">{}</span> yet.</p>
+                <p class="text-xs text-base-content/70 mt-1">Use Add Agent to create your first one.</p>
             </div>"#,
             escape_html_text(&company.name)
         );
@@ -247,28 +247,28 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
 
     format!(
         r##"
-        <div id="agent-row-{agent_id}" class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-600">
+        <div id="agent-row-{agent_id}" class="bg-base-200 border border-base-300 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-base-content/30">
             <div class="space-y-1">
                 <div class="flex items-center gap-2">
                     {avatar}
-                    <span class="font-bold text-white text-base">{name}</span>
-                    <span class="text-xs font-mono text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded">@{slug}</span>
+                    <span class="font-bold text-base-content text-base">{name}</span>
+                    <span class="text-xs font-mono text-primary bg-primary/10 border border-primary/40 px-2 py-0.5 rounded">@{slug}</span>
                 </div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-mono">
-                    <div><span class="text-slate-500">Provider:</span> <span class="text-slate-200">{provider}</span></div>
-                    <div><span class="text-slate-500">Model:</span> <span class="text-slate-200">{model}</span></div>
-                    <div><span class="text-slate-500">Run timeout:</span> <span class="text-slate-200">{run_timeout}</span></div>
-                    <div class="max-w-xs truncate"><span class="text-slate-500">System Prompt:</span> <span class="text-slate-300">{system_prompt_display}</span></div>
-                    <div class="max-w-xs truncate"><span class="text-slate-500">Config:</span> <span class="text-slate-300">{config_display}</span></div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70 font-mono">
+                    <div><span class="text-base-content/70">Provider:</span> <span class="text-base-content">{provider}</span></div>
+                    <div><span class="text-base-content/70">Model:</span> <span class="text-base-content">{model}</span></div>
+                    <div><span class="text-base-content/70">Run timeout:</span> <span class="text-base-content">{run_timeout}</span></div>
+                    <div class="max-w-xs truncate"><span class="text-base-content/70">System Prompt:</span> <span class="text-base-content/80">{system_prompt_display}</span></div>
+                    <div class="max-w-xs truncate"><span class="text-base-content/70">Config:</span> <span class="text-base-content/80">{config_display}</span></div>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <button hx-get="/companies/{company_id}/agents/{agent_id}/edit" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
-                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition cursor-pointer">
+                        class="px-3 py-1.5 bg-base-300 hover:bg-base-content/15 text-base-content text-xs font-medium rounded-lg transition cursor-pointer">
                     Edit
                 </button>
                 <button hx-delete="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete agent '{name}'?"
-                        class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-xs font-medium rounded-lg transition cursor-pointer">
+                        class="px-3 py-1.5 bg-error/10 hover:bg-error/20 text-base-content border border-error/40 text-xs font-medium rounded-lg transition cursor-pointer">
                     Delete
                 </button>
             </div>
@@ -317,52 +317,52 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
 
     format!(
         r##"
-        <div id="agent-row-{agent_id}" class="bg-slate-800 border border-indigo-500/50 rounded-xl p-5 shadow-xl">
+        <div id="agent-row-{agent_id}" class="bg-base-200 border border-primary/40 rounded-xl p-5 shadow-xl">
             <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
                   hx-params="not avatar_file" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
-                        <input type="text" name="name" value="{name}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <label class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
+                        <input type="text" name="name" value="{name}" required class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
-                        <input type="text" name="slug" value="{slug}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <label class="block text-xs font-medium text-base-content/80 mb-1">Slug</label>
+                        <input type="text" name="slug" value="{slug}" required class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
                     {avatar_field}
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Provider</label>
-                        <input type="text" name="provider" value="{provider}" placeholder="openai, anthropic" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <label class="block text-xs font-medium text-base-content/80 mb-1">Provider</label>
+                        <input type="text" name="provider" value="{provider}" placeholder="openai, anthropic" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Model</label>
-                        <input type="text" name="model" value="{model}" placeholder="gpt-4o" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <label class="block text-xs font-medium text-base-content/80 mb-1">Model</label>
+                        <input type="text" name="model" value="{model}" placeholder="gpt-4o" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Run Timeout</label>
-                        <input type="number" name="run_timeout_secs" min="1" max="3600" value="{run_timeout}" placeholder="Default" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <label class="block text-xs font-medium text-base-content/80 mb-1">Run Timeout</label>
+                        <input type="number" name="run_timeout_secs" min="1" max="3600" value="{run_timeout}" placeholder="Default" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
                 </div>
 
                 <div>
                     {prompt_gen_html}
-                    <textarea id="agent_system_prompt_{agent_id}" name="system_prompt" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">{system_prompt}</textarea>
+                    <textarea id="agent_system_prompt_{agent_id}" name="system_prompt" rows="2" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">{system_prompt}</textarea>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Config JSON</label>
-                    <textarea name="config_json" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">{config_json_str}</textarea>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Config JSON</label>
+                    <textarea name="config_json" rows="3" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content font-mono focus:outline-none focus:border-primary transition">{config_json_str}</textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" hx-get="/companies/{company_id}/agents/{agent_id}/cancel" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
-                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition cursor-pointer">
+                            class="px-3 py-1.5 bg-base-300 hover:bg-base-content/15 text-base-content/80 text-xs font-medium rounded-lg transition cursor-pointer">
                         Cancel
                     </button>
-                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition cursor-pointer shadow-md shadow-indigo-900/20">
+                    <button type="submit" class="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-content text-xs font-medium rounded-lg transition cursor-pointer shadow-md shadow-primary/20">
                         Save Changes
                     </button>
                 </div>

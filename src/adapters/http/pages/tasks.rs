@@ -84,28 +84,28 @@ fn task_token_meter_card(totals: &TaskTokenTotals) -> String {
     format!(
         r##"
         <!-- Token Meter Summary Card -->
-        <div class="bg-slate-900/80 border border-indigo-900/60 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+        <div class="bg-base-100 border border-primary/40 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-indigo-950/80 border border-indigo-700/50 rounded-lg text-indigo-400">
+                <div class="p-2.5 bg-primary/10 border border-primary/40 rounded-lg text-primary">
                     {meter_glyph}
                 </div>
                 <div>
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Token Meter Summary</h4>
-                    <p class="text-xs text-slate-400">Total tokens consumed by tasks on this page</p>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-base-content/80">Token Meter Summary</h4>
+                    <p class="text-xs text-base-content/70">Total tokens consumed by tasks on this page</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 text-xs font-mono">
-                <div class="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">Prompt Tokens:</span>
-                    <span class="text-indigo-300 font-bold ml-1.5">{total_prompt_tokens}</span>
+                <div class="bg-base-300 px-3 py-1.5 rounded-lg border border-base-300">
+                    <span class="text-base-content/70">Prompt Tokens:</span>
+                    <span class="text-primary font-bold ml-1.5">{total_prompt_tokens}</span>
                 </div>
-                <div class="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">Completion Tokens:</span>
-                    <span class="text-indigo-300 font-bold ml-1.5">{total_completion_tokens}</span>
+                <div class="bg-base-300 px-3 py-1.5 rounded-lg border border-base-300">
+                    <span class="text-base-content/70">Completion Tokens:</span>
+                    <span class="text-primary font-bold ml-1.5">{total_completion_tokens}</span>
                 </div>
-                <div class="bg-indigo-950/90 px-3.5 py-1.5 rounded-lg border border-indigo-700/80">
-                    <span class="text-indigo-200 font-semibold">Total Tokens:</span>
-                    <span class="text-white font-extrabold text-sm ml-1.5">{total_tokens_meter}</span>
+                <div class="bg-primary/10 px-3.5 py-1.5 rounded-lg border border-primary/40">
+                    <span class="text-primary font-semibold">Total Tokens:</span>
+                    <span class="text-base-content font-extrabold text-sm ml-1.5">{total_tokens_meter}</span>
                 </div>
             </div>
         </div>
@@ -127,27 +127,27 @@ fn task_filter_bar(
     format!(
         r##"
         <!-- Filter & Sort Bar -->
-        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-6">
             <form hx-get="/companies/{company_id}/tasks/filter" hx-target="#task-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input type="hidden" name="limit" value="{limit}">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Channel</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Filter by Channel</label>
                     <select name="channel_id" data-action="submit-form"
-                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        class="w-full px-3 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                         {wf_options}
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Status</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Filter by Status</label>
                     <select name="status" data-action="submit-form"
-                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        class="w-full px-3 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                         {status_options}
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Sort by Time</label>
+                    <label class="block text-xs font-medium text-base-content/80 mb-1">Sort by Time</label>
                     <select name="sort" data-action="submit-form"
-                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        class="w-full px-3 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                         <option value="desc" {sort_desc_selected}>Newest First</option>
                         <option value="asc" {sort_asc_selected}>Oldest First</option>
                     </select>
@@ -182,9 +182,9 @@ pub fn company_tasks_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
-                <h2 class="text-2xl font-bold text-white">{company_name} Background Tasks</h2>
-                <p class="text-slate-400 text-sm mt-0.5">Monitor, stop, or resume background processing tasks for <span class="font-mono text-indigo-300">/{slug}</span></p>
+                <a href="/companies" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-base-content">{company_name} Background Tasks</h2>
+                <p class="text-base-content/70 text-sm mt-0.5">Monitor, stop, or resume background processing tasks for <span class="font-mono text-primary">/{slug}</span></p>
             </div>
         </div>
 
@@ -194,7 +194,7 @@ pub fn company_tasks_page(
 {filter_bar}
         <!-- Task List Section -->
         <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Tasks</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Tasks</h3>
             <div id="task-list" class="space-y-3">
                 {task_list_html}
             </div>
@@ -215,8 +215,8 @@ pub fn task_list_fragment(
 ) -> String {
     let tasks_html = if tasks.is_empty() {
         r##"
-            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">No tasks matching the selected filters.</p>
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
+                <p class="text-base-content/70 text-sm">No tasks matching the selected filters.</p>
             </div>
         "##
         .to_string()
@@ -230,7 +230,7 @@ pub fn task_list_fragment(
     let link = |link: &TaskPageLink, label: &str| {
         format!(
             r##"<a href="{href}" hx-get="{hx_get}" hx-target="#task-list" hx-swap="innerHTML"
-                class="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">{label}</a>"##,
+                class="px-3 py-2 text-xs font-semibold bg-base-200 hover:bg-base-300 text-base-content border border-base-300 rounded-lg transition">{label}</a>"##,
             href = escape_html_attr(&link.href),
             hx_get = escape_html_attr(&link.hx_get),
             label = label,
@@ -250,7 +250,7 @@ pub fn task_list_fragment(
         format!(
             r##"<nav aria-label="Task pagination" class="flex items-center justify-between pt-3">
                 <div>{previous}</div>
-                <span class="text-xs font-mono text-slate-400">Page {page}</span>
+                <span class="text-xs font-mono text-base-content/70">Page {page}</span>
                 <div>{next}</div>
             </nav>"##,
             page = pagination.current_page,
@@ -372,15 +372,14 @@ fn payload_string<'a>(payload: &'a serde_json::Value, path: &[&str]) -> Option<&
         .as_str()
 }
 
-const BADGE_INDIGO: &str = "bg-indigo-950/80 text-indigo-300 border border-indigo-800/50";
-const BADGE_PURPLE: &str = "bg-purple-950/80 text-purple-300 border border-purple-800/50";
-const BADGE_PURPLE_STRONG: &str = "bg-purple-950/80 text-purple-300 border border-purple-800/60";
-const BADGE_SLATE: &str = "bg-slate-800 text-slate-300 border border-slate-700";
-const BADGE_EMERALD: &str = "bg-emerald-950/80 text-emerald-300 border border-emerald-800/50";
-const BADGE_CYAN: &str = "bg-cyan-950/80 text-cyan-300 border border-cyan-800/60";
-const BADGE_TEAL: &str = "bg-teal-950/80 text-teal-300 border border-teal-800/60";
-const BADGE_TOKENS: &str =
-    "bg-indigo-950/90 text-indigo-200 border border-indigo-700/60 font-semibold";
+const BADGE_INDIGO: &str = "bg-primary/10 text-primary border border-primary/40";
+const BADGE_PURPLE: &str = "bg-secondary/10 text-secondary border border-secondary/40";
+const BADGE_PURPLE_STRONG: &str = "bg-secondary/10 text-secondary border border-secondary/40";
+const BADGE_SLATE: &str = "bg-base-200 text-base-content/80 border border-base-300";
+const BADGE_EMERALD: &str = "bg-success/10 text-base-content border border-success/40";
+const BADGE_CYAN: &str = "bg-info/10 text-base-content border border-info/40";
+const BADGE_TEAL: &str = "bg-success/10 text-base-content border border-success/40";
+const BADGE_TOKENS: &str = "bg-primary/10 text-primary border border-primary/40 font-semibold";
 
 /// One summary chip above the raw task payload.
 fn badge(style: &str, label: impl std::fmt::Display) -> String {
@@ -534,15 +533,15 @@ fn finish_reason_badge(metadata: &serde_json::Value) -> String {
     };
     let (style, label) = match reason {
         "length" | "max_tokens" => (
-            "bg-amber-950/90 text-amber-300 border border-amber-700/80 font-bold",
+            "bg-warning/10 text-base-content border border-warning/40 font-bold",
             format!("Finish Reason: {reason} (TRUNCATED MID-SENTENCE)"),
         ),
         "stop" | "end_turn" => (
-            "bg-emerald-950/90 text-emerald-300 border border-emerald-700/80 font-semibold",
+            "bg-success/10 text-base-content border border-success/40 font-semibold",
             format!("Finish Reason: {reason}"),
         ),
         other => (
-            "bg-slate-800 text-slate-300 border border-slate-700 font-semibold",
+            "bg-base-200 text-base-content/80 border border-base-300 font-semibold",
             format!("Finish Reason: {other}"),
         ),
     };
@@ -583,15 +582,15 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
 
     format!(
         r##"
-        <details class="mt-3 border-t border-slate-800/80 pt-3 group">
-            <summary class="cursor-pointer text-xs font-semibold text-slate-400 hover:text-indigo-300 transition flex items-center gap-1.5 select-none">
-                <span class="text-indigo-400 group-open:rotate-90 transition-transform">{disclosure}</span>
+        <details class="mt-3 border-t border-base-300 pt-3 group">
+            <summary class="cursor-pointer text-xs font-semibold text-base-content/70 hover:text-primary transition flex items-center gap-1.5 select-none">
+                <span class="text-primary group-open:rotate-90 transition-transform">{disclosure}</span>
                 <span>Task Execution Parameters</span>
             </summary>
             <div class="mt-2.5">
                 {runtime_summary}
                 {summary_badges_html}
-                <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-96">{payload_str}</pre>
+                <pre class="bg-base-300 p-3 rounded-lg text-base-content font-mono text-[11px] border border-base-300 overflow-x-auto whitespace-pre-wrap max-h-96">{payload_str}</pre>
             </div>
         </details>
         "##,
@@ -619,42 +618,42 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let created_at_str = super::format_time(task.created_at);
     let status_badge = match task.status {
         TaskStatus::Pending => status_pill(
-            "bg-amber-950 text-amber-300 border-amber-700/50",
+            "bg-warning/10 text-base-content border-warning/40",
             "Pending",
             None,
         ),
         TaskStatus::Processing => status_pill(
-            "bg-indigo-950 text-indigo-300 border-indigo-700/50 animate-pulse",
+            "bg-primary/10 text-primary border-primary/40 animate-pulse",
             "Processing",
             None,
         ),
         TaskStatus::PendingApproval => status_pill(
-            "bg-sky-950 text-sky-300 border-sky-700/50",
+            "bg-info/10 text-base-content border-info/40",
             "Awaiting Approval",
             Some(Icon::Hourglass),
         ),
         TaskStatus::WaitingForThirdPartyReply => status_pill(
-            "bg-cyan-950 text-cyan-300 border-cyan-700/50",
+            "bg-info/10 text-base-content border-info/40",
             "Awaiting 3rd Party Reply",
             Some(Icon::Hourglass),
         ),
         TaskStatus::Completed => status_pill(
-            "bg-emerald-950 text-emerald-300 border-emerald-700/50",
+            "bg-success/10 text-base-content border-success/40",
             "Completed",
             None,
         ),
         TaskStatus::Failed => status_pill(
-            "bg-rose-950 text-rose-300 border-rose-700/50",
+            "bg-error/10 text-base-content border-error/40",
             "Failed",
             None,
         ),
         TaskStatus::DeadLetter => status_pill(
-            "bg-purple-950 text-purple-300 border-purple-700/50",
+            "bg-secondary/10 text-secondary border-secondary/40",
             "Dead Letter",
             None,
         ),
         TaskStatus::Stopped => status_pill(
-            "bg-slate-800 text-slate-400 border-slate-600",
+            "bg-base-200 text-base-content/70 border-base-content/30",
             "Stopped",
             None,
         ),
@@ -663,7 +662,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let action_button = match task.status {
         TaskStatus::Pending | TaskStatus::Processing | TaskStatus::Failed => format!(
             r##"<button hx-post="/companies/{company_id}/tasks/{task_id}/stop" hx-target="#task-{task_id}" hx-swap="outerHTML"
-                class="px-3 py-1.5 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                class="px-3 py-1.5 text-xs font-semibold bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                 Stop Task
             </button>"##,
             company_id = company_id,
@@ -671,7 +670,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         ),
         TaskStatus::Stopped | TaskStatus::DeadLetter => format!(
             r##"<button hx-post="/companies/{company_id}/tasks/{task_id}/resume" hx-target="#task-{task_id}" hx-swap="outerHTML"
-                class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer shadow-md shadow-emerald-600/30">
+                class="px-3 py-1.5 text-xs font-semibold bg-success hover:bg-success/90 text-success-content rounded-lg transition cursor-pointer shadow-md shadow-success/20">
                 Resume Task
             </button>"##,
             company_id = company_id,
@@ -683,7 +682,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let thread_link = match task.thread_id {
         Some(tid) => format!(
             r##"<a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}"
-                class="px-3 py-1.5 text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
+                class="px-3 py-1.5 text-xs font-semibold bg-primary/10 hover:bg-primary/90 text-base-content rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
                 <span>Open Thread</span>
             </a>"##,
             company_id = company_id,
@@ -695,7 +694,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let thread_info = match task.thread_id {
         Some(tid) => format!(
-            r##" • Thread: <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
+            r##" • Thread: <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}" class="font-mono text-base-content hover:text-base-content underline font-medium">{tid}</a>"##,
             company_id = company_id,
             channel_id = task.channel_id,
             tid = tid
@@ -705,7 +704,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let error_html = match &task.last_error {
         Some(err) if !err.is_empty() => format!(
-            r##"<div class="mt-2 text-xs font-mono bg-slate-950/80 p-2 rounded border border-rose-900/50 text-rose-300">Error: {err}</div>"##,
+            r##"<div class="mt-2 text-xs font-mono bg-base-300 p-2 rounded border border-error/40 text-base-content">Error: {err}</div>"##,
             err = escape_html_text(err),
         ),
         _ => String::new(),
@@ -713,10 +712,10 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let token_meter_badge = if let Some(tu) = task.token_usage() {
         format!(
-            r##"<div class="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-950/80 border border-indigo-800/70 text-indigo-300 font-mono text-xs shadow-sm">
-                <span class="inline-flex items-center gap-1.5 text-indigo-400 font-semibold">{glyph} Token Meter:</span>
-                <span class="text-white font-bold">{total} total</span>
-                <span class="text-slate-400 text-[11px]">(Prompt: {prompt} • Completion: {completion})</span>
+            r##"<div class="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/40 text-primary font-mono text-xs shadow-sm">
+                <span class="inline-flex items-center gap-1.5 text-primary font-semibold">{glyph} Token Meter:</span>
+                <span class="text-base-content font-bold">{total} total</span>
+                <span class="text-base-content/70 text-[11px]">(Prompt: {prompt} • Completion: {completion})</span>
             </div>"##,
             glyph = icon(Icon::Graph, BUTTON_ICON),
             total = tu.total_tokens,
@@ -731,15 +730,15 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     format!(
         r##"
-        <div id="task-{task_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-slate-600 transition shadow-sm">
+        <div id="task-{task_id}" class="bg-base-100 border border-base-300 rounded-xl p-4 md:p-5 hover:border-base-content/30 transition shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-xs text-slate-300 font-semibold">{task_id}</span>
+                        <span class="font-mono text-xs text-base-content/80 font-semibold">{task_id}</span>
                         {status_badge}
-                        <span class="text-xs text-slate-400 font-mono">Retries: {retry_count}/{max_retries}</span>
+                        <span class="text-xs text-base-content/70 font-mono">Retries: {retry_count}/{max_retries}</span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">Type: <span class="font-mono text-indigo-300">{task_type}</span> • Enqueued {created_at_str}{thread_info}</p>
+                    <p class="text-xs text-base-content/70 mt-1">Type: <span class="font-mono text-primary">{task_type}</span> • Enqueued {created_at_str}{thread_info}</p>
                     {token_meter_badge}
                 </div>
                 <div class="flex items-center gap-2">

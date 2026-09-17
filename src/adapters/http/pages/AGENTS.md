@@ -3,16 +3,16 @@ Rust in this directory.
 
 Two shells render from here and they are **not** interchangeable:
 
-- `ui_layout` (`mailbox.rs`) — every `/ui` response. Loads daisyUI 5 and Tailwind v4, both from
-  CDN, and carries one `<style>` block holding the page CSS consts (`BRAND_LOGO_STYLES`,
+- `ui_layout` (`mailbox.rs`) — the mailbox shell. Loads the compiled `assets/app.css` bundle
+  (daisyUI 5 and Tailwind v4), and carries one `<style>` block holding the page CSS consts (`BRAND_LOGO_STYLES`,
   `DARK_THEME_BLUES`, `FIELD_STYLES`).
-- `base_layout` / `public_layout` (`layout.rs`, both wrapping `layout`) — login, onboarding, and
-  the older `agents.rs`, `channels.rs`, `tasks.rs`, `simulation.rs` pages. Tailwind only, **no
-  daisyUI**.
+- `base_layout` / `public_layout` (`layout.rs`) — login, onboarding, and the older management
+  pages. These also load `assets/app.css`, including daisyUI. `base_layout` shares the mailbox
+  theme switch, preference initialization, and logo styles; `public_layout` defaults to dark.
 
-Nothing you add to the `/ui` `<style>` block reaches the second set, and daisyUI component classes
-(`input`, `select`, `btn`, `card`) do nothing there. Check which shell a page renders through
-before styling it.
+Mailbox-specific inline style overrides do not reach the second set unless explicitly shared.
+Use theme tokens in both shells, including JavaScript-generated controls and fragments. Check
+which shell a page renders through before styling it.
 
 # Every user action needs visible progress feedback
 
@@ -74,7 +74,7 @@ The failure mode is quiet: the change looks correct in dark — the default, and
 probably already in — and does nothing in light. If a token override is meant to apply in both
 themes, write it `!important` and say why in the const's doc comment.
 
-Ordering matters too. The `<style>` block must stay **after** the two daisyUI `<link>` tags in
+Ordering matters too. The `<style>` block must stay **after** the compiled stylesheet `<link>` in
 `ui_layout`'s `<head>`; equal-specificity rules are decided by source order, and moving it above
 them reverts every override at once.
 

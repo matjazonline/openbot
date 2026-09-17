@@ -1136,7 +1136,7 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
 /// The wordmark, in both inks: the dark one for the light theme, the light one for the dark
 /// theme. Both are sent, and [`BRAND_LOGO_STYLES`] hides the one that does not belong -- swapping
 /// the `src` from script instead would leave the mark blank for a moment on every theme change.
-fn brand_logo() -> String {
+pub(super) fn brand_logo() -> String {
     let logo_light = crate::adapters::http::routes::assets::logo_light_url();
     format!(
         r##"
@@ -1152,7 +1152,7 @@ fn brand_logo() -> String {
 /// `<html>`, which `THEME_INIT_SCRIPT` sets before the first paint and `applyTheme` keeps current.
 ///
 /// Dark is the default here as it is everywhere else: an unset `data-theme` is the dark theme.
-const BRAND_LOGO_STYLES: &str = r##"
+pub(super) const BRAND_LOGO_STYLES: &str = r##"
         .brand-logo-on-light { display: none; }
         [data-theme="light"] .brand-logo-on-dark { display: none; }
         [data-theme="light"] .brand-logo-on-light { display: block; }
@@ -1445,7 +1445,7 @@ const COMPACT_LAYOUT_STYLES: &str = r##"
 /// in agreement with the box.
 ///
 /// The icon shows the theme the click would take you *to*, not the one you are already in.
-const THEME_CONTROLLER: &str = r##"
+pub(super) const THEME_CONTROLLER: &str = r##"
                 <label class="swap swap-rotate btn btn-ghost btn-circle" title="Switch between light and dark">
                     <input id="theme-toggle" type="checkbox" class="theme-controller" value="light"
                         aria-label="Switch between light and dark"

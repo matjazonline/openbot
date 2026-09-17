@@ -2,7 +2,12 @@
 
 use super::*;
 
-pub(crate) const MARKDOWN_CONTENT_STYLES: &str = "[&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-600 [&_blockquote]:pl-3 [&_blockquote]:text-slate-300 [&_a]:underline [&_a]:text-indigo-300 [&_strong]:font-bold [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-slate-900 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_th]:border [&_th]:border-slate-700 [&_th]:p-2 [&_th]:text-left [&_td]:border [&_td]:border-slate-800 [&_td]:p-2";
+/// Every colour here is a daisyUI theme token rather than a fixed slate/indigo, because the
+/// markdown this styles is rendered inside theme-aware containers: a literal `bg-slate-800` on
+/// `code` painted a black box behind `base-content`'s near-black ink under the light theme, which
+/// is unreadable. Tokens track whichever theme `data-theme` selects, so `code` and `pre` sit one
+/// step off the surface (`base-300` on a `base-200` bubble) in both.
+pub(crate) const MARKDOWN_CONTENT_STYLES: &str = "[&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-base-content/20 [&_blockquote]:pl-3 [&_blockquote]:text-base-content/70 [&_a]:underline [&_a]:text-primary [&_strong]:font-bold [&_code]:rounded [&_code]:bg-base-300 [&_code]:text-base-content [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-base-300 [&_pre]:text-base-content [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_th]:border [&_th]:border-base-300 [&_th]:p-2 [&_th]:text-left [&_td]:border [&_td]:border-base-300 [&_td]:p-2";
 
 /// Makes daisyUI's `loading` indicators actually move.
 ///
@@ -109,15 +114,15 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
 
 /// Navigation shown once a session exists: company-scoped shortcuts plus the account menu.
 const AUTHENTICATED_NAV: &str = r##"
-                <a id="nav-channels" href="#" class="hidden text-slate-300 hover:text-white transition">Channels</a>
-                <a id="nav-agents" href="#" class="hidden text-slate-300 hover:text-white transition">Agents</a>
+                <a id="nav-channels" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Channels</a>
+                <a id="nav-agents" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Agents</a>
                 <details class="relative">
-                    <summary class="list-none text-slate-300 hover:text-white transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>
-                    <div class="absolute right-0 z-50 mt-2 w-36 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 shadow-xl">
-                        <a href="/companies" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">Companies</a>
-                        <a href="/ui/invites" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">My Invites</a>
-                        <form method="post" action="/logout" class="border-t border-slate-700">
-                            <button type="submit" class="w-full px-4 py-2.5 text-left text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer">Log Out</button>
+                    <summary class="list-none text-base-content/80 hover:text-base-content transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>
+                    <div class="absolute right-0 z-50 mt-2 w-36 overflow-hidden rounded-lg border border-base-300 bg-base-200 shadow-xl">
+                        <a href="/companies" class="block px-4 py-2.5 text-base-content/80 hover:bg-base-300 hover:text-base-content transition">Companies</a>
+                        <a href="/ui/invites" class="block px-4 py-2.5 text-base-content/80 hover:bg-base-300 hover:text-base-content transition">My Invites</a>
+                        <form method="post" action="/logout" class="border-t border-base-300">
+                            <button type="submit" class="w-full px-4 py-2.5 text-left text-base-content/80 hover:bg-base-300 hover:text-base-content transition cursor-pointer">Log Out</button>
                         </form>
                     </div>
                 </details>
@@ -125,8 +130,8 @@ const AUTHENTICATED_NAV: &str = r##"
 
 /// Navigation for signed-out visitors.
 const PUBLIC_NAV: &str = r##"
-                <a href="/login" class="text-slate-300 hover:text-white transition">Sign In</a>
-                <a href="/register" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition">Sign Up</a>
+                <a href="/login" class="text-base-content/80 hover:text-base-content transition">Sign In</a>
+                <a href="/register" class="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-content rounded-lg transition">Sign Up</a>
         "##;
 
 /// Client-side behaviour shared by every page: remembering the selected company, the spam-warning
@@ -280,7 +285,7 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
                 let dropdown = wrapper.querySelector('.team-dropdown');
                 if (!dropdown) {
                     dropdown = document.createElement('div');
-                    dropdown.className = 'team-dropdown absolute left-0 right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl hidden max-h-48 overflow-y-auto font-sans';
+                    dropdown.className = 'team-dropdown absolute left-0 right-0 top-full mt-1 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl hidden max-h-48 overflow-y-auto font-sans';
                     wrapper.appendChild(dropdown);
                 }
 
@@ -293,15 +298,15 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
 
                 function updateChips() {
                     const currentEmails = getParsedEmails();
-                    chipsContainer.innerHTML = '<span class="text-[11px] font-medium text-slate-400 mr-1">Team:</span>';
+                    chipsContainer.innerHTML = '<span class="text-[11px] font-medium text-base-content/70 mr-1">Team:</span>';
                     members.forEach(member => {
                         const emailLower = member.email.toLowerCase();
                         const isSelected = currentEmails.includes(emailLower);
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = isSelected
-                            ? 'px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono cursor-pointer hover:bg-emerald-500/30 transition flex items-center gap-1'
-                            : 'px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-mono cursor-pointer hover:bg-slate-700 hover:text-white transition flex items-center gap-1';
+                            ? 'px-2 py-0.5 rounded-md bg-success/10 text-base-content border border-success/40 text-[11px] font-mono cursor-pointer hover:bg-success/20 transition flex items-center gap-1'
+                            : 'px-2 py-0.5 rounded-md bg-base-200 text-base-content/80 border border-base-300 text-[11px] font-mono cursor-pointer hover:bg-base-300 hover:text-base-content transition flex items-center gap-1';
                         // The glyph is markup, the email is not: it goes in as text so an
                         // address containing angle brackets stays an address.
                         btn.innerHTML = (isSelected ? CHIP_SELECTED_MARK : CHIP_ADD_MARK) + '<span></span>';
@@ -357,9 +362,9 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
                     dropdown.innerHTML = '';
                     matches.forEach(m => {
                         const item = document.createElement('div');
-                        item.className = 'px-3 py-2 hover:bg-slate-700/80 cursor-pointer text-xs flex items-center justify-between border-b border-slate-700/50 last:border-b-0 text-slate-200';
-                        item.innerHTML = `<span class="font-mono text-emerald-400 font-medium">${m.email}</span>` +
-                            (m.username ? `<span class="text-slate-400 text-[11px]">${m.username} (${m.role})</span>` : `<span class="text-slate-400 text-[11px]">${m.role}</span>`);
+                        item.className = 'px-3 py-2 hover:bg-base-300 cursor-pointer text-xs flex items-center justify-between border-b border-base-300 last:border-b-0 text-base-content';
+                        item.innerHTML = `<span class="font-mono text-base-content font-medium">${m.email}</span>` +
+                            (m.username ? `<span class="text-base-content/70 text-[11px]">${m.username} (${m.role})</span>` : `<span class="text-base-content/70 text-[11px]">${m.role}</span>`);
 
                         item.addEventListener('mousedown', (e) => {
                             e.preventDefault();
@@ -445,8 +450,8 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
             var advancedForm = document.getElementById('advanced-channel-form');
             var simpleBtn = document.getElementById('tab-simple-btn');
             var advancedBtn = document.getElementById('tab-advanced-btn');
-            var active = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
-            var idle = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+            var active = 'px-3 py-1 rounded-md text-primary-content bg-primary font-semibold transition cursor-pointer';
+            var idle = 'px-3 py-1 rounded-md text-base-content/70 hover:text-base-content transition cursor-pointer';
             var simple = mode === 'simple';
             if (simpleForm) simpleForm.classList.toggle('hidden', !simple);
             if (advancedForm) advancedForm.classList.toggle('hidden', simple);
@@ -518,6 +523,8 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
         }"##;
 
 pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String {
+    use super::mailbox::{BRAND_LOGO_STYLES, THEME_CONTROLLER, brand_logo};
+
     let title = escape_html_text(title);
     let home_href = if authenticated {
         "/companies"
@@ -531,30 +538,33 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     };
     let app_css = crate::adapters::http::routes::assets::app_css_url();
     let app_js = crate::adapters::http::routes::assets::app_js_url();
-    let logo_light = crate::adapters::http::routes::assets::logo_light_url();
+    let theme_init_js = crate::adapters::http::routes::assets::theme_init_js_url();
+    let brand_logo = brand_logo();
 
     format!(
         r##"<!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-900">
+<html lang="en" data-theme="dark" class="h-full bg-base-100">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="{app_css}" rel="stylesheet" type="text/css" />
-    <style>{SPINNER_STYLES}</style>
+    <style>{SPINNER_STYLES}{BRAND_LOGO_STYLES}</style>
+    <script src="{theme_init_js}"></script>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
-<body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">
+<body class="h-full font-sans antialiased text-base-content flex flex-col items-center p-4 md:p-8">
     <div class="w-full max-w-4xl">
-        <nav class="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <nav class="flex items-center justify-between mb-8 pb-4 border-b border-base-300">
             <a href="{home_href}" class="flex items-center" title="BusyBots">
-                <img src="{logo_light}" alt="BusyBots" class="h-9 w-auto">
+                {brand_logo}
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 {navigation}
+                {THEME_CONTROLLER}
             </div>
         </nav>
-        <div class="bg-slate-800/80 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-2xl p-6 md:p-8">
+        <div class="bg-base-200 backdrop-blur-md border border-base-300 rounded-2xl shadow-2xl p-6 md:p-8">
             {content}
         </div>
     </div>
@@ -567,15 +577,15 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
 pub fn success_alert(message: &str, redirect_url: Option<(&str, &str)>) -> String {
     let redirect_html = match redirect_url {
         Some((url, label)) => format!(
-            r##"<div class="mt-3"><a href="{url}" class="inline-block text-xs font-semibold uppercase tracking-wider text-emerald-300 hover:text-white underline transition">{label} &rarr;</a></div>"##
+            r##"<div class="mt-3"><a href="{url}" class="inline-block text-xs font-semibold uppercase tracking-wider text-base-content hover:text-base-content underline transition">{label} &rarr;</a></div>"##
         ),
         None => String::new(),
     };
 
     format!(
-        r##"<div class="p-4 mb-4 rounded-xl bg-emerald-950/60 border border-emerald-600/40 text-emerald-200 text-sm">
+        r##"<div class="p-4 mb-4 rounded-xl bg-success/10 border border-success/40 text-base-content text-sm">
             <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                <svg class="w-5 h-5 text-base-content flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 <span>{message}</span>
             </div>
             {redirect_html}
@@ -585,8 +595,8 @@ pub fn success_alert(message: &str, redirect_url: Option<(&str, &str)>) -> Strin
 
 pub fn error_alert(message: &str) -> String {
     format!(
-        r##"<div class="p-4 mb-4 rounded-xl bg-rose-950/60 border border-rose-600/40 text-rose-200 text-sm flex items-center gap-2 font-medium">
-            <svg class="w-5 h-5 text-rose-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 19 9 0 0118 0z"></path></svg>
+        r##"<div class="p-4 mb-4 rounded-xl bg-error/10 border border-error/40 text-base-content text-sm flex items-center gap-2 font-medium">
+            <svg class="w-5 h-5 text-base-content flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 19 9 0 0118 0z"></path></svg>
             <span>{message}</span>
         </div>"##
     )
