@@ -24,6 +24,7 @@ use crate::{
             ExternalThreadKey, InboundEventId, InboundSource, QualifiedIdentity, RecipientRole,
             ReplyMessageKeyCandidate, ReplyThreadKeyCandidate,
         },
+        unicode_sanitization::sanitize_string,
         value_objects::CompanySlug,
     },
     transport::{
@@ -109,8 +110,8 @@ impl CanonicalContent {
         subject: impl Into<String>,
         body_text: impl Into<String>,
     ) -> Result<Self, BoundsError> {
-        let subject = subject.into();
-        let body_text = body_text.into();
+        let subject = sanitize_string(subject.into());
+        let body_text = sanitize_string(body_text.into());
         bounded_text("subject", &subject, MAX_SUBJECT_BYTES)?;
         bounded_text("body", &body_text, MAX_BODY_BYTES)?;
         Ok(Self { subject, body_text })
@@ -788,6 +789,17 @@ mod tests {
         assert!(each_channel_in_one_task(&[]).is_ok());
         assert!(each_channel_in_one_task(&[task(&[channel]), task(&[other])]).is_ok());
         assert!(each_channel_in_one_task(&[task(&[other, channel]), task(&[channel])]).is_err());
+    }
+
+    #[test]
+    fn canonical_content_strips_invisible_and_prompt_injection_characters() {
+        let hostile_subject = "Invoice\u{200B} #1234\u{E0001}\u{E0020}";
+        let hostile_body = "Please pay now.\u{202E}gnirts\u{202C}\u{FEFF}\u{3164}";
+
+        let content =
+            CanonicalContent::parse(hostile_subject, hostile_body).expect("valid bounded content");
+        assert_eq!(content.subject(), "Invoice #1234");
+        assert_eq!(content.body_text(), "Please pay now.gnirts");
     }
 
     #[test]

@@ -249,3 +249,31 @@ fn the_delivery_context_leads_the_prompt_when_the_agent_was_copied() {
         )
     );
 }
+
+#[test]
+fn prompt_composition_sanitizes_invisible_unicode_injection_characters() {
+    let fence = UntrustedFence::fixed("FENCE");
+    let parts = PromptParts {
+        message: "Hello\u{200B}\u{E0001}\u{E0041} World!\u{202E}attack\u{202C}",
+        subject: Some("Invoice\u{FEFF} #101\u{3164}"),
+        history: &[],
+        internal_notes: &[],
+        upstream: Some("Summary\u{200C} of prior step"),
+        recipient_role: None,
+    };
+
+    let composed = parts.compose(&fence);
+
+    assert!(composed.contains("Subject: Invoice #101\n"));
+    assert!(composed.contains("Hello World!attack"));
+    assert!(composed.contains("Summary of prior step"));
+    // Ensure all invisible characters are stripped out
+    assert!(!composed.contains('\u{200B}'));
+    assert!(!composed.contains('\u{E0001}'));
+    assert!(!composed.contains('\u{E0041}'));
+    assert!(!composed.contains('\u{202E}'));
+    assert!(!composed.contains('\u{202C}'));
+    assert!(!composed.contains('\u{FEFF}'));
+    assert!(!composed.contains('\u{3164}'));
+    assert!(!composed.contains('\u{200C}'));
+}

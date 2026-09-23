@@ -1,5 +1,7 @@
 use uuid::Uuid;
 
+use crate::entities::unicode_sanitization::sanitize_invisible_unicode;
+
 /// Hex characters of the per-run marker. Long enough that content cannot land on it by accident or
 /// guess it from the inside, short enough to stay readable where it appears in a prompt.
 const FENCE_ID_CHARS: usize = 16;
@@ -76,14 +78,15 @@ impl UntrustedFence {
         Self(id.to_string())
     }
 
-    /// `content` presented as untrusted data of kind `kind`, with any occurrence of this run's
-    /// marker removed from the content first.
+    /// `content` presented as untrusted data of kind `kind`, with invisible/prompt-injection Unicode
+    /// characters stripped and any occurrence of this run's marker removed from the content first.
     pub fn wrap(&self, kind: UntrustedKind, content: &str) -> String {
         let id = &self.0;
         let tag = kind.tag();
+        let sanitized = sanitize_invisible_unicode(content);
         format!(
             "<{tag}-{id}>\n{}\n</{tag}-{id}>",
-            content.replace(id.as_str(), "")
+            sanitized.replace(id.as_str(), "")
         )
     }
 }
@@ -123,6 +126,17 @@ mod tests {
         assert_eq!(wrapped.matches("abc123").count(), 2);
         assert!(wrapped.starts_with("<untrusted-message-abc123>\n"));
         assert!(wrapped.ends_with("\n</untrusted-message-abc123>"));
+    }
+
+    #[test]
+    fn fence_strips_invisible_unicode_injection_characters() {
+        let fence = UntrustedFence::fixed("abc123");
+        let hostile = "hello\u{200B}\u{200D}world\u{E0001}\u{E0041}\u{202E}bidi\u{202C}";
+        let wrapped = fence.wrap(UntrustedKind::Message, hostile);
+        assert_eq!(
+            wrapped,
+            "<untrusted-message-abc123>\nhelloworldbidi\n</untrusted-message-abc123>"
+        );
     }
 
     #[test]

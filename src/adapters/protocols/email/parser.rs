@@ -17,6 +17,7 @@ use crate::{
         channel::strip_quiet_prefix,
         correlation::{CORRELATION_HEADER, CorrelationId},
         message::AttachmentMetadata,
+        unicode_sanitization::{sanitize_invisible_unicode, sanitize_string},
         value_objects::{ObjectKey, ThreadIndex, ThreadIndexParseError},
     },
     transport::SMALL_INLINE_IMAGE_BYTES,
@@ -183,7 +184,7 @@ impl EmailParser {
             .map(parse_email_list)
             .unwrap_or_default();
 
-        let subject = payload.subject.unwrap_or_else(|| "No Subject".to_string());
+        let subject = sanitize_string(payload.subject.unwrap_or_else(|| "No Subject".to_string()));
         let is_auto_reply_from_subject = Self::is_auto_reply_subject(&subject);
         let is_auto_reply = is_auto_reply_from_headers || is_auto_reply_from_subject;
 
@@ -211,7 +212,7 @@ impl EmailParser {
 
         // Preserve full text in clean_text_body; quote stripping is applied during thread ingestion
         // if the email is a reply in an existing thread and not forwarded.
-        let base_clean_text = base_text.trim().to_string();
+        let base_clean_text = sanitize_invisible_unicode(base_text.trim()).to_string();
         let quiet_body = strip_quiet_prefix(&base_clean_text);
         let is_context_only = is_context_from_headers || quiet_body.is_some();
         let clean_text_body = quiet_body.unwrap_or(&base_clean_text).to_string();
@@ -553,5 +554,22 @@ Subject: Test Email
         let md = EmailParser::html_to_markdown(html);
         assert!(md.contains("# Title"));
         assert!(md.contains("**bold**"));
+    }
+
+    #[test]
+    fn parse_inbound_email_sanitizes_invisible_unicode_injection_characters() {
+        let payload = RawInboundPayload {
+            to: "support@acme.com".to_string(),
+            from: "user@example.com".to_string(),
+            subject: Some("Invoice\u{200B} #999\u{E0001}\u{E0020}".to_string()),
+            text: Some("Clean line\u{202E}reversed\u{202C}\u{FEFF}\u{3164}.".to_string()),
+            ..Default::default()
+        };
+
+        let (parsed, _) = EmailParser::parse(payload, "mailagents.com");
+
+        assert_eq!(parsed.subject, "Invoice #999");
+        assert_eq!(parsed.clean_text_body, "Clean linereversed.");
+        assert_eq!(parsed.prompt_text, "Clean linereversed.");
     }
 }

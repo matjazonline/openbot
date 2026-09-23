@@ -7,6 +7,7 @@
 use crate::entities::internal_note::AgentInstructionNote;
 use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};
 use crate::entities::message_view::AgentHistoryMessage;
+use crate::entities::unicode_sanitization::sanitize_invisible_unicode;
 use crate::services::prompt_fence::{UntrustedFence, UntrustedKind};
 use crate::use_cases::thread::RecipientRole;
 
@@ -163,8 +164,9 @@ impl PromptParts<'_> {
 /// when there is nothing to show. Collapsing the whitespace is what keeps a header carrying its own
 /// newlines from forging the section markers the prompt is built from.
 pub(super) fn prompt_subject(subject: &str) -> Option<String> {
-    let mut collapsed = String::with_capacity(subject.len());
-    for word in subject.split_whitespace() {
+    let sanitized = sanitize_invisible_unicode(subject);
+    let mut collapsed = String::with_capacity(sanitized.len());
+    for word in sanitized.split_whitespace() {
         if !collapsed.is_empty() {
             collapsed.push(' ');
         }

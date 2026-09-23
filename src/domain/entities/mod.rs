@@ -36,6 +36,7 @@ pub mod thread;
 pub mod thread_handoff;
 pub mod tool_catalogue;
 pub mod transport;
+pub mod unicode_sanitization;
 pub mod upload;
 pub mod user;
 pub mod value_objects;
