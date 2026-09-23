@@ -4,8 +4,8 @@ The deployment is **two Fly apps in the same organization**:
 
 | App | Config | Role |
 | --- | --- | --- |
-| `mail-agents-server` | `fly.toml` | axum API (3001) + inbound SMTP listener (2525) + task worker |
-| `mail-agents-db` | `deploy/postgres/fly.toml` | self-hosted Postgres on a volume, no public IP |
+| `openbots` | `fly.toml` | axum API (3001) + inbound SMTP listener (2525) + task worker |
+| `openbots-db` | `deploy/postgres/fly.toml` | self-hosted Postgres on a volume, no public IP |
 
 They talk over Fly's private 6PN network, so the database is never exposed to
 the internet.
@@ -65,9 +65,9 @@ The equivalent manual steps, if you'd rather run them by hand:
 ### 1. Database
 
 ```sh
-fly apps create mail-agents-db
-fly volumes create pgdata --app mail-agents-db --region fra --size 10
-fly secrets set POSTGRES_PASSWORD='<generate-a-strong-one>' --app mail-agents-db
+fly apps create openbots-db
+fly volumes create pgdata --app openbots-db --region fra --size 10
+fly secrets set POSTGRES_PASSWORD='<generate-a-strong-one>' --app openbots-db
 fly deploy -c deploy/postgres/fly.toml
 ```
 
@@ -104,11 +104,11 @@ will correctly report the extension as unavailable.
 ### 2. Application
 
 ```sh
-fly apps create mail-agents-server
+fly apps create openbots
 fly ips allocate-v4          # dedicated IPv4, required for SMTP on port 25
 
 fly secrets set \
-  DATABASE_URL="postgres://mail_agents:<POSTGRES_PASSWORD>@mail-agents-db.internal:5432/mail_agents" \
+  DATABASE_URL="postgres://mail_agents:<POSTGRES_PASSWORD>@openbots-db.internal:5432/mail_agents" \
   JWT_SECRET="<random-64-chars>" \
   SMTP_USERNAME="<relay-user>" \
   SMTP_PASSWORD="<relay-password>" \
@@ -128,7 +128,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 
 | Secret | Notes |
 | --- | --- |
-| `DATABASE_URL` | Points at `mail-agents-db.internal` |
+| `DATABASE_URL` | Points at `openbots-db.internal` |
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound TLS relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. Remote relay certificates are validated. If outbound SMTP is not configured, registration skips confirmation. |
@@ -288,7 +288,7 @@ For a version 1 to version 2 rotation, keep both versions through two separate r
 1. Back up/escrow both key versions and verify the current database:
 
    ```sh
-   fly ssh console --app mail-agents-server \
+   fly ssh console --app openbots \
      --command "/app/mail_agents credentials status --require-version 1"
    ```
 
@@ -301,9 +301,9 @@ For a version 1 to version 2 rotation, keep both versions through two separate r
 4. **Converge** and require database-backed proof:
 
    ```sh
-   fly ssh console --app mail-agents-server \
+   fly ssh console --app openbots \
      --command "/app/mail_agents credentials rotate"
-   fly ssh console --app mail-agents-server \
+   fly ssh console --app openbots \
      --command "/app/mail_agents credentials status --require-version 2"
    ```
 
@@ -548,7 +548,7 @@ SMTP listener have to keep running with zero HTTP traffic; letting Fly suspend
 the machine on idle would silently stall both.
 
 **Never scale the database past one machine.** `fly scale count 2` on
-`mail-agents-db` gives you two independent Postgres instances on separate
+`openbots-db` gives you two independent Postgres instances on separate
 volumes — not replicas. That is silent data divergence, not high availability.
 
 **Backups are volume snapshots only**, taken daily with roughly five days of
@@ -589,9 +589,9 @@ recycle a process that is otherwise serving traffic.
 
 ```sh
 fly logs                                  # app logs
-fly logs -a mail-agents-db                # database logs
+fly logs -a openbots-db                # database logs
 fly ssh console                           # shell into the app machine
-fly ssh console -a mail-agents-db -C "psql -U mail_agents mail_agents"
+fly ssh console -a openbots-db -C "psql -U mail_agents mail_agents"
 fly status                                # machine health
 fly secrets list                          # names only, never values
 ```

@@ -3,9 +3,9 @@
 #
 # This app deliberately has NO public IP and NO [http_service]/[[services]]
 # blocks. It is reachable only over the org's private 6PN network, as
-# `mail-agents-db.internal:5432`.
+# `openbots-db.internal:5432`.
 
-app = "mail-agents-db"
+app = "openbots-db"
 primary_region = "fra"
 
 [build]

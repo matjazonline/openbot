@@ -1,8 +1,8 @@
-# Pattern B: Persistent Reverse WebSocket Tunnel Architecture Plan for `mail-agents-server`
+# Pattern B: Persistent Reverse WebSocket Tunnel Architecture Plan for `openbots`
 
 This document outlines the architectural design and implementation plan for executing OpenCode agent prompts on a user's **local machine** using a persistent reverse WebSocket tunnel (Pattern B).
 
-With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode serve`) on their machine. The daemon establishes a secure, outbound-only WebSocket connection back to `mail-agents-server`. No open incoming ports, static IPs, or public tunneling services (like Ngrok or Cloudflare Tunnels) are required.
+With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode serve`) on their machine. The daemon establishes a secure, outbound-only WebSocket connection back to `openbots`. No open incoming ports, static IPs, or public tunneling services (like Ngrok or Cloudflare Tunnels) are required.
 
 ---
 
@@ -10,7 +10,7 @@ With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode 
 
 ```
 +-----------------------------------------------------------------------------------+
-|                                mail-agents-server                                 |
+|                                openbots                                 |
 |                                                                                   |
 |  +-------------------+       +-----------------------+     +-------------------+  |
 |  │ Inbound Webhook / │       │ ThreadUseCases        │     │ Workflow Entity   │  |
@@ -62,7 +62,7 @@ With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode 
 
 ## 2. Key Advantages
 
-1. **Zero Firewall Configuration:** The connection is initiated outbound from the user's machine to `mail-agents-server` over standard HTTPS/WSS (`port 443`).
+1. **Zero Firewall Configuration:** The connection is initiated outbound from the user's machine to `openbots` over standard HTTPS/WSS (`port 443`).
 2. **Access to Local Resources:** The local `opencode` instance can read local files, execute local code, access local databases, or call intranet APIs.
 3. **Instant Real-Time Execution:** Persistent connection eliminates handshake latency for prompt requests.
 

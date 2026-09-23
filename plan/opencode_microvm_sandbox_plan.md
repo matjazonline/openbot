@@ -1,6 +1,6 @@
-# MicroVM Sandbox Isolation (Option 2) Architecture Plan for `mail-agents-server`
+# MicroVM Sandbox Isolation (Option 2) Architecture Plan for `openbots`
 
-This document details the architectural design and implementation plan for executing OpenCode prompts inside isolated, hardware-virtualized MicroVM sandboxes (e.g., **E2B**, **Daytona**, or a custom Firecracker microservice) for `mail-agents-server`.
+This document details the architectural design and implementation plan for executing OpenCode prompts inside isolated, hardware-virtualized MicroVM sandboxes (e.g., **E2B**, **Daytona**, or a custom Firecracker microservice) for `openbots`.
 
 Execution mode (`in_process` vs `microvm_sandbox`) is specified per **Workflow** in `workflow_config` (with system-level fallback credentials defined in `AppConfig`).
 
@@ -10,7 +10,7 @@ Execution mode (`in_process` vs `microvm_sandbox`) is specified per **Workflow**
 
 ```
 +-----------------------------------------------------------------------------------+
-|                                mail-agents-server                                 |
+|                                openbots                                 |
 |                                                                                   |
 |  +-------------------+       +-----------------------+     +-------------------+  |
 |  │ Inbound Webhook / │       │ ThreadUseCases        │     │ Workflow Entity   │  |

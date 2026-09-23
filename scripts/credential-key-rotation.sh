@@ -8,7 +8,7 @@ usage() {
   echo "       RETAINED_CREDENTIAL_ENCRYPTION_KEYS='<new-only-ring>' $0 <old-version> <new-version> --retire --backup-retention-confirmed" >&2
 }
 
-APP_NAME="${FLY_APP_NAME:-mail-agents-server}"
+APP_NAME="${FLY_APP_NAME:-openbots}"
 RETIRE=false
 BACKUP_RETENTION_CONFIRMED=false
 versions=()

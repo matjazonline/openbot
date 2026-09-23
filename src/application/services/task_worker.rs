@@ -3031,7 +3031,7 @@ mod tests {
         );
         assert_eq!(
             email.body_text,
-            "Audit complete: nothing to report.\n\nDone by busybots.net"
+            "Audit complete: nothing to report.\n\nDone by openbots.net"
         );
         assert_eq!(email.subject, "Re: Audit Report");
         // Keyed on the task, so the retry that skipped the agent re-derived the first attempt's

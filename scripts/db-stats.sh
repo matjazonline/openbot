@@ -134,7 +134,7 @@ if ! command -v fly >/dev/null 2>&1; then
   exit 64
 fi
 
-fly_app="${DATABASE_FLY_APP:-mail-agents-db}"
+fly_app="${DATABASE_FLY_APP:-openbots-db}"
 database_user="${POSTGRES_USER:-mail_agents}"
 database_name="${POSTGRES_DB:-mail_agents}"
 encoded_sql="$(printf '%s\n' "$snapshot_sql" | base64 | tr -d '\n')"

@@ -1,6 +1,6 @@
 # Custom Agent Tools
 
-`mail-agents-server` provides five application-owned custom tools:
+`openbots` provides five application-owned custom tools:
 
 ```text
 create_agent_channel

@@ -1,4 +1,4 @@
-# Mail Agents Server
+# openbots
 
 A transport-neutral agent automation platform built in Rust. Email is the initial/default channel
 binding; canonical channels, actors, messages, threads, and deliveries are not email-shaped.

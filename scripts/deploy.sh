@@ -4,14 +4,14 @@
 #
 # Usage:
 #   scripts/deploy.sh                 # deploy db, then app
-#   scripts/deploy.sh db              # deploy mail-agents-db only
-#   scripts/deploy.sh app             # deploy mail-agents-server only
+#   scripts/deploy.sh db              # deploy openbots-db only
+#   scripts/deploy.sh app             # deploy openbots only
 #   scripts/deploy.sh db app          # same as no args, explicit order
 #   scripts/deploy.sh --bootstrap db  # first-time db setup, then deploy
 #
-# --bootstrap creates the mail-agents-db app, its pgdata volume, and sets
+# --bootstrap creates the openbots-db app, its pgdata volume, and sets
 # POSTGRES_PASSWORD, before deploying; for the app target it creates the
-# mail-agents-server app, allocates a dedicated IPv4 (required for inbound
+# openbots app, allocates a dedicated IPv4 (required for inbound
 # SMTP on port 25), and prompts for its secrets (DATABASE_URL, JWT_SECRET,
 # SMTP_USERNAME/PASSWORD and credential-encryption keys) before deploying. It's a no-op
 # (skipped with a message) once the app already exists, so it's safe to
@@ -50,19 +50,19 @@ if ! command -v fly >/dev/null 2>&1; then
 fi
 
 bootstrap_db() {
-  if fly status --app mail-agents-db >/dev/null 2>&1; then
-    echo "==> mail-agents-db already exists, skipping bootstrap"
+  if fly status --app openbots-db >/dev/null 2>&1; then
+    echo "==> openbots-db already exists, skipping bootstrap"
     return
   fi
 
   local region
   region="$(awk -F'"' '/^primary_region/ {print $2; exit}' "$DB_CONFIG")"
 
-  echo "==> Creating mail-agents-db"
-  fly apps create mail-agents-db
+  echo "==> Creating openbots-db"
+  fly apps create openbots-db
 
   echo "==> Creating pgdata volume ($region, 5GB)"
-  fly volumes create pgdata --app mail-agents-db --region "$region" --size 5 --yes
+  fly volumes create pgdata --app openbots-db --region "$region" --size 5 --yes
 
   echo "==> Setting POSTGRES_PASSWORD"
   read -rsp "Postgres password for mail_agents (leave empty to generate one): " PG_PASSWORD
@@ -72,27 +72,27 @@ bootstrap_db() {
     echo "Generated password (save this — it will not be shown again):"
     echo "$PG_PASSWORD"
   fi
-  fly secrets set POSTGRES_PASSWORD="$PG_PASSWORD" --app mail-agents-db
+  fly secrets set POSTGRES_PASSWORD="$PG_PASSWORD" --app openbots-db
 }
 
 bootstrap_app() {
-  if fly status --app mail-agents-server >/dev/null 2>&1; then
-    echo "==> mail-agents-server already exists, skipping bootstrap"
+  if fly status --app openbots >/dev/null 2>&1; then
+    echo "==> openbots already exists, skipping bootstrap"
     return
   fi
 
-  echo "==> Creating mail-agents-server"
-  fly apps create mail-agents-server
+  echo "==> Creating openbots"
+  fly apps create openbots
 
   echo "==> Allocating dedicated IPv4 (required for inbound SMTP on port 25)"
-  fly ips allocate-v4 --app mail-agents-server
+  fly ips allocate-v4 --app openbots
 
   local database_url
   if [[ -n "$PG_PASSWORD" ]]; then
-    database_url="postgres://mail_agents:${PG_PASSWORD}@mail-agents-db.internal:5432/mail_agents"
-    echo "==> Building DATABASE_URL from the POSTGRES_PASSWORD just set on mail-agents-db"
+    database_url="postgres://mail_agents:${PG_PASSWORD}@openbots-db.internal:5432/mail_agents"
+    echo "==> Building DATABASE_URL from the POSTGRES_PASSWORD just set on openbots-db"
   else
-    read -rp "DATABASE_URL (postgres://mail_agents:<POSTGRES_PASSWORD>@mail-agents-db.internal:5432/mail_agents): " database_url
+    read -rp "DATABASE_URL (postgres://mail_agents:<POSTGRES_PASSWORD>@openbots-db.internal:5432/mail_agents): " database_url
   fi
 
   echo "==> Generating JWT_SECRET"
@@ -114,15 +114,15 @@ bootstrap_app() {
     "CREDENTIAL_ENCRYPTION_KEYS=1:$credential_key"
     "CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1"
   )
-  fly secrets set "${secrets_args[@]}" --app mail-agents-server
+  fly secrets set "${secrets_args[@]}" --app openbots
 
   echo "==> Before deploying, edit fly.toml: APP_DOMAIN_NAME, CORS_ALLOWED_ORIGINS, primary_region"
 }
 
 validate_app_secrets() {
   local secret_list
-  if ! secret_list="$(fly secrets list --app mail-agents-server --json)"; then
-    echo "Unable to inspect mail-agents-server secrets; refusing to deploy." >&2
+  if ! secret_list="$(fly secrets list --app openbots --json)"; then
+    echo "Unable to inspect openbots secrets; refusing to deploy." >&2
     exit 1
   fi
   secret_list="$(printf '%s' "$secret_list" | tr -d '[:space:]')"
@@ -135,7 +135,7 @@ validate_app_secrets() {
     fi
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "mail-agents-server is missing required secret names: ${missing[*]}" >&2
+    echo "openbots is missing required secret names: ${missing[*]}" >&2
     echo "Set them with 'fly secrets set' before deploying. Secret values cannot be recovered from Fly." >&2
     exit 1
   fi
@@ -145,7 +145,7 @@ deploy_db() {
   if [[ "$BOOTSTRAP" == true ]]; then
     bootstrap_db
   fi
-  echo "==> Deploying mail-agents-db"
+  echo "==> Deploying openbots-db"
   fly deploy -c "$DB_CONFIG"
 }
 
@@ -164,7 +164,7 @@ deploy_app() {
     exit 1
   }
 
-  echo "==> Deploying mail-agents-server"
+  echo "==> Deploying openbots"
   (cd "$ROOT_DIR" && fly deploy)
 }
 

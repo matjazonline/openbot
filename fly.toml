@@ -1,4 +1,4 @@
-app = "mail-agents-server"
+app = "openbots"
 primary_region = "fra"
 
 # A mailbox send holds its request open until the agent answers, up to the 15s inline wait before
