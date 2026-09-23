@@ -3,6 +3,22 @@
 A transport-neutral agent automation platform built in Rust. Email is the initial/default channel
 binding; canonical channels, actors, messages, threads, and deliveries are not email-shaped.
 
+## Platform Highlights & Feature Summary
+
+> **"Put your business operations on autopilot without handing the keys to a black-box LLM."**
+>
+> openbots (busybots) decouples **cognitive reasoning** from **deterministic workflow execution**. Business logic, state machines, human approval gates, and external integrations run on a durable, rock-solid workflow engine in Rust, while bounded AI agents are invoked only where natural language understanding or synthesis is required.
+
+### Key Capabilities
+- **Deterministic Multi-Agent Pipelines:** Chain sequential agent workflows via channel syntax (`+`), deterministic role context, and mention triggers (`@slug`), supported by quiet context-only ingestion and automated cron schedules.
+- **Human-in-the-Loop (HITL) & Safe Delegation:** Automatic manual handoffs on external replies ("Needs Instruction"), interactive draft-and-approval gates (`Draft Ready` $\rightarrow$ dispatch), and response reviews.
+- **Enterprise Security & Anti-Loop Defenses:** 3-stage inbound spam and prompt-injection filtering (Rust heuristics, Rspamd/SpamAssassin daemon scoring, pre-flight LLM guardrails), participant ACLs, cycle detection, and strict turn/hop rate limits.
+- **Governance & Continuity:** Multi-tier RBAC (Owner/Admin/Member), atomic work reassignment during employee offboarding (`MemberWorkAtStake`), and versioned AES-256-GCM BYOK credential management.
+- **Command Center & Observability:** Live HTMX/SSE mailbox (`/ui`), real-time Kanban tasks board (`/ui/tasks`), delivery audit tracking (`/ui/deliveries`), and operational dashboards.
+- **Roadmap:** Pure deterministic step primitives (`transform`, `branch`, `http.request`, `agent.run`), versioned SOP code DAGs (TWI job breakdowns, verification checklists), zero-trust action registries (`Workflow-as-a-Tool`), turnkey workflow marketplace packages, native Slack/webhook ingress, and ephemeral microVM sandboxes.
+
+*(For detailed product architecture and feature breakdowns, see [`marketing/features.md`](marketing/features.md).)*
+
 Agents run on **Rig** by default, with ai-agents selectable per agent. Choose the runtime in agent
 settings or send `"harness_kind":"rig"` with `"config_json":{"version":1}` to the agent API.
 Credentials come from company model connections. Rig supports guarded tools, company HTTP MCP,
