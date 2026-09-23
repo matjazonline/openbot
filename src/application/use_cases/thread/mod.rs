@@ -133,7 +133,7 @@ pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
 /// Apply the product footer shared by agent replies before they become canonical content.
 pub fn agent_response_body(response: &str) -> String {
-    format!("{response}\n\nDone by busybots.net")
+    format!("{response}\n\nDone by openbots.net")
 }
 
 /// One channel an already-queued agent run drives.
