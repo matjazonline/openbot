@@ -53,6 +53,12 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
+Phase01 implementation is complete. [PROGRESS.md](PROGRESS.md) records verified evidence and
+[RESUME.md](RESUME.md) records the requested stop boundary and next task: phase02, Definition and
+context contract. The foundation is not yet a production workflow runtime.
+[REPLACEMENT-MAP.md](REPLACEMENT-MAP.md) inventories the current entry points, callers,
+projections, owners, and removal gates for phase 01 item 6.
+
 ## Working rules
 
 Follow repository and subsystem `AGENTS.md`. Use graft before source exploration and trace callers

@@ -5,4 +5,5 @@ pub mod infra;
 
 // Re-exports for shorter use statements.
 pub use application::*;
+pub use domain::workflow;
 pub use domain::*;
