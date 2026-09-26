@@ -1,11 +1,11 @@
 # busybots: Product Overview & Feature Matrix
-*Enterprise-Grade Autonomous Operations & Deterministic Workflow Platform*
+*Autonomous Operations & Deterministic Workflow Platform*
 
 ---
 
 ## 🌟 The Core Value Proposition (The Hero Pitch)
 
-> **"Put your business operations on autopilot without handing the keys to a black-box LLM."**
+> **"Put your busy operations on autopilot without handing the keys to a black-box LLM."**
 >
 > Most AI agent platforms make a fatal architectural mistake: they let non-deterministic LLMs control business logic, state transitions, and live API integrations inside an opaque prompt loop. When the model hallucinates or loops, your critical business processes derail.
 >
