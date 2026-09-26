@@ -20,6 +20,7 @@ fresh-database deployment. This phase does not introduce backward compatibility 
 | Human races | One winner among submission, timeout, cancellation, and competing reviewers |
 | Recovery | Crash/restart at each durable boundary retains completed work and pending continuations |
 | External uncertainty | Unknown non-idempotent writes are not blindly repeated |
+| MCP over HTTP | Explicit `mcp.call` works without an agent; JSON/SSE results, schema validation, revocation, cancellation, and uncertain-effect recovery use the shared action contract |
 | Partial delivery | Successful destinations are not resent when a sibling fails |
 | Workflow tools | Parent agent resumes its saved call after child completion/review |
 | Bounded repetition | Last-round acceptance works; exhaustion never auto-approves |

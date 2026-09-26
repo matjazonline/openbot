@@ -1,4 +1,4 @@
-# 04 — Shared actions, HTTP, tools, and delivery
+# 04 — Shared actions, HTTP, MCP, tools, and delivery
 
 ## Outcome and dependencies
 
@@ -51,8 +51,55 @@ response size, and retained output. Redact credentials and sensitive headers fro
 context. Server operators own any explicitly required private-network exception.
 
 `tool.call` exposes registered capabilities through the same service. Unknown or unsupported
-write/recovery contracts cannot be registered as safely retryable. Remote tools, if retained,
-must also obey these rules; their metadata is not an authority to grant access.
+write/recovery contracts cannot be registered as safely retryable. Remote tools must also obey
+these rules; their metadata is not an authority to grant access.
+
+## MCP tool calls over HTTP
+
+Add `mcp.call` as a first-class workflow step. It invokes one explicitly selected MCP tool over
+Streamable HTTP without requiring an agent or model tool selection. Its `with` configuration
+contains `connection` (a declared MCP resource slot), `tool` (a fixed tool name), and `arguments`
+(a typed object supporting the phase 2 binding vocabulary). Resolve the slot through the run's
+binding revision to a company-owned MCP connection with a fixed endpoint and credential reference.
+Never accept endpoint URLs, raw credentials, or arbitrary authorization headers from step inputs.
+
+```yaml
+lookup_customer:
+  type: mcp.call
+  with:
+    connection: customer_service
+    tool: lookup_customer
+    arguments:
+      customer_id: { ref: "/input/customer_id" }
+  next: $end
+```
+
+The containing workflow declares the `customer_service` MCP resource slot and the input schema;
+its binding selects the company connection. Reuse/refactor the existing MCP client port and HTTP
+adapter for initialization, discovery, calls, cancellation, and session cleanup. The workflow
+handler invokes the shared action service; transport/session code stays in the adapter. Direct
+agent MCP tools use that same service and enforce the same authorization and recovery policy.
+
+Validate the selected tool and argument schema during publication/binding readiness checks. Freeze
+the approved tool contract in the published bundle and reject incompatible discovery at execution
+before dispatch; server metadata cannot silently broaden capabilities or establish retry safety.
+Resolve current credentials and enforce connection/tool revocation at use time. Apply the HTTP
+destination protections, redirect restrictions, deadlines, size bounds, and secret redaction above
+to initialization, discovery, and calls, including JSON and SSE responses.
+
+Expose a bounded result envelope containing `content`, optional `structuredContent`, and `isError`
+(default false when absent). Validate structured output against the frozen output schema when one
+is declared. Downstream steps reference the committed envelope through `steps.<id>.output`.
+Do not automatically fetch resource links returned in tool content. A tool-level `isError: true`
+is a classified action failure, not success; persist the bounded error result for diagnostics.
+Neither tool errors nor output-validation failures prove that a remote effect was not applied.
+
+Persist the frozen connection identity, tool, arguments, and invocation identity before dispatch.
+MCP request/session IDs are transport correlation, not durable idempotency keys. A timeout, lost
+response, worker crash, or session expiry after possible dispatch follows the unknown-effect
+reconciliation protocol; reconnecting must not silently repeat `tools/call`. Cancellation attempts
+protocol cancellation and session cleanup but does not prove rollback. Only the approved operation
+contract or reconciliation evidence can establish that replay is safe.
 
 ## Provider-neutral messaging
 
@@ -77,6 +124,11 @@ outside workflow handlers.
   cannot silently create new logical effects.
 - Tests cover uncertain writes, reconciliation, revocation, cancellation, and argument changes.
 - HTTP tests cover redirect, private-address, DNS-resolution, timeout, size, and secret leakage paths.
+- MCP fixtures exercise initialization/discovery and explicit calls with JSON and SSE responses,
+  typed argument/result references, tool errors, schema drift, and unavailable or revoked tools.
+- MCP tests cover cross-company connections, secret redaction, response limits, session expiry,
+  cancellation cleanup, and crash/timeout after dispatch without unsafe replay. Competing claimants
+  cannot dispatch the same invocation concurrently; committed results survive restart without a call.
 
 ## Design references
 

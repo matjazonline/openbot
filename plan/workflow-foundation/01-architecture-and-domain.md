@@ -21,7 +21,7 @@ flowchart TD
     F --> I
     F --> J[Child workflow]
     J --> D
-    I --> K[HTTP / tools / message delivery]
+    I --> K[HTTP / MCP / tools / message delivery]
     E --> L[Atomic result and advancement]
     L --> D
 ```

@@ -12,7 +12,8 @@ are deliberate architectural boundaries. Listing an item here does not promise i
 | Slack and additional transport adapters | Retain provider-neutral contracts; implement email now. Slack needs connection setup, authenticated events, threading, and delivery contracts. |
 | Rich workflow package installer/marketplace | Basic templates and company copies only. No package dependency installer, setup provisioning framework, ratings, billing, or public submissions. |
 | Automatic template upgrades and merge proposals | Company workflows adopt changes through explicit edits/publication. No automatic replacement of customized definitions. |
-| Named business-provider integrations such as CRM/payment suites | Generic HTTP and registered tools are foundation capabilities; implementing a HubSpot, Stripe, or other product suite is separate work. |
+| Named business-provider integrations such as CRM/payment suites | Generic HTTP, MCP tool calls over HTTP, and registered tools are foundation capabilities; implementing a HubSpot, Stripe, or other product suite is separate work. |
+| Additional MCP transports and general MCP client features | Foundation includes explicit tool calls over Streamable HTTP. Stdio subprocesses, legacy HTTP+SSE transport, and general resource/prompt browsing are separate work. |
 | Sophisticated human voting/quorum approval policies | One assigned reviewer or eligible group with first valid response. Multi-party voting and quorum business decisions require explicit policies and tests. |
 | Multi-response outreach aggregation | One matching response per correlated wait. Aggregating several respondents needs explicit completion, partial-result, deadline, and cancellation semantics. |
 | Live collaborative editing and rich discussion | Append-only comments, optimistic edits, and explicit submission suffice. No collaborative document editor or comment reactions. |
@@ -49,5 +50,6 @@ are deliberate architectural boundaries. Listing an item here does not promise i
 Human comments, structured feedback, revised drafts, alternate human-selected routes, and bounded
 review rounds are part of the foundation. So are direct agent write tools, workflow-as-tool calls,
 action-specific authorization, uncertain-effect recovery, independent same-thread message runs,
-provider-neutral sending/replying, explicit memory steps, and classifier-selected capabilities.
+provider-neutral sending/replying, explicit memory steps, classifier-selected capabilities, and
+explicit `mcp.call` steps over Streamable HTTP through the shared action service.
 The phases must implement these contracts before the foundation is considered complete.

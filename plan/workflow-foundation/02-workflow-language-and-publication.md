@@ -42,6 +42,7 @@ state and budget behavior.
 | `decision.rule`, `decision.human`, `decision.agent` | Declared choice plus validated data |
 | `data.map` | Pure data construction and transformation |
 | `http.request`, `tool.call` | Shared action-service invocation |
+| `mcp.call` | Explicit MCP tool invocation over Streamable HTTP through the shared action service |
 | `message.send`, `message.reply` | Canonical message and provider-neutral delivery |
 | `workflow.call`, `flow.repeat` | Pinned child execution and bounded sequential repetition |
 | `wait.event`, `wait.timer` | Correlated durable suspension with a deadline |
@@ -62,7 +63,8 @@ references fail rather than falling back to the agent's broader defaults. See ph
 1. Support operator-supplied templates and company-owned copies. Template updates never change a
    company copy automatically. This is a simple catalogue, not a package installation platform.
 2. Publication freezes agent instructions, skills, capability profiles, child versions, and their
-   dependency hashes. Resource slots declare compatible company-owned runtime resources.
+   dependency hashes. MCP calls freeze the selected tool name, input/output contract, and approved
+   effect/recovery policy. Resource slots declare compatible company-owned runtime resources.
 3. Binding revisions select one published workflow and provide schema-validated parameters and
    resource selections. Activation validates tenant ownership, provider capabilities, and readiness.
    Updating a binding affects future admissions only.
@@ -72,7 +74,8 @@ references fail rather than falling back to the agent's broader defaults. See ph
    activate/deactivate binding. Use expected revisions for edits and idempotent publication commands.
 6. Build valid fixtures for reviewed support, autonomous response, triage/routing, and repeated
    human revision. The autonomous fixture omits classification and capability selection to exercise
-   saved agent defaults. Expand the same fixtures as later handlers become available.
+   saved agent defaults. Include an explicit `mcp.call` fixture with typed arguments and downstream
+   result references. Expand the same fixtures as later handlers become available.
 
 ## Acceptance
 

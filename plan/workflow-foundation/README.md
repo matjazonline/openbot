@@ -5,7 +5,7 @@
 Replace hardcoded message-to-agent dispatch with one durable workflow engine in Rust and
 PostgreSQL. Company admins author YAML workflows, publish immutable versions, and bind them to
 channels and schedules. Agents, human decisions, context loading, memory, tools, HTTP requests,
-and message delivery become explicit steps.
+MCP tool calls over HTTP, and message delivery become explicit steps.
 
 This is an implementation plan, not documentation of shipped features. It incorporates the
 architecture discussion and the subsequent human-comment, feedback, and revision design.
@@ -21,6 +21,8 @@ not another engine alongside those proposals.
   never blocks another message in the same conversation.
 - Direct agent tools and workflow tools are both supported, including writes, through one shared
   action service with authorization, approval, idempotency, and effect recovery.
+- Explicit `mcp.call` steps invoke company-bound MCP tools over Streamable HTTP through that same
+  action service, without requiring an agent step.
 - Standardize agent execution on Rig; remove the alternate `ai-agents` runtime.
 - Capability selection is optional: without an explicit selection, `agent.run` uses the agent's
   saved tools and skills from the run's frozen specification, subject to authorization limits.
@@ -41,7 +43,7 @@ all interfaces until then. Build the representative workflow fixtures from phase
 | [01](01-architecture-and-domain.md) | Ownership, boundaries, domain contracts, replacement map |
 | [02](02-workflow-language-and-publication.md) | YAML compiler, registry, context, versioning |
 | [03](03-durable-runtime-and-persistence.md) | Admission, independent runs, jobs, transitions, recovery |
-| [04](04-actions-http-and-delivery.md) | Shared action protocol, HTTP, tools, message effects |
+| [04](04-actions-http-and-delivery.md) | Shared action protocol, HTTP, MCP calls, tools, message effects |
 | [05](05-human-decisions-and-waits.md) | Human tasks, comments, feedback, authorization decisions, waits |
 | [06](06-agent-context-memory-and-capabilities.md) | Rig integration, explicit context/memory/classification |
 | [07](07-child-workflows-and-review-revisions.md) | Child calls, workflow tools, bounded feedback rounds |

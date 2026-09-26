@@ -14,6 +14,9 @@ architecture. Application commands already exist; pages do not introduce paralle
   activation; show which channels/schedules will remain on older versions.
 - Bindings: select version, resources and schema-driven parameters; validate readiness and activate.
   Show paused/unconfigured bindings plainly rather than silently using a default workflow.
+- MCP steps: select a company MCP connection for the declared resource slot, inspect the selected
+  tool's frozen schema, and validate argument bindings. Show tool/connection identity, bounded
+  results, and reconciliation status in run details; keep credentials out of source and previews.
 - Agents: instructions, model settings, skills and grant ceilings. Provide an explicit assistant
   channel setup action, not implicit channel creation on every agent save.
 - Capability configuration: show “Use agent tools and skills” as the default for an agent step;
