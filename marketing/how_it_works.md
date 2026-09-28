@@ -4,7 +4,7 @@
 
 Most AI agent tools force you into one of two extremes: an isolated chatbot widget in another browser tab, or a fragile "autonomous" script that hallucinates actions behind your back.
 
-**BusyBots takes a completely different path.** It brings your team and specialized AI agents into the exact same shared discussions, powered by the most universal communication medium on earth: **Email**.
+**BusyBots takes a completely different path.** It brings your team and specialized AI agents into the exact same shared discussions, powered by the most universal communication medium on earth: **Email** or **Browser**.
 
 Here is how real work gets done with BusyBots, step by step.
 
