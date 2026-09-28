@@ -534,7 +534,7 @@ async fn load_collaboration_tasks(
         r#"WITH RECURSIVE task_tree(id, depth, path) AS (
                SELECT id, 0, ARRAY[id]
                FROM background_tasks
-               WHERE company_id = $1 AND id = $2
+               WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2
                UNION ALL
                SELECT child.id, parent.depth + 1, parent.path || child.id
                FROM task_tree AS parent
@@ -552,7 +552,7 @@ async fn load_collaboration_tasks(
                 AND inbound_source.external_message_key = request_part.provider_message_key
                 AND inbound_source.message_id <> target.request_message_id
                JOIN background_tasks AS child
-                 ON child.company_id = target.company_id
+                 ON child.queue_kind = 'legacy' AND child.company_id = target.company_id
                 AND child.source_message_uuid = inbound_source.message_id
                 AND child.channel_id = target.internal_channel_id
                WHERE parent.depth < $5
@@ -579,7 +579,7 @@ async fn load_collaboration_tasks(
             AND owner.id = task.owner_principal_id
             AND task.channel_id = ANY($4::uuid[])
            LEFT JOIN agents AS agent ON agent.id = owner.agent_id
-           WHERE task.company_id = $1 AND task.id IN (SELECT id FROM task_tree)
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id IN (SELECT id FROM task_tree)
            ORDER BY task.created_at, task.id
            LIMIT $3"#,
     )
@@ -637,7 +637,7 @@ async fn load_collaboration_targets(
                 AND inbound_source.external_message_key = request_part.provider_message_key
                 AND inbound_source.message_id <> target.request_message_id
                JOIN background_tasks AS child
-                 ON child.company_id = inbound_source.company_id
+                 ON child.queue_kind = 'legacy' AND child.company_id = inbound_source.company_id
                 AND child.source_message_uuid = inbound_source.message_id
                 AND child.channel_id = target.internal_channel_id
                WHERE request_part.company_id = target.company_id
@@ -671,7 +671,7 @@ pub(crate) async fn collaboration_summary_on(
         .map_err(AppError::from)?;
     let root = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT id FROM background_tasks
-           WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)"#,
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND channel_id = ANY($3)"#,
     )
     .bind(scope.company_id)
     .bind(task_id)

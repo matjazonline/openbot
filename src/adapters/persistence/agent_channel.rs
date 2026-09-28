@@ -156,7 +156,7 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         sqlx::query(
-            "INSERT INTO agent_channel_provisions (task_id, request_hash, agent_id, channel_id, warnings) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO agent_channel_provisions (task_id, request_hash, agent_id, channel_id, warnings, company_id) VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(request.lease.task_id)
         .bind(&request.request_hash)
@@ -165,6 +165,7 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .bind(serde_json::to_value(&warnings).map_err(|error| {
             AppError::Internal(format!("Provisioning warnings could not be stored: {error}"))
         })?)
+        .bind(request.company_id)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;

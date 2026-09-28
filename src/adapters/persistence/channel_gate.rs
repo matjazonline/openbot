@@ -98,7 +98,7 @@ pub(crate) async fn task_gate_key_on(
     task_id: Uuid,
 ) -> AppResult<Option<ChannelGateKey>> {
     let row: Option<(Uuid, Uuid)> =
-        sqlx::query_as("SELECT company_id, channel_id FROM background_tasks WHERE id = $1")
+        sqlx::query_as("SELECT company_id, channel_id FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1")
             .bind(task_id)
             .fetch_optional(&mut *conn)
             .await

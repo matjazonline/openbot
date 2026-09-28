@@ -274,6 +274,11 @@ impl SchedulePersistence for PostgresPersistence {
         channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
+        if existing.channel_id != channel_id {
+            return Err(AppError::BadRequest(
+                "A schedule cannot change its channel".into(),
+            ));
+        }
         let recipient_strs: Vec<String> = write
             .recipient_emails
             .iter()
@@ -291,11 +296,11 @@ impl SchedulePersistence for PostgresPersistence {
 
         let db = sqlx::query_as::<_, ScheduleDb>(&format!(
             r#"UPDATE channel_schedules
-               SET channel_id = $1, name = $2, schedule_type = $3, interval_seconds = $4,
+               SET name = $2, schedule_type = $3, interval_seconds = $4,
                    subject_template = $5, prompt_template = $6, delivery_mode = $7,
                    recipient_emails = $8, timezone = $9, run_as_user_id = $10,
                    next_run_at = $11, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $12
+               WHERE id = $12 AND channel_id = $1 AND company_id = $13
                RETURNING {SCHEDULE_COLUMNS}"#
         ))
         .bind(channel_id)
@@ -310,6 +315,7 @@ impl SchedulePersistence for PostgresPersistence {
         .bind(write.run_as_user_id)
         .bind(next_run_at)
         .bind(existing.id)
+        .bind(existing.company_id)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -372,14 +378,16 @@ impl SchedulePersistence for PostgresPersistence {
             })?;
 
             sqlx::query(
-                r#"INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot)
-                   VALUES ($1, $2, $3, $4)
+                r#"INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot, company_id, channel_id)
+                   VALUES ($1, $2, $3, $4, $5, $6)
                    ON CONFLICT (schedule_id, scheduled_for) DO NOTHING"#,
             )
             .bind(Uuid::new_v4())
             .bind(schedule.id)
             .bind(scheduled_for)
             .bind(snapshot)
+            .bind(schedule.company_id)
+            .bind(schedule.channel_id)
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -473,7 +481,7 @@ impl SchedulePersistence for PostgresPersistence {
         task_id: Uuid,
     ) -> AppResult<bool> {
         let result = sqlx::query(
-            r#"UPDATE schedule_runs
+            r#"UPDATE schedule_runs AS run
                SET task_id = $4, last_error = NULL, materialization_status = 'materialized',
                    materialization_worker_id = NULL, materialization_generation = NULL,
                    materialization_locked_at = NULL, materialization_lock_expires_at = NULL,
@@ -481,7 +489,16 @@ impl SchedulePersistence for PostgresPersistence {
                WHERE id = $1 AND thread_id IS NOT NULL AND task_id IS NULL
                  AND materialization_status = 'materializing'
                  AND materialization_worker_id = $2 AND materialization_generation = $3
-                 AND materialization_lock_expires_at > CURRENT_TIMESTAMP"#,
+                 AND materialization_lock_expires_at > CURRENT_TIMESTAMP
+                 AND EXISTS (
+                     SELECT 1 FROM background_tasks AS task
+                     JOIN channel_schedules AS schedule ON schedule.id = run.schedule_id
+                     WHERE task.id = $4 AND task.queue_kind = 'legacy'
+                       AND task.company_id = schedule.company_id
+                       AND task.company_id = run.company_id
+                       AND task.channel_id = run.channel_id
+                       AND task.thread_id = run.thread_id
+                 )"#,
         )
         .bind(run_id)
         .bind(worker_id)
@@ -598,7 +615,7 @@ impl SchedulePersistence for PostgresPersistence {
                       thread.created_at, thread.updated_at
                FROM background_tasks AS task
                JOIN threads AS thread ON thread.id = task.thread_id
-               WHERE task.task_type = 'scheduled_agent_run'
+               WHERE task.queue_kind = 'legacy' AND task.task_type = 'scheduled_agent_run'
                  AND task.payload->>'schedule_id' = $1
                ORDER BY thread.created_at DESC, thread.id DESC
                OFFSET $2 LIMIT $3"#,
@@ -628,6 +645,7 @@ impl SchedulePersistence for PostgresPersistence {
                      AND task.company_id = schedule.company_id
                      AND task.channel_id = schedule.channel_id
                      AND task.thread_id = $3
+                     AND task.queue_kind = 'legacy'
                      AND task.task_type = 'scheduled_agent_run'
                      AND task.payload->>'schedule_id' = $2::text
                )"#,
@@ -801,6 +819,60 @@ mod tests {
         let _ = SchedulePersistence::delete(&persistence, hourly.id).await;
         let _ = ChannelPersistence::delete(&persistence, channel.id).await;
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
+    }
+
+    async fn assert_schedule_update_keeps_channel(
+        persistence: &PostgresPersistence,
+        schedule: &ChannelSchedule,
+        target_channel: Uuid,
+    ) -> ChannelSchedule {
+        let write = ScheduleWrite {
+            name: "Updated Triage".into(),
+            schedule_type: ScheduleType::Interval,
+            interval_seconds: Some(1800),
+            scheduled_at: None,
+            subject_template: "[Updated] {{time}}".into(),
+            prompt_template: "Updated prompt".into(),
+            delivery_mode: ScheduleDeliveryMode::EmailParticipants,
+            recipient_emails: vec![],
+            timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
+            enabled: false,
+        };
+        let before = SchedulePersistence::get_by_id(persistence, schedule.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            SchedulePersistence::update(persistence, schedule, target_channel, write.clone())
+                .await
+                .is_err()
+        );
+        let after = SchedulePersistence::get_by_id(persistence, schedule.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&before).unwrap(),
+            serde_json::to_value(&after).unwrap()
+        );
+        let updated =
+            SchedulePersistence::update(persistence, schedule, schedule.channel_id, write)
+                .await
+                .unwrap();
+        assert_eq!(updated.name, "Updated Triage");
+        assert_eq!(
+            updated.run_as_user_id, None,
+            "an edit that names nobody hands the schedule back to the system"
+        );
+        assert_eq!(updated.channel_id, schedule.channel_id);
+        assert_eq!(updated.interval_seconds, Some(1800));
+        assert_eq!(
+            updated.delivery_mode,
+            ScheduleDeliveryMode::EmailParticipants
+        );
+
+        updated
     }
 
     #[tokio::test]
@@ -1207,39 +1279,8 @@ mod tests {
         assert!(re_read_one_off.next_run_at.is_none());
         assert!(re_read_one_off.last_run_at.is_some());
 
-        // 5. Update schedule
-        let updated = SchedulePersistence::update(
-            &persistence,
-            &schedule,
-            moved_channel.id,
-            ScheduleWrite {
-                name: "Updated Triage".into(),
-                schedule_type: ScheduleType::Interval,
-                interval_seconds: Some(1800),
-                scheduled_at: None,
-                subject_template: "[Updated] {{time}}".into(),
-                prompt_template: "Updated prompt".into(),
-                delivery_mode: ScheduleDeliveryMode::EmailParticipants,
-                recipient_emails: vec![],
-                timezone: ScheduleTimezone::utc(),
-                run_as_user_id: None,
-                enabled: false,
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(updated.name, "Updated Triage");
-        assert_eq!(
-            updated.run_as_user_id, None,
-            "an edit that names nobody hands the schedule back to the system"
-        );
-        assert_eq!(updated.channel_id, moved_channel.id);
-        assert_eq!(updated.interval_seconds, Some(1800));
-        assert_eq!(
-            updated.delivery_mode,
-            ScheduleDeliveryMode::EmailParticipants
-        );
+        let updated =
+            assert_schedule_update_keeps_channel(&persistence, &schedule, moved_channel.id).await;
 
         // 5b. An edit that leaves the cadence alone must not move the next run, and must not
         // resume a paused schedule -- pausing is `set_enabled`'s job alone.

@@ -194,6 +194,9 @@ pub(crate) async fn cancel_unsent_outreach_questions(
                   updated_at = CURRENT_TIMESTAMP
              FROM task_outreach_targets AS target
             WHERE target.outreach_id = $1
+              AND EXISTS (SELECT 1 FROM task_outreaches AS outreach
+                          JOIN background_tasks AS task ON task.id = outreach.task_id
+                          WHERE outreach.id = target.outreach_id AND task.queue_kind = 'legacy')
               AND target.delivery_id = delivery.id
               AND delivery.status IN ('pending', 'retryable')"#,
     )
@@ -216,7 +219,10 @@ pub(crate) async fn record_outreach_reply_on(
             r#"SELECT id, task_id, company_id, status,
                   required_threshold_percent::double precision,
                   expires_at
-           FROM task_outreaches WHERE id = $1 FOR UPDATE"#,
+           FROM task_outreaches WHERE id = $1
+             AND EXISTS (SELECT 1 FROM background_tasks AS task
+                         WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
+           FOR UPDATE"#,
         )
         .bind(matched.outreach_id)
         .fetch_one(&mut *connection)
@@ -319,10 +325,10 @@ pub(crate) async fn record_outreach_reply_on(
             r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
                    wait_expires_at = NULL, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                    lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-               WHERE id = $1 AND status IN (
+               WHERE queue_kind = 'legacy' AND id = $1 AND status IN (
                    'waiting_for_third_party_reply', 'pending_approval'
                ) AND awaited_outreach_id = $2
-               AND EXISTS (SELECT 1 FROM task_outreaches outreach WHERE outreach.id = $2
+               AND EXISTS (SELECT 1 FROM task_outreaches AS outreach WHERE outreach.id = $2
                    AND outreach.company_id = background_tasks.company_id AND outreach.task_id = background_tasks.id
                    AND outreach.created_by_principal_id IS NOT DISTINCT FROM background_tasks.owner_principal_id
                    AND outreach.ownership_version = background_tasks.ownership_version)"#,
@@ -375,7 +381,7 @@ pub(crate) async fn get_task_by_id_on(
                   attention_version, owner_principal_id,
                   owner_principal_kind, ownership_version, worker_id, execution_generation,
                   locked_at, lock_expires_at, run_at, created_at, updated_at
-           FROM background_tasks WHERE id = $1"#,
+           FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1"#,
     )
     .bind(id)
     .fetch_optional(pool)
@@ -407,7 +413,7 @@ impl TaskPersistence for PostgresPersistence {
             r#"SELECT task.thread_id, task.correlation_id, outreach.subject, outreach.body
                FROM task_outreaches AS outreach
                JOIN background_tasks AS task
-                 ON task.company_id = outreach.company_id AND task.id = outreach.task_id
+                 ON task.queue_kind = 'legacy' AND task.company_id = outreach.company_id AND task.id = outreach.task_id
                JOIN task_outreach_targets AS target
                  ON target.company_id = outreach.company_id
                 AND target.outreach_id = outreach.id
@@ -467,7 +473,7 @@ impl TaskPersistence for PostgresPersistence {
                FROM background_tasks AS task
                LEFT JOIN principals AS owner
                  ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
-               WHERE task.thread_id = ANY($1)
+               WHERE task.queue_kind = 'legacy' AND task.thread_id = ANY($1)
                  AND task.status IN ('pending', 'processing', 'pending_approval',
                                 'waiting_for_third_party_reply', 'dead_letter', 'completed')
                ORDER BY task.thread_id,
@@ -539,7 +545,7 @@ impl TaskPersistence for PostgresPersistence {
                SELECT $1, id, company_id, $2, 'waiting', $3, $4, $5, $6,
                       owner_principal_id, owner_principal_kind, ownership_version
                FROM background_tasks
-               WHERE id = $7 AND company_id = $8
+               WHERE queue_kind = 'legacy' AND id = $7 AND company_id = $8
                  AND status = 'processing' AND worker_id = $9
                  AND execution_generation = $10
                  AND owner_principal_id = $11 AND ownership_version = $12
@@ -634,7 +640,7 @@ impl TaskPersistence for PostgresPersistence {
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $1, awaited_outreach_id = $8,
                        worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                        updated_at = CURRENT_TIMESTAMP, {attribution}
-                   WHERE id = $2 AND company_id = $3
+                   WHERE queue_kind = 'legacy' AND id = $2 AND company_id = $3
                      AND status = 'processing' AND worker_id = $4
                      AND execution_generation = $5
                      AND owner_principal_id = $6 AND ownership_version = $7
@@ -709,7 +715,7 @@ impl TaskPersistence for PostgresPersistence {
                  JOIN background_tasks AS task ON task.id = outreach.task_id
                  JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
                  JOIN message_delivery_parts AS part ON part.delivery_id = target.delivery_id
-                WHERE task.company_id = $1 AND task.channel_id = $2 AND task.thread_id = $3
+                WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = $2 AND task.thread_id = $3
                   AND target.email = $4
                   AND outreach.status IN (
                       'waiting', 'timeout_pending_approval', 'threshold_met',
@@ -783,9 +789,9 @@ impl TaskPersistence for PostgresPersistence {
                       )::bigint,
                       COUNT(target.*) FILTER (WHERE target.status = 'responded')::bigint,
                       outreach.expires_at
-               FROM task_outreaches outreach
-               JOIN background_tasks task ON task.id = outreach.task_id
-               JOIN task_outreach_targets target ON target.outreach_id = outreach.id
+               FROM task_outreaches AS outreach
+               JOIN background_tasks AS task ON task.id = outreach.task_id AND task.queue_kind = 'legacy'
+               JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
                WHERE outreach.status = 'waiting' AND outreach.expires_at <= $1
                  AND task.status = 'waiting_for_third_party_reply'
                GROUP BY outreach.id, task.id
@@ -832,6 +838,8 @@ impl TaskPersistence for PostgresPersistence {
             r#"UPDATE task_outreaches
                SET status = 'timeout_pending_approval', updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'waiting' AND expires_at <= CURRENT_TIMESTAMP
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                RETURNING task_id"#,
         )
         .bind(outreach_id)
@@ -851,7 +859,7 @@ impl TaskPersistence for PostgresPersistence {
                SET status = 'pending_approval', wait_expires_at = NULL,
                    worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                    updated_at = CURRENT_TIMESTAMP, {attribution}
-               WHERE id = $1 AND status = 'waiting_for_third_party_reply'"#,
+               WHERE queue_kind = 'legacy' AND id = $1 AND status = 'waiting_for_third_party_reply'"#,
             attribution = attribution.set_clause(),
         ))
         .bind(task_id)
@@ -868,6 +876,8 @@ impl TaskPersistence for PostgresPersistence {
             r#"UPDATE task_outreaches
                SET status = 'waiting', version = version + 1, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'timeout_pending_approval'
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                RETURNING task_id, expires_at"#,
         )
         .bind(outreach_id)
@@ -883,7 +893,7 @@ impl TaskPersistence for PostgresPersistence {
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $2,
                        updated_at = CURRENT_TIMESTAMP, {attribution}
-                   WHERE id = $1 AND status = 'pending_approval'"#,
+                   WHERE queue_kind = 'legacy' AND id = $1 AND status = 'pending_approval'"#,
                 attribution = attribution.set_clause(),
             ))
             .bind(task_id)
@@ -901,11 +911,14 @@ impl TaskPersistence for PostgresPersistence {
             r#"SELECT outreach.subject, outreach.body, outreach.status,
                       outreach.required_threshold_percent::double precision,
                       target.email::text, target.responded_at IS NOT NULL
-               FROM task_outreaches outreach
-               JOIN task_outreach_targets target ON target.outreach_id = outreach.id
+               FROM task_outreaches AS outreach
+               JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
                WHERE outreach.id = (
                    SELECT id FROM task_outreaches
-                   WHERE task_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1
+                   WHERE task_id = $1
+                     AND EXISTS (SELECT 1 FROM background_tasks AS task
+                                 WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
+                   ORDER BY created_at DESC, id DESC LIMIT 1
                )
                ORDER BY outreach.created_at DESC, target.email"#,
         )
@@ -948,6 +961,8 @@ impl TaskPersistence for PostgresPersistence {
         sqlx::query_scalar::<_, Uuid>(
             r#"SELECT id FROM task_outreaches
                WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                ORDER BY id FOR UPDATE"#,
         )
         .bind(task_id)
@@ -959,6 +974,8 @@ impl TaskPersistence for PostgresPersistence {
                SET status = 'completed', version = version + 1,
                    updated_at = CURRENT_TIMESTAMP
                WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                RETURNING id"#,
         )
         .bind(task_id)
@@ -1017,7 +1034,7 @@ impl TaskPersistence for PostgresPersistence {
                                      updated_at + $2::interval
                                  ) < CURRENT_TIMESTAMP
                        ) AS reply_overdue
-                   FROM background_tasks
+                   FROM background_tasks WHERE queue_kind = 'legacy'
                ),
                deliveries AS (
                    SELECT
@@ -1093,7 +1110,7 @@ impl TaskPersistence for PostgresPersistence {
                    locked_at = NULL,
                    lock_expires_at = NULL,
                    updated_at = CURRENT_TIMESTAMP
-               WHERE status = 'processing'
+               WHERE queue_kind = 'legacy' AND status = 'processing'
                  AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP)
                RETURNING id, retry_count, company_id, status"#,
         )
@@ -1112,7 +1129,9 @@ impl TaskPersistence for PostgresPersistence {
                        error = $4,
                        stop_reason = $5,
                        finished_at = CURRENT_TIMESTAMP
-                   WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#,
+                   WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'
+                      AND EXISTS (SELECT 1 FROM background_tasks AS task
+                                  WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#,
             )
             .bind(task_id)
             .bind(retry_count)
@@ -1156,7 +1175,7 @@ impl TaskPersistence for PostgresPersistence {
             r#"SELECT task.thread_id
                  FROM task_outreach_targets AS target
                  JOIN task_outreaches AS outreach ON outreach.id = target.outreach_id
-                 JOIN background_tasks AS task ON task.id = outreach.task_id
+                 JOIN background_tasks AS task ON task.id = outreach.task_id AND task.queue_kind = 'legacy'
                 WHERE target.delivery_id = $1"#,
         )
         .bind(delivery_id.as_uuid())
@@ -1172,10 +1191,26 @@ impl TaskPersistence for PostgresPersistence {
         write: &MessageWrite,
     ) -> AppResult<CanonicalMessageId> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let workflow_target: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM task_outreach_targets AS target
+             JOIN task_outreaches AS outreach ON outreach.id = target.outreach_id
+             JOIN background_tasks AS task ON task.id = outreach.task_id
+             WHERE target.delivery_id = $1 AND task.queue_kind <> 'legacy')",
+        )
+        .bind(delivery_id.as_uuid())
+        .fetch_one(&mut *tx)
+        .await?;
+        if workflow_target {
+            return Err(AppError::Conflict("Outreach requires a legacy task".into()));
+        }
         let stored =
             crate::adapters::persistence::thread::insert_message_on(&mut tx, write).await?;
         sqlx::query(
-            "UPDATE task_outreach_targets SET request_message_id = $2 WHERE delivery_id = $1",
+            "UPDATE task_outreach_targets AS target SET request_message_id = $2
+             WHERE delivery_id = $1
+               AND EXISTS (SELECT 1 FROM task_outreaches AS outreach
+                           JOIN background_tasks AS task ON task.id = outreach.task_id
+                           WHERE outreach.id = target.outreach_id AND task.queue_kind = 'legacy')",
         )
         .bind(delivery_id.as_uuid())
         .bind(stored.canonical_id.as_uuid())
@@ -1268,7 +1303,7 @@ impl TaskPersistence for PostgresPersistence {
                  ON assignment.company_id = task.company_id
                 AND assignment.channel_id = task.channel_id
                 AND assignment.agent_id = principal.agent_id
-               WHERE task.company_id = $1 AND task.channel_id = $2 AND task.id = $3
+               WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = $2 AND task.id = $3
                  AND task.status = 'processing' AND task.worker_id = $4
                  AND task.execution_generation = $5
                  AND task.owner_principal_id = $6 AND task.ownership_version = $7
@@ -1412,7 +1447,7 @@ impl TaskPersistence for PostgresPersistence {
                       attempt.machine_region
                FROM task_attempts AS attempt
                JOIN background_tasks AS task ON task.id = attempt.task_id
-               WHERE task.company_id = $1 AND attempt.task_id = $2
+               WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND attempt.task_id = $2
                ORDER BY attempt.attempt_number"#,
         )
         .bind(company_id)
@@ -1465,6 +1500,8 @@ impl TaskPersistence for PostgresPersistence {
             r#"SELECT target.channel_id, target.thread_id, target.recipient_role
                FROM task_channel_targets AS target
                WHERE target.company_id = $1 AND target.task_id = $2
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = target.task_id AND task.queue_kind = 'legacy')
                ORDER BY target.position, target.channel_id"#,
         )
         .bind(company_id)
@@ -1502,6 +1539,8 @@ impl TaskPersistence for PostgresPersistence {
             sqlx::query(
                 r#"SELECT id FROM task_outreaches
                    WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                    ORDER BY id FOR UPDATE"#,
             )
             .bind(commit.lease.task_id)
@@ -1516,7 +1555,7 @@ impl TaskPersistence for PostgresPersistence {
         let company_id: Option<Uuid> = sqlx::query_scalar(
             r#"UPDATE background_tasks
                SET payload = $1, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $2 AND status = 'processing' AND worker_id = $3
+               WHERE queue_kind = 'legacy' AND id = $2 AND status = 'processing' AND worker_id = $3
                   AND execution_generation = $4
                   AND owner_principal_id = $5 AND ownership_version = $6
                   AND lock_expires_at > CURRENT_TIMESTAMP
@@ -1648,6 +1687,8 @@ impl TaskPersistence for PostgresPersistence {
                        SET status = 'completed', version = version + 1,
                            updated_at = CURRENT_TIMESTAMP
                        WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                        RETURNING id"#,
                 )
                 .bind(commit.lease.task_id)
@@ -1673,7 +1714,7 @@ impl TaskPersistence for PostgresPersistence {
                        worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                        lock_expires_at = NULL, wait_expires_at = NULL,
                        updated_at = CURRENT_TIMESTAMP
-                   WHERE company_id = $1 AND id = $2"#,
+                   WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2"#,
             )
             .bind(delivery.company_id)
             .bind(commit.lease.task_id)
@@ -1714,6 +1755,8 @@ impl TaskPersistence for PostgresPersistence {
                    SET status = 'completed', version = version + 1,
                        updated_at = CURRENT_TIMESTAMP
                    WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')
+                 AND EXISTS (SELECT 1 FROM background_tasks AS task
+                             WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
                    RETURNING id"#,
             )
             .bind(commit.lease.task_id)
@@ -1793,7 +1836,7 @@ impl TaskPersistence for PostgresPersistence {
                 r#"SELECT status, owner_principal_id, owner_principal_kind,
                           ownership_version, thread_id
                    FROM background_tasks
-                   WHERE company_id = $1 AND id = $2
+                   WHERE company_id = $1 AND id = $2 AND queue_kind = 'legacy'
                    FOR UPDATE"#,
             )
             .bind(completion.company_id)
@@ -1918,7 +1961,7 @@ impl TaskPersistence for PostgresPersistence {
                        transition_actor_kind = 'human', transition_actor_id = $3,
                        worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                        lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-                   WHERE company_id = $1 AND id = $2"#,
+                   WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2"#,
             )
             .bind(completion.company_id)
             .bind(completion.task_id)
@@ -2049,7 +2092,7 @@ impl TaskPersistence for PostgresPersistence {
                    worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                    lock_expires_at = NULL, wait_expires_at = NULL,
                    updated_at = CURRENT_TIMESTAMP
-               WHERE company_id = $1 AND id = $2"#,
+               WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2"#,
         )
         .bind(completion.company_id)
         .bind(completion.task_id)
@@ -2089,7 +2132,7 @@ impl TaskPersistence for PostgresPersistence {
         let result = sqlx::query(
             r#"UPDATE background_tasks
                SET lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND status = 'processing' AND worker_id = $2
+               WHERE queue_kind = 'legacy' AND id = $1 AND status = 'processing' AND worker_id = $2
                  AND execution_generation = $4
                  AND owner_principal_id = $5 AND ownership_version = $6
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
@@ -2119,7 +2162,7 @@ impl TaskPersistence for PostgresPersistence {
         attempt: TaskAttemptRef,
         machine: &MachineIdentity,
     ) -> AppResult<()> {
-        sqlx::query(BEGIN_ATTEMPT_SQL)
+        let result = sqlx::query(BEGIN_ATTEMPT_SQL)
             .bind(Uuid::new_v4())
             .bind(attempt.task_id)
             .bind(attempt.attempt_number)
@@ -2130,6 +2173,9 @@ impl TaskPersistence for PostgresPersistence {
             .execute(&self.pool)
             .await
             .map_err(AppError::from)?;
+        if result.rows_affected() != 1 {
+            return Err(AppError::from(sqlx::Error::RowNotFound));
+        }
         Ok(())
     }
 
@@ -2223,13 +2269,13 @@ impl TaskPersistence for PostgresPersistence {
             r#"WITH RECURSIVE pending_company AS (
                    (SELECT task.company_id
                       FROM background_tasks AS task
-                     WHERE task.status = 'pending' AND task.owner_principal_kind = 'agent'
+                     WHERE task.queue_kind = 'legacy' AND task.status = 'pending' AND task.owner_principal_kind = 'agent'
                      ORDER BY task.company_id
                      LIMIT 1)
                    UNION ALL
                    SELECT (SELECT task.company_id
                              FROM background_tasks AS task
-                            WHERE task.status = 'pending' AND task.owner_principal_kind = 'agent'
+                            WHERE task.queue_kind = 'legacy' AND task.status = 'pending' AND task.owner_principal_kind = 'agent'
                               AND task.company_id > previous.company_id
                             ORDER BY task.company_id
                             LIMIT 1)
@@ -2238,7 +2284,7 @@ impl TaskPersistence for PostgresPersistence {
                ), in_flight AS (
                    SELECT task.company_id, COUNT(*) AS running
                      FROM background_tasks AS task
-                    WHERE task.status = 'processing' AND task.lock_expires_at > CURRENT_TIMESTAMP
+                    WHERE task.queue_kind = 'legacy' AND task.status = 'processing' AND task.lock_expires_at > CURRENT_TIMESTAMP
                     GROUP BY task.company_id
                ), candidate AS (
                    SELECT slice.id, slice.run_at, slice.created_at,
@@ -2251,7 +2297,7 @@ impl TaskPersistence for PostgresPersistence {
                                    ORDER BY task.run_at ASC, task.created_at ASC, task.id ASC
                                ) AS queue_position
                           FROM background_tasks AS task
-                         WHERE task.company_id = pending_company.company_id
+                         WHERE task.queue_kind = 'legacy' AND task.company_id = pending_company.company_id
                            AND task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP
                            AND task.owner_principal_kind = 'agent'
                            AND EXISTS (
@@ -2272,7 +2318,7 @@ impl TaskPersistence for PostgresPersistence {
                    SELECT task.id
                      FROM background_tasks AS task
                      JOIN candidate ON candidate.id = task.id
-                    WHERE task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP
+                    WHERE task.queue_kind = 'legacy' AND task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP
                       AND task.owner_principal_kind = 'agent'
                     ORDER BY candidate.company_round ASC, candidate.run_at ASC,
                              candidate.created_at ASC, task.id ASC
@@ -2292,7 +2338,7 @@ impl TaskPersistence for PostgresPersistence {
                    transition_approval_id = NULL,
                    transition_outreach_id = NULL
                FROM claimable
-               WHERE task.id = claimable.id
+               WHERE task.queue_kind = 'legacy' AND task.id = claimable.id
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
                          task.correlation_id, task.task_type, task.status, task.payload,
                          task.retry_count,
@@ -2340,7 +2386,7 @@ impl TaskPersistence for PostgresPersistence {
                    transition_reason = 'completed', transition_actor_kind = 'worker',
                    transition_actor_id = $2, transition_approval_id = NULL,
                    transition_outreach_id = NULL
-               WHERE id = $1 AND status = 'processing' AND worker_id = $2
+               WHERE queue_kind = 'legacy' AND id = $1 AND status = 'processing' AND worker_id = $2
                  AND execution_generation = $3
                  AND owner_principal_id = $4 AND ownership_version = $5
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
@@ -2402,7 +2448,7 @@ impl TaskPersistence for PostgresPersistence {
                       attention_version, owner_principal_id,
                       owner_principal_kind, ownership_version, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
-               FROM background_tasks WHERE company_id = "#,
+               FROM background_tasks WHERE queue_kind = 'legacy' AND company_id = "#,
         );
         query.push_bind(company_id);
         if let Some(channel_id) = channel_id {
@@ -2449,7 +2495,7 @@ impl TaskPersistence for PostgresPersistence {
                       attention_version, owner_principal_id,
                       owner_principal_kind, ownership_version, worker_id, execution_generation,
                       locked_at, lock_expires_at, run_at, created_at, updated_at
-               FROM background_tasks WHERE company_id = "#,
+               FROM background_tasks WHERE queue_kind = 'legacy' AND company_id = "#,
         );
         query.push_bind(company_id);
         query

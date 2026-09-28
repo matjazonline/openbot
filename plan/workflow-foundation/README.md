@@ -53,11 +53,15 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 implementation is complete. [PROGRESS.md](PROGRESS.md) records verified evidence and
-[RESUME.md](RESUME.md) records the requested stop boundary and next task: phase02, Definition and
-context contract. The foundation is not yet a production workflow runtime.
-[REPLACEMENT-MAP.md](REPLACEMENT-MAP.md) inventories the current entry points, callers,
-projections, owners, and removal gates for phase 01 item 6.
+Phase01 and phase02 library scope (02.1–02.8) are verified. Whole phase03.1 admission and
+independent contexts is now verified: fixed-channel schedules, historical handoff provenance,
+nullable exact job/run association, atomic admission, saved replay authorization and committed
+history capture. Independent integration review and final1981-test database suite passed
+(22existing ignored) at stock2MiB; all static/SQLx/migration gates passed.03.2 has not started.
+[RESUME.md](RESUME.md) is the fresh-session entry point; [PROGRESS.md](PROGRESS.md) and
+[ADMISSION-03.1.md](ADMISSION-03.1.md) record acceptance, criterion coverage and exact evidence.
+Earlier BRIEF/JOB records retain detailed slice history. No backward compatibility is required.
+[REPLACEMENT-MAP.md](REPLACEMENT-MAP.md) inventories current owners and removal gates.
 
 ## Working rules
 

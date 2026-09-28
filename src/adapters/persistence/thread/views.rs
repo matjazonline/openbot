@@ -174,20 +174,20 @@ struct ThreadTaskLookupDb {
 /// key, and the fallback's scope and order support a first-match index probe using
 /// `background_tasks_thread_correlation_match_idx`. Keep its expression and tie-breakers aligned
 /// with the index. The ascending UUID preserves the old stable sort's winner for equal timestamps.
-pub(super) const THREAD_TASK_LOOKUP_SQL: &str = r#"
+pub(in crate::adapters::persistence) const THREAD_TASK_LOOKUP_SQL: &str = r#"
     SELECT rendered.canonical_id, COALESCE(direct.id, fallback.id) AS task_id
     FROM unnest($3::uuid[], $4::uuid[]) AS rendered (canonical_id, correlation_id)
     LEFT JOIN LATERAL (
         SELECT task.id
         FROM background_tasks AS task
-        WHERE task.company_id = $1 AND task.thread_id = $2
+        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.thread_id = $2
           AND task.source_message_uuid = rendered.canonical_id
         LIMIT 1
     ) AS direct ON TRUE
     LEFT JOIN LATERAL (
         SELECT task.id
         FROM background_tasks AS task
-        WHERE direct.id IS NULL
+        WHERE task.queue_kind = 'legacy' AND direct.id IS NULL
           AND task.company_id = $1 AND task.thread_id = $2
           AND task.correlation_id = rendered.correlation_id
         ORDER BY (task.task_type IN ('email_agent_dispatch', 'scheduled_agent_run')) DESC,

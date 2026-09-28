@@ -53,6 +53,8 @@ p256 = { version = "0.13", features = ["ecdsa", "pem"] }
 # RS256 for the Google service-account assertion that buys a Cloud Storage access token.
 jsonwebtoken = "9"
 chrono-tz = "0.10.4"
+serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
+bigdecimal = "0.4.10"
 
 [dev-dependencies]
 # `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of

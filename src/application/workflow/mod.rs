@@ -4,9 +4,16 @@
 //! Resource/effect authorization, production persistence and workers follow.
 
 mod authorization;
+pub mod binding;
+pub mod compiler;
 mod contracts;
+pub mod fixtures;
+pub mod lifecycle;
 mod ports;
+pub mod publication;
+pub mod registry;
 mod service;
+pub mod templates;
 
 pub use authorization::*;
 pub use contracts::*;

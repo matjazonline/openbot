@@ -1,0 +1,53 @@
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000001
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema:
+  type: object
+  properties:
+    reviewer: {type: string, maxLength: 128}
+    deadline: {type: string, maxLength: 64}
+  required: [reviewer, deadline]
+  additionalProperties: false
+output_schema: true
+resources: []
+entry: draft
+steps:
+  draft:
+    type: agent.run
+    with:
+      agent: {literal: assistant}
+      context: {object: {untrusted_message: {ref: /input/message}}}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: review}
+  review:
+    type: decision.human
+    with:
+      proposal: {ref: /steps/draft/output}
+      reviewer: {object: {kind: {literal: user}, id: {ref: /params/reviewer}}}
+      deadline: {ref: /params/deadline}
+      data_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+      feedback_required: {literal: [reject]}
+    routes: {choices: {approve: reply, reject: $end}}
+  reply:
+    type: message.reply
+    with:
+      source_message: {ref: /input/source_message}
+      content: {ref: /steps/review/output/data}
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

@@ -25,8 +25,16 @@ fn valid_part(value: &str) -> bool {
 
 macro_rules! name_type {
     ($name:ident, $dotted:expr) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+        #[serde(transparent)]
         pub struct $name(String);
+
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
+                let value = <String as serde::Deserialize>::deserialize(decoder)?;
+                Self::parse(value).map_err(serde::de::Error::custom)
+            }
+        }
 
         impl $name {
             pub fn parse(value: impl AsRef<str>) -> Result<Self, NameError> {
@@ -63,11 +71,37 @@ name_type!(ChoiceName, false);
 name_type!(ResourceName, false);
 name_type!(TypeName, true);
 name_type!(FailureCode, true);
+name_type!(TemplateId, false);
+
+macro_rules! positive_revision {
+    ($name:ident) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub struct $name(std::num::NonZeroU64);
+        impl $name {
+            pub fn new(value: u64) -> Option<Self> {
+                std::num::NonZeroU64::new(value).map(Self)
+            }
+            pub fn get(self) -> u64 {
+                self.0.get()
+            }
+        }
+    };
+}
+positive_revision!(TemplateRevision);
+positive_revision!(DraftRevision);
+positive_revision!(BindingRevision);
+positive_revision!(BindingStateRevision);
 
 macro_rules! uuid_type {
     ($name:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+        #[serde(transparent)]
         pub struct $name(Uuid);
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
+                <Uuid as serde::Deserialize>::deserialize(decoder).map(Self)
+            }
+        }
         impl $name {
             pub fn new(value: Uuid) -> Self {
                 Self(value)
@@ -94,6 +128,8 @@ uuid_type!(ScheduleId);
 uuid_type!(ScheduleOccurrenceId);
 uuid_type!(ActionInvocationId);
 uuid_type!(WaitId);
+uuid_type!(WorkflowBindingId);
+uuid_type!(RuntimeResourceId);
 
 #[cfg(test)]
 mod tests {

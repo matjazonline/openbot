@@ -88,9 +88,19 @@ async fn get_connection(
     company: Uuid,
     id: Uuid,
 ) -> AppResult<CompanyMcpConnection> {
-    sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.id = $2 AND connection.deleted_at IS NULL"))
-        .bind(company).bind(id).fetch_optional(db).await?.ok_or_else(conflict)?.try_into()
+    connection_on(db, company, id).await?.ok_or_else(conflict)
 }
+
+/// Caller holds the company lock when using these facts as transaction authority.
+pub(super) async fn connection_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    id: Uuid,
+) -> AppResult<Option<CompanyMcpConnection>> {
+    sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.id = $2 AND connection.deleted_at IS NULL"))
+        .bind(company).bind(id).fetch_optional(db).await?.map(TryInto::try_into).transpose()
+}
+
 async fn replace_grants(
     tx: &mut Transaction<'_, Postgres>,
     company: Uuid,

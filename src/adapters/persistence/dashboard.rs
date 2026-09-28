@@ -100,6 +100,7 @@ const TASK_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
       FROM background_tasks
+     WHERE queue_kind = 'legacy'
      {scope}
      GROUP BY status
      ORDER BY status"#;
@@ -118,6 +119,7 @@ const TASK_PRESSURE_SQL: &str = r#"
                WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
       FROM background_tasks
+     WHERE queue_kind = 'legacy'
      {scope}"#;
 
 const DELIVERY_QUEUE_SQL: &str = r#"
@@ -193,7 +195,8 @@ const THROUGHPUT_BODY: &str = r#",
                COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
                COUNT(*) FILTER (WHERE status IN ('failed', 'dead_letter'))::bigint AS failed
           FROM background_tasks
-         WHERE status IN ('completed', 'failed', 'dead_letter')
+         WHERE queue_kind = 'legacy'
+           AND status IN ('completed', 'failed', 'dead_letter')
            AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -228,7 +231,7 @@ const LATENCY_BODY: &str = r#",
                              * 1000)::double precision
                ) AS p95_ms
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id
+          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -260,7 +263,8 @@ const QUEUE_DEPTH_BODY: &str = r#",
     open_tasks AS (
         SELECT created_at, updated_at, status
           FROM background_tasks
-         WHERE (status IN ('pending', 'processing', 'pending_approval',
+         WHERE queue_kind = 'legacy'
+           AND (status IN ('pending', 'processing', 'pending_approval',
                            'waiting_for_third_party_reply')
                 OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2))
            {scope}
@@ -302,7 +306,7 @@ const ATTEMPT_STATS_SQL: &str = r#"
            COALESCE(SUM(attempt.prompt_tokens), 0)::bigint AS prompt_tokens,
            COALESCE(SUM(attempt.completion_tokens), 0)::bigint AS completion_tokens
       FROM task_attempts AS attempt
-      JOIN background_tasks AS task ON task.id = attempt.task_id
+      JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
      WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
        {scope}"#;
 
@@ -314,7 +318,7 @@ const RETRY_RATE_BODY: &str = r#",
                COUNT(*)::bigint AS attempts,
                COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id
+          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -354,7 +358,7 @@ const OUTSTANDING_SQL: &str = r#"
       FROM background_tasks AS task
       JOIN companies AS company ON company.id = task.company_id
       JOIN channels AS channel ON channel.id = task.channel_id
-     WHERE (
+     WHERE task.queue_kind = 'legacy' AND (
              task.status IN ('processing', 'pending_approval',
                              'waiting_for_third_party_reply', 'dead_letter')
              OR (task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP)
@@ -377,9 +381,9 @@ const OUTSTANDING_SQL: &str = r#"
 /// Assembled at first use rather than on every read. A reading is taken at most once per tick per
 /// view, and there is still no reason to rebuild twenty strings each time.
 static TASK_QUEUE: LazyLock<ScopedSql> =
-    LazyLock::new(|| ScopedSql::new(TASK_QUEUE_SQL, "WHERE company_id = $1"));
+    LazyLock::new(|| ScopedSql::new(TASK_QUEUE_SQL, "AND company_id = $1"));
 static TASK_PRESSURE: LazyLock<ScopedSql> =
-    LazyLock::new(|| ScopedSql::new(TASK_PRESSURE_SQL, "WHERE company_id = $1"));
+    LazyLock::new(|| ScopedSql::new(TASK_PRESSURE_SQL, "AND company_id = $1"));
 static DELIVERY_QUEUE: LazyLock<ScopedSql> =
     LazyLock::new(|| ScopedSql::new(DELIVERY_QUEUE_SQL, "WHERE company_id = $1"));
 static DELIVERY_PRESSURE: LazyLock<ScopedSql> =

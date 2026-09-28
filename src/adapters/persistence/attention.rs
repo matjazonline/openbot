@@ -118,7 +118,7 @@ WITH params AS (
     FROM background_tasks AS task
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
-    WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+    WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
       AND ($4 <> 'my_work'
            OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
       AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
@@ -220,6 +220,11 @@ WITH params AS (
       -- `drafting` is visible progress rather than work, and the two terminal states are gone for
       -- good. Changing one without the other is the bug.
       AND handoff.state IN ('needs_instruction', 'draft_ready')
+      AND (run.task_id IS NULL OR EXISTS (
+          SELECT 1 FROM background_tasks AS task
+          WHERE task.company_id = run.company_id AND task.id = run.task_id
+            AND task.queue_kind = 'legacy'
+      ))
       AND ($4 <> 'my_work' OR handoff.responsible_principal_id = $3)
       AND ($4 <> 'unassigned' OR handoff.responsible_principal_id IS NULL)
 
@@ -245,6 +250,7 @@ WITH params AS (
      AND approver.id = approval.approver_principal_id
     WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
       AND approval.status = 'pending'
+      AND (approval.task_id IS NULL OR task.queue_kind = 'legacy')
       AND ($4 <> 'my_work' OR approval.approver_principal_id = $3)
       -- Skips the branch outright under `unassigned`. Sound only because the select list above
       -- makes responsibility 'principal' or 'external', never 'channel_team', so `ranked` would
@@ -268,6 +274,7 @@ WITH params AS (
     LEFT JOIN background_tasks AS task
       ON task.company_id = draft.company_id AND task.id = draft.task_id
     WHERE review.company_id = $1 AND draft.channel_id = ANY($2) AND review.status = 'pending'
+      AND (draft.task_id IS NULL OR task.queue_kind = 'legacy')
       -- A draft a thread handoff's drafting run produced is queued as its handoff, not as a
       -- review: one piece of work, one item. This is the same de-duplication the `task` branch
       -- performs against pending reviews, pointed the other way, and it is `DraftTarget`'s
@@ -300,7 +307,7 @@ WITH params AS (
       ON task.company_id = outreach.company_id AND task.id = outreach.task_id
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
-    WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+    WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
       AND outreach.status = 'timeout_pending_approval'
       AND ($4 <> 'my_work'
            OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
@@ -329,6 +336,7 @@ WITH params AS (
     LEFT JOIN principals AS owner
       ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
     WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+      AND (delivery.task_id IS NULL OR task.queue_kind = 'legacy')
       AND delivery.status IN ('outcome_unknown', 'dead_letter')
       AND delivery.last_error_class IS DISTINCT FROM 'superseded'
       AND ($4 <> 'my_work'
@@ -738,6 +746,14 @@ impl AttentionPersistence for PostgresPersistence {
         let fingerprint = command_fingerprint(&command)?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         lock_attention_source(&mut tx, command.company_id, source_kind, command.source_id).await?;
+        if command.source_kind == AttentionSourceKind::Task {
+            super::legacy_task::require_legacy_task_on(
+                &mut tx,
+                command.company_id,
+                Some(command.source_id),
+            )
+            .await?;
+        }
         if let Some(version) = existing_event(
             &mut tx,
             command.company_id,
@@ -754,15 +770,16 @@ impl AttentionPersistence for PostgresPersistence {
         let manager =
             actor_is_manager(&mut tx, command.company_id, command.actor_principal_id).await?;
 
-        let (old_priority, old_due, old_responsible, old_version, channel_id) =
-            match command.source_kind {
-                AttentionSourceKind::Task => {
-                    let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
+        let (old_priority, old_due, old_responsible, old_version, channel_id) = match command
+            .source_kind
+        {
+            AttentionSourceKind::Task => {
+                let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
                         sqlx::query_as(
                             r#"SELECT business_priority, business_due_at, owner_principal_id,
                               attention_version, channel_id
                        FROM background_tasks
-                       WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3) FOR UPDATE"#,
+                       WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND channel_id = ANY($3) FOR UPDATE"#,
                         )
                         .bind(command.company_id)
                         .bind(command.source_id)
@@ -770,31 +787,31 @@ impl AttentionPersistence for PostgresPersistence {
                         .fetch_optional(&mut *tx)
                         .await
                         .map_err(AppError::from)?;
-                    row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
-                }
-                AttentionSourceKind::Handoff => {
-                    let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
-                        sqlx::query_as(
-                            r#"SELECT business_priority, business_due_at, responsible_principal_id,
+                row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
+            }
+            AttentionSourceKind::Handoff => {
+                let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
+                    sqlx::query_as(
+                        r#"SELECT business_priority, business_due_at, responsible_principal_id,
                               version, channel_id
                        FROM manual_handoffs
                        WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)
                          AND status = 'open' FOR UPDATE"#,
-                        )
-                        .bind(command.company_id)
-                        .bind(command.source_id)
-                        .bind(&command.visible_channel_ids)
-                        .fetch_optional(&mut *tx)
-                        .await
-                        .map_err(AppError::from)?;
-                    row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
-                }
-                AttentionSourceKind::ThreadHandoff
-                | AttentionSourceKind::Approval
-                | AttentionSourceKind::ResponseReview
-                | AttentionSourceKind::DelegationDecision
-                | AttentionSourceKind::DeliveryFailure => unreachable!(),
-            };
+                    )
+                    .bind(command.company_id)
+                    .bind(command.source_id)
+                    .bind(&command.visible_channel_ids)
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(AppError::from)?;
+                row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
+            }
+            AttentionSourceKind::ThreadHandoff
+            | AttentionSourceKind::Approval
+            | AttentionSourceKind::ResponseReview
+            | AttentionSourceKind::DelegationDecision
+            | AttentionSourceKind::DeliveryFailure => unreachable!(),
+        };
         if let Some(responsible) = command.responsible_principal_id {
             require_channel_principal(&mut tx, command.company_id, channel_id, responsible).await?;
         }
@@ -829,7 +846,7 @@ impl AttentionPersistence for PostgresPersistence {
                     r#"UPDATE background_tasks
                        SET business_priority = $3, business_due_at = $4,
                            attention_version = $5, updated_at = CURRENT_TIMESTAMP
-                       WHERE company_id = $1 AND id = $2 AND attention_version = $6"#,
+                       WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND attention_version = $6"#,
                 )
                 .bind(command.company_id)
                 .bind(command.source_id)
@@ -1022,7 +1039,7 @@ impl AttentionPersistence for PostgresPersistence {
                         CASE WHEN task.owner_principal_kind = 'person'
                              THEN 'principal' ELSE 'channel_team' END AS responsibility_kind
                  FROM background_tasks AS task
-                 WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+                 WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
                    AND task.status IN ('pending','processing','pending_approval',
                                        'waiting_for_third_party_reply','failed','dead_letter')
                    AND (task.owner_principal_kind = 'person'
@@ -1069,6 +1086,7 @@ impl AttentionPersistence for PostgresPersistence {
                  FROM human_approvals AS approval
                  WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
                    AND approval.status = 'pending'
+                   AND (approval.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = approval.company_id AND task.id = approval.task_id AND task.queue_kind = 'legacy'))
                  UNION ALL
                  SELECT review.created_at, review.reviewer_principal_id, 'principal'
                  FROM response_reviews AS review
@@ -1077,6 +1095,7 @@ impl AttentionPersistence for PostgresPersistence {
                   AND draft.version = review.draft_version AND draft.status = 'pending_review'
                  WHERE review.company_id = $1 AND draft.channel_id = ANY($2)
                    AND review.status = 'pending'
+                   AND (draft.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = draft.company_id AND task.id = draft.task_id AND task.queue_kind = 'legacy'))
                  UNION ALL
                  SELECT outreach.created_at,
                         CASE WHEN task.owner_principal_kind = 'person'
@@ -1085,7 +1104,7 @@ impl AttentionPersistence for PostgresPersistence {
                              THEN 'principal' ELSE 'channel_team' END
                  FROM task_outreaches AS outreach
                  JOIN background_tasks AS task ON task.id = outreach.task_id
-                 WHERE task.company_id = $1 AND task.channel_id = ANY($2)
+                 WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
                    AND outreach.status = 'timeout_pending_approval'
                  UNION ALL
                  SELECT delivery.created_at,
@@ -1097,6 +1116,7 @@ impl AttentionPersistence for PostgresPersistence {
                  LEFT JOIN background_tasks AS task
                    ON task.company_id = delivery.company_id AND task.id = delivery.task_id
                  WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+                   AND (delivery.task_id IS NULL OR task.queue_kind = 'legacy')
                    AND delivery.status IN ('outcome_unknown','dead_letter')
                    AND delivery.last_error_class IS DISTINCT FROM 'superseded'
                    AND NOT EXISTS (
@@ -1116,7 +1136,7 @@ impl AttentionPersistence for PostgresPersistence {
                          SELECT command.outreach_id
                          FROM delegation_control_commands AS command
                          JOIN background_tasks AS task ON task.id = command.task_id
-                         WHERE command.company_id = $1 AND task.channel_id = ANY($2)
+                         WHERE task.queue_kind = 'legacy' AND command.company_id = $1 AND task.channel_id = ANY($2)
                            AND command.operation IN (
                                'cancel_target','cancel_outreach','reassign_internal_target'
                            )
@@ -1124,7 +1144,7 @@ impl AttentionPersistence for PostgresPersistence {
                          SELECT event.related_outreach_id
                          FROM task_status_events AS event
                          JOIN background_tasks AS task ON task.id = event.task_id
-                         WHERE event.company_id = $1 AND task.channel_id = ANY($2)
+                         WHERE task.queue_kind = 'legacy' AND event.company_id = $1 AND task.channel_id = ANY($2)
                            AND event.reason = 'outreach_timed_out'
                            AND event.related_outreach_id IS NOT NULL
                      ) AS affected
@@ -1133,7 +1153,7 @@ impl AttentionPersistence for PostgresPersistence {
                      SELECT COUNT(*)::float8
                      FROM task_outreaches AS outreach
                      JOIN background_tasks AS task ON task.id = outreach.task_id
-                     WHERE outreach.company_id = $1 AND task.channel_id = ANY($2)
+                     WHERE task.queue_kind = 'legacy' AND outreach.company_id = $1 AND task.channel_id = ANY($2)
                  ) AS total
                )
                SELECT clock.as_of,
@@ -1143,14 +1163,14 @@ impl AttentionPersistence for PostgresPersistence {
                     FROM current_actionable) AS oldest_actionable_age_seconds,
                  (SELECT AVG(EXTRACT(EPOCH FROM (claim.occurred_at - task.created_at)))::float8
                     FROM first_claim AS claim JOIN background_tasks AS task ON task.id = claim.task_id
-                    WHERE task.channel_id = ANY($2))
+                    WHERE task.queue_kind = 'legacy' AND task.channel_id = ANY($2))
                     AS average_time_to_claim_seconds,
                  (SELECT AVG(EXTRACT(EPOCH FROM (
                          CASE WHEN outreach.status IN ('waiting','timeout_pending_approval')
                               THEN clock.as_of ELSE outreach.updated_at END - outreach.created_at
                      )))::float8 FROM task_outreaches AS outreach
                      JOIN background_tasks AS task ON task.id = outreach.task_id
-                     WHERE outreach.company_id = $1 AND task.channel_id = ANY($2))
+                     WHERE task.queue_kind = 'legacy' AND outreach.company_id = $1 AND task.channel_id = ANY($2))
                     AS average_delegation_wait_seconds,
                  (SELECT AVG(EXTRACT(EPOCH FROM (
                          COALESCE((
@@ -1167,19 +1187,25 @@ impl AttentionPersistence for PostgresPersistence {
                       ON draft.company_id = review.company_id AND draft.id = review.draft_id
                      AND draft.version = review.draft_version
                     WHERE review.company_id = $1 AND draft.channel_id = ANY($2)
-                      AND review.status <> 'pending')
+                      AND review.status <> 'pending'
+                      AND (draft.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = draft.company_id AND task.id = draft.task_id AND task.queue_kind = 'legacy')))
                     AS average_review_turnaround_seconds,
                  (SELECT adverse / NULLIF(total, 0) FROM control_counts)
                     AS timeout_cancel_reassign_rate,
                  (SELECT AVG(EXTRACT(EPOCH FROM (event.transitioned_at - task.created_at)))::float8
                     FROM task_status_events AS event
                     JOIN background_tasks AS task ON task.id = event.task_id
-                    WHERE event.company_id = $1 AND task.channel_id = ANY($2)
+                    WHERE task.queue_kind = 'legacy' AND event.company_id = $1 AND task.channel_id = ANY($2)
                       AND event.to_status = 'completed')
                     AS average_time_to_logical_external_response_seconds,
-                 (SELECT COUNT(*) FROM message_deliveries
-                    WHERE company_id = $1 AND channel_id = ANY($2) AND status = 'dead_letter'
-                      AND last_error_class IS DISTINCT FROM 'superseded')::bigint
+                 (SELECT COUNT(*) FROM message_deliveries AS delivery
+                    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2) AND delivery.status = 'dead_letter'
+                      AND delivery.last_error_class IS DISTINCT FROM 'superseded'
+                      AND (delivery.task_id IS NULL OR EXISTS (
+                          SELECT 1 FROM background_tasks AS task
+                          WHERE task.company_id = delivery.company_id AND task.id = delivery.task_id
+                            AND task.queue_kind = 'legacy'
+                      )))::bigint
                     AS permanent_delivery_failure_count
                FROM clock"#,
         )

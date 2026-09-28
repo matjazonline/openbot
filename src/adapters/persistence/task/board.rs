@@ -36,7 +36,7 @@ pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
                    SELECT correlation_id FROM (
                        SELECT correlation_id
                        FROM background_tasks
-                       WHERE company_id = $1
+                       WHERE queue_kind = 'legacy' AND company_id = $1
                          AND (status IN ('pending', 'processing', 'pending_approval',
                                          'waiting_for_third_party_reply', 'failed', 'dead_letter')
                               OR updated_at >= $3)
@@ -51,14 +51,14 @@ pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
                    WHERE EXISTS (
                        SELECT 1
                        FROM background_tasks AS visible_task
-                       WHERE visible_task.company_id = $1
+                       WHERE visible_task.queue_kind = 'legacy' AND visible_task.company_id = $1
                          AND visible_task.correlation_id = recent.correlation_id
                          AND visible_task.channel_id = ANY($5::uuid[])
                    )
                      AND ($2::uuid IS NULL OR EXISTS (
                        SELECT 1
                        FROM background_tasks AS filtered_task
-                       WHERE filtered_task.company_id = $1
+                       WHERE filtered_task.queue_kind = 'legacy' AND filtered_task.company_id = $1
                          AND filtered_task.correlation_id = recent.correlation_id
                          AND filtered_task.channel_id = $2
                          AND filtered_task.channel_id = ANY($5::uuid[])
@@ -73,18 +73,18 @@ pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
 pub(crate) const BOARD_ELIGIBLE_EVERY_CHAIN: &str = r#"
                    SELECT DISTINCT task.correlation_id
                    FROM background_tasks AS task
-                   WHERE task.company_id = $1
+                   WHERE task.queue_kind = 'legacy' AND task.company_id = $1
                      AND EXISTS (
                          SELECT 1
                          FROM background_tasks AS visible_task
-                         WHERE visible_task.company_id = task.company_id
+                         WHERE visible_task.queue_kind = 'legacy' AND visible_task.company_id = task.company_id
                            AND visible_task.correlation_id = task.correlation_id
                            AND visible_task.channel_id = ANY($5::uuid[])
                      )
                      AND ($2::uuid IS NULL OR EXISTS (
                          SELECT 1
                          FROM background_tasks AS filtered_task
-                         WHERE filtered_task.company_id = task.company_id
+                         WHERE filtered_task.queue_kind = 'legacy' AND filtered_task.company_id = task.company_id
                            AND filtered_task.correlation_id = task.correlation_id
                            AND filtered_task.channel_id = $2
                            AND filtered_task.channel_id = ANY($5::uuid[])
@@ -167,7 +167,7 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                      ON thread.company_id = task.company_id
                     AND thread.channel_id = task.channel_id
                     AND thread.id = task.thread_id
-                   WHERE task.company_id = $1
+                   WHERE task.queue_kind = 'legacy' AND task.company_id = $1
                    GROUP BY task.correlation_id
                ),
                participant_rollup AS (
@@ -187,7 +187,7 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                      ON assignment.company_id = channel.company_id
                     AND assignment.channel_id = channel.id
                    LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
-                   WHERE task.company_id = $1
+                   WHERE task.queue_kind = 'legacy' AND task.company_id = $1
                    GROUP BY task.correlation_id
                ),
                delivery_rollup AS (
@@ -350,7 +350,9 @@ pub(crate) fn chain_status_events_query<'a>(
                   reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
                   retry_count, run_at, execution_generation, transitioned_at
            FROM task_status_events
-           WHERE company_id = "#,
+           WHERE EXISTS (SELECT 1 FROM background_tasks AS task
+               WHERE task.id = task_status_events.task_id AND task.queue_kind = 'legacy')
+             AND company_id = "#,
     );
     query
         .push_bind(company_id)
@@ -498,7 +500,7 @@ pub(crate) async fn chain_detail_on(
              ON assignment.company_id = channel.company_id
             AND assignment.channel_id = channel.id
            LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
-           WHERE task.company_id = $1 AND task.correlation_id = $2
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.correlation_id = $2
              AND task.channel_id = ANY($3)
            GROUP BY task.correlation_id"#,
     )
@@ -522,7 +524,7 @@ pub(crate) async fn chain_detail_on(
                   execution_generation, locked_at, lock_expires_at, run_at, created_at,
                   updated_at
            FROM background_tasks
-           WHERE company_id = $1 AND correlation_id = $2 AND channel_id = ANY($4)
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND correlation_id = $2 AND channel_id = ANY($4)
            ORDER BY created_at, id
            LIMIT $3"#,
     )
@@ -544,7 +546,7 @@ pub(crate) async fn chain_detail_on(
                   attempt.machine_region
            FROM task_attempts AS attempt
            JOIN background_tasks AS task ON task.id = attempt.task_id
-           WHERE task.company_id = $1 AND attempt.task_id = ANY($2)
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND attempt.task_id = ANY($2)
            ORDER BY attempt.task_id, attempt.attempt_number
            LIMIT $3"#,
     )
@@ -628,7 +630,7 @@ pub(crate) async fn chain_detail_on(
            FROM human_approvals AS approval
            JOIN background_tasks AS task
              ON task.company_id = approval.company_id AND task.id = approval.task_id
-           WHERE task.company_id = $1 AND approval.task_id = ANY($2)
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND approval.task_id = ANY($2)
            ORDER BY approval.created_at, approval.id
            LIMIT $3"#,
         )
@@ -673,7 +675,7 @@ pub(crate) async fn chain_detail_on(
              ON task.company_id = outreach.company_id AND task.id = outreach.task_id
            LEFT JOIN task_outreach_targets AS target
              ON target.company_id = outreach.company_id AND target.outreach_id = outreach.id
-           WHERE task.company_id = $1 AND outreach.task_id = ANY($2)
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND outreach.task_id = ANY($2)
            GROUP BY outreach.id
            ORDER BY outreach.created_at, outreach.id
            LIMIT $3"#,

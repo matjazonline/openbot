@@ -1,29 +1,38 @@
 use super::{
     AdmissionResult, CancelCommand, CancelResult, ClaimRequest, ClaimedExecution, CompanyId,
-    OwnedVersion, PreparedAdmission, RunHead,
+    IdempotencyKey, PreparedAdmission, RunHead, binding::ConfiguredBinding,
 };
 use crate::application::app_error::AppResult;
-use crate::domain::workflow::{RunId, VersionId};
+use crate::domain::workflow::{RunId, TriggerRef, WorkflowBindingId};
 use async_trait::async_trait;
+use std::sync::Arc;
 
 #[async_trait]
-/// Looks up a published immutable version within the requested company.
-/// `None` means absent; `Err` means infrastructure failure. The returned
-/// envelope must match the requested company/version and its validated graph.
-/// Structural graph validation is not schema, resource or authorization proof.
-pub trait WorkflowDefinitions: Send + Sync {
-    async fn published_version(
+/// Selects the original immutable configuration for a matching company/key/binding
+/// replay or matching company/binding/canonical source event, otherwise the
+/// currently active binding with a selectable version. Source lookup is required
+/// even when a redelivery uses a different command key or trigger UUID. Manual
+/// events use their stable trigger UUID; messages use their canonical message ID,
+/// schedules their occurrence, and child events their immediate execution/action.
+/// Never substitute current configuration for a saved run, even after archive or
+/// deactivation. None means absent/unselectable; errors propagate. The returned
+/// company and logical binding must match. This read is not an activation grant:
+/// WorkflowAdmission must close races with selection changes before new-run commit.
+pub trait WorkflowBindings: Send + Sync {
+    async fn admission_binding(
         &self,
         company_id: CompanyId,
-        version_id: VersionId,
-    ) -> AppResult<Option<OwnedVersion>>;
+        binding_id: WorkflowBindingId,
+        key: &IdempotencyKey,
+        trigger: &TriggerRef,
+    ) -> AppResult<Option<Arc<ConfiguredBinding>>>;
 }
 
 #[async_trait]
 /// One atomic owner for company-scoped dedup, immutable snapshots, the run,
 /// first execution and first scheduling job. Exact replay returns the original
-/// run even when a new proposed random ID is supplied; changed identity or
-/// snapshots, related association, or stable trigger/source under the same
+/// run even when binding revisions or proposed random IDs change; changed logical binding or
+/// input, related association, or stable trigger/source under the same
 /// company/key return `Conflict` without new writes. Correlation and proposed
 /// random IDs are excluded from equivalence. This is a trusted internal write port;
 /// the service reauthorizes the authenticated actor before every admission
@@ -34,6 +43,17 @@ pub trait WorkflowDefinitions: Send + Sync {
 /// without writes; reader errors propagate. Causal references and correlation
 /// never grant access, deduplicate on their own, or fence a write. Later storage
 /// commits must close authority revocation races.
+/// For a new run, atomically verify that the prepared binding revision/bundle is
+/// still selected and active and its version selectable; a stale selection must
+/// fail without writes (Conflict error, safe for the caller to reload/retry).
+/// Existing admissions are resolved first and retain their original configuration;
+/// configuration revisions and parameters are not part of replay equivalence.
+/// A new command key for the same canonical source and logical binding aliases
+/// the original run after checking input/association equivalence and current
+/// authority. Persist the alias's command equivalence atomically; never create a
+/// second run or select current configuration for an already admitted source.
+/// Persist the exact selected revision, resource references and complete bundle
+/// with the run, never reconstruct them from a later mutable binding head.
 /// New runs begin `Queued`; replay must preserve their authoritative state.
 pub trait WorkflowAdmission: Send + Sync {
     /// Dedup, snapshots, run, first execution, and first job share one atomic commit.

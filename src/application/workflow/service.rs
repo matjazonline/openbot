@@ -1,19 +1,19 @@
 use super::contracts::AdmissionSnapshots;
 use super::{
     AdmissionResult, AdmitWorkflowRequest, CancelCommand, CancelResult, CancelWorkflowRequest,
-    OwnedVersion, PreparedAdmission, WorkflowAdmission, WorkflowAuthorization, WorkflowDefinitions,
-    WorkflowInspection, WorkflowOperation, WorkflowRunTransitions,
+    PreparedAdmission, WorkflowAdmission, WorkflowAuthorization, WorkflowBindings,
+    WorkflowInspection, WorkflowOperation, WorkflowRunTransitions, binding::ConfiguredBinding,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{
     Binding, Context, ContextLimits, ContextReference, ExecutionId, RunId, RunMetadata,
-    TriggerSource, ValidatedWorkflow, resolve,
+    TriggerSource, resolve,
 };
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
 pub struct WorkflowService<D, A, T, I, H> {
-    definitions: D,
+    bindings: D,
     admission: A,
     transitions: T,
     inspection: I,
@@ -22,21 +22,15 @@ pub struct WorkflowService<D, A, T, I, H> {
 
 impl<D, A, T, I, H> WorkflowService<D, A, T, I, H>
 where
-    D: WorkflowDefinitions,
+    D: WorkflowBindings,
     A: WorkflowAdmission,
     T: WorkflowRunTransitions,
     I: WorkflowInspection,
     H: WorkflowAuthorization,
 {
-    pub fn new(
-        definitions: D,
-        admission: A,
-        transitions: T,
-        inspection: I,
-        authorization: H,
-    ) -> Self {
+    pub fn new(bindings: D, admission: A, transitions: T, inspection: I, authorization: H) -> Self {
         Self {
-            definitions,
+            bindings,
             admission,
             transitions,
             inspection,
@@ -44,10 +38,9 @@ where
         }
     }
 
-    /// Authorizes the current actor and related visibility before any run write.
-    /// A definition with unresolved resource requirements is rejected with
-    /// `BadRequest`; structural validation and lifecycle access do not authorize
-    /// tools, resources, or execution effects.
+    /// Authorizes every admission/replay, then captures one checked immutable binding.
+    /// Resource readiness is checked on activation; effects recheck current access,
+    /// revocation and secrets at use time. A frozen snapshot is never an access grant.
     pub async fn admit(&self, request: AdmitWorkflowRequest) -> AppResult<AdmissionResult> {
         self.authorization
             .authorize(
@@ -57,22 +50,22 @@ where
                 WorkflowOperation::Admit,
             )
             .await?;
-        let version = self
-            .definitions
-            .published_version(request.company_id, request.version_id)
+        let binding = self
+            .bindings
+            .admission_binding(
+                request.company_id,
+                request.binding_id,
+                &request.idempotency_key,
+                &request.trigger,
+            )
             .await?
-            .ok_or_else(|| AppError::NotFound("workflow version".into()))?;
-        verify_version(&version, &request)?;
-        if !version.definition.definition().resources.is_empty() {
-            return Err(AppError::BadRequest(
-                "workflow resources are not yet resolvable".into(),
-            ));
-        }
+            .ok_or_else(|| AppError::NotFound("workflow binding".into()))?;
+        verify_binding(&binding, &request)?;
         let proposed_run = RunId::new(Uuid::new_v4());
-        let snapshots = bounded_snapshots(&request, &version.definition, proposed_run)?;
+        let snapshots = bounded_snapshots(&request, &binding, proposed_run)?;
         let command = PreparedAdmission::new(
             request,
-            &version,
+            binding,
             proposed_run,
             ExecutionId::new(Uuid::new_v4()),
             snapshots,
@@ -119,16 +112,13 @@ where
     }
 }
 
-fn verify_version(version: &OwnedVersion, request: &AdmitWorkflowRequest) -> AppResult<()> {
-    let definition = version.definition.definition();
-    if version.company_id != request.company_id
+fn verify_binding(binding: &ConfiguredBinding, request: &AdmitWorkflowRequest) -> AppResult<()> {
+    if binding.company_id() != request.company_id
         || request.trigger.company_id() != request.company_id
-        || version.version_id != request.version_id
-        || version.workflow_id != definition.workflow_id
-        || version.version_id != definition.version_id
+        || binding.id() != request.binding_id
     {
         return Err(AppError::Internal(
-            "workflow definition returned mismatched scope or identity".into(),
+            "workflow binding returned mismatched scope or identity".into(),
         ));
     }
     Ok(())
@@ -138,13 +128,13 @@ fn verify_version(version: &OwnedVersion, request: &AdmitWorkflowRequest) -> App
 /// Each snapshot also consumes its own domain work/depth budget before cloning.
 fn bounded_snapshots(
     request: &AdmitWorkflowRequest,
-    definition: &ValidatedWorkflow,
+    binding: &ConfiguredBinding,
     run_id: RunId,
 ) -> AppResult<AdmissionSnapshots> {
     let outputs = BTreeMap::new();
     let context = Context {
         input: &request.input,
-        params: &request.params,
+        params: binding.params(),
         step_outputs: &outputs,
         run: RunMetadata {
             run_id,
@@ -154,7 +144,7 @@ fn bounded_snapshots(
             },
         },
     };
-    let limits = definition.context_limits();
+    let limits = binding.bundle().compiled().graph().context_limits();
     let input = resolve(
         &Binding::Reference(ContextReference::parse("/input").expect("static reference")),
         &context,
@@ -165,7 +155,7 @@ fn bounded_snapshots(
         .map_err(|error| AppError::Internal(format!("bounded input encoding: {error}")))?
         .len();
     let remaining = limits.output_bytes - input_bytes;
-    let params = resolve(
+    resolve(
         &Binding::Reference(ContextReference::parse("/params").expect("static reference")),
         &context,
         ContextLimits {
@@ -174,5 +164,15 @@ fn bounded_snapshots(
         },
     )
     .map_err(|error| AppError::BadRequest(format!("workflow params: {error}")))?;
-    Ok(AdmissionSnapshots { input, params })
+    binding
+        .bundle()
+        .compiled()
+        .validate_input(&input)
+        .map_err(|error| {
+            AppError::BadRequest(format!(
+                "workflow input ({}): {}",
+                error.code, error.message
+            ))
+        })?;
+    Ok(AdmissionSnapshots { input })
 }

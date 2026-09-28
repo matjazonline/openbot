@@ -228,7 +228,7 @@ async fn tasks_for_message(
 ) -> AppResult<Vec<Uuid>> {
     sqlx::query_scalar(
         r#"SELECT id FROM background_tasks
-           WHERE company_id = $1 AND source_message_uuid = $2
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND source_message_uuid = $2
            ORDER BY array_position($3::uuid[], thread_id), id"#,
     )
     .bind(company_id)

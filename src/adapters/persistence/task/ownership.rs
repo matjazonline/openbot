@@ -295,7 +295,7 @@ pub(crate) async fn change_task_ownership_on(
         r#"SELECT channel_id, status, owner_principal_id, owner_principal_kind, ownership_version,
                   execution_generation
            FROM background_tasks
-           WHERE company_id = $1 AND id = $2
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2
            FOR UPDATE"#,
     )
     .bind(command.company_id)
@@ -426,7 +426,7 @@ pub(crate) async fn change_task_ownership_on(
                transition_outreach_id = CASE WHEN status = 'processing'
                    THEN NULL ELSE transition_outreach_id END,
                updated_at = CURRENT_TIMESTAMP
-           WHERE company_id = $1 AND id = $2 AND ownership_version = $6"#,
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND ownership_version = $6"#,
     )
     .bind(command.company_id)
     .bind(command.task_id)
@@ -447,7 +447,7 @@ pub(crate) async fn change_task_ownership_on(
                SET status = 'failed', stop_reason = 'ownership_transferred',
                    error = 'Task ownership changed during execution',
                    finished_at = CURRENT_TIMESTAMP
-               WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing'"#,
+               WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing' AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#,
         )
         .bind(command.task_id)
         .bind(task.execution_generation)
@@ -509,7 +509,7 @@ pub(crate) async fn list_task_ownership_events_on(
 ) -> AppResult<Vec<TaskOwnershipEvent>> {
     let query = format!(
         "SELECT {EVENT_COLUMNS} FROM task_ownership_events \
-         WHERE company_id = $1 AND task_id = $2 ORDER BY sequence"
+         WHERE company_id = $1 AND task_id = $2 AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_ownership_events.task_id AND task.queue_kind = 'legacy') ORDER BY sequence"
     );
     let rows = sqlx::query_as::<_, TaskOwnershipEventDb>(&query)
         .bind(company_id)
@@ -531,7 +531,7 @@ pub(crate) async fn list_chain_ownership_events_on(
     }
     let query = format!(
         "SELECT {EVENT_COLUMNS} FROM task_ownership_events \
-         WHERE company_id = $1 AND task_id = ANY($2) \
+         WHERE company_id = $1 AND task_id = ANY($2) AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_ownership_events.task_id AND task.queue_kind = 'legacy') \
          ORDER BY occurred_at, task_id, sequence LIMIT $3"
     );
     let rows = sqlx::query_as::<_, TaskOwnershipEventDb>(&query)

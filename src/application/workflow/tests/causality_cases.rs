@@ -7,7 +7,7 @@ fn with_source(
     source: TriggerSource,
     correlation_id: CorrelationId,
 ) -> AdmitWorkflowRequest {
-    let mut command = request(company_id, version_id, key, json!({"in": key}), json!({}));
+    let mut command = request(company_id, version_id, key, json!({"in": key}));
     command.trigger = TriggerRef::new(company_id, trigger_id_for_key(key), source).unwrap();
     command.correlation_id = correlation_id;
     command
@@ -188,19 +188,19 @@ async fn replay_keeps_original_trace_and_source_is_part_of_equivalence() {
         .unwrap(),
         AdmissionResult::Conflict
     );
-    assert_changed_trigger_conflicts_and_distinct_key_creates(
+    assert_changed_trigger_and_input_conflict(
         &store, company_id, version_id, message_id, original, run_id,
     )
     .await;
 }
 
-async fn assert_changed_trigger_conflicts_and_distinct_key_creates(
+async fn assert_changed_trigger_and_input_conflict(
     store: &MemoryStore,
     company_id: CompanyId,
     version_id: VersionId,
     message_id: CanonicalMessageId,
     original: CorrelationId,
-    run_id: RunId,
+    _run_id: RunId,
 ) {
     let svc = service(store);
     let mut changed_trigger = with_source(
@@ -230,8 +230,8 @@ async fn assert_changed_trigger_conflicts_and_distinct_key_creates(
         ))
         .await
         .unwrap();
-    assert!(matches!(distinct, AdmissionResult::Created(other) if other != run_id));
-    assert_eq!(store.state.lock().unwrap().runs.len(), 2);
+    assert_eq!(distinct, AdmissionResult::Conflict);
+    assert_eq!(store.state.lock().unwrap().runs.len(), 1);
 }
 
 #[tokio::test]
@@ -415,13 +415,7 @@ async fn seed_parent_actions(
 ) -> (ActionRef, ActionRef) {
     let svc = service(store);
     let AdmissionResult::Created(parent_run) = svc
-        .admit(request(
-            company_id,
-            version_id,
-            "parent",
-            json!(1),
-            json!(2),
-        ))
+        .admit(request(company_id, version_id, "parent", json!(1)))
         .await
         .unwrap()
     else {

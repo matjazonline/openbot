@@ -17,7 +17,7 @@ pub(super) async fn lock_subject(
 ) -> AppResult<()> {
     if let Some(suspension) = subject.suspension {
         let locked = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM background_tasks WHERE company_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT id FROM background_tasks WHERE company_id = $1 AND id = $2 AND queue_kind = 'legacy' FOR UPDATE",
         )
         .bind(subject.company_id)
         .bind(suspension.task_id())
@@ -43,9 +43,9 @@ pub(super) async fn link_wait(
     if let Some(reference) = invocation {
         let existing = sqlx::query_as::<_, ExistingInvocationWait>(
             r#"SELECT wait.run_id, wait.invocation_id, wait.checkpoint_revision
-                FROM task_approval_waits wait JOIN background_tasks task ON task.id = wait.task_id AND task.company_id = wait.company_id
+                FROM task_approval_waits AS wait JOIN background_tasks AS task ON task.id = wait.task_id AND task.company_id = wait.company_id
                 WHERE wait.company_id = $1 AND wait.task_id = $2 AND wait.approval_id = $3 AND wait.state = 'waiting'
-                  AND task.status = 'pending_approval' AND wait.ownership_version = task.ownership_version
+                  AND task.queue_kind = 'legacy' AND task.status = 'pending_approval' AND wait.ownership_version = task.ownership_version
                   AND wait.owner_principal_id IS NOT DISTINCT FROM task.owner_principal_id"#,
         ).bind(subject.company_id).bind(suspension.task_id()).bind(approval.id).fetch_optional(&mut **tx).await?;
         if let Some(existing) = existing {
@@ -146,7 +146,7 @@ impl PostgresPersistence {
         }
         if let Some(task_id) = candidate.task_id {
             sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM background_tasks WHERE company_id = $1 AND id = $2 FOR UPDATE",
+                "SELECT id FROM background_tasks WHERE company_id = $1 AND id = $2 AND queue_kind = 'legacy' FOR UPDATE",
             )
             .bind(candidate.company_id)
             .bind(task_id)
@@ -207,7 +207,7 @@ async fn settle_task(
         r#"UPDATE background_tasks AS task SET status = $4, run_at = CURRENT_TIMESTAMP,
                wait_expires_at = NULL, last_error = $5, updated_at = CURRENT_TIMESTAMP, {attribution}
            FROM task_approval_waits AS wait
-           WHERE task.company_id = $1 AND task.id = $2 AND task.status = 'pending_approval'
+           WHERE task.company_id = $1 AND task.id = $2 AND task.queue_kind = 'legacy' AND task.status = 'pending_approval'
              AND wait.company_id = task.company_id AND wait.task_id = task.id
              AND wait.approval_id = $3 AND wait.state = 'waiting'
              AND wait.owner_principal_id IS NOT DISTINCT FROM task.owner_principal_id
@@ -260,7 +260,7 @@ pub(super) async fn decision_note(
 ) -> AppResult<()> {
     let correlation = if let Some(task_id) = approval.task_id {
         let id = sqlx::query_scalar::<_, Uuid>(
-            "SELECT correlation_id FROM background_tasks WHERE company_id = $1 AND id = $2",
+            "SELECT correlation_id FROM background_tasks WHERE company_id = $1 AND id = $2 AND queue_kind = 'legacy'",
         )
         .bind(approval.company_id)
         .bind(task_id)

@@ -5,9 +5,11 @@
 mod causality;
 mod context;
 mod definition;
+mod expression;
 mod graph;
 mod ids;
 mod outcome;
+mod rule;
 mod state;
 mod transition;
 
@@ -16,20 +18,23 @@ pub use causality::{
     StepCausality, TriggerRef, TriggerSource,
 };
 pub use context::{
-    Binding, Context, ContextError, ContextLimits, ContextReference, RunMetadata, resolve,
+    Binding, Comparison, Context, ContextError, ContextLimits, ContextReference, RunMetadata,
+    canonical_array_index, preflight_binding, resolve, resolve_inputs, validate_context_value,
 };
 pub use definition::{
     ExecutionLimits, ResourceRequirement, Routes, StepDefinition, WorkflowDefinition,
 };
 pub use graph::{GraphError, ValidatedWorkflow, validate};
 pub use ids::{
-    ActionInvocationId, ChoiceName, CompanyId, ExecutionId, FailureCode, NameError, ResourceName,
-    RunId, ScheduleId, ScheduleOccurrenceId, StepId, TriggerId, TypeName, VersionId, WaitId,
-    WorkflowId,
+    ActionInvocationId, BindingRevision, BindingStateRevision, ChoiceName, CompanyId,
+    DraftRevision, ExecutionId, FailureCode, NameError, ResourceName, RunId, RuntimeResourceId,
+    ScheduleId, ScheduleOccurrenceId, StepId, TemplateId, TemplateRevision, TriggerId, TypeName,
+    VersionId, WaitId, WorkflowBindingId, WorkflowId,
 };
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,
     OutcomeError, RetryEligibility, StepFailure, StepOutcome, resolve_outcome,
 };
+pub use rule::{OrderedRule, RuleCase, RuleError};
 pub use state::{RunState, RunStateError, WaitingReason};
 pub use transition::{RouteError, RouteSelection, TransitionTarget, select_route};

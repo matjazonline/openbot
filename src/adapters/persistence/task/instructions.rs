@@ -152,7 +152,7 @@ async fn lock_instruction_task(
     sqlx::query_as::<_, LockedTask>(
         r#"SELECT status, owner_principal_kind, ownership_version, execution_generation
              FROM background_tasks
-            WHERE company_id = $1 AND channel_id = $2 AND thread_id = $3 AND id = $4
+            WHERE queue_kind = 'legacy' AND company_id = $1 AND channel_id = $2 AND thread_id = $3 AND id = $4
             FOR UPDATE"#,
     )
     .bind(command.company_id)
@@ -236,7 +236,7 @@ async fn requeue_processing_task(
                   transition_reason = 'agent_instruction', transition_actor_kind = 'human',
                   transition_actor_id = $5, transition_approval_id = NULL,
                   transition_outreach_id = NULL, updated_at = CURRENT_TIMESTAMP
-            WHERE company_id = $1 AND id = $2 AND status = 'processing'
+            WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND status = 'processing'
               AND ownership_version = $3 AND execution_generation = $4"#,
     )
     .bind(command.company_id)
@@ -266,7 +266,7 @@ async fn requeue_processing_task(
               SET status = 'failed', stop_reason = 'agent_instruction',
                   error = 'A collaborator added explicit internal-note context',
                   finished_at = CURRENT_TIMESTAMP
-            WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing'"#,
+            WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing' AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#,
     )
     .bind(command.task_id)
     .bind(task.execution_generation)
@@ -297,7 +297,7 @@ pub(crate) async fn ask_owner_to_act(
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     advisory_lock(&mut tx, command.company_id, command.command_id).await?;
     if let Some((stored_fingerprint, outcome)) = sqlx::query_as::<_, (String, String)>(
-        "SELECT command_fingerprint, wake_outcome FROM task_agent_instructions WHERE company_id = $1 AND command_id = $2",
+        "SELECT command_fingerprint, wake_outcome FROM task_agent_instructions WHERE company_id = $1 AND command_id = $2 AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_agent_instructions.task_id AND task.queue_kind = 'legacy')",
     )
     .bind(command.company_id)
     .bind(command.command_id)
@@ -392,7 +392,7 @@ async fn ensure_thread_has_no_active_task(
 ) -> AppResult<()> {
     let active = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT id FROM background_tasks
-            WHERE company_id = $1 AND channel_id = $2 AND thread_id = $3
+            WHERE queue_kind = 'legacy' AND company_id = $1 AND channel_id = $2 AND thread_id = $3
               AND status IN ('pending', 'processing', 'pending_approval', 'waiting_for_third_party_reply')
             ORDER BY created_at, id LIMIT 1
             FOR UPDATE"#,
@@ -604,7 +604,7 @@ pub(crate) async fn claim_agent_instruction_notes(
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     let fenced = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT id FROM background_tasks
-            WHERE company_id = $1 AND thread_id = $2 AND id = $3
+            WHERE queue_kind = 'legacy' AND company_id = $1 AND thread_id = $2 AND id = $3
               AND status = 'processing' AND worker_id = $4
               AND execution_generation = $5 AND owner_principal_id = $6
               AND ownership_version = $7 AND lock_expires_at > CURRENT_TIMESTAMP

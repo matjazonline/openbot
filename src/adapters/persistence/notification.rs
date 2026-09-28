@@ -646,7 +646,7 @@ async fn source_snapshot(
                 r#"SELECT channel_id, thread_id, correlation_id, status,
                               owner_principal_id, owner_principal_kind
                          FROM background_tasks AS task
-                        WHERE task.company_id = $1 AND task.id = $2
+                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
                         FOR SHARE OF task"#,
             )
             .bind(event.company_id)
@@ -709,6 +709,7 @@ async fn source_snapshot(
                          LEFT JOIN background_tasks AS task
                            ON task.company_id = draft.company_id AND task.id = draft.task_id
                         WHERE review.company_id = $1 AND review.draft_id = $2
+                          AND (draft.task_id IS NULL OR task.queue_kind = 'legacy')
                         ORDER BY review.draft_version DESC LIMIT 1
                         FOR SHARE OF review"#,
             )
@@ -736,7 +737,7 @@ async fn source_snapshot(
                               outreach.status, task.owner_principal_id, task.owner_principal_kind
                          FROM task_outreaches AS outreach
                          JOIN background_tasks AS task ON task.id = outreach.task_id
-                        WHERE task.company_id = $1 AND outreach.id = $2
+                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND outreach.id = $2
                         FOR SHARE OF outreach, task"#,
             )
             .bind(event.company_id)
@@ -766,7 +767,7 @@ async fn source_snapshot(
                 r#"SELECT channel_id, thread_id, correlation_id, status,
                               owner_principal_id, owner_principal_kind
                          FROM background_tasks AS task
-                        WHERE task.company_id = $1 AND task.id = $2
+                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
                         FOR SHARE OF task"#,
             )
             .bind(event.company_id)
@@ -800,6 +801,7 @@ async fn source_snapshot(
                      JOIN background_tasks AS task
                        ON task.company_id = delivery.company_id AND task.id = delivery.task_id
                     WHERE delivery.company_id = $1 AND delivery.id = $2
+                      AND task.queue_kind = 'legacy'
                     FOR SHARE OF delivery, task"#,
             )
             .bind(event.company_id)

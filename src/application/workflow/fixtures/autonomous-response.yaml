@@ -1,0 +1,34 @@
+# Saved agent tools and skills apply: no classifier or capability_profile.
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000002
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema: true
+resources: []
+entry: draft
+steps:
+  draft:
+    type: agent.run
+    with:
+      agent: {literal: assistant}
+      context: {object: {untrusted_message: {ref: /input/message}}}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: reply}
+  reply:
+    type: message.reply
+    with:
+      source_message: {ref: /input/source_message}
+      content: {ref: /steps/draft/output}
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

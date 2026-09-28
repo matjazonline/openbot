@@ -18,7 +18,7 @@ pub(crate) async fn lock_task_execution_on(
         .map_err(|_| AppError::Conflict("Ownership version exhausted".into()))?;
     let task = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT id FROM background_tasks
-           WHERE company_id = $1 AND id = $2 AND status = 'processing'
+           WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND status = 'processing'
              AND worker_id = $3 AND execution_generation = $4
              AND owner_principal_id = $5 AND ownership_version = $6
              AND lock_expires_at > CURRENT_TIMESTAMP FOR UPDATE"#,
@@ -41,7 +41,7 @@ pub(super) async fn load_on(
     run: RunId,
 ) -> AppResult<Option<RunCheckpoint>> {
     let value = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT checkpoint FROM task_harness_runs WHERE company_id = $1 AND task_id = $2 AND id = $3 FOR UPDATE",
+        "SELECT checkpoint FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2 AND id = $3 FOR UPDATE",
     ).bind(company).bind(task).bind(run.0).fetch_optional(&mut *tx).await?;
     value.map(decode).transpose()
 }
@@ -155,7 +155,7 @@ impl PostgresPersistence {
             return Err(AppError::NotFound("Harness run".into()));
         };
         let scope_matches = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS (SELECT 1 FROM task_harness_runs WHERE id = $1 AND owner_principal_id = $2 AND ownership_version = $3 AND state <> 'superseded')",
+            "SELECT EXISTS (SELECT 1 FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND id = $1 AND owner_principal_id = $2 AND ownership_version = $3 AND state <> 'superseded')",
         ).bind(write.run_id.0).bind(write.lease.claimed_owner.principal_id().map(|id| id.as_uuid()))
             .bind(write.lease.ownership_version as i64).fetch_one(&mut *tx).await?;
         if !scope_matches {
@@ -253,7 +253,7 @@ impl HarnessRunStore for PostgresPersistence {
             return Ok(WriteOutcome::OwnershipLost);
         }
         let existing = sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT checkpoint FROM task_harness_runs WHERE company_id = $1 AND task_id = $2 AND agent_id = $3 AND ownership_version = $4 ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+            "SELECT checkpoint FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2 AND agent_id = $3 AND ownership_version = $4 ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
         ).bind(write.company_id).bind(write.lease.task_id).bind(request.identity.agent_id)
         .bind(request.lease.ownership_version as i64).fetch_optional(&mut *tx).await?;
         if let Some(value) = existing {
@@ -274,7 +274,7 @@ impl HarnessRunStore for PostgresPersistence {
             return Ok(WriteOutcome::AlreadyApplied(saved));
         }
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT count(*) FROM task_harness_runs WHERE company_id = $1 AND task_id = $2",
+            "SELECT count(*) FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2",
         )
         .bind(write.company_id)
         .bind(write.lease.task_id)
@@ -300,7 +300,7 @@ impl HarnessRunStore for PostgresPersistence {
         task_id: Uuid,
     ) -> AppResult<Option<RunDiagnostics>> {
         let value = sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT checkpoint FROM task_harness_runs WHERE company_id = $1 AND task_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1",
+            "SELECT checkpoint FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1",
         ).bind(company_id).bind(task_id).fetch_optional(&self.pool).await?;
         value
             .map(|value| decode(value).map(|run| RunDiagnostics::from(&run)))
@@ -314,7 +314,7 @@ impl HarnessRunStore for PostgresPersistence {
         run_id: RunId,
     ) -> AppResult<Option<RunCheckpoint>> {
         let value = sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT checkpoint FROM task_harness_runs WHERE company_id = $1 AND task_id = $2 AND id = $3",
+            "SELECT checkpoint FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2 AND id = $3",
         ).bind(company_id).bind(task_id).bind(run_id.0).fetch_optional(&self.pool).await?;
         value.map(decode).transpose()
     }
@@ -482,7 +482,7 @@ pub(crate) async fn supersede_harness_runs_on(
     previous_version: u64,
 ) -> AppResult<()> {
     let values = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT checkpoint FROM task_harness_runs WHERE company_id = $1 AND task_id = $2 AND ownership_version = $3 AND state <> 'superseded' ORDER BY id FOR UPDATE",
+        "SELECT checkpoint FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND company_id = $1 AND task_id = $2 AND ownership_version = $3 AND state <> 'superseded' ORDER BY id FOR UPDATE",
     ).bind(company_id).bind(task_id).bind(previous_version as i64).fetch_all(&mut *tx).await?;
     for value in values {
         let run = decode(value)?;
@@ -518,7 +518,7 @@ pub(crate) async fn supersede_harness_runs_for_tasks_on(
                  JOIN unnest($2::uuid[], $3::bigint[]) AS stopped(task_id, ownership_version)
                    ON run.task_id = stopped.task_id
                   AND run.ownership_version = stopped.ownership_version
-                WHERE run.company_id = $1 AND run.state <> 'superseded'
+                WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = run.task_id AND task.queue_kind = 'legacy') AND run.company_id = $1 AND run.state <> 'superseded'
                 ORDER BY run.id
                 LIMIT $4
                   FOR UPDATE OF run"#,
@@ -597,7 +597,7 @@ pub(crate) async fn resolve_harness_outreach_on(
     let link = sqlx::query_as::<_, OutreachLink>(
         r#"SELECT outreach.company_id, outreach.task_id, outreach.harness_run_id,
                   outreach.harness_invocation_id, outreach.checkpoint_revision, outreach.status, task.status AS task_status
-           FROM task_outreaches AS outreach JOIN background_tasks AS task ON task.id = outreach.task_id
+           FROM task_outreaches AS outreach JOIN background_tasks AS task ON task.id = outreach.task_id AND task.queue_kind = 'legacy'
            WHERE outreach.id = $1 AND outreach.harness_run_id IS NOT NULL
              AND task.owner_principal_id IS NOT DISTINCT FROM outreach.created_by_principal_id
              AND task.ownership_version = outreach.ownership_version
@@ -651,7 +651,7 @@ pub(crate) async fn resolve_harness_outreach_on(
         _ => return Ok(()),
     };
     persist_checkpoint_on(tx, link.company_id, link.task_id, &run, &next).await?;
-    sqlx::query("UPDATE background_tasks SET awaited_outreach_id = NULL WHERE company_id = $1 AND id = $2 AND awaited_outreach_id = $3")
+    sqlx::query("UPDATE background_tasks SET awaited_outreach_id = NULL WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND awaited_outreach_id = $3")
         .bind(link.company_id).bind(link.task_id).bind(outreach_id).execute(&mut *tx).await?;
     sqlx::query("UPDATE task_approval_waits AS wait SET state = 'expired' FROM human_approvals AS approval WHERE wait.approval_id = approval.id AND approval.company_id = $1 AND approval.task_id = $2 AND approval.payload->>'outreach_id' = $3 AND wait.state = 'waiting'")
         .bind(link.company_id).bind(link.task_id).bind(outreach_id.to_string()).execute(&mut *tx).await?;
@@ -665,7 +665,7 @@ pub(super) async fn validate_final_publication_on(
     message: &crate::use_cases::thread::MessageWrite,
 ) -> AppResult<()> {
     let saved: Option<sqlx::types::Json<AgentExecutionOutput>> = sqlx::query_scalar(
-        "SELECT checkpoint->'final_output' FROM task_harness_runs WHERE task_id = $1 AND owner_principal_id = $2 AND ownership_version = $3 AND state = 'completed'",
+        "SELECT checkpoint->'final_output' FROM task_harness_runs WHERE EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_harness_runs.task_id AND task.queue_kind = 'legacy') AND task_id = $1 AND owner_principal_id = $2 AND ownership_version = $3 AND state = 'completed'",
     ).bind(lease.task_id).bind(lease.claimed_owner.principal_id().map(|id| id.as_uuid()))
         .bind(lease.ownership_version as i64).fetch_optional(&mut *tx).await?;
     if let Some(saved) = saved

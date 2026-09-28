@@ -1,11 +1,12 @@
-use super::{RelatedAssociation, WorkflowActor};
+use super::{RelatedAssociation, WorkflowActor, binding::ConfiguredBinding};
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::entities::correlation::CorrelationId;
 use crate::domain::workflow::{
-    ExecutionId, RunCausality, RunId, RunState, StepCausality, StepId, TriggerRef,
-    ValidatedWorkflow, VersionId, WorkflowId,
+    ExecutionId, RunCausality, RunId, RunState, StepCausality, StepId, TriggerRef, VersionId,
+    WorkflowBindingId, WorkflowId,
 };
 use serde_json::Value;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
@@ -52,16 +53,6 @@ impl IdempotencyKey {
     }
 }
 
-/// Company-owned published version. Graph validation is structural only: this
-/// value does not prove schema validity, resource compatibility or authorization.
-#[derive(Debug, Clone)]
-pub struct OwnedVersion {
-    pub company_id: CompanyId,
-    pub workflow_id: WorkflowId,
-    pub version_id: VersionId,
-    pub definition: ValidatedWorkflow,
-}
-
 /// The idempotency key identifies a logical admission within one company;
 /// it is independent of correlation IDs and proposed random run IDs.
 pub struct AdmitWorkflowRequest {
@@ -71,41 +62,36 @@ pub struct AdmitWorkflowRequest {
     pub trigger: TriggerRef,
     /// Observability only. It is neither authority nor an idempotency or fence key.
     pub correlation_id: CorrelationId,
-    pub version_id: VersionId,
+    pub binding_id: WorkflowBindingId,
     pub idempotency_key: IdempotencyKey,
     pub input: Value,
-    pub params: Value,
 }
 
-/// Already bounded, immutable run snapshots kept together to prevent swaps.
+/// Input validated against the pinned bundle and aggregate input/parameter bound.
 pub(super) struct AdmissionSnapshots {
     pub(super) input: Value,
-    pub(super) params: Value,
 }
 
-/// Constructed only after company/version checks and bounded snapshot resolution.
-/// The admission adapter commits this command, the first execution, and its job
-/// atomically. Deduplication compares workflow/version and both snapshots under
-/// `(company, idempotency_key)` including the related association and stable
-/// trigger/source. Proposed random IDs, actor and correlation do not enter
-/// equivalence. Every replay reauthorizes and revalidates source records.
-#[derive(Debug, Clone)]
+/// Constructed only after authorization, checked binding selection and bounded input.
+/// Retains the exact immutable configuration; adapters persist it with the run and
+/// first job. Replay equivalence uses logical binding, input, association and stable
+/// trigger under company/key, excluding revision, actor, correlation and random IDs.
+#[derive(Clone)]
 pub struct PreparedAdmission {
     company_id: CompanyId,
+    actor: WorkflowActor,
     association: RelatedAssociation,
     causality: RunCausality,
     idempotency_key: IdempotencyKey,
-    workflow_id: WorkflowId,
-    version_id: VersionId,
+    binding: Arc<ConfiguredBinding>,
     first_step: StepCausality,
     input: Value,
-    params: Value,
 }
 
 impl PreparedAdmission {
     pub(super) fn new(
         request: AdmitWorkflowRequest,
-        version: &OwnedVersion,
+        binding: Arc<ConfiguredBinding>,
         run_id: RunId,
         execution_id: ExecutionId,
         snapshots: AdmissionSnapshots,
@@ -118,24 +104,33 @@ impl PreparedAdmission {
                 request.company_id,
                 run_id,
                 execution_id,
-                version.definition.definition().entry.clone(),
+                binding
+                    .bundle()
+                    .compiled()
+                    .graph()
+                    .definition()
+                    .entry
+                    .clone(),
             ),
         )
         .map_err(|error| AppError::Internal(error.to_string()))?;
         Ok(Self {
             company_id: request.company_id,
+            actor: request.actor,
             association: request.association,
             causality,
             idempotency_key: request.idempotency_key,
-            workflow_id: version.workflow_id,
-            version_id: version.version_id,
+            binding,
             first_step,
             input: snapshots.input,
-            params: snapshots.params,
         })
     }
     pub fn company_id(&self) -> CompanyId {
         self.company_id
+    }
+    /// Retained so the atomic persistence owner can recheck current authority.
+    pub fn actor(&self) -> WorkflowActor {
+        self.actor
     }
     pub fn association(&self) -> RelatedAssociation {
         self.association
@@ -156,10 +151,24 @@ impl PreparedAdmission {
         &self.first_step
     }
     pub fn workflow_id(&self) -> WorkflowId {
-        self.workflow_id
+        self.binding
+            .bundle()
+            .compiled()
+            .graph()
+            .definition()
+            .workflow_id
     }
     pub fn version_id(&self) -> VersionId {
-        self.version_id
+        self.binding
+            .bundle()
+            .compiled()
+            .graph()
+            .definition()
+            .version_id
+    }
+    /// The run owns this exact binding revision and complete frozen bundle.
+    pub fn binding(&self) -> &Arc<ConfiguredBinding> {
+        &self.binding
     }
     pub fn entry(&self) -> &StepId {
         self.first_step.execution().step_id()
@@ -171,13 +180,13 @@ impl PreparedAdmission {
         &self.input
     }
     pub fn params(&self) -> &Value {
-        &self.params
+        self.binding.params()
     }
 }
 
 /// `Replayed` returns the originally committed run; `Conflict` means the same
-/// company/key was used with a different workflow, version, related association,
-/// stable trigger identity or source, or input/parameter snapshot.
+/// company/key was used with a different logical binding, related association,
+/// stable trigger identity/source, or input. Configuration changes alone are not conflicts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdmissionResult {
     Created(RunId),

@@ -25,6 +25,7 @@ pub mod database_query_health;
 pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
+mod legacy_task;
 pub mod memory;
 pub mod notification;
 pub mod participant;
@@ -38,6 +39,7 @@ pub mod test_support;
 pub mod thread;
 pub mod thread_handoff;
 pub mod user;
+pub mod workflow;
 
 #[derive(Clone)]
 pub struct PostgresPersistence {

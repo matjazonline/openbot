@@ -1,0 +1,64 @@
+# Compiler fixture only: phase07 adds next-input/exit/exhaustion scheduling.
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000004
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema:
+  type: object
+  properties:
+    reviewer: {type: string, maxLength: 128}
+    deadline: {type: string, maxLength: 64}
+  required: [reviewer, deadline]
+  additionalProperties: false
+output_schema: true
+resources: []
+entry: revisions
+steps:
+  revisions:
+    type: flow.repeat
+    child_workflow_id: 00000000-0000-0000-0000-000000000005
+    child_version_id: 00000000-0000-0000-0000-000000000069
+    max_iterations: 3
+    with:
+      input:
+        object:
+          message: {ref: /input/message}
+          previous_body: {literal: ""}
+          feedback: {literal: ""}
+          reviewer: {ref: /params/reviewer}
+          deadline: {ref: /params/deadline}
+    routes: {success: outcome}
+  outcome:
+    type: decision.rule
+    with:
+      data: {ref: /steps/revisions/output/result/data}
+      data_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    rule:
+      cases:
+        - when: {eq: [{ref: /steps/revisions/output/result/choice}, {literal: accept}]}
+          choice: accepted
+      default: exhausted
+    routes: {choices: {accepted: reply, exhausted: escalate}}
+  reply:
+    type: message.reply
+    with:
+      source_message: {ref: /input/source_message}
+      content: {ref: /steps/revisions/output/result/data}
+    routes: {success: $end}
+  escalate:
+    type: message.send
+    with:
+      content: {literal: {body: Human revision needs further attention.}}
+      destinations: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
+    routes: {success: $end}
+limits: {max_steps: 40, max_context_bytes: 65536}

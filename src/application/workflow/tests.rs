@@ -6,10 +6,9 @@ use crate::domain::entities::{
     message::CanonicalMessageId, participant::PrincipalAccessContext, thread::Thread,
 };
 use crate::domain::workflow::{
-    ActionInvocationId, ActionRef, ChildCause, ExecutionId, ExecutionLimits, ExecutionRef, Routes,
-    RunCausality, RunId, RunState, ScheduleId, ScheduleOccurrenceId, StepCausality, StepDefinition,
-    TransitionTarget, TriggerId, TriggerRef, TriggerSource, TypeName, VersionId,
-    WorkflowDefinition, WorkflowId, validate,
+    ActionInvocationId, ActionRef, BindingRevision, ChildCause, ExecutionId, ExecutionRef,
+    RunCausality, RunId, RunState, ScheduleId, ScheduleOccurrenceId, StepCausality, TriggerId,
+    TriggerRef, TriggerSource, VersionId, WorkflowBindingId, WorkflowId,
 };
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -51,37 +50,59 @@ fn trigger_id_for_key(key: &str) -> TriggerId {
     TriggerId::new(Uuid::from_u128(value))
 }
 
-fn owned(company_id: CompanyId, version_id: VersionId, context_bytes: usize) -> OwnedVersion {
-    let workflow_id = WorkflowId::new(Uuid::new_v4());
-    let definition = WorkflowDefinition {
-        format_version: 1,
-        workflow_id,
-        version_id,
-        input_schema: None,
-        parameter_schema: None,
-        output_schema: None,
-        resources: vec![],
-        entry: step_id("actual_entry"),
-        steps: BTreeMap::from([(
-            step_id("actual_entry"),
-            StepDefinition {
-                step_type: TypeName::parse("agent.run").unwrap(),
-                inputs: BTreeMap::new(),
-                routes: Routes::Success(TransitionTarget::End),
-                final_error: None,
+// These fixtures reuse the version UUID for the logical binding UUID to keep
+// the existing source/authorization matrix concise; production IDs are distinct types.
+fn owned(
+    company_id: CompanyId,
+    version_id: VersionId,
+    context_bytes: usize,
+) -> Arc<binding::ConfiguredBinding> {
+    configured(company_id, version_id, context_bytes, json!(2))
+}
+
+fn configured(
+    company_id: CompanyId,
+    version_id: VersionId,
+    context_bytes: usize,
+    params: Value,
+) -> Arc<binding::ConfiguredBinding> {
+    let mut source: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    let entry = source["entry"].as_str().unwrap().to_owned();
+    let step = source["steps"]
+        .as_object_mut()
+        .unwrap()
+        .remove(&entry)
+        .unwrap();
+    source["steps"]["actual_entry"] = step;
+    source["entry"] = json!("actual_entry");
+    source["limits"]["max_context_bytes"] = json!(context_bytes);
+    source["input_schema"] = json!({});
+    source["parameter_schema"] = json!({});
+    source["steps"]["actual_entry"]["with"]["output_schema"] = json!({"literal":{}});
+    let bundle = Arc::new(
+        publication::freeze(
+            crate::adapters::workflow_source::decode(&source.to_string()).unwrap(),
+            company_id,
+            version_id,
+            publication::DependencySnapshots::default(),
+            vec![],
+        )
+        .unwrap(),
+    );
+    Arc::new(
+        binding::ConfiguredBinding::new(
+            binding::BindingConfiguration {
+                id: WorkflowBindingId::new(version_id.as_uuid()),
+                revision: BindingRevision::new(1).unwrap(),
+                company_id,
+                params,
+                resources: BTreeMap::new(),
             },
-        )]),
-        limits: ExecutionLimits {
-            max_steps: 10,
-            max_context_bytes: context_bytes,
-        },
-    };
-    OwnedVersion {
-        company_id,
-        workflow_id,
-        version_id,
-        definition: validate(definition).unwrap(),
-    }
+            bundle,
+        )
+        .unwrap(),
+    )
 }
 
 fn request(
@@ -89,7 +110,6 @@ fn request(
     version_id: VersionId,
     key: &str,
     input: Value,
-    params: Value,
 ) -> AdmitWorkflowRequest {
     AdmitWorkflowRequest {
         company_id,
@@ -98,10 +118,9 @@ fn request(
         trigger: TriggerRef::new(company_id, trigger_id_for_key(key), TriggerSource::Manual)
             .unwrap(),
         correlation_id: CorrelationId::new(),
-        version_id,
+        binding_id: WorkflowBindingId::new(version_id.as_uuid()),
         idempotency_key: IdempotencyKey::parse(key).unwrap(),
         input,
-        params,
     }
 }
 
@@ -114,7 +133,7 @@ struct MemoryStore {
 
 #[derive(Default)]
 struct State {
-    versions: BTreeMap<(CompanyId, VersionId), OwnedVersion>,
+    versions: BTreeMap<(CompanyId, VersionId), Arc<binding::ConfiguredBinding>>,
     admissions: BTreeMap<(CompanyId, IdempotencyKey), StoredAdmission>,
     runs: BTreeMap<(CompanyId, RunId), TestRun>,
     access: BTreeMap<(CompanyId, Uuid), PrincipalAccessContext>,
@@ -134,16 +153,19 @@ struct State {
     fail_admit: bool,
     fail_head: bool,
     fail_cancel: bool,
-    returned_version: Option<OwnedVersion>,
+    returned_version: Option<Arc<binding::ConfiguredBinding>>,
     returned_head: Option<RunHead>,
+    replace_on_admit: Option<Arc<binding::ConfiguredBinding>>,
 }
 
+#[derive(Clone)]
 struct StoredAdmission {
     causality: RunCausality,
-    workflow_id: WorkflowId,
+    command_trigger: TriggerRef,
     version_id: VersionId,
     input: Value,
     params: Value,
+    binding: Arc<binding::ConfiguredBinding>,
     association: RelatedAssociation,
 }
 
@@ -173,18 +195,19 @@ impl TestJob {
 }
 
 impl MemoryStore {
-    fn new(version: OwnedVersion) -> Self {
+    fn new(version: Arc<binding::ConfiguredBinding>) -> Self {
         let mut state = State::default();
         state.access.insert(
-            (version.company_id, actor().user_id()),
+            (version.company_id(), actor().user_id()),
             PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::Owner,
             },
         );
-        state
-            .versions
-            .insert((version.company_id, version.version_id), version);
+        state.versions.insert(
+            (version.company_id(), VersionId::new(version.id().as_uuid())),
+            version,
+        );
         Self {
             state: Arc::new(Mutex::new(state)),
             admission_barrier: None,
@@ -202,21 +225,38 @@ impl MemoryStore {
 }
 
 #[async_trait]
-impl WorkflowDefinitions for MemoryStore {
-    async fn published_version(
+impl WorkflowBindings for MemoryStore {
+    async fn admission_binding(
         &self,
         company_id: CompanyId,
-        version_id: VersionId,
-    ) -> AppResult<Option<OwnedVersion>> {
+        binding_id: WorkflowBindingId,
+        key: &IdempotencyKey,
+        trigger: &TriggerRef,
+    ) -> AppResult<Option<Arc<binding::ConfiguredBinding>>> {
         let result = {
             let state = self.state.lock().unwrap();
             if state.fail_lookup {
                 return Err(AppError::Database("lookup failed".into()));
             }
             state
-                .returned_version
-                .clone()
-                .or_else(|| state.versions.get(&(company_id, version_id)).cloned())
+                .admissions
+                .get(&(company_id, key.clone()))
+                .filter(|saved| saved.binding.id() == binding_id)
+                .or_else(|| {
+                    state.admissions.values().find(|saved| {
+                        saved.binding.company_id() == company_id
+                            && saved.binding.id() == binding_id
+                            && same_source_event(saved.causality.trigger(), trigger)
+                    })
+                })
+                .map(|saved| saved.binding.clone())
+                .or_else(|| state.returned_version.clone())
+                .or_else(|| {
+                    state
+                        .versions
+                        .get(&(company_id, VersionId::new(binding_id.as_uuid())))
+                        .cloned()
+                })
         };
         if let Some(barrier) = &self.admission_barrier {
             barrier.wait().await;
@@ -234,12 +274,10 @@ impl WorkflowAdmission for MemoryStore {
         }
         let key = (command.company_id(), command.idempotency_key().clone());
         if let Some(saved) = state.admissions.get(&key) {
-            if saved.workflow_id != command.workflow_id()
-                || saved.version_id != command.version_id()
+            if saved.binding.id() != command.binding().id()
                 || saved.input != *command.input()
-                || saved.params != *command.params()
                 || saved.association != command.association()
-                || saved.causality.trigger() != command.trigger()
+                || saved.command_trigger != *command.trigger()
             {
                 return Ok(AdmissionResult::Conflict);
             }
@@ -247,15 +285,32 @@ impl WorkflowAdmission for MemoryStore {
             validate_source(&state, command)?;
             return Ok(AdmissionResult::Replayed(run_id));
         }
+        if let Some(replayed) = replay_source_alias(&mut state, command)? {
+            return Ok(replayed);
+        }
+        if let Some(next) = state.replace_on_admit.take() {
+            state.versions.insert(
+                (next.company_id(), VersionId::new(next.id().as_uuid())),
+                next,
+            );
+        }
+        let selected = state.versions.get(&(
+            command.company_id(),
+            VersionId::new(command.binding().id().as_uuid()),
+        ));
+        if !selected.is_some_and(|selected| Arc::ptr_eq(selected, command.binding())) {
+            return Err(AppError::Conflict("binding selection changed".into()));
+        }
         validate_source(&state, command)?;
         state.admissions.insert(
             key,
             StoredAdmission {
                 causality: command.causality().clone(),
-                workflow_id: command.workflow_id(),
+                command_trigger: command.trigger().clone(),
                 version_id: command.version_id(),
                 input: command.input().clone(),
                 params: command.params().clone(),
+                binding: command.binding().clone(),
                 association: command.association(),
             },
         );
@@ -277,6 +332,42 @@ impl WorkflowAdmission for MemoryStore {
         });
         Ok(AdmissionResult::Created(command.proposed_run_id()))
     }
+}
+
+fn same_source_event(left: &TriggerRef, right: &TriggerRef) -> bool {
+    left.company_id() == right.company_id()
+        && left.source() == right.source()
+        && (!matches!(left.source(), TriggerSource::Manual)
+            || left.trigger_id() == right.trigger_id())
+}
+
+fn replay_source_alias(
+    state: &mut State,
+    command: &PreparedAdmission,
+) -> AppResult<Option<AdmissionResult>> {
+    let Some(mut saved) = state
+        .admissions
+        .values()
+        .find(|saved| {
+            saved.binding.company_id() == command.company_id()
+                && saved.binding.id() == command.binding().id()
+                && same_source_event(saved.causality.trigger(), command.trigger())
+        })
+        .cloned()
+    else {
+        return Ok(None);
+    };
+    if saved.input != *command.input() || saved.association != command.association() {
+        return Ok(Some(AdmissionResult::Conflict));
+    }
+    validate_source(state, command)?;
+    let run_id = saved.causality.run_id();
+    saved.command_trigger = command.trigger().clone();
+    state.admissions.insert(
+        (command.company_id(), command.idempotency_key().clone()),
+        saved,
+    );
+    Ok(Some(AdmissionResult::Replayed(run_id)))
 }
 
 #[async_trait]
@@ -454,3 +545,6 @@ mod causality_cases;
 mod source_validation;
 mod state_cases;
 use source_validation::validate_source;
+
+#[path = "tests/snapshot_cases.rs"]
+mod snapshot_cases;

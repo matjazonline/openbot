@@ -175,7 +175,7 @@ impl ApprovalPersistence for PostgresPersistence {
                     r#"UPDATE background_tasks
                        SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                            lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-                       WHERE id = $1 AND company_id = $2
+                       WHERE id = $1 AND company_id = $2 AND queue_kind = 'legacy'
                          AND owner_principal_id IS NOT DISTINCT FROM $5
                          AND ownership_version = $6
                          AND (
@@ -342,16 +342,18 @@ impl ApprovalPersistence for PostgresPersistence {
             tx.rollback().await.map_err(AppError::from)?;
             return Ok(None);
         }
-        sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE id = $1 FOR UPDATE")
-            .bind(task_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM background_tasks WHERE id = $1 AND queue_kind = 'legacy' FOR UPDATE",
+        )
+        .bind(task_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
         let current_wait = sqlx::query_scalar::<_, bool>(
-            r#"SELECT EXISTS (SELECT 1 FROM background_tasks task
-                JOIN task_outreaches outreach ON outreach.id = task.awaited_outreach_id AND outreach.task_id = task.id AND outreach.company_id = task.company_id
-                JOIN task_approval_waits wait ON wait.task_id = task.id AND wait.company_id = task.company_id
-                WHERE task.id = $1 AND task.company_id = $2 AND task.status = 'pending_approval'
+            r#"SELECT EXISTS (SELECT 1 FROM background_tasks AS task
+                JOIN task_outreaches AS outreach ON outreach.id = task.awaited_outreach_id AND outreach.task_id = task.id AND outreach.company_id = task.company_id
+                JOIN task_approval_waits AS wait ON wait.task_id = task.id AND wait.company_id = task.company_id
+                WHERE task.queue_kind = 'legacy' AND task.id = $1 AND task.company_id = $2 AND task.status = 'pending_approval'
                     AND outreach.id = $3 AND outreach.ownership_version = task.ownership_version
                     AND wait.approval_id = $4 AND wait.state = 'waiting'
                     AND wait.ownership_version = task.ownership_version
@@ -411,7 +413,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
                            wait_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-                       WHERE id = $1 AND status = 'pending_approval'"#,
+                       WHERE id = $1 AND queue_kind = 'legacy' AND status = 'pending_approval'"#,
                     attribution = attribution.set_clause(),
                 ))
                 .bind(task_id)
@@ -437,7 +439,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'waiting_for_third_party_reply',
                            wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP, {attribution}
-                       WHERE id = $1 AND status = 'pending_approval'"#,
+                       WHERE id = $1 AND queue_kind = 'legacy' AND status = 'pending_approval'"#,
                     attribution = attribution.set_clause(),
                 ))
                 .bind(task_id)
@@ -490,7 +492,7 @@ impl ApprovalPersistence for PostgresPersistence {
                     r#"UPDATE background_tasks SET status = 'stopped', wait_expires_at = NULL,
                            worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                            updated_at = CURRENT_TIMESTAMP, {attribution}
-                       WHERE id = $1 AND status = 'pending_approval'"#,
+                       WHERE id = $1 AND queue_kind = 'legacy' AND status = 'pending_approval'"#,
                     attribution = attribution.set_clause(),
                 ))
                 .bind(task_id)

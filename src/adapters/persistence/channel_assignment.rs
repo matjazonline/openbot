@@ -345,20 +345,7 @@ async fn withdraw_removed_agents_work_on(
     // without locks; the task lock below re-checks every fact the selection relied on, so work a
     // transfer or a completion moved out of scope in the meantime is left alone.
     lock_task_outreaches_on(tx, &candidates).await?;
-    let affected: Vec<Uuid> = sqlx::query_scalar(
-        r#"SELECT id FROM background_tasks
-            WHERE id = ANY($1) AND company_id = $2 AND channel_id = $3
-              AND owner_principal_kind = 'agent' AND owner_principal_id = ANY($4)
-            ORDER BY id
-              FOR UPDATE"#,
-    )
-    .bind(&candidates)
-    .bind(request.company_id)
-    .bind(request.channel_id)
-    .bind(&principals)
-    .fetch_all(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
+    let affected = lock_removed_agent_tasks_on(tx, request, &candidates, &principals).await?;
 
     let actor = StopActor::ChannelAgentRemoved(request.actor_user_id);
     let stopped = stop_tasks_on(tx, request.company_id, &affected, actor).await?;
@@ -380,6 +367,29 @@ async fn withdraw_removed_agents_work_on(
         .map(|id| id.as_uuid())
         .collect();
     Ok(removal)
+}
+
+async fn lock_removed_agent_tasks_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &ChannelUpdate,
+    candidates: &[Uuid],
+    principals: &[Uuid],
+) -> AppResult<Vec<Uuid>> {
+    sqlx::query_scalar(
+        r#"SELECT id FROM background_tasks
+            WHERE queue_kind = 'legacy'
+              AND id = ANY($1) AND company_id = $2 AND channel_id = $3
+              AND owner_principal_kind = 'agent' AND owner_principal_id = ANY($4)
+            ORDER BY id
+              FOR UPDATE"#,
+    )
+    .bind(candidates)
+    .bind(request.company_id)
+    .bind(request.channel_id)
+    .bind(principals)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)
 }
 
 /// The tasks a removal acts on, at most `limit` of them, in id order.
@@ -406,7 +416,8 @@ async fn affected_tasks_on(
         r#"SELECT id FROM (
                SELECT task.id
                  FROM background_tasks AS task
-                WHERE task.company_id = $1 AND task.owner_principal_id = ANY($3)
+                WHERE task.queue_kind = 'legacy'
+                  AND task.company_id = $1 AND task.owner_principal_id = ANY($3)
                   AND task.status IN ('pending', 'processing', 'pending_approval',
                                       'waiting_for_third_party_reply', 'stopped', 'failed',
                                       'dead_letter')
@@ -434,7 +445,7 @@ async fn affected_tasks_on(
                SELECT task.id
                  FROM message_deliveries AS delivery
                  JOIN background_tasks AS task ON task.id = delivery.task_id
-                WHERE delivery.company_id = $1
+                WHERE task.queue_kind = 'legacy' AND delivery.company_id = $1
                   AND delivery.status IN ('pending', 'retryable', 'sending', 'outcome_unknown')
                   AND delivery.cancellation_requested_at IS NULL
                   AND task.company_id = $1 AND task.channel_id = $2
@@ -445,7 +456,8 @@ async fn affected_tasks_on(
                  FROM response_drafts AS draft
                  JOIN background_tasks AS task
                    ON task.company_id = draft.company_id AND task.id = draft.task_id
-                WHERE draft.company_id = $1 AND draft.status = 'pending_review'
+                WHERE task.queue_kind = 'legacy'
+                  AND draft.company_id = $1 AND draft.status = 'pending_review'
                   AND task.channel_id = $2 AND task.status = 'completed'
                   AND task.owner_principal_kind = 'agent' AND task.owner_principal_id = ANY($3)
            ) AS affected

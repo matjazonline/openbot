@@ -834,6 +834,7 @@ async fn update_schedule(
     Form(form): Form<CreateScheduleForm>,
 ) -> AppResult<Response> {
     let company_id = form.schedule.company_id;
+    // The edit form carries the fixed channel as scope; tampering is rejected by the use case.
     let channel_id = form.channel_id;
     let write = form.schedule.into_write()?;
 
@@ -1367,6 +1368,33 @@ mod tests {
     /// One team, two viewers: the picker offers the owner everybody and the admin only
     /// themselves, and the schedule the owner already attributed comes back to the admin as a
     /// locked value rather than as a choice they could quietly re-point.
+    #[test]
+    fn schedule_editor_keeps_channel_fixed_and_creation_keeps_selector() {
+        let company = test_company();
+        let schedule = test_schedule(company.id, Uuid::new_v4());
+        let run_as = ScheduleRunAsChoices {
+            team: vec![],
+            restricted_to: None,
+        };
+        let mut props = pages::ScheduleFormPaneProps {
+            company_id: company.id,
+            channels: &[],
+            schedule: Some(&schedule),
+            run_as: &run_as,
+            error: None,
+        };
+        let edit = pages::schedule_form_pane(&props);
+        assert!(!edit.contains(r#"<select name="channel_id""#));
+        assert!(edit.contains(&format!(
+            r#"<input type="hidden" name="channel_id" value="{}">"#,
+            schedule.channel_id
+        )));
+        props.schedule = None;
+        let create = pages::schedule_form_pane(&props);
+        assert!(create.contains(r#"<select name="channel_id" required"#));
+        assert!(!create.contains(r#"<input type="hidden" name="channel_id""#));
+    }
+
     #[test]
     fn the_run_as_picker_offers_only_what_the_viewer_may_choose() {
         let company = test_company();

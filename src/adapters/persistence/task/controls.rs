@@ -248,7 +248,7 @@ async fn revoke_internal_child(
             AND inbound_source.external_message_key = request_part.provider_message_key
             AND inbound_source.message_id <> target.request_message_id
            JOIN background_tasks AS child
-             ON child.company_id = target.company_id
+             ON child.queue_kind = 'legacy' AND child.company_id = target.company_id
             AND child.source_message_uuid = inbound_source.message_id
             AND child.channel_id = target.internal_channel_id
            WHERE target.id = $1
@@ -278,7 +278,7 @@ async fn revoke_internal_child(
                SET status = 'stopped', worker_id = NULL, execution_generation = NULL,
                    locked_at = NULL, lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP,
                    {attribution}
-               WHERE id = $1"#,
+               WHERE queue_kind = 'legacy' AND id = $1"#,
             attribution = attribution.set_clause(),
         ))
         .bind(child_id)
@@ -291,7 +291,7 @@ async fn revoke_internal_child(
                    SET status = 'failed', stop_reason = 'delegation_cancelled',
                        error = 'Internal delegation was cancelled',
                        finished_at = CURRENT_TIMESTAMP
-                   WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing'"#,
+                   WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing' AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#,
             )
             .bind(child_id)
             .bind(generation)
@@ -316,8 +316,8 @@ async fn wake_task(
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, wait_expires_at = NULL,
                worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-           WHERE id = $1 AND status IN ('waiting_for_third_party_reply', 'pending_approval')
-             AND awaited_outreach_id = $2 AND EXISTS (SELECT 1 FROM task_outreaches outreach
+           WHERE queue_kind = 'legacy' AND id = $1 AND status IN ('waiting_for_third_party_reply', 'pending_approval')
+             AND awaited_outreach_id = $2 AND EXISTS (SELECT 1 FROM task_outreaches AS outreach
                  WHERE outreach.id = $2 AND outreach.company_id = background_tasks.company_id
                  AND outreach.ownership_version = background_tasks.ownership_version
                  AND outreach.created_by_principal_id IS NOT DISTINCT FROM background_tasks.owner_principal_id)"#,
@@ -685,7 +685,7 @@ async fn apply_operation(
                    SET status = CASE WHEN status = 'pending_approval'
                                      THEN 'waiting_for_third_party_reply' ELSE status END,
                        wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP, {attribution}
-                   WHERE id = $1 AND status IN (
+                   WHERE queue_kind = 'legacy' AND id = $1 AND status IN (
                        'waiting_for_third_party_reply', 'pending_approval'
                    )"#,
                 attribution = attribution.set_clause(),
@@ -907,7 +907,7 @@ async fn apply_operation(
                    SET status = 'stopped', worker_id = NULL, execution_generation = NULL,
                        locked_at = NULL, lock_expires_at = NULL, wait_expires_at = NULL,
                        updated_at = CURRENT_TIMESTAMP, {attribution}
-                   WHERE id = $1"#,
+                   WHERE queue_kind = 'legacy' AND id = $1"#,
                 attribution = attribution.set_clause(),
             ))
             .bind(command.task_id)
@@ -918,7 +918,7 @@ async fn apply_operation(
                 sqlx::query(
                     r#"UPDATE task_attempts SET status = 'failed', stop_reason = 'delegation_cancelled',
                        error = 'Task was stopped by a delegation control', finished_at = CURRENT_TIMESTAMP
-                       WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing'"#,
+                       WHERE task_id = $1 AND execution_generation = $2 AND status = 'processing' AND EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#,
                 )
                 .bind(command.task_id)
                 .bind(generation)
@@ -973,7 +973,7 @@ pub(crate) async fn execute_delegation_command_on(
     .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
     let task = sqlx::query_as::<_, LockedTask>(
         r#"SELECT status, owner_principal_id, owner_principal_kind, execution_generation, ownership_version
-           FROM background_tasks WHERE company_id = $1 AND id = $2 FOR UPDATE"#,
+           FROM background_tasks WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 FOR UPDATE"#,
     )
     .bind(command.company_id)
     .bind(command.task_id)
@@ -1012,7 +1012,7 @@ pub(crate) async fn execute_delegation_command_on(
     .await
     .map_err(AppError::from)?;
     let task_status_text: String =
-        sqlx::query_scalar("SELECT status FROM background_tasks WHERE company_id = $1 AND id = $2")
+        sqlx::query_scalar("SELECT status FROM background_tasks WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2")
             .bind(command.company_id)
             .bind(command.task_id)
             .fetch_one(&mut *tx)

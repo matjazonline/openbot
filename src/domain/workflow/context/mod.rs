@@ -23,6 +23,30 @@ pub enum Binding {
         reference: ContextReference,
         fallback: Box<Binding>,
     },
+    Concat(Vec<Binding>),
+    Compare {
+        op: Comparison,
+        left: Box<Binding>,
+        right: Box<Binding>,
+    },
+    In {
+        value: Box<Binding>,
+        items: Box<Binding>,
+    },
+    Exists(ContextReference),
+    And(Vec<Binding>),
+    Or(Vec<Binding>),
+    Not(Box<Binding>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Comparison {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +90,31 @@ impl ContextReference {
     pub fn as_str(&self) -> &str {
         &self.raw
     }
+
+    pub fn step_id(&self) -> Option<&StepId> {
+        match &self.root {
+            ReferenceRoot::Step(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    pub fn tail(&self) -> &[String] {
+        match self.root {
+            ReferenceRoot::Input | ReferenceRoot::Params => &self.path[1..],
+            ReferenceRoot::Step(_) => &self.path[3..],
+            ReferenceRoot::RunId | ReferenceRoot::ParentRunId => &[],
+        }
+    }
+
+    pub fn root_name(&self) -> &'static str {
+        match self.root {
+            ReferenceRoot::Input => "input",
+            ReferenceRoot::Params => "params",
+            ReferenceRoot::Step(_) => "steps",
+            ReferenceRoot::RunId => "run.id",
+            ReferenceRoot::ParentRunId => "run.parent_id",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,6 +155,8 @@ pub enum ContextError {
     InvalidReference(String),
     #[error("context limit exceeded: {0}")]
     Limit(&'static str),
+    #[error("binding operand type mismatch: {0}")]
+    Operand(&'static str),
 }
 
 fn segments(pointer: &str) -> Result<Vec<String>, ContextError> {
@@ -145,15 +196,8 @@ fn lookup<'a>(value: &'a Value, path: &[String], pointer: &str) -> Result<&'a Va
         value = match value {
             Value::Object(map) => map.get(part),
             Value::Array(items) => {
-                if part.is_empty()
-                    || (part.len() > 1 && part.starts_with('0'))
-                    || !part.bytes().all(|c| c.is_ascii_digit())
-                {
-                    return Err(ContextError::InvalidReference(pointer.into()));
-                }
-                let index = part
-                    .parse::<usize>()
-                    .map_err(|_| ContextError::InvalidReference(pointer.into()))?;
+                let index = canonical_array_index(part)
+                    .ok_or_else(|| ContextError::InvalidReference(pointer.into()))?;
                 items.get(index)
             }
             _ => return Err(ContextError::InvalidReference(pointer.into())),
@@ -161,6 +205,16 @@ fn lookup<'a>(value: &'a Value, path: &[String], pointer: &str) -> Result<&'a Va
         .ok_or_else(|| ContextError::Missing(pointer.into()))?;
     }
     Ok(value)
+}
+
+pub fn canonical_array_index(segment: &str) -> Option<usize> {
+    if segment.is_empty()
+        || segment.len() > 1 && segment.starts_with('0')
+        || !segment.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    segment.parse().ok()
 }
 
 fn reference<'a>(
@@ -254,11 +308,15 @@ fn check_value(value: &Value, budget: &mut usize, max_depth: usize) -> Result<()
     Ok(())
 }
 
-pub(super) fn validate_output(value: &Value, limits: ContextLimits) -> Result<(), ContextError> {
+pub fn validate_context_value(value: &Value, limits: ContextLimits) -> Result<(), ContextError> {
     let mut work_budget = limits.work_nodes.min(MAX_WORK_NODES);
     check_value(value, &mut work_budget, MAX_JSON_DEPTH)?;
     let mut byte_budget = limits.output_bytes.min(MAX_OUTPUT_BYTES);
     check_size(value, &mut byte_budget)
+}
+
+pub(super) fn validate_output(value: &Value, limits: ContextLimits) -> Result<(), ContextError> {
+    validate_context_value(value, limits)
 }
 
 fn check_binding(
@@ -275,6 +333,21 @@ fn check_binding(
             return Err(ContextError::Limit("binding depth"));
         }
         match binding {
+            Binding::Literal(value) => {
+                // The binding node was already charged; count literal descendants.
+                let mut value_budget = budget.saturating_add(1);
+                check_value(
+                    value,
+                    &mut value_budget,
+                    MAX_JSON_DEPTH.saturating_sub(depth),
+                )?;
+                *budget = value_budget;
+                // Each literal must fit the remaining space, but operators may
+                // short circuit or combine parts into one result. Evaluation
+                // charges the shared output budget for values actually used.
+                let mut literal_budget = *key_bytes;
+                check_size(value, &mut literal_budget)?;
+            }
             Binding::Object(map) => {
                 ensure_pending_capacity(stack.len(), map.len(), *budget, "binding nodes")?;
                 for (key, child) in map {
@@ -284,15 +357,35 @@ fn check_binding(
                     stack.push((child, depth + 1));
                 }
             }
-            Binding::Array(items) => {
+            Binding::Array(items)
+            | Binding::Concat(items)
+            | Binding::And(items)
+            | Binding::Or(items) => {
                 ensure_pending_capacity(stack.len(), items.len(), *budget, "binding nodes")?;
                 stack.extend(items.iter().map(|child| (child, depth + 1)));
             }
             Binding::Default { fallback, .. } => stack.push((fallback, depth + 1)),
+            Binding::Compare { left, right, .. } => {
+                ensure_pending_capacity(stack.len(), 2, *budget, "binding nodes")?;
+                stack.push((left, depth + 1));
+                stack.push((right, depth + 1));
+            }
+            Binding::In { value, items } => {
+                ensure_pending_capacity(stack.len(), 2, *budget, "binding nodes")?;
+                stack.push((value, depth + 1));
+                stack.push((items, depth + 1));
+            }
+            Binding::Not(child) => stack.push((child, depth + 1)),
             _ => {}
         }
     }
     Ok(())
+}
+
+pub fn preflight_binding(binding: &Binding, limits: ContextLimits) -> Result<(), ContextError> {
+    let mut nodes = MAX_BINDING_NODES;
+    let mut key_bytes = limits.output_bytes.min(MAX_OUTPUT_BYTES);
+    check_binding(binding, &mut nodes, &mut key_bytes)
 }
 
 fn evaluate(
@@ -344,7 +437,97 @@ fn evaluate(
             .map(|child| evaluate(child, context, budget, bytes, depth + 1))
             .collect::<Result<Vec<_>, _>>()
             .map(Value::Array),
+        Binding::Exists(pointer) => match reference(pointer, context) {
+            Ok(_) => Ok(Value::Bool(true)),
+            Err(ContextError::Missing(_)) => Ok(Value::Bool(false)),
+            Err(error) => Err(error),
+        },
+        Binding::Concat(items) => eval_concat(items, context, budget, bytes, depth),
+        Binding::Compare { op, left, right } => {
+            let left = evaluate(left, context, budget, bytes, depth + 1)?;
+            let right = evaluate(right, context, budget, bytes, depth + 1)?;
+            Ok(Value::Bool(super::expression::compare(*op, &left, &right)?))
+        }
+        Binding::In { value, items } => {
+            eval_membership(value, items, context, budget, bytes, depth)
+        }
+        Binding::And(items) | Binding::Or(items) => eval_boolean(
+            items,
+            matches!(binding, Binding::And(_)),
+            context,
+            budget,
+            bytes,
+            depth,
+        ),
+        Binding::Not(item) => {
+            let Value::Bool(value) = evaluate(item, context, budget, bytes, depth + 1)? else {
+                return Err(ContextError::Operand("not expects a boolean"));
+            };
+            Ok(Value::Bool(!value))
+        }
     }
+}
+
+fn eval_concat(
+    items: &[Binding],
+    context: &Context<'_>,
+    budget: &mut usize,
+    bytes: &mut usize,
+    depth: usize,
+) -> Result<Value, ContextError> {
+    let mut result = String::new();
+    for item in items {
+        let mut part_budget = *bytes;
+        let Value::String(part) = evaluate(item, context, budget, &mut part_budget, depth + 1)?
+        else {
+            return Err(ContextError::Operand("concat expects strings"));
+        };
+        if result.len().saturating_add(part.len()) > *bytes {
+            return Err(ContextError::Limit("output bytes"));
+        }
+        result.push_str(&part);
+    }
+    let value = Value::String(result);
+    check_size(&value, bytes)?;
+    Ok(value)
+}
+
+fn eval_membership(
+    value: &Binding,
+    items: &Binding,
+    context: &Context<'_>,
+    budget: &mut usize,
+    bytes: &mut usize,
+    depth: usize,
+) -> Result<Value, ContextError> {
+    let value = evaluate(value, context, budget, bytes, depth + 1)?;
+    let Value::Array(items) = evaluate(items, context, budget, bytes, depth + 1)? else {
+        return Err(ContextError::Operand("in expects an array"));
+    };
+    Ok(Value::Bool(
+        items
+            .iter()
+            .any(|item| super::expression::equal(item, &value)),
+    ))
+}
+
+fn eval_boolean(
+    items: &[Binding],
+    and: bool,
+    context: &Context<'_>,
+    budget: &mut usize,
+    bytes: &mut usize,
+    depth: usize,
+) -> Result<Value, ContextError> {
+    for item in items {
+        let Value::Bool(value) = evaluate(item, context, budget, bytes, depth + 1)? else {
+            return Err(ContextError::Operand("boolean operator expects booleans"));
+        };
+        if value != and {
+            return Ok(Value::Bool(!and));
+        }
+    }
+    Ok(Value::Bool(and))
 }
 
 pub fn resolve(
@@ -353,9 +536,7 @@ pub fn resolve(
     limits: ContextLimits,
 ) -> Result<Value, ContextError> {
     let output_limit = limits.output_bytes.min(MAX_OUTPUT_BYTES);
-    let mut binding_budget = MAX_BINDING_NODES;
-    let mut key_budget = output_limit;
-    check_binding(binding, &mut binding_budget, &mut key_budget)?;
+    preflight_binding(binding, limits)?;
     let mut work_budget = limits.work_nodes.min(MAX_WORK_NODES);
     let mut byte_budget = output_limit;
     let value = evaluate(binding, context, &mut work_budget, &mut byte_budget, 0)?;
@@ -365,257 +546,54 @@ pub fn resolve(
     Ok(value)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-    use uuid::Uuid;
-    fn id(s: &str) -> StepId {
-        StepId::parse(s).unwrap()
-    }
-    fn context<'a>(
-        input: &'a Value,
-        params: &'a Value,
-        outputs: &'a BTreeMap<StepId, Value>,
-    ) -> Context<'a> {
-        Context {
-            input,
-            params,
-            step_outputs: outputs,
-            run: RunMetadata {
-                run_id: RunId::new(Uuid::nil()),
-                parent_run_id: None,
-            },
-        }
-    }
-    fn reference(path: &str) -> Binding {
-        Binding::Reference(ContextReference::parse(path).unwrap())
-    }
-
-    #[test]
-    fn typed_values_defaults_and_immutability() {
-        let input = json!({"null":null,"number":3,"escaped/key":true});
-        let params = json!(["a", "b"]);
-        let outputs = BTreeMap::from([(id("first"), json!({"done":[1,2]}))]);
-        let original = outputs.clone();
-        let ctx = context(&input, &params, &outputs);
-        let binding = Binding::Object(BTreeMap::from([
-            (
-                "null".into(),
-                Binding::Default {
-                    reference: ContextReference::parse("/input/null").unwrap(),
-                    fallback: Box::new(Binding::Literal(json!("wrong"))),
-                },
-            ),
-            (
-                "missing".into(),
-                Binding::Default {
-                    reference: ContextReference::parse("/input/absent").unwrap(),
-                    fallback: Box::new(reference("/params/1")),
-                },
-            ),
-            ("value".into(), reference("/steps/first/output/done/0")),
-            ("escaped".into(), reference("/input/escaped~1key")),
-        ]));
-        assert_eq!(
-            resolve(&binding, &ctx, ContextLimits::default()).unwrap(),
-            json!({"null":null,"missing":"b","value":1,"escaped":true})
-        );
-        assert_eq!(outputs, original);
+/// Resolve all named step inputs against one budget before the caller persists the snapshot.
+/// The optional name identifies the failing field; None denotes the aggregate object.
+pub fn resolve_inputs<'a>(
+    bindings: &'a BTreeMap<String, Binding>,
+    context: &Context<'_>,
+    limits: ContextLimits,
+) -> Result<Value, (Option<&'a str>, ContextError)> {
+    let output_limit = limits.output_bytes.min(MAX_OUTPUT_BYTES);
+    let mut preflight_nodes = MAX_BINDING_NODES;
+    let mut preflight_bytes = output_limit
+        .checked_sub(2)
+        .ok_or((None, ContextError::Limit("output bytes")))?;
+    for (index, (name, binding)) in bindings.iter().enumerate() {
+        let punctuation = usize::from(index > 0) + 1;
+        preflight_bytes = preflight_bytes
+            .checked_sub(punctuation)
+            .ok_or((Some(name.as_str()), ContextError::Limit("output bytes")))?;
+        let mut writer = CappedWriter {
+            remaining: preflight_bytes,
+        };
+        serde_json::to_writer(&mut writer, name)
+            .map_err(|_| (Some(name.as_str()), ContextError::Limit("output bytes")))?;
+        preflight_bytes = writer.remaining;
+        check_binding(binding, &mut preflight_nodes, &mut preflight_bytes)
+            .map_err(|error| (Some(name.as_str()), error))?;
     }
 
-    #[test]
-    fn malformed_paths_do_not_default() {
-        let input = json!([1]);
-        let params = json!({});
-        let outputs = BTreeMap::new();
-        let ctx = context(&input, &params, &outputs);
-        for path in [
-            "input/0",
-            "/unknown/x",
-            "/input/~2",
-            "/steps/x/other",
-            "/steps/1bad/output",
-            "/run/private",
-        ] {
-            assert!(
-                matches!(
-                    ContextReference::parse(path),
-                    Err(ContextError::InvalidReference(_))
-                ),
-                "{path}"
-            );
-        }
-        for path in [
-            "/input/00",
-            "/input/9999999999999999999999999999999999999999",
-        ] {
-            let fallback = Binding::Default {
-                reference: ContextReference::parse(path).unwrap(),
-                fallback: Box::new(Binding::Literal(json!(1))),
-            };
-            assert!(
-                matches!(
-                    resolve(&fallback, &ctx, ContextLimits::default()),
-                    Err(ContextError::InvalidReference(_))
-                ),
-                "{path}"
-            );
-        }
+    let mut work_budget = limits.work_nodes.min(MAX_WORK_NODES);
+    let mut byte_budget = output_limit - 2;
+    let mut values = Map::new();
+    for (index, (name, binding)) in bindings.iter().enumerate() {
+        byte_budget = byte_budget
+            .checked_sub(usize::from(index > 0) + 1)
+            .ok_or((Some(name.as_str()), ContextError::Limit("output bytes")))?;
+        let mut writer = CappedWriter {
+            remaining: byte_budget,
+        };
+        serde_json::to_writer(&mut writer, name)
+            .map_err(|_| (Some(name.as_str()), ContextError::Limit("output bytes")))?;
+        byte_budget = writer.remaining;
+        let value = evaluate(binding, context, &mut work_budget, &mut byte_budget, 0)
+            .map_err(|error| (Some(name.as_str()), error))?;
+        values.insert(name.clone(), value);
     }
-
-    #[test]
-    fn scalar_traversal_is_invalid_and_null_is_a_value() {
-        let input = json!({"number": 4, "boolean": true, "string": "text", "null": null});
-        let params = json!({});
-        let outputs = BTreeMap::new();
-        let ctx = context(&input, &params, &outputs);
-        assert_eq!(
-            resolve(&reference("/input/null"), &ctx, ContextLimits::default()).unwrap(),
-            Value::Null
-        );
-        for field in ["number", "boolean", "string", "null"] {
-            let path = format!("/input/{field}/child");
-            let binding = Binding::Default {
-                reference: ContextReference::parse(&path).unwrap(),
-                fallback: Box::new(Binding::Literal(json!("fallback"))),
-            };
-            assert!(
-                matches!(
-                    resolve(&binding, &ctx, ContextLimits::default()),
-                    Err(ContextError::InvalidReference(_))
-                ),
-                "{field}"
-            );
-        }
-    }
-
-    #[test]
-    fn wide_inputs_are_rejected_before_pending_stack_growth() {
-        let input = Value::Array(vec![Value::Null; MAX_WORK_NODES + 1]);
-        let params = json!({});
-        let outputs = BTreeMap::new();
-        let ctx = context(&input, &params, &outputs);
-        assert!(matches!(
-            resolve(&reference("/input"), &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("work nodes"))
-        ));
-        let input = Value::Object(
-            (0..MAX_WORK_NODES + 1)
-                .map(|n| (format!("k{n}"), Value::Null))
-                .collect(),
-        );
-        let ctx = context(&input, &params, &outputs);
-        assert!(matches!(
-            resolve(&reference("/input"), &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("work nodes"))
-        ));
-        let wide_array = Binding::Array(vec![Binding::Literal(Value::Null); MAX_BINDING_NODES]);
-        assert!(matches!(
-            resolve(&wide_array, &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("binding nodes"))
-        ));
-        let wide_object = Binding::Object(
-            (0..MAX_BINDING_NODES)
-                .map(|n| (format!("k{n}"), Binding::Literal(Value::Null)))
-                .collect(),
-        );
-        assert!(matches!(
-            resolve(&wide_object, &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("binding nodes"))
-        ));
-    }
-
-    #[test]
-    fn depth_work_and_output_budgets() {
-        let mut deep = json!(0);
-        for _ in 0..65 {
-            deep = Value::Array(vec![deep]);
-        }
-        let params = json!({});
-        let outputs = BTreeMap::new();
-        let ctx = context(&deep, &params, &outputs);
-        assert!(matches!(
-            resolve(&reference("/input"), &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("JSON depth"))
-        ));
-        let input = json!({"value":[1,2,3]});
-        let ctx = context(&input, &params, &outputs);
-        let many = Binding::Array((0..100).map(|_| reference("/input/value")).collect());
-        assert!(matches!(
-            resolve(
-                &many,
-                &ctx,
-                ContextLimits {
-                    output_bytes: MAX_OUTPUT_BYTES,
-                    work_nodes: 100
-                }
-            ),
-            Err(ContextError::Limit("work nodes"))
-        ));
-        assert!(matches!(
-            resolve(
-                &many,
-                &ctx,
-                ContextLimits {
-                    output_bytes: 10,
-                    work_nodes: MAX_WORK_NODES
-                }
-            ),
-            Err(ContextError::Limit("output bytes"))
-        ));
-    }
-
-    #[test]
-    fn exact_binding_and_pointer_limits() {
-        let input = json!(0);
-        let params = json!({});
-        let outputs = BTreeMap::new();
-        let ctx = context(&input, &params, &outputs);
-        let mut nested = Binding::Literal(json!(1));
-        for _ in 0..MAX_BINDING_DEPTH {
-            nested = Binding::Array(vec![nested]);
-        }
-        assert!(resolve(&nested, &ctx, ContextLimits::default()).is_ok());
-        let too_deep = Binding::Array(vec![nested]);
-        assert!(matches!(
-            resolve(&too_deep, &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("binding depth"))
-        ));
-        let exact = Binding::Array(
-            (0..MAX_BINDING_NODES - 1)
-                .map(|_| Binding::Literal(Value::Null))
-                .collect(),
-        );
-        assert!(resolve(&exact, &ctx, ContextLimits::default()).is_ok());
-        let excessive = Binding::Array(
-            (0..MAX_BINDING_NODES)
-                .map(|_| Binding::Literal(Value::Null))
-                .collect(),
-        );
-        assert!(matches!(
-            resolve(&excessive, &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("binding nodes"))
-        ));
-        let many_segments = format!("/input{}", "/x".repeat(MAX_POINTER_SEGMENTS));
-        assert!(matches!(
-            ContextReference::parse(&many_segments),
-            Err(ContextError::Limit("pointer segments"))
-        ));
-        let long_pointer = format!("/input/{}", "x".repeat(MAX_POINTER_BYTES));
-        assert!(matches!(
-            ContextReference::parse(&long_pointer),
-            Err(ContextError::Limit("pointer bytes"))
-        ));
-        let exact_output = Binding::Literal(Value::String("x".repeat(MAX_OUTPUT_BYTES - 2)));
-        assert!(resolve(&exact_output, &ctx, ContextLimits::default()).is_ok());
-        let oversized_key = Binding::Object(BTreeMap::from([(
-            "x".repeat(MAX_OUTPUT_BYTES + 1),
-            Binding::Literal(Value::Null),
-        )]));
-        assert!(matches!(
-            resolve(&oversized_key, &ctx, ContextLimits::default()),
-            Err(ContextError::Limit("output bytes"))
-        ));
-    }
+    let value = Value::Object(values);
+    validate_context_value(&value, limits).map_err(|error| (None, error))?;
+    Ok(value)
 }
+
+#[cfg(test)]
+mod tests;

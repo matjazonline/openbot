@@ -70,7 +70,7 @@ async fn source_threads_on(
            JOIN thread_messages AS filed
              ON filed.company_id = task.company_id
             AND filed.message_id = task.source_message_uuid
-           WHERE task.company_id = $1 AND task.id = $2
+           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
            ORDER BY filed.thread_id
            LIMIT $3"#,
     )

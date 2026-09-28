@@ -37,7 +37,7 @@ pub(super) async fn execute_command(
         r#"SELECT task.channel_id
              FROM response_drafts AS draft
              JOIN background_tasks AS task
-               ON task.company_id = draft.company_id AND task.id = draft.task_id
+               ON task.company_id = draft.company_id AND task.id = draft.task_id AND task.queue_kind = 'legacy'
             WHERE draft.company_id = $1 AND draft.id = $2 AND draft.version = $3"#,
     )
     .bind(command.company_id)
@@ -329,7 +329,7 @@ async fn approve_on(
              FROM response_drafts AS draft
             WHERE (draft.company_id, draft.id, draft.version) = ($1, $2, $3)
               AND task.company_id = draft.company_id AND task.id = draft.task_id
-              AND task.status = 'pending_approval'"#,
+              AND task.queue_kind = 'legacy' AND task.status = 'pending_approval'"#,
     )
     .bind(command.company_id)
     .bind(command.draft_id.as_uuid())
@@ -424,7 +424,7 @@ async fn reject_on(
              FROM response_drafts AS draft
             WHERE (draft.company_id, draft.id, draft.version) = ($1, $2, $3)
               AND task.company_id = draft.company_id AND task.id = draft.task_id
-              AND task.status = 'pending_approval'"#,
+              AND task.queue_kind = 'legacy' AND task.status = 'pending_approval'"#,
     )
     .bind(command.company_id)
     .bind(command.draft_id.as_uuid())
@@ -494,7 +494,7 @@ async fn expire_locked_review(
              FROM response_drafts AS draft
             WHERE (draft.company_id, draft.id, draft.version) = ($1, $2, $3)
               AND task.company_id = draft.company_id AND task.id = draft.task_id
-              AND task.status = 'pending_approval'"#,
+              AND task.queue_kind = 'legacy' AND task.status = 'pending_approval'"#,
     )
     .bind(command.company_id)
     .bind(command.draft_id.as_uuid())

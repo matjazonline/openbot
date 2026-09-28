@@ -1,0 +1,60 @@
+# Phase07 will bind each new round's feedback and prior draft from its parent.
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000005
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    previous_body: {type: string}
+    feedback: {type: string}
+    reviewer: {type: string, maxLength: 128}
+    deadline: {type: string, maxLength: 64}
+  required: [message, previous_body, feedback, reviewer, deadline]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema:
+  type: object
+  properties:
+    choice: {type: string, enum: [accept, revise]}
+    data:
+      type: object
+      properties: {body: {type: string, maxLength: 16384}}
+      required: [body]
+      additionalProperties: false
+    feedback: {type: string, maxLength: 16384}
+  required: [choice, data, feedback]
+  additionalProperties: false
+resources: []
+entry: draft
+steps:
+  draft:
+    type: agent.run
+    with:
+      agent: {literal: assistant}
+      context:
+        object:
+          untrusted_message: {ref: /input/message}
+          previous_body: {ref: /input/previous_body}
+          feedback: {ref: /input/feedback}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: review}
+  review:
+    type: decision.human
+    with:
+      proposal: {ref: /steps/draft/output}
+      reviewer: {object: {kind: {literal: user}, id: {ref: /input/reviewer}}}
+      deadline: {ref: /input/deadline}
+      data_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+      feedback_required: {literal: [revise]}
+    routes: {choices: {accept: $end, revise: $end}}
+limits: {max_steps: 10, max_context_bytes: 65536}

@@ -636,6 +636,38 @@ fn delete_schedule_button(schedule_id: Option<Uuid>, company_id: Uuid) -> String
     }
 }
 
+fn schedule_channel_field(props: &ScheduleFormPaneProps<'_>) -> String {
+    if let Some(schedule) = props.schedule {
+        let label = props
+            .channels
+            .iter()
+            .find(|channel| channel.id == schedule.channel_id)
+            .map(|channel| format!("#{} ({})", channel.slug, channel.name))
+            .unwrap_or_else(|| schedule.channel_id.to_string());
+        return format!(
+            r#"<input type="hidden" name="channel_id" value="{}"><p class="py-2">{}</p><p class="text-xs opacity-70">The channel is fixed when the schedule is created.</p>"#,
+            schedule.channel_id,
+            escape_html_text(&label)
+        );
+    }
+    let channel_options: String = props
+        .channels
+        .iter()
+        .map(|ch| {
+            format!(
+                r#"<option value="{}">#{} ({})</option>"#,
+                ch.id,
+                escape_html_text(&ch.slug),
+                escape_html_text(&ch.name)
+            )
+        })
+        .collect();
+
+    format!(
+        r#"<select name="channel_id" required class="select w-full">{channel_options}</select>"#
+    )
+}
+
 pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
     let company_id = props.company_id;
     let (is_edit, title, action_url) = match props.schedule {
@@ -685,25 +717,6 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
         })
         .unwrap_or_default();
 
-    let channel_options: String = props
-        .channels
-        .iter()
-        .map(|ch| {
-            let selected = if props.schedule.is_some_and(|s| s.channel_id == ch.id) {
-                "selected"
-            } else {
-                ""
-            };
-            format!(
-                r#"<option value="{}" {}>#{} ({})</option>"#,
-                ch.id,
-                selected,
-                escape_html_text(&ch.slug),
-                escape_html_text(&ch.name)
-            )
-        })
-        .collect();
-
     let (interval_hidden, oneoff_hidden) = if is_oneoff {
         ("hidden", "")
     } else {
@@ -734,9 +747,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                         </label>
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Target Channel</span></div>
-                            <select name="channel_id" required class="select w-full">
-                                {channel_options}
-                            </select>
+                            {channel_field}
                         </label>
                     </div>
 
@@ -830,7 +841,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
         company_id = company_id,
         error_html = form_error_banner(props.error),
         name = escape_html_text(name),
-        channel_options = channel_options,
+        channel_field = schedule_channel_field(props),
         interval_selected = if !is_oneoff { "selected" } else { "" },
         oneoff_selected = if is_oneoff { "selected" } else { "" },
         interval_hidden = interval_hidden,

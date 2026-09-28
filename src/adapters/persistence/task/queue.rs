@@ -26,6 +26,9 @@ use crate::{
     },
 };
 
+// This module implements only the legacy task contract. Workflow attempts share the table,
+// but must be read and changed by their own runtime rather than these entry points.
+
 /// Taking a task's lease. Only a task that is still pending and already due can be claimed, so two
 /// callers racing for the same row leave exactly one of them holding it.
 pub(crate) const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
@@ -34,7 +37,7 @@ pub(crate) const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
        lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP,
        transition_reason = 'claimed', transition_actor_kind = 'worker',
        transition_actor_id = $2, transition_approval_id = NULL, transition_outreach_id = NULL
-   WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP
+   WHERE queue_kind = 'legacy' AND id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP
      AND owner_principal_kind = 'agent'
      AND EXISTS (
          SELECT 1 FROM principals AS owner
@@ -55,7 +58,9 @@ pub(crate) const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
 pub(crate) const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
        (id, task_id, attempt_number, execution_generation, status, started_at,
         worker_id, machine_id, machine_region)
-   VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP, $5, $6, $7)
+   SELECT $1, task.id, $3, $4, 'processing', CURRENT_TIMESTAMP, $5, $6, $7
+     FROM background_tasks AS task
+    WHERE task.id = $2 AND task.queue_kind = 'legacy'
    ON CONFLICT (task_id, attempt_number) DO UPDATE
       SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
           error = NULL, stop_reason = NULL, prompt_tokens = NULL, completion_tokens = NULL,
@@ -70,7 +75,9 @@ pub(crate) const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
        stop_reason = $8,
        finished_at = CURRENT_TIMESTAMP
    WHERE task_id = $1 AND attempt_number = $2 AND execution_generation = $3
-     AND status = 'processing'"#;
+     AND status = 'processing'
+     AND EXISTS (SELECT 1 FROM background_tasks AS task
+                 WHERE task.id = task_attempts.task_id AND task.queue_kind = 'legacy')"#;
 
 /// What a reaped run is recorded as having failed with. The reaper writes it to both the task row
 /// and the attempt ledger, which must agree on why the run vanished.
@@ -154,7 +161,7 @@ pub(crate) async fn mark_task_failed_on(
            SET status = $1, retry_count = retry_count + 1, last_error = $2,
                run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
-           WHERE id = $4 AND status = 'processing' AND worker_id = $5
+           WHERE queue_kind = 'legacy' AND id = $4 AND status = 'processing' AND worker_id = $5
              AND execution_generation = $6
              AND owner_principal_id = $7 AND ownership_version = $8
              AND lock_expires_at > CURRENT_TIMESTAMP
@@ -223,12 +230,13 @@ pub(crate) async fn stop_task_on(
     actor: StopActor,
 ) -> AppResult<BackgroundTask> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
-    let company_id: Uuid =
-        sqlx::query_scalar("SELECT company_id FROM background_tasks WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+    let company_id: Uuid = sqlx::query_scalar(
+        "SELECT company_id FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
     lock_task_outreaches_on(&mut tx, &[id]).await?;
     if stop_tasks_on(&mut tx, company_id, &[id], actor)
         .await?
@@ -246,7 +254,7 @@ pub(crate) async fn stop_task_on(
                   owner_principal_kind, ownership_version, worker_id,
                   execution_generation, locked_at, lock_expires_at, run_at, created_at,
                   updated_at
-             FROM background_tasks WHERE id = $1"#,
+             FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1"#,
     )
     .bind(id)
     .fetch_one(&mut *tx)
@@ -265,7 +273,10 @@ pub(crate) async fn lock_task_outreaches_on(
     task_ids: &[Uuid],
 ) -> AppResult<()> {
     sqlx::query_scalar::<_, Uuid>(
-        "SELECT id FROM task_outreaches WHERE task_id = ANY($1) ORDER BY id FOR UPDATE",
+        "SELECT id FROM task_outreaches WHERE task_id = ANY($1)
+         AND EXISTS (SELECT 1 FROM background_tasks AS task
+                     WHERE task.id = task_outreaches.task_id AND task.queue_kind = 'legacy')
+         ORDER BY id FOR UPDATE",
     )
     .bind(task_ids)
     .fetch_all(&mut **tx)
@@ -305,7 +316,7 @@ pub(crate) async fn stop_tasks_on(
         r#"WITH interrupted AS (
                SELECT id, execution_generation
                  FROM background_tasks
-                WHERE company_id = $1 AND id = ANY($2) AND status IN ({statuses})
+                WHERE queue_kind = 'legacy' AND company_id = $1 AND id = ANY($2) AND status IN ({statuses})
                 ORDER BY id
                   FOR UPDATE
            )
@@ -314,7 +325,7 @@ pub(crate) async fn stop_tasks_on(
                   locked_at = NULL, lock_expires_at = NULL, wait_expires_at = NULL,
                   updated_at = CURRENT_TIMESTAMP, {attribution}
              FROM interrupted
-            WHERE task.id = interrupted.id
+            WHERE task.queue_kind = 'legacy' AND task.id = interrupted.id
         RETURNING task.id, task.ownership_version,
                   interrupted.execution_generation AS interrupted_generation"#,
         attribution = TransitionAttribution::stopped(actor).set_clause(),
@@ -414,7 +425,9 @@ async fn close_interrupted_attempts_on(
              FROM unnest($1::uuid[], $2::uuid[]) AS interrupted(task_id, execution_generation)
             WHERE attempt.task_id = interrupted.task_id
               AND attempt.execution_generation = interrupted.execution_generation
-              AND attempt.status = 'processing'"#,
+              AND attempt.status = 'processing'
+              AND EXISTS (SELECT 1 FROM background_tasks AS task
+                          WHERE task.id = attempt.task_id AND task.queue_kind = 'legacy')"#,
     )
     .bind(&task_ids)
     .bind(&generations)
@@ -607,7 +620,7 @@ pub(crate) async fn resume_task_on(
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
                execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                updated_at = CURRENT_TIMESTAMP, {attribution}{retry_budget}
-           WHERE id = $1
+           WHERE queue_kind = 'legacy' AND id = $1
              AND status IN ({statuses})
              AND {OWNER_STILL_ASSIGNED_SQL}
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
@@ -628,7 +641,7 @@ pub(crate) async fn resume_task_on(
         // Tell "its agent was removed from the channel" apart from "not resumable by this actor",
         // which keeps the not-found answer it always had.
         let unassigned: bool = sqlx::query_scalar(&format!(
-            "SELECT EXISTS (SELECT 1 FROM background_tasks WHERE id = $1 \
+            "SELECT EXISTS (SELECT 1 FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1 \
              AND status IN ({statuses}) AND NOT {OWNER_STILL_ASSIGNED_SQL})",
             statuses = resumable_statuses(actor),
         ))
@@ -681,19 +694,19 @@ pub(crate) async fn insert_task(
          execution_generation, locked_at, lock_expires_at, run_at, created_at, updated_at";
     let conflict = match source {
         TaskSource::Message(_) => {
-            "ON CONFLICT (company_id, source_message_uuid, channel_id)              DO UPDATE SET source_message_uuid = EXCLUDED.source_message_uuid"
+            "ON CONFLICT (company_id, source_message_uuid, channel_id)              DO UPDATE SET source_message_uuid = EXCLUDED.source_message_uuid WHERE background_tasks.queue_kind = 'legacy'"
         }
         TaskSource::ScheduleRun(_) => {
-            "ON CONFLICT (company_id, source_schedule_run_id)              DO UPDATE SET source_schedule_run_id = EXCLUDED.source_schedule_run_id"
+            "ON CONFLICT (company_id, source_schedule_run_id)              DO UPDATE SET source_schedule_run_id = EXCLUDED.source_schedule_run_id WHERE background_tasks.queue_kind = 'legacy'"
         }
         TaskSource::Unattributed => "",
     };
     let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"INSERT INTO background_tasks (
                 id, company_id, channel_id, thread_id, source_message_uuid,
-                source_schedule_run_id, correlation_id, task_type, status, payload
+                source_schedule_run_id, correlation_id, task_type, status, payload, queue_kind
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, 'legacy')
            {conflict}
            {RETURNING}"#
     ))

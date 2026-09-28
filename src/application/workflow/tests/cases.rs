@@ -6,13 +6,7 @@ async fn admission_derives_entry_and_commits_one_job_with_snapshots() {
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
     let result = service(&store)
-        .admit(request(
-            company_id,
-            version_id,
-            "message:1",
-            json!({"n":1}),
-            json!({"p":true}),
-        ))
+        .admit(request(company_id, version_id, "message:1", json!({"n":1})))
         .await
         .unwrap();
     let AdmissionResult::Created(run_id) = result else {
@@ -26,7 +20,7 @@ async fn admission_derives_entry_and_commits_one_job_with_snapshots() {
     assert_eq!(state.runs[&(company_id, run_id)].state, RunState::Queued);
     let saved = state.admissions.values().next().unwrap();
     assert_eq!(saved.input, json!({"n":1}));
-    assert_eq!(saved.params, json!({"p":true}));
+    assert_eq!(saved.params, json!(2));
     assert_eq!(saved.version_id, version_id);
 }
 
@@ -37,34 +31,26 @@ async fn missing_failing_or_mismatched_definition_prevents_admission() {
     let store = MemoryStore::new(owned(company_id, version_id, 128));
     let svc = service(&store);
     assert!(matches!(
-        svc.admit(request(company_id, version(), "k1", json!(1), json!(2)))
+        svc.admit(request(company_id, version(), "k1", json!(1)))
             .await,
         Err(AppError::NotFound(_))
     ));
     store.state.lock().unwrap().fail_lookup = true;
     assert!(matches!(
-        svc.admit(request(company_id, version_id, "k2", json!(1), json!(2)))
+        svc.admit(request(company_id, version_id, "k2", json!(1)))
             .await,
         Err(AppError::Database(_))
     ));
     store.state.lock().unwrap().fail_lookup = false;
     store.state.lock().unwrap().returned_version = Some(owned(company(), version_id, 128));
     assert!(matches!(
-        svc.admit(request(company_id, version_id, "k3", json!(1), json!(2)))
+        svc.admit(request(company_id, version_id, "k3", json!(1)))
             .await,
         Err(AppError::Internal(_))
     ));
     store.state.lock().unwrap().returned_version = Some(owned(company_id, version(), 128));
     assert!(matches!(
-        svc.admit(request(company_id, version_id, "k4", json!(1), json!(2)))
-            .await,
-        Err(AppError::Internal(_))
-    ));
-    let mut wrong_workflow = owned(company_id, version_id, 128);
-    wrong_workflow.workflow_id = WorkflowId::new(Uuid::new_v4());
-    store.state.lock().unwrap().returned_version = Some(wrong_workflow);
-    assert!(matches!(
-        svc.admit(request(company_id, version_id, "k5", json!(1), json!(2)))
+        svc.admit(request(company_id, version_id, "k4", json!(1)))
             .await,
         Err(AppError::Internal(_))
     ));
@@ -75,40 +61,22 @@ async fn missing_failing_or_mismatched_definition_prevents_admission() {
 async fn aggregate_snapshot_limit_and_write_failure() {
     let company_id = company();
     let version_id = version();
-    let store = MemoryStore::new(owned(company_id, version_id, 10));
+    let store = MemoryStore::new(configured(company_id, version_id, 10, json!("abc")));
     let svc = service(&store);
     assert!(matches!(
-        svc.admit(request(
-            company_id,
-            version_id,
-            "over",
-            json!("abcd"),
-            json!("abc")
-        ))
-        .await,
+        svc.admit(request(company_id, version_id, "over", json!("abcd")))
+            .await,
         Err(AppError::BadRequest(_))
     ));
     let exact = svc
-        .admit(request(
-            company_id,
-            version_id,
-            "exact",
-            json!("abc"),
-            json!("abc"),
-        ))
+        .admit(request(company_id, version_id, "exact", json!("abc")))
         .await
         .unwrap();
     assert!(matches!(exact, AdmissionResult::Created(_)));
     store.state.lock().unwrap().fail_admit = true;
     assert!(matches!(
-        svc.admit(request(
-            company_id,
-            version_id,
-            "failed",
-            json!(1),
-            json!(2)
-        ))
-        .await,
+        svc.admit(request(company_id, version_id, "failed", json!(1)))
+            .await,
         Err(AppError::Database(_))
     ));
     assert_eq!(store.state.lock().unwrap().jobs.len(), 1);
@@ -135,15 +103,15 @@ async fn replay_conflict_and_company_scoped_key() {
     );
     let svc = service(&store);
     let first = svc
-        .admit(request(company_a, version_id, "same", json!(1), json!(2)))
+        .admit(request(company_a, version_id, "same", json!(1)))
         .await
         .unwrap();
     let replay = svc
-        .admit(request(company_a, version_id, "same", json!(1), json!(2)))
+        .admit(request(company_a, version_id, "same", json!(1)))
         .await
         .unwrap();
     let conflict = svc
-        .admit(request(company_a, version_id, "same", json!(3), json!(2)))
+        .admit(request(company_a, version_id, "same", json!(3)))
         .await
         .unwrap();
     let another_version = version();
@@ -152,17 +120,11 @@ async fn replay_conflict_and_company_scoped_key() {
         owned(company_a, another_version, 128),
     );
     let changed_definition = svc
-        .admit(request(
-            company_a,
-            another_version,
-            "same",
-            json!(1),
-            json!(2),
-        ))
+        .admit(request(company_a, another_version, "same", json!(1)))
         .await
         .unwrap();
     let other = svc
-        .admit(request(company_b, version_id, "same", json!(1), json!(2)))
+        .admit(request(company_b, version_id, "same", json!(1)))
         .await
         .unwrap();
     let AdmissionResult::Created(original) = first else {
@@ -182,8 +144,8 @@ async fn competing_admissions_create_one_run_and_job() {
     let store = MemoryStore::new(owned(company_id, version_id, 128)).with_admission_barrier();
     let svc = service(&store);
     let (left, right) = tokio::join!(
-        svc.admit(request(company_id, version_id, "race", json!(1), json!(2))),
-        svc.admit(request(company_id, version_id, "race", json!(1), json!(2))),
+        svc.admit(request(company_id, version_id, "race", json!(1))),
+        svc.admit(request(company_id, version_id, "race", json!(1))),
     );
     let results = [left.unwrap(), right.unwrap()];
     assert!(
@@ -208,7 +170,7 @@ async fn competing_claimants_claim_once_and_bounds_reject() {
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
     service(&store)
-        .admit(request(company_id, version_id, "claim", json!(1), json!(2)))
+        .admit(request(company_id, version_id, "claim", json!(1)))
         .await
         .unwrap();
     let store = store.with_claim_barrier();
@@ -254,13 +216,7 @@ async fn cancellation_checks_scope_and_expected_revision() {
         CancelResult::NotFound
     );
     let AdmissionResult::Created(run_id) = svc
-        .admit(request(
-            company_id,
-            version_id,
-            "cancel",
-            json!(1),
-            json!(2),
-        ))
+        .admit(request(company_id, version_id, "cancel", json!(1)))
         .await
         .unwrap()
     else {
@@ -338,13 +294,7 @@ async fn cancellation_preserves_errors_and_invalidates_pending_job() {
     let store = MemoryStore::new(owned(company_id, version_id, 128));
     let svc = service(&store);
     let AdmissionResult::Created(run_id) = svc
-        .admit(request(
-            company_id,
-            version_id,
-            "cancel",
-            json!(1),
-            json!(2),
-        ))
+        .admit(request(company_id, version_id, "cancel", json!(1)))
         .await
         .unwrap()
     else {

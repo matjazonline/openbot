@@ -8,7 +8,7 @@ async fn admit_run(
     key: &str,
 ) -> RunId {
     let AdmissionResult::Created(run_id) = service(store)
-        .admit(request(company_id, version_id, key, json!(1), json!(2)))
+        .admit(request(company_id, version_id, key, json!(1)))
         .await
         .unwrap()
     else {
@@ -56,13 +56,7 @@ async fn replay_preserves_running_and_terminal_state() {
     );
     assert_eq!(
         service(&store)
-            .admit(request(
-                company_id,
-                version_id,
-                "replay",
-                json!(1),
-                json!(2)
-            ))
+            .admit(request(company_id, version_id, "replay", json!(1)))
             .await
             .unwrap(),
         AdmissionResult::Replayed(run_id)
@@ -77,13 +71,7 @@ async fn replay_preserves_running_and_terminal_state() {
     }
     assert_eq!(
         service(&store)
-            .admit(request(
-                company_id,
-                version_id,
-                "replay",
-                json!(1),
-                json!(2)
-            ))
+            .admit(request(company_id, version_id, "replay", json!(1)))
             .await
             .unwrap(),
         AdmissionResult::Replayed(run_id)

@@ -447,6 +447,11 @@ const LIVE_TASK_STATUSES: [&str; 5] = [
 ];
 
 impl PostgresPersistence {
+    fn required_legacy_channel(task: Uuid, channel: Option<Uuid>) -> AppResult<Uuid> {
+        channel
+            .ok_or_else(|| AppError::Internal(format!("Legacy task {task} is missing channel_id")))
+    }
+
     async fn owned_tasks_at_stake(
         &self,
         company_id: Uuid,
@@ -455,9 +460,9 @@ impl PostgresPersistence {
         let probe = i64::try_from(MemberWorkAtStake::MAX_PER_KIND + 1)
             .map_err(|_| AppError::Internal("Work-at-stake bound does not fit a limit".into()))?;
         let rows = sqlx::query!(
-            r#"SELECT id, channel_id, correlation_id, task_type, status, ownership_version
+            r#"SELECT id, channel_id AS "channel_id?", correlation_id, task_type, status, ownership_version
                FROM background_tasks
-               WHERE company_id = $1 AND owner_principal_id = $2
+               WHERE queue_kind = 'legacy' AND company_id = $1 AND owner_principal_id = $2
                  AND owner_principal_kind = 'person'
                  AND status = ANY($3)
                ORDER BY created_at, id
@@ -475,7 +480,7 @@ impl PostgresPersistence {
             .map(|row| {
                 Ok(OwnedTaskAtStake {
                     task_id: row.id,
-                    channel_id: row.channel_id,
+                    channel_id: Self::required_legacy_channel(row.id, row.channel_id)?,
                     correlation_id: row.correlation_id,
                     task_type: row.task_type,
                     status: TaskStatus::from_str(&row.status).map_err(AppError::Internal)?,
@@ -518,6 +523,7 @@ impl PostgresPersistence {
                WHERE target.company_id = $1
                  AND target.status = 'active'
                  AND outreach.status IN ('waiting', 'timeout_pending_approval')
+                 AND task.queue_kind = 'legacy'
                  AND task.status NOT IN ('completed', 'stopped')
                ORDER BY outreach.expires_at, target.id
                LIMIT $3"#,
@@ -533,7 +539,7 @@ impl PostgresPersistence {
             .map(|row| {
                 Ok(DelegatedAskAtStake {
                     task_id: row.task_id,
-                    channel_id: row.channel_id,
+                    channel_id: Self::required_legacy_channel(row.task_id, row.channel_id)?,
                     outreach_id: row.outreach_id,
                     target_id: row.target_id,
                     outreach_version: u64::try_from(row.version).map_err(|_| {

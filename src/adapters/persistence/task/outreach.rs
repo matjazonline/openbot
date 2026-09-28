@@ -32,7 +32,11 @@ pub(crate) async fn tally_outreach_targets(
         r#"SELECT COUNT(*) FILTER (WHERE status IN ('active', 'responded'))::bigint,
                   COUNT(*) FILTER (WHERE status = 'responded')::bigint
              FROM task_outreach_targets
-            WHERE company_id = $1 AND outreach_id = $2"#,
+            WHERE company_id = $1 AND outreach_id = $2
+              AND EXISTS (SELECT 1 FROM task_outreaches AS outreach
+                  JOIN background_tasks AS task ON task.id = outreach.task_id
+                  WHERE outreach.id = task_outreach_targets.outreach_id
+                    AND task.queue_kind = 'legacy')"#,
     )
     .bind(company_id)
     .bind(outreach_id)

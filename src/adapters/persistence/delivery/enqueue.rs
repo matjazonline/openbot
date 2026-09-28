@@ -27,6 +27,8 @@ pub async fn insert_delivery_on(
     tx: &mut Transaction<'_, Postgres>,
     delivery: &NewDelivery,
 ) -> AppResult<DeliveryCreation> {
+    super::super::legacy_task::require_legacy_task_on(tx, delivery.company_id, delivery.task_id)
+        .await?;
     if !delivery.message_audience.is_externally_deliverable() {
         return Err(AppError::BadRequest(
             "Internal-only and unclassified messages cannot be delivered externally.".into(),

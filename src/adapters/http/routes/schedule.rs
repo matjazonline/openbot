@@ -63,6 +63,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScheduleRequest {
     pub name: String,
     pub schedule_type: ScheduleType,
@@ -274,6 +275,7 @@ pub async fn update_schedule_json(
     Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
     Json(body): Json<ScheduleRequest>,
 ) -> AppResult<Json<ChannelSchedule>> {
+    // The URL channel scopes the existing schedule; it cannot select a new channel.
     let updated = schedule_use_cases
         .update_schedule(user.id, company_id, id, channel_id, body.into_write())
         .await?;
@@ -504,3 +506,7 @@ mod tests {
         assert_eq!(write.name, "Daily Digest");
     }
 }
+
+#[cfg(test)]
+#[path = "schedule_channel_tests.rs"]
+mod schedule_channel_tests;

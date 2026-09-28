@@ -190,6 +190,7 @@ pub(crate) async fn create_review_draft_on(
     draft: &PreparedReviewDraft,
     assigned_reviewer: Option<PrincipalId>,
 ) -> AppResult<PrincipalId> {
+    super::legacy_task::require_legacy_task_on(tx, draft.company_id, draft.task_id).await?;
     crate::adapters::response_schema::validate_publication(
         draft.publication.message(),
         draft.publication.delivery(),
@@ -325,7 +326,7 @@ async fn resolve_reviewer_on(
         r#"WITH candidates AS (
                SELECT task.owner_principal_id AS principal_id, 1 AS priority
                FROM background_tasks AS task
-               WHERE task.company_id = $1 AND task.id = $3
+               WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $3
                  AND task.owner_principal_kind = 'person'
                UNION ALL
                SELECT channel.preferred_reviewer_principal_id, 2
@@ -477,7 +478,7 @@ async fn validate_evidence_on(
                 r#"SELECT EXISTS (
                            SELECT 1 FROM task_attempts AS attempt
                            JOIN background_tasks AS task ON task.id = attempt.task_id
-                           WHERE task.company_id = $1 AND task.id = $2
+                           WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
                              AND attempt.execution_generation = $3
                        )"#,
             )
@@ -490,7 +491,7 @@ async fn validate_evidence_on(
             EvidenceSource::RetainedToolResult { task_id, result_id } => sqlx::query_scalar(
                 r#"SELECT EXISTS(
                        SELECT 1 FROM background_tasks
-                       WHERE company_id = $1 AND id = $2
+                       WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2
                          AND EXISTS (
                              SELECT 1
                              FROM jsonb_array_elements(
@@ -773,7 +774,7 @@ async fn expire_due(
                 WHERE (source.company_id, source.id, source.version) =
                       ($1, expired.draft_id, expired.draft_version)
                   AND task.company_id = source.company_id AND task.id = source.task_id
-                  AND task.status = 'pending_approval'
+                  AND task.queue_kind = 'legacy' AND task.status = 'pending_approval'
            )
            UPDATE response_drafts AS draft
               SET status = 'expired', updated_at = CURRENT_TIMESTAMP
@@ -989,7 +990,7 @@ async fn evidence_openable(
                 .map_err(AppError::from)?
         }
         _ => sqlx::query_scalar(
-            "SELECT channel_id FROM background_tasks WHERE company_id = $1 AND id = $2",
+            "SELECT channel_id FROM background_tasks WHERE company_id = $1 AND id = $2 AND queue_kind = 'legacy'",
         )
         .bind(company_id)
         .bind(id)

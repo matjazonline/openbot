@@ -7,7 +7,6 @@ use crate::domain::entities::{
     transport::PrincipalId,
     value_objects::ChannelSlug,
 };
-use crate::domain::workflow::{ResourceName, ResourceRequirement};
 
 fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
     Channel {
@@ -58,7 +57,7 @@ fn admitted_request(
     key: &str,
     association: RelatedAssociation,
 ) -> AdmitWorkflowRequest {
-    let mut request = request(company_id, version_id, key, json!(1), json!(2));
+    let mut request = request(company_id, version_id, key, json!(1));
     request.association = association;
     request
 }

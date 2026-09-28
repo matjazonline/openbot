@@ -1,0 +1,44 @@
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000003
+input_schema:
+  type: object
+  properties: {message: {type: string, maxLength: 16384}}
+  required: [message]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema: true
+resources: []
+entry: classify
+steps:
+  classify:
+    type: ai.classify
+    with:
+      context: {object: {untrusted_message: {ref: /input/message}}}
+      output_schema: {literal: {type: string, enum: [support, sales, other]}}
+    routes: {success: route}
+  route:
+    type: decision.rule
+    with:
+      data: {ref: /steps/classify/output}
+      data_schema: {literal: {type: string, enum: [support, sales, other]}}
+    rule:
+      cases:
+        - when: {eq: [{ref: /steps/classify/output}, {literal: support}]}
+          choice: support
+        - when: {eq: [{ref: /steps/classify/output}, {literal: sales}]}
+          choice: sales
+      default: other
+    routes: {choices: {support: support, sales: sales, other: $end}}
+  support:
+    type: message.send
+    with:
+      content: {object: {body: {ref: /input/message}}}
+      destinations: {literal: [{kind: channel, id: support}]}
+    routes: {success: $end}
+  sales:
+    type: message.send
+    with:
+      content: {object: {body: {ref: /input/message}}}
+      destinations: {literal: [{kind: channel, id: sales}]}
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

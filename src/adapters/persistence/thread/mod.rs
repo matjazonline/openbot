@@ -14,6 +14,9 @@ mod reply_publication;
 mod views;
 
 #[cfg(test)]
+pub(super) use views::THREAD_TASK_LOOKUP_SQL;
+
+#[cfg(test)]
 #[path = "test_support.rs"]
 mod test_support;
 

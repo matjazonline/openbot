@@ -144,3 +144,31 @@ Validation on 2026-09-12: all four new regressions passed; the full database-bac
 passed with 1,485 tests and 22 ignored. All migrations applied to a fresh disposable database and
 the stored index definition was inspected. SQLx metadata regeneration produced no cache changes.
 Formatting, offline compilation of all targets, and Clippy with warnings denied passed.
+
+## Workflow discriminator correction (2026-09-28)
+
+Legacy projections now explicitly require `queue_kind = 'legacy'`. The original index did not
+cover that column, so the full-page regression chose the correlation index plus Sort again
+(about 1,195 rows per fallback loop). Migration
+`20260928090000_index_legacy_thread_task_matches.sql` transactionally rebuilds the same index
+with `queue_kind` after the three scope keys and before the preference expression. Its equality
+condition both restores covering access and excludes workflow history before scanning the ordered
+range. Making it an INCLUDE column alone would cover the query but could still scan and discard
+thousands of workflow rows, particularly when there is no legacy match. The expression input,
+preference order, ascending UUID tie-breaker and non-null thread predicate remain unchanged.
+
+The original full-page regression is unchanged. The additional
+`workflow_job_projection_lookup_bounds_workflow_heavy_history` regression explains the production
+SQL under both forced custom and generic plans on an isolated migrated database. It includes
+6,000 newer workflow tasks on each of two hot correlations, one older non-main legacy winner on
+one correlation, and 10,000 singleton legacy correlations. A full page alternates between the
+legacy winner and the workflow-only correlation. It checks exact results, the ordered index,
+queue discriminator in the index condition, no history sort and zero rows discarded by a filter.
+The fixture vacuums retained history before checking plans; the visibility/statistics limitation
+above still applies. Only disposable fixtures open the workflow deployment gate; the production
+guard remains installed. The normal transactional rebuild can block task writes while it runs.
+
+Validation for this correction: all four original lookup tests and five mixed projection tests
+passed, including the custom/generic workflow-heavy plan check. The full database-backed library
+suite passed 1,939 tests with 22 existing ignored at the stock 2 MiB stack; locked offline all-target
+compilation and Clippy, SQLx metadata regeneration, formatting and migration checks passed.

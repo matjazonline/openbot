@@ -15,7 +15,7 @@ SELECT task.channel_id, principal.agent_id, task.status, COUNT(*)::bigint AS cou
   LEFT JOIN principals AS principal
     ON principal.company_id = task.company_id AND principal.id = task.owner_principal_id
    AND task.owner_principal_kind = 'agent'
- WHERE task.company_id = $1 AND task.status = ANY($2) AND task.channel_id = ANY($3)
+ WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.status = ANY($2) AND task.channel_id = ANY($3)
  GROUP BY task.channel_id, principal.agent_id, task.status
 "#;
 

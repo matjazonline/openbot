@@ -43,6 +43,7 @@ pub trait SchedulePersistence: Send + Sync {
         channel_id: Uuid,
     ) -> AppResult<Vec<ChannelSchedule>>;
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<ChannelSchedule>>;
+    /// Edits within the existing channel; `channel_id` is scope, never a destination.
     async fn update(
         &self,
         existing: &ChannelSchedule,
@@ -362,6 +363,11 @@ impl ScheduleUseCases {
         mut write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let existing = self.managed_schedule(user_id, company_id, id).await?;
+        if existing.channel_id != channel_id {
+            return Err(AppError::BadRequest(
+                "A schedule cannot change its channel".into(),
+            ));
+        }
         let channel_id = self
             .managed_channel_id(user_id, company_id, channel_id)
             .await?;
@@ -925,7 +931,11 @@ mod tests {
                 .iter_mut()
                 .find(|s| s.id == existing.id)
                 .ok_or_else(|| AppError::NotFound("Not found".into()))?;
-            s.channel_id = channel_id;
+            if s.channel_id != channel_id || existing.channel_id != channel_id {
+                return Err(AppError::BadRequest(
+                    "A schedule cannot change its channel".into(),
+                ));
+            }
             s.name = write.name;
             s.schedule_type = write.schedule_type;
             s.interval_seconds = write.interval_seconds;
@@ -1546,6 +1556,47 @@ mod tests {
         assert_eq!(after.enabled, untouched.enabled);
     }
 
+    async fn assert_schedule_reassignment_rejected(
+        use_cases: &ScheduleUseCases,
+        admin_id: Uuid,
+        company_id: Uuid,
+        created: &ChannelSchedule,
+        target_channel_id: Uuid,
+    ) {
+        // Reassignment is rejected before any edit is persisted.
+        let rejected = use_cases
+            .update_schedule(
+                admin_id,
+                company_id,
+                created.id,
+                target_channel_id,
+                ScheduleWrite {
+                    name: "Must not be saved".into(),
+                    schedule_type: created.schedule_type,
+                    interval_seconds: created.interval_seconds,
+                    scheduled_at: None,
+                    subject_template: created.subject_template.clone(),
+                    prompt_template: created.prompt_template.clone(),
+                    delivery_mode: created.delivery_mode,
+                    recipient_emails: created.recipient_emails.clone(),
+                    timezone: created.timezone,
+                    run_as_user_id: None,
+                    enabled: created.enabled,
+                },
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(rejected, AppError::BadRequest(_)));
+        let unchanged = use_cases
+            .get_schedule(admin_id, company_id, created.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(unchanged.channel_id, created.channel_id);
+        assert_eq!(unchanged.name, created.name);
+        assert_eq!(unchanged.updated_at, created.updated_at);
+    }
+
     #[tokio::test]
     async fn schedule_use_cases_crud_and_manual_trigger_flow_works() {
         let owner_id = Uuid::new_v4();
@@ -1668,30 +1719,14 @@ mod tests {
             .unwrap();
         assert_eq!(list.len(), 1);
 
-        // Editing can move a schedule to another channel in the same company.
-        let moved = use_cases
-            .update_schedule(
-                admin_id,
-                company_id,
-                created.id,
-                target_channel.id,
-                ScheduleWrite {
-                    name: created.name.clone(),
-                    schedule_type: created.schedule_type,
-                    interval_seconds: created.interval_seconds,
-                    scheduled_at: None,
-                    subject_template: created.subject_template.clone(),
-                    prompt_template: created.prompt_template.clone(),
-                    delivery_mode: created.delivery_mode,
-                    recipient_emails: created.recipient_emails.clone(),
-                    timezone: created.timezone,
-                    run_as_user_id: None,
-                    enabled: created.enabled,
-                },
-            )
-            .await
-            .unwrap();
-        assert_eq!(moved.channel_id, target_channel.id);
+        assert_schedule_reassignment_rejected(
+            &use_cases,
+            admin_id,
+            company_id,
+            &created,
+            target_channel.id,
+        )
+        .await;
 
         // 3. Toggle and trigger the schedule now.
         let toggled = use_cases

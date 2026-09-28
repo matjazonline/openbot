@@ -1,0 +1,63 @@
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000006
+input_schema:
+  type: object
+  properties:
+    limit: {type: integer, minimum: 1, maximum: 20}
+    include_closed: {type: boolean}
+    labels: {type: array, items: {type: string}}
+    owner: {type: [string, "null"]}
+  required: [limit, include_closed, labels, owner]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema:
+  type: object
+  properties:
+    count: {type: integer, minimum: 0}
+    tickets:
+      type: array
+      items:
+        type: object
+        properties: {id: {type: integer}, open: {type: boolean}}
+        required: [id, open]
+        additionalProperties: false
+  required: [count, tickets]
+  additionalProperties: false
+resources: [{slot: tickets, kind: mcp, contract: tickets-v1}]
+entry: lookup
+steps:
+  lookup:
+    type: mcp.call
+    with:
+      connection: {literal: tickets}
+      tool: {literal: lookup_tickets}
+      arguments:
+        object:
+          limit: {ref: /input/limit}
+          include_closed: {ref: /input/include_closed}
+          labels: {ref: /input/labels}
+          filter: {object: {owner: {ref: /input/owner}}}
+    routes: {success: result}
+  result:
+    type: data.map
+    with:
+      value:
+        default:
+          ref: /steps/lookup/output/structuredContent
+          value: {literal: {count: 0, tickets: []}}
+      output_schema:
+        literal:
+          type: object
+          properties:
+            count: {type: integer, minimum: 0}
+            tickets:
+              type: array
+              items:
+                type: object
+                properties: {id: {type: integer}, open: {type: boolean}}
+                required: [id, open]
+                additionalProperties: false
+          required: [count, tickets]
+          additionalProperties: false
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

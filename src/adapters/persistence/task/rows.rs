@@ -25,7 +25,7 @@ use crate::{
 pub struct BackgroundTaskDb {
     pub id: Uuid,
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub channel_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
     pub correlation_id: Uuid,
     pub task_type: String,
@@ -258,7 +258,12 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
         Ok(BackgroundTask {
             id: db.id,
             company_id: db.company_id,
-            channel_id: db.channel_id,
+            channel_id: db.channel_id.ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Legacy background task {} has no channel_id",
+                    db.id
+                ))
+            })?,
             thread_id: db.thread_id,
             correlation_id: db.correlation_id.into(),
             task_type: db.task_type,

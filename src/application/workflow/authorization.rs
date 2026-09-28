@@ -64,9 +64,12 @@ pub enum RelatedAssociation {
 pub enum WorkflowOperation {
     Admit,
     Cancel,
+    CopyTemplate,
+    ManageDefinition,
+    ManageBinding,
 }
 
-/// Required lifecycle authorization for authenticated Admit and Cancel calls.
+/// Required lifecycle authorization for authenticated workflow lifecycle and authoring calls.
 /// The trusted ingress supplies the actor's user ID; current membership is
 /// loaded from persistence. Owners and admins may manage company workflows;
 /// members and outsiders receive a non-disclosing `NotFound`. Related channel
