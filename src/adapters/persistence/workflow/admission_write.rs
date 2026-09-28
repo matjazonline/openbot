@@ -1,6 +1,5 @@
 use super::*;
 use admission_binding::SourceKey;
-use serde_json::json;
 
 pub(super) async fn create(
     tx: &mut Transaction<'_, Postgres>,
@@ -68,6 +67,7 @@ async fn insert_execution_job(db: &mut PgConnection, command: &PreparedAdmission
          payload, queue_kind, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,'workflow_execution',$6,'workflow',$7)",
     ).bind(Uuid::new_v4()).bind(command.company_id().as_uuid()).bind(channel).bind(thread)
         .bind(command.causality().correlation_id().as_uuid())
-        .bind(json!({"version":1,"execution_id":execution})).bind(execution).execute(db).await?;
+        .bind(crate::application::workflow::activation::job_payload(command.first_execution_id()))
+        .bind(execution).execute(db).await?;
     Ok(())
 }

@@ -19,6 +19,8 @@ pub enum CausalError {
 }
 
 /// An execution instance identifies repeated visits to the same graph step separately.
+/// Durable activation ordinals increase across the entire run, not separately per
+/// step. A retry retains the execution ID and ordinal while changing its attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionRef {
     company_id: CompanyId,

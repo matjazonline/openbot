@@ -54,10 +54,14 @@ pub(super) struct BindingFixture {
 }
 impl BindingFixture {
     pub(super) async fn new(requirements: serde_json::Value) -> Self {
+        let mut source: serde_json::Value =
+            serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+        source["resources"] = requirements;
+        Self::from_source(source).await
+    }
+    pub(super) async fn from_source(source: serde_json::Value) -> Self {
         let fixture = Fixture::new().await;
         let mut draft = fixture.save(None);
-        let mut source: serde_json::Value = serde_json::from_str(&draft.content.source).unwrap();
-        source["resources"] = requirements;
         draft.content.source = source.to_string();
         fixture.service().save(draft).await.unwrap();
         let publication = fixture.publish();

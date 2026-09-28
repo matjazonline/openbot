@@ -1,4 +1,6 @@
 use super::*;
+#[path = "activation_tests.rs"]
+mod activation_tests;
 #[path = "admission_authority_tests.rs"]
 mod admission_authority_tests;
 #[path = "admission_history_tests.rs"]

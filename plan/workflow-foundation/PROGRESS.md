@@ -4,6 +4,50 @@ Original plans remain authoritative. Each point carries the full named section/i
 
 ## Current execution (2026-09-28 resume)
 
+12:56Z root ACCEPTED WHOLE03.2 Execution and commits item1. BRIEF-03.2 owns original
+criterion mapping, actual-code review/correction PASS and final combined evidence PASS.
+1992fullDBPASS/22existingignored/0fail at stock2MiB, all11activation tests included;
+migration130000, SQLx prepare, locked offlinealltarget check/Clippy, fmt/diff/graftPASS.
+Root57764/25840022.35%12:55:44Z usage/runtime. Continuing same cohesive worker
+/root/activation_gates UUID01a0e810-4390-7870-8bae-ce6d69530aac parent-verified57853
+=22.39%12:55:37Z, reviewer/root/activation_gates/combined_review
+UUID01a0e810-a6dd-7eb0-b913-6db615622a85 49725=19.24%12:54:46Z, token_count.info.
+03.3 bounded pure transactional batches assigned for expansion reconciliation first;
+no dependent implementation before scope check. TaskPG running, no builds.
+
+12:49Z03.2 implemented and independent actual-code/correction PASS, but final gates PENDING.
+BRIEF-03.2 records11focusedPASS at stock2MiB, migration130000 applied/immutable, fmt/diffPASS,
+two reviewed corrections (referenced-output budget and deadline after lock wait), and exact
+SQLx/offlinealltarget/Clippy/full-library/graft remaining commands. TaskPG running, no builds.
+Implementer retiring naturally at parent-verified119741/25840046.34%12:48:37Z; reviewer
+7514129.08%12:47:08Z completed, token_count.info sources. Root5137619.88%12:48:44Z
+usage/runtime. Fresh subtree required for remaining gates, no03.3 assignment yet.
+External index change observed: marketing images now clean, index.html only unstaged modified;
+workers issued no stage/commit/reset. Preserve current external state.
+
+12:35Z root ACCEPTED BRIEF-03.2 expansion;03.2 IMPLEMENTING. Reuse exact ID-only jobs,
+immutable execution identities and attempt owners. Run-wide activation order establishes bounded
+committed predecessor resolution; freeze-once input tuple is atomic under run-first locking.
+Completion writer, claims and scheduling remain later points; no unresolved contract blocker.
+Root45552/25840017.63%12:34:58Z usage/runtime; parent-verified implementer7056727.31%
+12:34:56Z token_count.info. Nested review handle is/root/execution_activation/activation_review
+(corrects abbreviated handle below). Original03.2 criteria and all listed gates remain mandatory.
+
+12:34Z fresh root resumed at03.2 Execution and commits item1;03.1 remains accepted.
+Queue03.2 activation ->03.3 bounded pure batches ->03.4 leases ->03.5 atomic commits
+->03.6 parking ->03.7 locks ->03.8 polling ->03.9 recovery, then phases04–10 per EXPANSION.
+Current03.2 EXPANDING; root acceptance required before dependent assignments.
+Root01a0e7ff-1731-7f72-8389-cd0f74926fed runtime verified Astra/low; latest34246/258400
+=13.25%12:31:45Z token_usage_record.usage/task_started.model_context_window.
+Implementer tool/root/execution_activation UUID01a0e800-552f-7193-9219-ec7210fdded0
+Astra/medium startup21713=8.40%12:32:20Z; nested reviewer tool/root/execution_activation/reviewer
+UUID01a0e800-bac8-7802-be31-04c81f1f6214 Astra/medium startup21253=8.22%12:32:44Z,
+usage/task_started sources. Reviewer capacity confirmed before source edits.
+Root owns PROGRESS/RESUME acceptance; implementer owns BRIEF-03.2 evidence and taskPG when
+restarted. Preserve staged/unstaged index.html and staged marketing/images/BB-billing.png,
+marketing/images/features.png. No staging/commit/reset/deploy. Applied migrations through105000
+remain immutable. Existing full-plan expansion reused,03.2 contracts being reconciled.
+
 11:18Z ROOT ACCEPTED WHOLE03.1 Admission and independent contexts. A2 fixed schedule,
 B historical provenance, C/D nullable exact association and E/F atomic admission/authority/history
 all independently verified. Final criterion mapping and exact logs: ADMISSION-03.1.md:148.

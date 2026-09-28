@@ -1,4 +1,5 @@
 //! PostgreSQL is the sole owner of workflow authoring and runtime records.
+mod activation;
 mod admission;
 mod admission_binding;
 mod admission_history;
