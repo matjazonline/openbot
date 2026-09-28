@@ -248,6 +248,11 @@ async fn workflow_job_association_insert_serializes_parent_update() {
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM background_tasks WHERE id = $1 AND channel_id = $2 AND thread_id = $3")
             .bind(job).bind(f.channel).bind(f.thread).fetch_one(pool).await.unwrap();
         assert_eq!(count, 1);
+        sqlx::query("DELETE FROM background_tasks WHERE id = $1")
+            .bind(job)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 }
 
@@ -295,9 +300,14 @@ async fn workflow_job_association_prior_parent_update_serializes_insert() {
             .unwrap_err();
         constraint(error, expected);
         editor.rollback().await.unwrap();
-        tokio::time::timeout(Duration::from_secs(5), insert)
+        let job = tokio::time::timeout(Duration::from_secs(5), insert)
             .await
             .unwrap()
+            .unwrap();
+        sqlx::query("DELETE FROM background_tasks WHERE id = $1")
+            .bind(job)
+            .execute(pool)
+            .await
             .unwrap();
     }
 }

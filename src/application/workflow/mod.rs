@@ -5,6 +5,7 @@
 
 pub mod activation;
 mod authorization;
+pub mod batch;
 pub mod binding;
 pub mod compiler;
 mod contracts;

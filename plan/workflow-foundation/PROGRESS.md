@@ -4,6 +4,55 @@ Original plans remain authoritative. Each point carries the full named section/i
 
 ## Current execution (2026-09-28 resume)
 
+13:35Z root ACCEPTED WHOLE03.3 bounded pure transactional batches. BRIEF-03.3 final
+checkpoint records15focused/2007fullDBPASS/22existingignored/0fail stock2MiB,
+migrations/SQLx/offlinealltargetcheck/Clippy/fmt/diff/graftPASS; independent actual-code
+and correction/integration review PASS, no remaining findings. Prior failures superseded.
+Same implementer/root/batch_verify UUID01a0e832-e897-7952-b436-ce88d876a887
+parent-verified58999/25840022.83%13:34:09Z; reviewer/root/batch_verify/review
+UUID01a0e833-51cf-78f1-a208-4907154ee36c55908=21.64%13:33:22Z token_count.info.
+Root53911/25840020.86%13:34:13Z usage/runtime.03.4 expansion assigned; no source edits
+before contract coverage check. PG running, no builds. Applied migrations through133100 immutable.
+
+
+13:28Z03.3 IMPLEMENTED BUT UNVERIFIED, correction handoff BRIEF-03.3 latest checkpoint.
+Independent code review found no runtime defect; two test findings corrected, remaining
+E0616 private fixture version access must be fixed then required gates/rereview completed.
+208workflowPASS; full2005PASS1fixtureFAIL22ignored, rerun compileFAIL; not accepted.
+Retired /root/pure_batches parent-verified129268/25840050.03%13:26:56Z;
+reviewer86422/25840033.45%13:25:30Z token_count.info sources, both completed.
+Fresh /root/batch_verify Astra/medium assigned correction+verification with own reviewer.
+Root48560/25840018.79%13:27:07Z usage/runtime. PG running transferred; no builds.
+Migrations through20260928133100 immutable. No next point begun.
+
+
+13:06Z fresh root resumed03.3 from accepted BRIEF; original03 and EXPANSION reconciled.
+Required nested reviewer capacity SUCCEEDED before source edits. Implementer
+/root/pure_batches UUID01a0e81e-4dc9-7920-8825-ea6ec7c67e9e Astra/medium;
+nested /root/pure_batches/reviewer Astra/medium. Root01a0e81d-a106-7651-8b03-d0c253c67f38
+runtime verified Astra/low; startup21419/258400=8.29%13:04:27Z usage/runtime sources.
+Implementer startup21269/258400=8.23%13:05:05Z usage/runtime sources.
+03.3 IMPLEMENTING;03.2 evidence preserved. Root owns PROGRESS/RESUME; worker owns
+BRIEF-03.3 and retained taskPG. Preserve external website/deletion work; no staging/commit/reset.
+
+
+13:02Z CAPACITY STOP before03.3 implementation: required nested reviewer spawn failed
+`agent thread limit reached`; no handle created/no close control, no substitution.
+03.2 remains VERIFIED;03.3 expansion ACCEPTED in BRIEF-03.3, no03.3 source edits.
+TaskPG stopped fast/wait and status confirmed; retained directory. All workers quiescent.
+Fresh session must continue03.3 with new pair; do not reuse retired workers.
+Last implementer/root/pure_batches UUID01a0e819-f790-7232-9863-4a7778cc7071
+26308/25840010.18%13:01:29Z usage/runtime. Previous worker parent latest9415836.44%
+12:59:47Z token_count.info. Root6769726.20%13:01:12Z usage/runtime, NOT context stop.
+RESUME/README updated. No commit/stage/reset/deploy; external edits preserved.
+
+12:59Z root ACCEPTED03.3 expansion BRIEF-03.3: bounded map/rule transactions, frozen
+rule choice, run/route/successor records and sole-job continuation; real competing callers,
+rollback/replay/deadline/budget tests required. No03.3 source edits yet. Worker retiring at
+clean expansion boundary because completed03.2 context dominates; parent-verified91872
+/25840035.55%12:58:53Z token_count.info, reviewer idle19.24%. Root6263424.24%12:59:00Z
+usage/runtime. Fresh implementation subtree next; taskPG running transferred unchanged.
+
 12:56Z root ACCEPTED WHOLE03.2 Execution and commits item1. BRIEF-03.2 owns original
 criterion mapping, actual-code review/correction PASS and final combined evidence PASS.
 1992fullDBPASS/22existingignored/0fail at stock2MiB, all11activation tests included;

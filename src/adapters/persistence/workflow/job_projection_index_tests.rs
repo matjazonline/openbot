@@ -11,19 +11,24 @@ async fn seed_mixed_history(f: &JobFixture, legacy: Uuid, hot: Uuid, absent: Uui
     sqlx::query("UPDATE background_tasks SET thread_id = $2, correlation_id = $3, created_at = '2000-01-01' WHERE id = $1")
         .bind(legacy).bind(thread).bind(hot).execute(pool).await.unwrap();
     sqlx::query(
-        r#"INSERT INTO background_tasks
+        r#"WITH executions AS (
+            INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation)
+            SELECT original.company_id,original.run_id,gen_random_uuid(),original.step_id,history.ordinal + 1
+            FROM workflow_executions AS original CROSS JOIN generate_series(1,12000) AS history(ordinal)
+            WHERE original.company_id = $1 AND original.id = $4
+            RETURNING id,activation)
+        INSERT INTO background_tasks
                (id, company_id, channel_id, thread_id, correlation_id, task_type, status,
                 queue_kind, workflow_execution_id, payload)
-           SELECT gen_random_uuid(), $1, $2, $3, correlation.id, 'workflow_execution', 'completed',
-                  'workflow', $4, $5
-           FROM unnest($6::uuid[]) AS correlation (id)
-           CROSS JOIN generate_series(1, 6000) AS history (ordinal)"#,
+           SELECT gen_random_uuid(), $1, $2, $3, ($5::uuid[])[CASE WHEN executions.activation <= 6001 THEN 1 ELSE 2 END],
+                  'workflow_execution', 'completed', 'workflow', executions.id,
+                  jsonb_build_object('version',1,'execution_id',executions.id::text)
+           FROM executions"#,
     )
     .bind(company)
     .bind(f.channel)
     .bind(thread)
     .bind(f.execution)
-    .bind(f.payload())
     .bind([hot, absent])
     .execute(pool)
     .await

@@ -53,15 +53,16 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 and phase02 library scope (02.1–02.8) are verified. Whole phase03.1 admission and
-independent contexts is now verified: fixed-channel schedules, historical handoff provenance,
-nullable exact job/run association, atomic admission, saved replay authorization and committed
-history capture. Independent integration review and final1981-test database suite passed
-(22existing ignored) at stock2MiB; all static/SQLx/migration gates passed.03.2 has not started.
-[RESUME.md](RESUME.md) is the fresh-session entry point; [PROGRESS.md](PROGRESS.md) and
-[ADMISSION-03.1.md](ADMISSION-03.1.md) record acceptance, criterion coverage and exact evidence.
-Earlier BRIEF/JOB records retain detailed slice history. No backward compatibility is required.
-[REPLACEMENT-MAP.md](REPLACEMENT-MAP.md) inventories current owners and removal gates.
+Phase01 and phase02 library scope (02.1–02.8), whole03.1 admission,03.2 activation,
+and03.3 bounded pure transactional batches are verified.03.3 records frozen rule
+choices and atomic step/output/route/audit/successor progression, with bounded ID-only
+continuations and replay protection. Independent code and integration review passed;
+15focused and2007full database tests passed at stock2MiB (22existing ignored), alongside
+migration/SQLx/offline check/Clippy/fmt/diff/graft gates.03.4 fenced I/O leases and actual
+future cancellation is next. [RESUME.md](RESUME.md) is the resume entry point;
+[PROGRESS.md](PROGRESS.md) and [BRIEF-03.3.md](BRIEF-03.3.md) record acceptance evidence.
+No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
+inventories current owners and removal gates.
 
 ## Working rules
 

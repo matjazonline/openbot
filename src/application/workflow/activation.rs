@@ -1,7 +1,7 @@
 //! Freeze logical activation inputs once. This is not a worker ownership grant.
 use super::{CompanyId, publication::PublishedBundle};
 use crate::application::app_error::{AppError, AppResult};
-use crate::domain::workflow::{Binding, Context, ExecutionId, RunId, StepId};
+use crate::domain::workflow::{Binding, ChoiceName, Context, ExecutionId, RunId, StepId};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,7 +11,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkflowJobId(pub Uuid);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActivationRequest {
     pub company: CompanyId,
     pub run: RunId,
@@ -27,6 +27,7 @@ pub struct ActivatedExecution {
     pub step: StepId,
     pub ordinal: u64,
     pub inputs: Value,
+    pub choice: Option<ChoiceName>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -63,6 +64,9 @@ pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<
         .get(step)
         .ok_or_else(|| AppError::Database("Unknown stored workflow step".into()))?;
     let mut pending: Vec<_> = definition.inputs.values().collect();
+    if let Some(rule) = bundle.compiled().rule(step) {
+        pending.extend(rule.cases.iter().map(|case| &case.when));
+    }
     let mut references = BTreeSet::new();
     while let Some(binding) = pending.pop() {
         let reference = match binding {

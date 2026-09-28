@@ -7,6 +7,8 @@ mod admission_authority_tests;
 mod admission_history_tests;
 #[path = "admission_source_tests.rs"]
 mod admission_source_tests;
+#[path = "batch_tests.rs"]
+mod batch_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};

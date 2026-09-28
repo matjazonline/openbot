@@ -4,6 +4,11 @@ use futures::TryStreamExt;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+struct FrozenActivation {
+    inputs: Value,
+    choice: Option<String>,
+}
+
 #[derive(sqlx::FromRow)]
 struct RunRow {
     binding_id: Uuid,
@@ -17,6 +22,7 @@ struct ExecutionRow {
     step_id: String,
     activation: i64,
     frozen_inputs: Option<Value>,
+    frozen_choice: Option<String>,
 }
 
 #[async_trait]
@@ -41,7 +47,7 @@ pub(super) async fn activate_on(
     .bind(request.company.as_uuid()).bind(request.run.as_uuid())
     .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let row = sqlx::query_as::<_, ExecutionRow>(
-        "SELECT step_id, activation, frozen_inputs FROM workflow_executions \
+        "SELECT step_id, activation, frozen_inputs, frozen_choice FROM workflow_executions \
          WHERE company_id = $1 AND run_id = $2 AND id = $3 FOR UPDATE",
     )
     .bind(request.company.as_uuid())
@@ -53,36 +59,43 @@ pub(super) async fn activate_on(
     validate_job(db, request).await?;
     let step = StepId::parse(row.step_id).map_err(|_| invalid())?;
     let ordinal = u64::try_from(row.activation).map_err(|_| invalid())?;
-    let inputs =
-        if let Some(inputs) = row.frozen_inputs {
-            inputs
-        } else {
-            if run.expired || row.activation > i64::from(run.max_steps) {
-                return Err(AppError::Conflict(
-                    "Workflow activation limit reached".into(),
-                ));
-            }
-            let inputs = resolve(db, request, &run, &step, row.activation).await?;
-            let written = sqlx::query(
-            "UPDATE workflow_executions SET frozen_inputs = $4, activated_at = clock_timestamp() \
+    let prepared = if let Some(inputs) = row.frozen_inputs {
+        FrozenActivation {
+            inputs,
+            choice: row.frozen_choice,
+        }
+    } else {
+        if run.expired || row.activation > i64::from(run.max_steps) {
+            return Err(AppError::Conflict(
+                "Workflow activation limit reached".into(),
+            ));
+        }
+        let prepared = resolve(db, request, &run, &step, row.activation).await?;
+        let written = sqlx::query(
+            "UPDATE workflow_executions SET frozen_inputs = $4, frozen_choice = $5, activated_at = clock_timestamp() \
              WHERE company_id = $1 AND run_id = $2 AND id = $3 \
              AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id = $1 \
                          AND run.id = $2 AND run.deadline > clock_timestamp())",
         )
         .bind(request.company.as_uuid()).bind(request.run.as_uuid())
-        .bind(request.execution.as_uuid()).bind(&inputs).execute(&mut *db).await?;
-            if written.rows_affected() != 1 {
-                return Err(AppError::Conflict(
-                    "Workflow activation deadline reached".into(),
-                ));
-            }
-            inputs
-        };
+        .bind(request.execution.as_uuid()).bind(&prepared.inputs).bind(&prepared.choice).execute(&mut *db).await?;
+        if written.rows_affected() != 1 {
+            return Err(AppError::Conflict(
+                "Workflow activation deadline reached".into(),
+            ));
+        }
+        prepared
+    };
     Ok(ActivatedExecution {
         execution: request.execution,
         step,
         ordinal,
-        inputs,
+        inputs: prepared.inputs,
+        choice: prepared
+            .choice
+            .map(ChoiceName::parse)
+            .transpose()
+            .map_err(|_| invalid())?,
     })
 }
 
@@ -109,7 +122,7 @@ async fn resolve(
     run: &RunRow,
     step: &StepId,
     ordinal: i64,
-) -> AppResult<Value> {
+) -> AppResult<FrozenActivation> {
     let binding = admission_binding::read_saved_binding(
         db,
         request.company,
@@ -140,7 +153,15 @@ async fn resolve(
             parent_run_id: parent_run(&source)?,
         },
     };
-    prepare_inputs(bundle, step, &context)
+    let inputs = prepare_inputs(bundle, step, &context)?;
+    let choice = bundle
+        .compiled()
+        .rule(step)
+        .map(|rule| rule.decide(&context, limits))
+        .transpose()
+        .map_err(|_| AppError::BadRequest("Invalid rule predicate".into()))?
+        .map(|choice| choice.as_str().to_owned());
+    Ok(FrozenActivation { inputs, choice })
 }
 
 async fn outputs(

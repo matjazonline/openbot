@@ -8,6 +8,8 @@ mod admission_source;
 mod admission_write;
 mod association;
 mod authority;
+mod batch;
+mod batch_commit;
 mod binding_rows;
 mod bindings;
 mod definitions;
