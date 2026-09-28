@@ -135,7 +135,15 @@ async fn run_steps(
         }
         let activated = activation::activate_on(db, current).await?;
         let completion = execute_pure(bundle, &activated)?.ok_or_else(invalid)?;
-        let next = batch_commit::complete(db, current, &activated, &completion, max_steps).await?;
+        let next = batch_commit::complete(
+            db,
+            current,
+            &activated,
+            &completion,
+            max_steps,
+            completion_job::CompletionOwner::Pure,
+        )
+        .await?;
         completed += 1;
         let Some(next) = next else {
             batch_commit::check_deadline(db, request).await?;

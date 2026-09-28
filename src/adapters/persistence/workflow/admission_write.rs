@@ -27,6 +27,15 @@ pub(super) async fn create(
 }
 
 async fn insert_run(db: &mut PgConnection, command: &PreparedAdmission) -> AppResult<()> {
+    let parent = match command.trigger().source() {
+        TriggerSource::Child {
+            parent: ChildCause::Execution(parent),
+        } => Some(parent),
+        TriggerSource::Child {
+            parent: ChildCause::Action(_),
+        } => return Err(invalid()),
+        _ => None,
+    };
     let (channel, thread) = binding_rows::association_columns(command.association());
     let limits = command
         .binding()
@@ -40,9 +49,9 @@ async fn insert_run(db: &mut PgConnection, command: &PreparedAdmission) -> AppRe
     sqlx::query(
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, \
-         max_steps, max_context_bytes, deadline) \
+         max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         CURRENT_TIMESTAMP + make_interval(secs => $18))",
+         CURRENT_TIMESTAMP + make_interval(secs => $18), $19, $20)",
     ).bind(command.company_id().as_uuid()).bind(command.proposed_run_id().as_uuid())
         .bind(command.binding().id().as_uuid()).bind(revision(command.binding().revision().get())?)
         .bind(command.workflow_id().as_uuid()).bind(command.version_id().as_uuid()).bind(channel).bind(thread)
@@ -51,7 +60,9 @@ async fn insert_run(db: &mut PgConnection, command: &PreparedAdmission) -> AppRe
         .bind(command.input()).bind(command.params()).bind(resources)
         .bind(i32::try_from(limits.max_steps).map_err(|_| invalid())?)
         .bind(i32::try_from(limits.max_context_bytes).map_err(|_| invalid())?)
-        .bind(f64::from(admission::ADMISSION_DEADLINE_SECONDS)).execute(db).await?;
+        .bind(f64::from(admission::ADMISSION_DEADLINE_SECONDS))
+        .bind(parent.map(|parent| parent.run_id().as_uuid()))
+        .bind(parent.map(|parent| parent.execution_id().as_uuid())).execute(db).await?;
     Ok(())
 }
 

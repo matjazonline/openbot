@@ -1,5 +1,4 @@
-//! Shared atomic progression seam. Fenced I/O results will extend this owner;
-//! they must not create an independent result/successor commit path.
+//! Single atomic progression writer shared by pure and fenced I/O completions.
 use super::*;
 use crate::application::workflow::{activation::*, batch::PureCompletion};
 
@@ -9,6 +8,7 @@ pub(super) async fn complete(
     activated: &ActivatedExecution,
     completion: &PureCompletion,
     max_steps: i32,
+    owner: completion_job::CompletionOwner,
 ) -> AppResult<Option<ActivationRequest>> {
     check_deadline(db, request).await?;
     let next = match &completion.target {
@@ -46,8 +46,6 @@ pub(super) async fn complete(
     if changed.rows_affected() != 1 {
         return Err(invalid());
     }
-    sqlx::query("UPDATE background_tasks SET status = 'completed', updated_at = clock_timestamp() WHERE company_id = $1 AND id = $2")
-        .bind(request.company.as_uuid()).bind(request.job.0).execute(&mut *db).await?;
     let changed = sqlx::query(
         "UPDATE workflow_runs SET state = $3, terminal_execution_id = $4 WHERE company_id = $1 AND id = $2 \
          AND state IN ('queued','running') AND deadline > clock_timestamp()",
@@ -62,8 +60,9 @@ pub(super) async fn complete(
         "INSERT INTO workflow_run_events (company_id,run_id,sequence,event_kind,actor_id,execution_id) \
          SELECT run.company_id,run.id, \
          (SELECT COALESCE(MAX(event.sequence),0)+1 FROM workflow_run_events AS event WHERE event.company_id = $1 AND event.run_id = $2), \
-         'pure_step_completed',run.actor_id,$3 FROM workflow_runs AS run WHERE run.company_id = $1 AND run.id = $2",
-    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(request.execution.as_uuid()).execute(&mut *db).await?;
+         $4,run.actor_id,$3 FROM workflow_runs AS run WHERE run.company_id = $1 AND run.id = $2",
+    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(request.execution.as_uuid()).bind(owner.event_kind()).execute(&mut *db).await?;
+    completion_job::finish(db, request, owner).await?;
     Ok(next)
 }
 

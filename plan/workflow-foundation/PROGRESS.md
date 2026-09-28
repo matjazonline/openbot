@@ -4,6 +4,106 @@ Original plans remain authoritative. Each point carries the full named section/i
 
 ## Current execution (2026-09-28 resume)
 
+15:39Z CAPACITY STOP before03.9 expansion/code: /root/workflow_recovery required nested
+reviewer creation rejected `agent thread limit reached`; no handle/no close control.
+No substitute topology or retries.03.3–03.8 VERIFIED,03.9 not begun. Fresh session required.
+Blocked worker UUID01a0e8a9-ef5a-7092-a9de-97738d69b06b parent22977/2584008.89%
+15:37:55Z token_count.info, completed/retired. Root123293/25840047.71%15:38:11Z
+usage/runtime, not context-threshold stop. All subtrees quiescent.
+Root stopped taskPG fast/wait; status confirmed no server running. Data retained.
+RESUME/README updated; actual staged/unstaged/untracked work preserved, including
+external website and external staging. No root/subtree stage/commit/reset/deploy.
+
+
+15:38Z root ACCEPTED WHOLE03.8 durable PostgreSQL polling. BRIEF-03.8 independent
+actual-code/corrections/combinedPASS;13focused2075fullDBPASS22ignored0fail2MiB;
+SQLx/offlinecheck/Clippy/fmt/staged+unstageddiff/graftPASS. No schema change.
+/root/workflow_polling retired parent120231/25840046.53%15:36:55Z token_count.info;
+reviewer32.80% owner-verified, both completed. Root119740/25840046.34%15:37:06Z usage/runtime.
+Fresh/root/workflow_recovery Astra/medium03.9 expansion assigned; nested capacity pending.
+TaskPG running transferred; no builds; no04 work.
+
+
+15:16Z root ACCEPTED03.8 expansion BRIEF-03.8; IMPLEMENTING bounded cyclic DB polling,
+periodic restart discovery and existing pure/wait/fenced orchestration; six gates,
+explicit phase04/06/07/08 boundaries. /root/workflow_polling UUID
+01a0e893-c15e-73e0-bba7-ecab22bfa506 parent68009/25840026.32%15:15:21Z usage/runtime;
+reviewer01a0e893-ffed-76f3-9e26-c8d4f11109dc startup21218=8.21%15:13:40Z usage/runtime.
+Root113725/25840044.01%15:15:24Z usage/runtime. TaskPG unchanged;03.9 not started.
+
+
+15:13Z root ACCEPTED WHOLE03.7 lock ordering/parent wakeup foundation. BRIEF-03.7
+independent actual-code/corrections/combinedPASS;12focused2062fullDBPASS22ignored0fail
+2MiB; migrations/SQLx/check/Clippy/fmt/staged+unstageddiff/graftPASS. Applied150500 immutable.
+/root/run_lock_order retired parent127007/25840049.15%15:12:48Z, reviewer90476=35.01%
+15:12:21Z token_count.info, both completed. Root109843/25840042.51%15:12:42Z token_count.info.
+Fresh/root/workflow_polling Astra/medium03.8 expansion assigned, nested capacity pending.
+TaskPG running transferred, no builds; external edits preserved.
+
+
+14:53Z root ACCEPTED03.7 expansion BRIEF-03.7; IMPLEMENTING single-run ordering audit,
+immutable admitted parent association, child-owned durable terminal wakeup event and
+bounded exact-parent read. Phase07 owns parent consumption/child creation semantics.
+/root/run_lock_order UUID01a0e87e-5f3c-7e02-a274-1a35263c8699 Astra/medium
+parent72976/25840028.24%14:52:32Z token_count.info; nested reviewer
+01a0e87e-9cdb-7c10-92ff-226002b2bf81 startup21095/2584008.16%14:50:17Z usage/runtime.
+Root103579/25840040.08%14:52:43Z usage/runtime. TaskPG unchanged,03.8 not started.
+
+
+14:50Z root ACCEPTED WHOLE03.6 atomic durable parking/resumption. BRIEF-03.6 final
+actual-code/corrections/combinedPASS;16focused2050fullDBPASS22ignored0fail2MiB;
+migrations/SQLx/offlinecheck/Clippy/fmt/staged+unstageddiff/graftPASS. Applied144500 immutable.
+/root/durable_waits retired parent126933/25840049.12%14:49:10Z; reviewer88304=34.17%
+14:48:39Z token_count.info, both completed. Root97619/25840037.78%14:49:17Z token_count.info.
+Fresh/root/run_lock_order Astra/medium03.7 expansion assigned, reviewer capacity pending.
+TaskPG running transferred, no builds. External staging/website changes preserved.
+
+
+14:30Z root ACCEPTED03.6 expansion BRIEF-03.6; IMPLEMENTING event/timer parking,
+exact-execution event facts, wait-owned registration intent, single consumption/progression
+and bounded deadline transition. Six acceptance groups retain original criteria.
+Parent implementer66709/25840025.82%14:29:37Z; reviewer21657=8.38%14:28:17Z
+(token_count.info sources). Root89609/25840034.68%14:29:39Z usage/runtime.
+TaskPG unchanged.03.7 not started.
+
+
+14:29Z root ACCEPTED WHOLE03.5 atomic fenced completion. BRIEF-03.5 final independent
+actual-code/correction/combinedPASS;14focused2034fullDBPASS22ignored0fail2MiB;
+migration/SQLx/check/Clippy/fmt/staged+unstageddiff/graftPASS. Applied141500 immutable.
+/root/fenced_commit retired parent122134/25840047.27%14:27:06Z, reviewer96165=37.22%
+14:26:42Z token_count.info, both quiescent. Root82430/25840031.90%14:27:16Z usage/runtime.
+Fresh/root/durable_waits Astra/medium UUID01a0e86a-1f1d-7f71-9e0d-c615bb0600d2
+startup21358/2584008.27%14:27:51Z usage/runtime; own nested reviewer capacity confirmed.
+03.6 expansion assigned. TaskPG running transferred, no builds. External staging
+preserved; no commit/stage/reset/deploy by agents.
+
+
+14:05Z root ACCEPTED03.5 expansion BRIEF-03.5; IMPLEMENTING shared fenced atomic
+completion/replay with six acceptance groups. /root/fenced_commit UUID
+01a0e852-8eba-73a0-8c76-f823842ceaa1 parent58616/25840022.68%14:04:20Z;
+nested reviewer01a0e852-d6c6-7571-be85-546b6cb218a6 21630=8.37%14:02:37Z,
+token_count.info sources. Root74037/25840028.65%14:04:24Z usage/runtime.
+Both Astra/medium, root Astra/low. TaskPG running; actual external website edits preserved.
+
+
+14:03Z root ACCEPTED WHOLE03.4 fenced I/O ownership and actual-future supervision.
+BRIEF-03.4 records independent actual-code/corrections/combined PASS,13focused and
+2020fullDBPASS22ignored0fail stock2MiB; SQLx/offlinecheck/Clippy/fmt/diff/graftPASS.
+No schema change.03.5 expansion assigned fresh /root/fenced_commit Astra/medium.
+Retired /root/io_leases UUID01a0e83d-1ebb-7be2-bfaf-048abf7ec08f parent122586/258400
+47.44%14:01:31Z; reviewer01a0e83d-635d-7820-8474-0e664b942bed78983=30.57%14:01:08Z,
+token_count.info sources. Both completed/quiescent. Root68916/25840026.67%14:01:36Z
+usage/runtime. TaskPG running transferred; no builds; no03.5 source edits yet.
+
+
+13:39Z root ACCEPTED03.4 expansion BRIEF-03.4 (six acceptance groups); no source edits.
+Fresh /root/io_leases Astra/medium assigned implementation with own nested reviewer.
+/root/batch_verify retired naturally because03.3 context dominated, not threshold:
+parent92773/25840035.90%13:38:08Z; reviewer55908=21.64%13:33:22Z token_count.info,
+both completed/quiescent. Root58550/25840022.66%13:37:08Z usage/runtime.
+TaskPG running transferred; no builds.03.5 remains queued after03.4 acceptance.
+
+
 13:35Z root ACCEPTED WHOLE03.3 bounded pure transactional batches. BRIEF-03.3 final
 checkpoint records15focused/2007fullDBPASS/22existingignored/0fail stock2MiB,
 migrations/SQLx/offlinealltargetcheck/Clippy/fmt/diff/graftPASS; independent actual-code

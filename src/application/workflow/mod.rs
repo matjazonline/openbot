@@ -8,14 +8,19 @@ mod authorization;
 pub mod batch;
 pub mod binding;
 pub mod compiler;
+pub mod completion;
 mod contracts;
 pub mod fixtures;
+pub mod lease;
 pub mod lifecycle;
 mod ports;
 pub mod publication;
 pub mod registry;
 mod service;
+pub mod supervise;
 pub mod templates;
+pub mod waits;
+pub mod wakeups;
 
 pub use authorization::*;
 pub use contracts::*;
@@ -24,3 +29,6 @@ pub use service::WorkflowService;
 
 #[cfg(test)]
 mod tests;
+
+pub mod polling;
+pub mod worker;

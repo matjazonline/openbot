@@ -26,13 +26,13 @@ async fn rejected(f: &AdmissionFixture, request: AdmitWorkflowRequest) {
     assert_eq!(f.counts().await, before);
 }
 
-struct ForeignSource {
-    company: CompanyId,
+pub(super) struct ForeignSource {
+    pub(super) company: CompanyId,
     channel: Uuid,
     message: Uuid,
 }
 impl ForeignSource {
-    async fn new(f: &AdmissionFixture) -> Self {
+    pub(super) async fn new(f: &AdmissionFixture) -> Self {
         let p = f.persistence();
         let company = CompanyPersistence::create(
             p,
@@ -218,7 +218,7 @@ async fn execution(f: &AdmissionFixture, command: &PreparedAdmission) -> Executi
     )
 }
 
-async fn foreign_parent(f: &AdmissionFixture, company: CompanyId) -> ExecutionRef {
+pub(super) async fn foreign_parent(f: &AdmissionFixture, company: CompanyId) -> ExecutionRef {
     let mut draft = f.binding.fixture.save(None);
     draft.target.company = company;
     f.binding.fixture.service().save(draft).await.unwrap();

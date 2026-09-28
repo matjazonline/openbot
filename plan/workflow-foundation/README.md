@@ -53,14 +53,12 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 and phase02 library scope (02.1–02.8), whole03.1 admission,03.2 activation,
-and03.3 bounded pure transactional batches are verified.03.3 records frozen rule
-choices and atomic step/output/route/audit/successor progression, with bounded ID-only
-continuations and replay protection. Independent code and integration review passed;
-15focused and2007full database tests passed at stock2MiB (22existing ignored), alongside
-migration/SQLx/offline check/Clippy/fmt/diff/graft gates.03.4 fenced I/O leases and actual
-future cancellation is next. [RESUME.md](RESUME.md) is the resume entry point;
-[PROGRESS.md](PROGRESS.md) and [BRIEF-03.3.md](BRIEF-03.3.md) record acceptance evidence.
+Phase01 and phase02 library scope (02.1–02.8) and03.1–03.8 are verified: admission,
+frozen activation, bounded pure batches, fenced I/O leases/actual-future cancellation,
+atomic fenced completion/replay, and durable event/timer parking/resumption. Independent code and integration review passed;
+latest13focused and2075full database tests passed at stock2MiB (22existing ignored),
+alongside migration/SQLx/offline check/Clippy/fmt/diff/graft gates.03.7–03.8 also verify run-first parent wakeups and durable polling;03.9 recovery is next; a host agent-thread limit blocked its required reviewer before any03.9 edits. Resume in a fresh session. [RESUME.md](RESUME.md) is the resume entry point;
+[PROGRESS.md](PROGRESS.md) and [BRIEF-03.8.md](BRIEF-03.8.md) hold current evidence.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
 inventories current owners and removal gates.
 

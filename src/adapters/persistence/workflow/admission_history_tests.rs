@@ -33,7 +33,7 @@ impl Conversation {
         conversation.insert(&mut db, f, conversation.message).await;
         conversation
     }
-    async fn insert(&self, db: &mut PgConnection, f: &AdmissionFixture, message: Uuid) {
+    pub(super) async fn insert(&self, db: &mut PgConnection, f: &AdmissionFixture, message: Uuid) {
         self.insert_message(db, f, message).await;
         self.insert_membership(db, f, message).await;
     }

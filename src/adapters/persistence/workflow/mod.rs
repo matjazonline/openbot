@@ -1,4 +1,12 @@
 //! PostgreSQL is the sole owner of workflow authoring and runtime records.
+//!
+//! Runtime transitions lock the run before its executions, jobs/attempts, waits
+//! and events. Discovery reads grant no authority. Reacquiring an already-owned
+//! run is safe. Child admission/replay may lock parent then child, never the
+//! reverse. Runtime transitions own only one run. Child terminal transitions append a
+//! child-owned wakeup fact; parent consumption must use a separate transaction.
+//! Foreign-key checks count as locks too: never insert a parent reference while
+//! completing the child. Parent linkage is immutable and established at admission.
 mod activation;
 mod admission;
 mod admission_binding;
@@ -12,11 +20,18 @@ mod batch;
 mod batch_commit;
 mod binding_rows;
 mod bindings;
+mod completion;
+mod completion_job;
 mod definitions;
+mod lease;
+mod lease_claim;
 mod resources;
 mod rows;
 #[cfg(test)]
 mod tests;
+mod wait_commit;
+mod waits;
+mod wakeups;
 
 use super::PostgresPersistence;
 use crate::app_error::{AppError, AppResult};
@@ -49,3 +64,5 @@ fn write_error(error: sqlx::Error) -> AppError {
         error.into()
     }
 }
+
+mod polling;

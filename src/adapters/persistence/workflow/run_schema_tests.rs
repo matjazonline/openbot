@@ -120,7 +120,7 @@ async fn compete_admission(
     let mut tx = f.fixture.persistence.pool().begin().await?;
     insert_run(&mut tx, f, run, RunAssociation::default()).await?;
     barrier.wait().await;
-    sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:manual:shared', $3)")
+    sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:[\"manual\",\"00000000-0000-0000-0000-000000000001\"]', $3)")
         .bind(f.target.company.as_uuid()).bind(f.target.binding.as_uuid()).bind(run)
         .execute(&mut *tx).await?;
     tx.commit().await
@@ -166,7 +166,7 @@ async fn workflow_run_schema_competing_source_claims_rollback_losing_run_and_sco
     insert_run(&mut db, &f, sibling, RunAssociation::default())
         .await
         .unwrap();
-    foreign_key(sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:manual:other', $3)")
+    foreign_key(sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:[\"manual\",\"00000000-0000-0000-0000-000000000002\"]', $3)")
         .bind(company).bind(Uuid::new_v4()).bind(sibling).execute(&mut *db).await.unwrap_err());
 }
 
@@ -196,7 +196,7 @@ async fn workflow_run_schema_final_audit_failure_rolls_back_all_admission_record
         .insert(&mut tx, company, run, history.messages[0], 1)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:manual:rollback', $3)")
+    sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, 'v1:[\"manual\",\"00000000-0000-0000-0000-000000000003\"]', $3)")
         .bind(company).bind(f.target.binding.as_uuid()).bind(run).execute(&mut *tx).await.unwrap();
     sqlx::query("INSERT INTO workflow_admission_commands (company_id, command_key, run_id, trigger_id) VALUES ($1, 'rollback', $2, $3)")
         .bind(company).bind(run).bind(Uuid::new_v4()).execute(&mut *tx).await.unwrap();

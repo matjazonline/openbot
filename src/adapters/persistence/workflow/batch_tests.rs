@@ -1,6 +1,8 @@
 use super::*;
 #[path = "batch_recovery_tests.rs"]
 mod recovery_tests;
+#[path = "wakeup_tests.rs"]
+mod wakeup_tests;
 use crate::application::workflow::{activation::*, batch::*};
 use std::time::Duration;
 use tokio::sync::Barrier;

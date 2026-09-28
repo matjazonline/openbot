@@ -105,6 +105,18 @@ pub fn execute_pure(
         }
         _ => return Ok(None),
     };
+    Ok(Some(validate_completion(
+        bundle, activation, output, route,
+    )?))
+}
+
+pub(super) fn validate_completion(
+    bundle: &PublishedBundle,
+    activation: &ActivatedExecution,
+    output: Value,
+    route: RouteSelection,
+) -> AppResult<PureCompletion> {
+    let compiled = bundle.compiled();
     validate_context_value(&output, compiled.graph().context_limits()).map_err(|_| invalid())?;
     compiled
         .validate_step_output(&activation.step, &output)
@@ -136,12 +148,12 @@ pub fn execute_pure(
             chrono::Utc::now(),
         )
         .map_err(|_| invalid())?;
-    Ok(Some(PureCompletion {
+    Ok(PureCompletion {
         output,
         route,
         target,
         state,
-    }))
+    })
 }
 fn invalid() -> AppError {
     AppError::Database("Invalid pure workflow activation".into())
