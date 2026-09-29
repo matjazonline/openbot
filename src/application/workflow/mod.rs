@@ -7,6 +7,8 @@ pub mod activation;
 mod authorization;
 pub mod batch;
 pub mod binding;
+pub mod budget;
+pub mod capacity;
 pub mod compiler;
 pub mod completion;
 mod contracts;

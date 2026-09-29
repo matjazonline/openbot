@@ -2,6 +2,142 @@
 
 Original plans remain authoritative. Each point carries the full named section/item, README rules, and applicable phase acceptance criteria. Execute phases 01–10 in order. Each phase depends on the preceding phases. No backward compatibility is required: do not add legacy shims.
 
+## Current execution (2026-09-29 resume)
+
+08:55Z ROOT ACCEPTED03.9 AND COMPLETE PHASE03. Combined same-run admission→pure→
+scriptedIO→wait→classifiedretry→fresh competing workers→completion test PASS.
+Full stock2MiB library2191PASS/0FAIL/22existing unrelated ignores includes461workflow
+passes and fresh isolated migration/schema gates. Corrected focused integration,
+SQLxprepare/check,offlinealltargets,strictClippy,fmt,bothdiff,graft PASS. Independent
+combined actual-code/correction/final evidence PASS with no unresolved findings.
+Exact criterion matrix/commands/logs BRIEF-03-FINAL.md; budgets/fairness briefs retained.
+USER REQUESTED HANDOFF AND STOP AFTER03: no04 work. RESUME now starts at04.1 only
+on future authorization. TaskPG STOPPED CLEANLY/data retained; all workers quiescent,
+no active commands/approvals. Applied migrations through20260929100000 IMMUTABLE.
+All staged/unstaged/untracked including external website/imagegen preserved; no
+stage/unstage/commit/reset/deploy by this run. External staging occurred throughout.
+Final subtree /root/phase03_gate UUID01a0ec52-90c8-7632-9408-e4d08d8ae8ec parent
+107165/25840041.47%08:54:07Z; reviewer01a0ec52-d514-73c3-96d4-124faffe4af2 parent
+93080/25840036.02%08:53:16Z token_count.info sources. Root01a0ebc3-94b9-77d2-
+81e5-93e6da1fe5e6 Astra/low121872/25840047.16%08:54:08Z usage/runtime sources.
+Stopped at user's phase boundary, not context/capacity failure.
+
+08:40Z root ACCEPTED fairness A–F:21focused+460workflow stock2MiB PASS plus15affected
+rerun after syntax-only Clippy correction; migration/schema/SQLx/offlinealltargets/
+Clippy/fmt/bothdiff/graft and independent actual-code/correction/final evidence PASS.
+No unresolved findings. Responsive worker/DB liveness and bounded fixture EXPLAIN
+limitations retained. Full03 combined/library gate remains next. Exact fairness brief.
+Retired/quiescent /root/fairness_acceptance UUID01a0ec3e-15e9-7701-9acb-809cd8c20d03
+parent109542/25840042.39%08:38:46Z; reviewer01a0ec3e-5420-7690-a1c8-4353e47c16cd
+parent102022/25840039.48%08:38:54Z token_count.info. Root115106/25840044.55%
+08:38:57Z usage/runtime. PG running/no jobs, all staging/website preserved.
+
+08:17Z fairness core IMPLEMENTED UNVERIFIED:current8focused stock2MiB PASS and
+limited correction-code review PASS; remaining integrated A–F coverage/full gates
+explicit in fairness brief final handoff. Applied20260929100000 IMMUTABLE. No03.9
+acceptance yet. Prior subtree retired/quiescent /root/tenant_fairness UUID01a0ec28-
+65ae-78b1-a2d1-10d03ef91307 parent124111/25840048.03%08:16:58Z; reviewer01a0ec28-
+b8ea-7bf2-8ed6-007698ef764a parent102280/25840039.58%08:15:24Z token_count.info.
+Root107085/25840041.44%08:17:04Z same sources. PG running/no jobs/approvals,
+transfer fresh worker for remaining A–F and final independent acceptance.
+
+07:58Z root ACCEPTED replacement fairness design after independent design challenge:
+per-worker company/job horizon discovery; persistent requester-sticky company demand;
+protected opportunity begins only global+company capacity free, exceeds enforced
+retry bound. Bounded-responsive worker/DB liveness stated, no arbitrary suspension
+claim. Ticket-conditional invalidation; original expiry/shared-cursor algorithms
+rejected. Actual sustained dispatch tests/code review still required. New worker
+/root/tenant_fairness UUID01a0ec28-65ae-78b1-a2d1-10d03ef91307 57926/25840022.42%
+07:58:01Z usage/runtime; reviewer01a0ec28-b8ea-7bf2-8ed6-007698ef764a parent44517/
+25840017.23%07:57:02Z token_count.info. Root100223/25840038.79%07:58:01Z usage/runtime.
+Fairness IMPLEMENTING, full03 pending; all staging preserved, taskPG running.
+
+07:54Z root ACCEPTED capacity-only claim+renew enforcement:6focused+445workflow
+stock2MiB PASS; migration/schema/SQLx/offlinealltargets/Clippy/fmt/bothdiff/graft
+and independent actual-code/corrections/final evidence PASS. Applied090000 IMMUTABLE.
+Exact fairness brief handoff. Dispatch fairness NOT verified: expiring demand
+counterexample recorded; resolve before code. EXPLAIN is bounded fixture evidence,
+not proof of history-independent work. Subtree retired/quiescent /root/fairness_capacity
+UUID01a0ec10-6214-77b0-9a56-e6bb66210f26 parent116848/25840045.22%07:52:41Z;
+reviewer01a0ec10-a7d1-7ef2-ad0b-ac98a3291a8f parent84750/25840032.8%07:52:45Z.
+Root95392/25840036.92%07:52:50Z usage/runtime; worker sources token_count.info.
+TaskPG running transferred/no jobs; all staging/website preserved. Next fairness.
+
+07:32Z root ACCEPTED BRIEF-03.9-FAIRNESS coverage: immutable DB-global typed policy
+(default global16/company2), authoritative live-lease capacity at shared claim
+boundary, durable company turns/job cursors and mandatory fair worker discovery.
+Actual dispatch under sustained replenishment required, not merely company visits.
+Raw poll remains diagnostic only; lock-order and no second ownership ledger retained.
+Worker /root/fairness_capacity UUID01a0ec10-6214-77b0-9a56-e6bb66210f26 parent70793/
+25840027.4%07:31:10Z; reviewer01a0ec10-a7d1-7ef2-ad0b-ac98a3291a8f ready9.62%.
+Root87814/25840033.98%07:31:01Z token_count.info sources. Worker owns fairness
+brief/code/taskPG; root progress/resume. Capacity/fairness still unverified.
+
+07:27Z root ACCEPTED combined durable budgets: first activation charging and prior
+fenced reservations/schema/frozen limits independently reviewed together PASS.
+9focused+439workflow stock2MiB PASS; migration/SQLx/offlinealltargets/Clippy/fmt/
+bothdiff/graft PASS. Exact BRIEF-03.9-BUDGETS final handoff/logs. No new migration.
+Retired/quiescent /root/budget_activation UUID01a0ebfb-b949-7a60-8593-7a66728ee417
+parent115366/25840044.65%07:26:28Z, final own45.03%; reviewer01a0ebfb-fbcf-7c42-
+942a-ed59eb6dba85 parent94303/25840036.49%07:26:35Z token_count.info sources.
+Root83745/25840032.41%07:26:28Z same sources. PG running/no jobs, transfer next.
+NEXT global/per-company capacity+sustained tenant fairness, then combined full03.
+Preserve all staging/website work; no commit/reset/deploy. Budgets verified.
+
+07:05Z root ACCEPTED fenced model/repetition reservations and durable exhaustion
+fragment:9focused+430workflow stock2MiB PASS; migration/SQLx/static/diff/graft and
+independent actual-code/correction/final evidence PASS. Exact budget brief handoff.
+Applied20260929080000 IMMUTABLE. First activation charging/fairness/full03 pending.
+Retired/quiescent /root/budget_runtime UUID01a0ebe8-e3d1-7cf2-9675-1061c0ca513e,
+parent114518/25840044.32%07:03:37Z; reviewer01a0ebe9-2508-7da3-bc2a-ed2fc311b101
+parent78473/25840030.37%07:02:23Z token_count.info sources; final own44.73%.
+Root75135/25840029.08%07:03:42Z usage/runtime. PG transfers running, no jobs.
+External staging observed: preserve entire index and website edits; no stage/commit
+or reset performed by root/subtrees. New worker to finish activation runtime.
+
+06:44Z root ACCEPTED budget schema/accounting foundation only:420workflow stock2MiB
+PASS; migration/SQLxprepare+check/offlinealltargets/Clippy/fmt/bothdiff/graft PASS;
+independent actual-code/corrections/final evidence PASS. BRIEF-03.9-BUDGETS exact
+handoff/logs. Applied20260929070000 IMMUTABLE. Reservation port, activation debit,
+fenced calls/exhaustion/runtime acceptance still pending. Retired/quiescent subtree
+/root/durable_budgets UUID01a0ebd2-5bb3-78c2-9f8b-90995bf1621a parent126102/
+25840048.80%06:43:39Z; reviewer01a0ebd2-a4c8-78b2-a839-7e3195d4b2c2 parent68394/
+25840026.47%06:43:40Z token_count.info sources; final own48.87%. Root66962/258400
+25.91%06:43:45Z usage/runtime. TaskPG transfers running, no build/test jobs.
+Preserve external website/index.html and website/assets/BB-logo1-transparent.png.
+
+06:20Z root ACCEPTED intermediate frozen-budget contract only:4focused+35domain+
+145application stock2MiB tests, offlinealltargets/Clippy/fmt/bothdiff/graft and
+independent actual-code/correction/evidence PASS. Exact BRIEF-03.9-BUDGETS handoff.
+Compiler revision2 freezes explicit ceilings; old revision1 refuses load. No durable
+port/accounting/schema/runtime enforcement yet. Prior subtree retired/quiescent:
+implementer parent109543/25840042.39%06:19:45Z, reviewer61426/25840023.77%
+06:19:06Z token_count.info sources. Root59250/25840022.93%06:19:56Z usage/runtime.
+Fresh /root/durable_budgets Astra/medium assigned remaining SQL/runtime tranche and
+own nested review, preserving accepted source edits and website work. TaskPG stopped
+untouched, ownership transferred. Full03.9/fairness/full03 remain pending.
+
+06:09Z root ACCEPTED BRIEF-03.9-BUDGETS expansion: frozen bounded root limits,
+immutable tenant-scoped root linkage, atomic exact reservation receipts/usage,
+activation charging and observable exhaustion via existing owners. Retained-row
+accounting must not replenish allowance; saved receipts never grant effect authority.
+Implementer UUID01a0ebc4-c634-7583-833e-5295f694343e parent-verified75765/258400
+29.32%06:08:49Z token_count.info sources. Root50173/25840019.42%06:08:51Z
+usage/runtime sources. Implementation and nested independent review now authorized;
+budgets remain unverified, fairness/full03 pending.
+
+06:06Z fresh root resumed durable root budgets, then capacity/fairness and combined03
+acceptance. Existing expansion retained; concrete budget reconciliation assigned to
+sole /root/root_budgets Astra/medium before code edits. Root owns PROGRESS/RESUME;
+worker owns BRIEF-03.9-BUDGETS/code/taskPG and its independent nested reviewer.
+Baseline HEAD ae401bfeffe9495ea95a4596c3368485f4b64232; only website/index.html
+modified at startup, preserved. Applied migrations through20260928210000 immutable.
+TaskPG retained/stopped at assignment; current sandbox permissions supersede old
+Full Access notes. No stage/commit/reset/deploy. Budgets/fairness/full03 unverified.
+Root UUID01a0ebc3-94b9-77d2-81e5-93e6da1fe5e6 Astra/low runtime confirmed;
+startup24566/2584009.51%06:04:51Z, latest48161/25840018.64%06:05:45Z,
+token_usage_record.usage/task_started.model_context_window sources.
+
 ## Current execution (2026-09-28 resume)
 
 21:03Z root ACCEPTED03.9 controls after concrete parent-FK lock regression correction.

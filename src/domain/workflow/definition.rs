@@ -36,6 +36,8 @@ pub const MAX_EXECUTION_STEPS: u32 = 100_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionLimits {
+    /// Shared across descendants; admission freezes the root's allowance.
+    pub root_budget: super::RootBudgetLimits,
     /// The runtime must debit this on each step execution, including repeats.
     pub max_steps: u32,
     /// The runtime passes this bound to every context resolution.

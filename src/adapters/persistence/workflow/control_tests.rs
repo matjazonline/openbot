@@ -412,3 +412,6 @@ mod guard_tests;
 
 #[path = "control_acceptance_tests.rs"]
 mod acceptance_tests;
+
+#[path = "budget_runtime_tests.rs"]
+mod budget_runtime_tests;

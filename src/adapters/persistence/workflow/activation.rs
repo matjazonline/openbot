@@ -16,6 +16,7 @@ struct RunRow {
     max_context_bytes: i32,
     max_steps: i32,
     expired: bool,
+    state: String,
 }
 #[derive(sqlx::FromRow)]
 struct ExecutionRow {
@@ -31,17 +32,21 @@ impl WorkflowActivation for PostgresPersistence {
         let mut tx = self.pool.begin().await?;
         let result = activate_on(&mut tx, request).await?;
         tx.commit().await?;
-        Ok(result)
+        result.ok_or_else(budget_exhausted)
     }
 }
 
-/// Caller owns the transaction. Later bounded batches reuse this same boundary.
+fn budget_exhausted() -> AppError {
+    AppError::Conflict("Workflow root activation budget exhausted".into())
+}
+
+/// None is a durably settled root-budget refusal; caller must commit it.
 pub(super) async fn activate_on(
     db: &mut PgConnection,
     request: ActivationRequest,
-) -> AppResult<ActivatedExecution> {
+) -> AppResult<Option<ActivatedExecution>> {
     let run = sqlx::query_as::<_, RunRow>(
-        "SELECT binding_id, input, max_context_bytes, max_steps, deadline <= clock_timestamp() AS expired \
+        "SELECT binding_id, input, max_context_bytes, max_steps, state, deadline <= clock_timestamp() AS expired \
          FROM workflow_runs WHERE company_id = $1 AND id = $2 FOR UPDATE",
     )
     .bind(request.company.as_uuid()).bind(request.run.as_uuid())
@@ -65,12 +70,18 @@ pub(super) async fn activate_on(
             choice: row.frozen_choice,
         }
     } else {
-        if run.expired || row.activation > i64::from(run.max_steps) {
+        if run.expired
+            || !matches!(run.state.as_str(), "queued" | "running")
+            || row.activation > i64::from(run.max_steps)
+        {
             return Err(AppError::Conflict(
                 "Workflow activation limit reached".into(),
             ));
         }
         let prepared = resolve(db, request, &run, &step, row.activation).await?;
+        if !budget::activate(db, request).await? {
+            return Ok(None);
+        }
         let written = sqlx::query(
             "UPDATE workflow_executions SET frozen_inputs = $4, frozen_choice = $5, activated_at = clock_timestamp() \
              WHERE company_id = $1 AND run_id = $2 AND id = $3 \
@@ -86,7 +97,7 @@ pub(super) async fn activate_on(
         }
         prepared
     };
-    Ok(ActivatedExecution {
+    Ok(Some(ActivatedExecution {
         execution: request.execution,
         step,
         ordinal,
@@ -96,7 +107,7 @@ pub(super) async fn activate_on(
             .map(ChoiceName::parse)
             .transpose()
             .map_err(|_| invalid())?,
-    })
+    }))
 }
 
 async fn validate_job(db: &mut PgConnection, request: ActivationRequest) -> AppResult<()> {

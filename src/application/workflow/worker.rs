@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 #[async_trait]
 pub trait WorkflowHandler: Send + Sync {
-    /// Missing subsystem support must not spend an execution attempt.
+    /// Pure, nonblocking capability decision. Missing support spends no attempt.
     fn supports(&self, kind: &WorkflowStepKind) -> bool;
     /// Effect permission, receipts and replay safety remain the handler's contract.
     async fn execute(
@@ -32,6 +32,7 @@ pub struct WorkflowWorker<'a, P, H> {
 impl<P, H> WorkflowWorker<'_, P, H>
 where
     P: WorkflowPolling
+        + WorkflowFairPolling
         + WorkflowBatch
         + WorkflowWaits
         + WorkflowLeases
@@ -42,20 +43,27 @@ where
     /// Own one actual operation at a time. Dropping the loop drops its in-flight
     /// future; an interrupted committed claim expires through the existing ledger.
     pub async fn run(&self, wakeup: &Notify, shutdown: &CancellationToken) {
-        let mut cursor = None;
         loop {
             let page = tokio::select! { biased;
                 _ = shutdown.cancelled() => return,
-                result = self.port.poll_work(cursor, self.poll.page_size()) => result,
+                result = self.port.poll_fair(self.worker, self.poll.page_size()) => result,
             };
             match page {
                 Ok(page) => {
-                    cursor = page.next;
                     for candidate in page.candidates {
                         let result = tokio::select! { biased;
                             _ = shutdown.cancelled() => return,
                             result = Box::pin(self.process(candidate, shutdown)) => result,
                         };
+                        if matches!(result, Ok(WorkDisposition::Unsupported))
+                            && let Some(ticket) = page.demand
+                            && let Err(error) = self.port.withdraw_demand(self.worker, ticket).await
+                        {
+                            tracing::warn!(error = %error, "Workflow demand withdrawal failed");
+                        }
+                        if matches!(result, Ok(WorkDisposition::Deferred)) {
+                            break; // Outstanding supported demand must get the very next retry.
+                        }
                         if let Err(error) = result {
                             tracing::warn!(company_id = %candidate.scope.company.as_uuid(),
                                 run_id = %candidate.scope.run.as_uuid(), error = %error,
@@ -88,24 +96,24 @@ where
         &self,
         candidate: PollCandidate,
         shutdown: &CancellationToken,
-    ) -> AppResult<()> {
+    ) -> AppResult<WorkDisposition> {
         let scope = candidate.scope;
         match candidate.work {
             PollWork::ExpiredRun => {
                 self.port.expire_run(scope).await?;
-                return Ok(());
+                return Ok(WorkDisposition::Done);
             }
             PollWork::Wait => {
                 self.port.resume_wait(scope).await?;
-                return Ok(());
+                return Ok(WorkDisposition::Done);
             }
             PollWork::ExpiredLease => {
                 self.port.retire_expired_io(scope, self.lease).await?;
-                return Ok(());
+                return Ok(WorkDisposition::Done);
             }
             PollWork::ExhaustedPending => {
                 self.port.retire_exhausted_work(scope, self.lease).await?;
-                return Ok(());
+                return Ok(WorkDisposition::Done);
             }
             PollWork::Job => {}
         }
@@ -122,11 +130,11 @@ where
                 }
             }
             _ if is_io_kind(&kind.0) && self.handler.supports(&kind) => {
-                self.execute_io(scope, &kind, shutdown).await?;
+                return self.execute_io(scope, &kind, shutdown).await;
             }
-            _ => {} // Durable unsupported boundary; cursor still moves forward.
+            _ => return Ok(WorkDisposition::Unsupported),
         }
-        Ok(())
+        Ok(WorkDisposition::Done)
     }
 
     async fn execute_io(
@@ -134,9 +142,9 @@ where
         scope: ActivationRequest,
         kind: &WorkflowStepKind,
         shutdown: &CancellationToken,
-    ) -> AppResult<()> {
+    ) -> AppResult<WorkDisposition> {
         let Some(claim) = self.port.claim_io(scope, self.worker, self.lease).await? else {
-            return Ok(());
+            return Ok(WorkDisposition::Deferred);
         };
         // Box the external boundary: stock-stack tests must remain safe as real
         // action/agent implementations replace the scripted handler.
@@ -153,6 +161,13 @@ where
         if let SupervisedResult::Ready(result) = result {
             self.port.complete_io(result).await?;
         }
-        Ok(())
+        Ok(WorkDisposition::Done)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkDisposition {
+    Done,
+    Deferred,
+    Unsupported,
 }

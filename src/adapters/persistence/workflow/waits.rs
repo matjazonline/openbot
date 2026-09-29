@@ -244,7 +244,9 @@ async fn signal_on(db: &mut PgConnection, signal: WorkflowSignal) -> AppResult<b
         scope.run.as_uuid(),
     )
     .await?;
-    let activation = activation::activate_on(db, scope).await?;
+    let activation = activation::activate_on(db, scope)
+        .await?
+        .ok_or_else(invalid)?;
     let spec = specification(binding.bundle(), &activation)?;
     if spec.timer
         || spec.deadline <= now

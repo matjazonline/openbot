@@ -333,3 +333,9 @@ async fn workflow_wakeup_scope_bounds_and_parent_identity_guards() {
 
 #[path = "wakeup_guard_tests.rs"]
 mod guard_tests;
+
+#[path = "budget_schema_tests.rs"]
+mod budget_schema_tests;
+
+#[path = "budget_activation_tests.rs"]
+mod budget_activation_tests;

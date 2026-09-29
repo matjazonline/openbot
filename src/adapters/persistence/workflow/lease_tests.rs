@@ -3,6 +3,9 @@ use crate::application::workflow::{activation::*, lease::*};
 use std::time::Duration;
 use tokio::{sync::Barrier, time::Instant};
 
+#[path = "capacity_tests.rs"]
+mod capacity_tests;
+
 fn policy() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(3)).unwrap()
 }

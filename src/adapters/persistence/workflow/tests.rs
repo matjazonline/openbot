@@ -49,31 +49,33 @@ impl PublicationDirectory for Preflight {
 }
 type Service = DefinitionService<Preflight, PostgresPersistence, WorkflowSourceDecoder, Preflight>;
 struct Fixture {
-    _db: OwnDatabase,
+    _db: Arc<OwnDatabase>,
     persistence: PostgresPersistence,
     target: DefinitionTarget,
 }
 impl Fixture {
     async fn new() -> Self {
-        let db = own_database()
-            .await
-            .expect("workflow SQL tests require a database");
+        let db = Arc::new(
+            own_database()
+                .await
+                .expect("workflow SQL tests require a database"),
+        );
+        Self::in_database(db, "").await
+    }
+    async fn in_database(db: Arc<OwnDatabase>, suffix: &str) -> Self {
         let persistence = PostgresPersistence::new(db.pool.clone());
+        let email = format!("workflow{suffix}@example.test");
         persistence
-            .create_user("workflow_owner", "workflow@example.test", "hash")
+            .create_user(&format!("workflow_owner{suffix}"), &email, "hash")
             .await
             .unwrap();
-        let user = persistence
-            .get_by_email("workflow@example.test")
-            .await
-            .unwrap()
-            .unwrap();
+        let user = persistence.get_by_email(&email).await.unwrap().unwrap();
         let company = CompanyPersistence::create(
             &persistence,
             user.id,
             CompanyWrite {
                 name: "Workflow tests".into(),
-                slug: "workflow-tests".into(),
+                slug: format!("workflow-tests{suffix}"),
                 ..Default::default()
             },
         )

@@ -6,7 +6,7 @@
 /// context/evaluation budgets, registry specialization or interpreter semantics,
 /// even when the serialized representation would remain identical. Old revisions
 /// require an explicit compatible loader; they must never be silently recompiled.
-pub const SEMANTIC_REVISION: u32 = 1;
+pub const SEMANTIC_REVISION: u32 = 2;
 mod analysis;
 mod binding;
 mod compile;

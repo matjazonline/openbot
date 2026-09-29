@@ -2,6 +2,7 @@
 //! integrity and bounded context construction; schema, resource authorization,
 //! expression compilation, and publication checks belong to later layers.
 
+mod budget;
 mod causality;
 mod context;
 mod definition;
@@ -14,6 +15,7 @@ mod rule;
 mod state;
 mod transition;
 
+pub use budget::{BudgetCharge, BudgetLimitError, BudgetResource, RootBudgetLimits};
 pub use causality::{
     ActionRef, CausalError, ChildCause, ExecutionRef, MessageEffectLink, RunCausality,
     StepCausality, TriggerRef, TriggerSource,

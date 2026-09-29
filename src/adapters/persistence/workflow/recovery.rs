@@ -49,7 +49,11 @@ pub(super) async fn retire_on(
         report.safety,
         RecoverySnapshot {
             attempts,
-            work_budget: RetryEligibility::Available,
+            work_budget: if matches!(reason, Retirement::BudgetExhausted) {
+                RetryEligibility::Exhausted
+            } else {
+                RetryEligibility::Available
+            },
             now: run.now,
             deadline: run.deadline,
         },
@@ -73,12 +77,14 @@ fn report(reason: &Retirement, kind: &str) -> AppResult<WorkflowFailure> {
     }
     // These engine-owned read handlers cannot dispatch an effect. Every other
     // interrupted handler is ambiguous until its owning subsystem reconciles it.
+    // Refusing new work does not prove that earlier charged effects are safe.
     let safety = if matches!(kind, "context.load" | "memory.load") {
         RetrySafety::SafeToRetry
     } else {
         RetrySafety::EffectOutcomeUnknown
     };
     let (class, code) = match reason {
+        Retirement::BudgetExhausted => (FailureClass::Terminal, "workflow.root_budget_exhausted"),
         Retirement::Expired => (FailureClass::Retryable, "workflow.lease_expired"),
         Retirement::Interrupted(LeaseReleaseCause::ActivationLimit) => {
             (FailureClass::Terminal, "workflow.activation_limit")
@@ -172,7 +178,9 @@ async fn route_failure(
         _ => return Err(invalid()),
     };
     Ok(if let Some(target) = target {
-        let activation = activation::activate_on(db, scope).await?;
+        let activation = activation::activate_on(db, scope)
+            .await?
+            .ok_or_else(invalid)?;
         // A final-error branch cannot manufacture an activation beyond the run allowance.
         if target == TransitionTarget::End
             || activation.ordinal < u64::try_from(run.max_steps).map_err(|_| invalid())?

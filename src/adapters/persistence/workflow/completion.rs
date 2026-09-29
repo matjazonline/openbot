@@ -77,7 +77,9 @@ pub(super) async fn complete_on(
         scope.run.as_uuid(),
     )
     .await?;
-    let activation = activation::activate_on(db, scope).await?;
+    let activation = activation::activate_on(db, scope)
+        .await?
+        .ok_or_else(invalid)?;
     let completion =
         match prepare_result(binding.bundle(), &activation, result.output, run.max_steps) {
             Ok(completion) => completion,

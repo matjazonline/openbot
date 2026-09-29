@@ -53,18 +53,15 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 and phase02 library scope (02.1–02.8) and03.1–03.8 are verified.03.9 now has
-verified recovery policy and durable classified-failure retry/final-error/reconciliation
-fragments (8focused+63integration stock2MiB plus migrations/SQLx/static gates and
-independent review). The poison-work fragment is verified:127database tests at stock2MiB plus
-migration/SQLx/static gates and independent actual-code/evidence review PASS.
-Resume from [RESUME.md](RESUME.md); [BRIEF-03.9.md](BRIEF-03.9.md) records evidence.
-Deadline maintenance and controls are verified. The parent-lock regression is fixed
-with an additive immutable-lineage migration; the unchanged two-second regression,
-15focused wakeup tests,26controls tests and411workflow tests pass at stock2MiB.
-Migration/SQLx/static gates and independent code/evidence review pass.
-User-requested stop after controls: durable root budgets, capacity/tenant fairness,
-and combined full phase03 acceptance remain pending. Resume from RESUME.md.
+Phase01 and phase02 library scope (02.1–02.8),03.1–03.8 and the03.9 recovery,
+controls, durable root budgets and sustained tenant fairness fragments are verified.
+The combined phase03 gate has passed the full database-backed library suite at
+the stock2MiB stack (2191passed,0failed,22existing optional/developer ignores),
+plus migration/schema, SQLx, offline compilation, Clippy and formatting checks.
+Independent combined actual-code and final evidence review passed; root accepted phase03.
+[BRIEF-03-FINAL.md](BRIEF-03-FINAL.md) records the exact gate and limitations.
+The user requested a handoff and stop after03. Phase04 has not started.
+Resume from [RESUME.md](RESUME.md) only in the next authorized session.
 [PROGRESS.md](PROGRESS.md) records accepted scope and handoffs.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
 inventories current owners and removal gates.

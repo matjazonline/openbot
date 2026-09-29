@@ -630,6 +630,11 @@ pub(crate) fn compile_resolved(
         "definition": super::json_value(&decoded.root, "")?,
         "descriptors": steps.facts,
         "dependencies": dependencies,
+        "root_budget": {
+            "activations": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::Activation),
+            "model_calls": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::ModelCall),
+            "repetitions": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::Repetition),
+        },
     });
     let content_hash = identity(&decoded.source, &representation);
     Ok(CompiledWorkflow {
@@ -655,6 +660,10 @@ pub(crate) fn compile_resolved(
 #[cfg(test)]
 #[path = "compile_test_support.rs"]
 mod test_support;
+
+#[cfg(test)]
+#[path = "budget_tests.rs"]
+mod budget_tests;
 
 #[cfg(test)]
 #[path = "compile_tests.rs"]

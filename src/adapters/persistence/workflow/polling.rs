@@ -3,11 +3,11 @@ use crate::application::workflow::{activation::*, polling::*};
 use std::time::Duration;
 
 #[derive(sqlx::FromRow)]
-struct CandidateRow {
+pub(super) struct CandidateRow {
     company_id: Uuid,
     run_id: Uuid,
     execution_id: Uuid,
-    job_id: Uuid,
+    pub(super) job_id: Uuid,
     work: String,
 }
 #[async_trait]
@@ -20,40 +20,7 @@ impl WorkflowPolling for PostgresPersistence {
             let mut tx = self.pool.begin().await?;
             sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
                 .execute(&mut *tx).await?;
-            let rows = sqlx::query_as::<_, CandidateRow>(r#"
-                SELECT job.company_id, execution.run_id, execution.id AS execution_id,
-                       job.id AS job_id,
-                       CASE WHEN run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp() THEN 'deadline'
-                            WHEN wait.id IS NOT NULL THEN 'wait'
-                            WHEN job.status = 'processing' THEN 'expired'
-                            WHEN job.retry_count >= job.max_retries THEN 'exhausted' ELSE 'job' END AS work
-                FROM background_tasks AS job
-                JOIN workflow_executions AS execution
-                  ON execution.company_id = job.company_id AND execution.id = job.workflow_execution_id
-                JOIN workflow_runs AS run
-                  ON run.company_id = execution.company_id AND run.id = execution.run_id
-                LEFT JOIN workflow_waits AS wait
-                  ON wait.company_id = execution.company_id AND wait.execution_id = execution.id
-                 AND wait.run_id = run.id AND wait.state = 'waiting'
-                WHERE job.queue_kind = 'workflow' AND execution.completed_at IS NULL
-                  AND ($1::uuid IS NULL OR job.id > $1)
-                  AND (
-                    (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
-                    OR (wait.id IS NULL AND run.state IN ('queued','running')
-                     AND run.deadline > clock_timestamp()
-                     AND ((job.status = 'pending' AND job.run_at <= clock_timestamp()
-                           )
-                          OR (job.status = 'processing' AND job.lock_expires_at <= clock_timestamp())))
-                    OR (wait.id IS NOT NULL AND (
-                        wait.deadline <= clock_timestamp() OR run.deadline <= clock_timestamp()
-                        OR run.state IN ('cancelled','failed','succeeded')
-                        OR EXISTS (SELECT 1 FROM workflow_wait_events AS event
-                            WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
-                              AND event.execution_id = wait.execution_id
-                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation)))
-                  )
-                ORDER BY job.id LIMIT $2
-            "#).bind(after.map(|cursor| cursor.0)).bind(i64::from(limit))
+            let rows = sqlx::query_as::<_, CandidateRow>(&format!("{CANDIDATES_SQL} AND ($1::uuid IS NULL OR job.id > $1) ORDER BY job.id LIMIT $2")).bind(after.map(|cursor| cursor.0)).bind(i64::from(limit))
                 .fetch_all(&mut *tx).await?;
             tx.commit().await?;
             let next = rows.last().map(|row| PollCursor(row.job_id));
@@ -92,7 +59,7 @@ impl WorkflowPolling for PostgresPersistence {
         }).await.map_err(|_| lease::timed_out())?
     }
 }
-fn candidate(row: CandidateRow) -> AppResult<PollCandidate> {
+pub(super) fn candidate(row: CandidateRow) -> AppResult<PollCandidate> {
     Ok(PollCandidate {
         scope: ActivationRequest {
             company: CompanyId::new(row.company_id),
@@ -110,3 +77,37 @@ fn candidate(row: CandidateRow) -> AppResult<PollCandidate> {
         },
     })
 }
+
+/// Shared eligibility for diagnostics and fair discovery. Neither grants ownership.
+pub(super) const CANDIDATES_SQL: &str = r#"
+                SELECT job.company_id, execution.run_id, execution.id AS execution_id,
+                       job.id AS job_id,
+                       CASE WHEN run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp() THEN 'deadline'
+                            WHEN wait.id IS NOT NULL THEN 'wait'
+                            WHEN job.status = 'processing' THEN 'expired'
+                            WHEN job.retry_count >= job.max_retries THEN 'exhausted' ELSE 'job' END AS work
+                FROM background_tasks AS job
+                JOIN workflow_executions AS execution
+                  ON execution.company_id = job.company_id AND execution.id = job.workflow_execution_id
+                JOIN workflow_runs AS run
+                  ON run.company_id = execution.company_id AND run.id = execution.run_id
+                LEFT JOIN workflow_waits AS wait
+                  ON wait.company_id = execution.company_id AND wait.execution_id = execution.id
+                 AND wait.run_id = run.id AND wait.state = 'waiting'
+                WHERE job.queue_kind = 'workflow' AND execution.completed_at IS NULL
+                  AND (
+                    (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
+                    OR (wait.id IS NULL AND run.state IN ('queued','running')
+                     AND run.deadline > clock_timestamp()
+                     AND ((job.status = 'pending' AND job.run_at <= clock_timestamp()
+                           )
+                          OR (job.status = 'processing' AND job.lock_expires_at <= clock_timestamp())))
+                    OR (wait.id IS NOT NULL AND (
+                        wait.deadline <= clock_timestamp() OR run.deadline <= clock_timestamp()
+                        OR run.state IN ('cancelled','failed','succeeded')
+                        OR EXISTS (SELECT 1 FROM workflow_wait_events AS event
+                            WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
+                              AND event.execution_id = wait.execution_id
+                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation)))
+                  )
+"#;

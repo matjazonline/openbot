@@ -61,6 +61,9 @@ impl BindingFixture {
     }
     pub(super) async fn from_source(source: serde_json::Value) -> Self {
         let fixture = Fixture::new().await;
+        Self::from_fixture(fixture, source).await
+    }
+    pub(super) async fn from_fixture(fixture: Fixture, source: serde_json::Value) -> Self {
         let mut draft = fixture.save(None);
         draft.content.source = source.to_string();
         fixture.service().save(draft).await.unwrap();

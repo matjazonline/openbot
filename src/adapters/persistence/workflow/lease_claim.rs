@@ -50,6 +50,9 @@ pub(super) async fn claim_on(
     let Some(activation) = Box::pin(pending_recovery::activate(db, scope)).await? else {
         return Ok(None);
     };
+    if !fairness::available(db, scope, worker).await? {
+        return Ok(None);
+    }
     let fence = WorkflowFence {
         scope,
         worker,

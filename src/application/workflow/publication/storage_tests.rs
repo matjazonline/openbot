@@ -31,7 +31,54 @@ fn workflow_storage_restores_all_frozen_fixtures_and_child_identity() {
         );
         assert_eq!(restored.children().len(), original.children().len());
         assert_eq!(store_bundle(&restored).unwrap(), bytes);
+        assert_eq!(
+            restored.compiled().graph().definition().limits.root_budget,
+            original.compiled().graph().definition().limits.root_budget
+        );
     }
+}
+
+#[test]
+fn workflow_root_budget_storage_roundtrip_and_old_semantics_refusal() {
+    let fixture = Fixture::AutonomousResponse;
+    let company = CompanyId::new(Uuid::from_u128(91));
+    let source = fixture.source().replace(
+        "limits: {",
+        "limits: {root_budget: {activations: 9, model_calls: 4, repetitions: 2}, ",
+    );
+    let original = freeze(
+        decode(&source).unwrap(),
+        company,
+        fixture.version_id(),
+        fixture.snapshots(company),
+        vec![],
+    )
+    .unwrap();
+    let bytes = store_bundle(&original).unwrap();
+    let restored = restore_bundle(&bytes, &WorkflowSourceDecoder).unwrap();
+    assert_eq!(
+        restored.compiled().graph().definition().limits.root_budget,
+        crate::domain::workflow::RootBudgetLimits::new(9, 4, 2).unwrap()
+    );
+    assert_eq!(store_bundle(&restored).unwrap(), bytes);
+    let mut stored: Value = serde_json::from_slice(&bytes).unwrap();
+    stored["compiler_revision"] = json!(1);
+    assert!(
+        restore_bundle(
+            &serde_json::to_vec(&stored).unwrap(),
+            &WorkflowSourceDecoder
+        )
+        .is_err()
+    );
+    stored["compiler_revision"] = json!(compiler::SEMANTIC_REVISION);
+    stored["versions"][0]["compiled"]["root_budget"]["model_calls"] = json!(5);
+    assert!(
+        restore_bundle(
+            &serde_json::to_vec(&stored).unwrap(),
+            &WorkflowSourceDecoder
+        )
+        .is_err()
+    );
 }
 
 #[test]

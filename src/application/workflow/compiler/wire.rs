@@ -4,8 +4,9 @@ use super::{
     parse_binding, required, scalar_string, sequence,
 };
 use crate::domain::workflow::{
-    ChoiceName, ExecutionLimits, OrderedRule, ResourceName, ResourceRequirement, Routes, RuleCase,
-    StepDefinition, StepId, TransitionTarget, TypeName, VersionId, WorkflowDefinition, WorkflowId,
+    BudgetResource, ChoiceName, ExecutionLimits, OrderedRule, ResourceName, ResourceRequirement,
+    RootBudgetLimits, Routes, RuleCase, StepDefinition, StepId, TransitionTarget, TypeName,
+    VersionId, WorkflowDefinition, WorkflowId,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -334,17 +335,7 @@ pub(crate) fn parse_workflow(
     })?;
     let parsed_steps = steps(required(&map, "steps", "", root)?, "/steps")?;
     let limits_node = required(&map, "limits", "", root)?;
-    let limit_fields = fields(limits_node, "/limits", &["max_steps", "max_context_bytes"])?;
-    let max_steps = positive_u32(
-        required(&limit_fields, "max_steps", "/limits", limits_node)?,
-        "/limits/max_steps",
-        100_000,
-    )?;
-    let max_context_bytes = positive_u32(
-        required(&limit_fields, "max_context_bytes", "/limits", limits_node)?,
-        "/limits/max_context_bytes",
-        1_048_576,
-    )? as usize;
+    let limits = execution_limits(limits_node)?;
     let mut spans = BTreeMap::new();
     locations(root, "", &mut spans);
     Ok(ParsedWorkflow {
@@ -358,15 +349,58 @@ pub(crate) fn parse_workflow(
             resources,
             entry,
             steps: parsed_steps.steps,
-            limits: ExecutionLimits {
-                max_steps,
-                max_context_bytes,
-            },
+            limits,
         },
         controls: parsed_steps.controls,
         rules: parsed_steps.rules,
         locations: spans,
     })
+}
+
+fn execution_limits(limits_node: &LocatedNode) -> Result<ExecutionLimits, Diagnostic> {
+    let limit_fields = fields(
+        limits_node,
+        "/limits",
+        &["max_steps", "max_context_bytes", "root_budget"],
+    )?;
+    let max_steps = positive_u32(
+        required(&limit_fields, "max_steps", "/limits", limits_node)?,
+        "/limits/max_steps",
+        100_000,
+    )?;
+    let max_context_bytes = positive_u32(
+        required(&limit_fields, "max_context_bytes", "/limits", limits_node)?,
+        "/limits/max_context_bytes",
+        1_048_576,
+    )? as usize;
+    let root_budget = limit_fields
+        .get("root_budget")
+        .map(|node| root_budget_limits(node))
+        .transpose()?
+        .unwrap_or_default();
+    Ok(ExecutionLimits {
+        max_steps,
+        max_context_bytes,
+        root_budget,
+    })
+}
+
+fn root_budget_limits(node: &LocatedNode) -> Result<RootBudgetLimits, Diagnostic> {
+    let path = "/limits/root_budget";
+    let values = fields(node, path, &["activations", "model_calls", "repetitions"])?;
+    let read = |field: &str, resource: BudgetResource| {
+        positive_u32(
+            required(&values, field, path, node)?,
+            &format!("{path}/{field}"),
+            resource.maximum(),
+        )
+    };
+    RootBudgetLimits::new(
+        read("activations", BudgetResource::Activation)?,
+        read("model_calls", BudgetResource::ModelCall)?,
+        read("repetitions", BudgetResource::Repetition)?,
+    )
+    .map_err(|_| Diagnostic::at("syntax.integer", "Invalid root budget", path, node.span))
 }
 
 trait NumericNode {

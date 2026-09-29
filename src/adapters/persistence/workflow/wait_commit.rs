@@ -68,7 +68,9 @@ async fn advance(
         scope.run.as_uuid(),
     )
     .await?;
-    let activation = activation::activate_on(db, scope).await?;
+    let activation = activation::activate_on(db, scope)
+        .await?
+        .ok_or_else(invalid)?;
     let output = event
         .as_ref()
         .map(|event| event.payload.clone())

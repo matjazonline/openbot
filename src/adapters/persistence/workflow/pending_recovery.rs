@@ -8,6 +8,7 @@ pub(super) enum PendingFailure {
     InvalidOutput,
     ActivationLimit,
     AttemptsExhausted,
+    RootBudgetExhausted,
 }
 impl PendingFailure {
     fn code(self) -> &'static str {
@@ -16,6 +17,7 @@ impl PendingFailure {
             Self::InvalidOutput => "workflow.invalid_output",
             Self::ActivationLimit => "workflow.activation_limit",
             Self::AttemptsExhausted => "workflow.attempts_exhausted",
+            Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
         }
     }
 }
@@ -33,7 +35,7 @@ pub(super) async fn activate(
         return Ok(None);
     }
     match activation::activate_on(db, scope).await {
-        Ok(activation) => Ok(Some(activation)),
+        Ok(activation) => Ok(activation),
         Err(AppError::BadRequest(_)) => {
             settle(db, scope, PendingFailure::InvalidInput).await?;
             Ok(None)

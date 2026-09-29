@@ -275,6 +275,7 @@ mod tests {
             entry: id("a"),
             steps: [(id("a"), branch), (id("b"), success)].into(),
             limits: ExecutionLimits {
+                root_budget: Default::default(),
                 max_steps: 10,
                 max_context_bytes: 1024,
             },

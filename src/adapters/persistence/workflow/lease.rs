@@ -48,7 +48,11 @@ impl WorkflowLeases for PostgresPersistence {
         let started = Instant::now();
         tokio::time::timeout(policy.persistence_timeout(), async {
             let mut tx = self.pool.begin().await?;
-            if !lock_fence(&mut tx, fence, policy).await? || live_window(&mut tx, fence, started).await?.is_none() { return Ok(None); }
+            if !lock_fence(&mut tx, fence, policy).await? { return Ok(None); }
+            // A renewal must not remain uncommitted across its old expiry while
+            // another claimant counts that old version as free capacity.
+            capacity::lock(&mut tx).await?;
+            if live_window(&mut tx, fence, started).await?.is_none() { return Ok(None); }
             sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id = $3 AND id = $4)) WHERE id = $1 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
                 .bind(fence.scope.job.0).bind(policy.duration().as_secs_f64()).bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).execute(&mut *tx).await?;
             let window = live_window(&mut tx, fence, started).await?;
@@ -132,7 +136,7 @@ pub(super) async fn lock_scope(
     Ok(active.then_some((run, job)))
 }
 
-async fn lock_fence(
+pub(super) async fn lock_fence(
     db: &mut PgConnection,
     fence: WorkflowFence,
     policy: LeasePolicy,
@@ -179,6 +183,7 @@ pub(super) async fn retire(
 
 #[derive(Clone)]
 pub(super) enum Retirement {
+    BudgetExhausted,
     Expired,
     Interrupted(LeaseReleaseCause),
 }

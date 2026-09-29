@@ -432,3 +432,6 @@ mod integration_tests;
 
 #[path = "maintenance_worker_tests.rs"]
 mod maintenance_worker_tests;
+
+#[path = "phase03_tests.rs"]
+mod phase03_tests;

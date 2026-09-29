@@ -40,6 +40,23 @@ async fn activated(f: &AdmissionFixture, request: ActivationRequest) -> bool {
         .unwrap()
 }
 
+async fn assert_charged(f: &AdmissionFixture, count: i64) {
+    let actual: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(sum(activations),0)::bigint FROM workflow_root_budget_usage",
+    )
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    let receipts: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_budget_receipts WHERE resource='activation'",
+    )
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    assert_eq!(actual, count);
+    assert_eq!(receipts, count);
+}
+
 #[tokio::test]
 async fn workflow_activation_competing_connections_freeze_once() {
     let (f, request) = fixture().await;
@@ -48,7 +65,7 @@ async fn workflow_activation_competing_connections_freeze_once() {
         let mut connection = f.persistence().pool().acquire().await.unwrap();
         let mut tx = sqlx::Connection::begin(&mut *connection).await.unwrap();
         barrier.wait().await;
-        let result = activate_on(&mut tx, request).await.unwrap();
+        let result = activate_on(&mut tx, request).await.unwrap().unwrap();
         tx.commit().await.unwrap();
         result
     };
@@ -64,6 +81,7 @@ async fn workflow_activation_competing_connections_freeze_once() {
             .await
             .unwrap();
     assert_eq!(count, 1);
+    assert_charged(&f, 1).await;
 }
 
 #[tokio::test]
@@ -71,11 +89,15 @@ async fn workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts()
     let (f, request) = fixture().await;
     // A worker dies with an uncommitted activation: dropping rolls back the write.
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    let original = activate_on(&mut tx, request).await.unwrap();
+    let original = activate_on(&mut tx, request).await.unwrap().unwrap();
     drop(tx);
     assert!(!activated(&f, request).await);
+    assert_charged(&f, 0).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    assert_eq!(activate_on(&mut tx, request).await.unwrap(), original);
+    assert_eq!(
+        activate_on(&mut tx, request).await.unwrap().unwrap(),
+        original
+    );
     tx.commit().await.unwrap(); // Simulate losing the response after commit.
     for attempt in [1, 2] {
         sqlx::query("INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, machine_id) VALUES (gen_random_uuid(), $1, $2, 'failed', gen_random_uuid(), gen_random_uuid(), 'activation-test')")
@@ -131,6 +153,7 @@ async fn workflow_activation_predecessor_order_repeats_and_saved_replay() {
     let next = successor(&f, first, "next", 2).await;
     assert!(f.persistence().activate(next).await.is_err());
     assert!(!activated(&f, next).await);
+    assert_charged(&f, 0).await;
     f.persistence().activate(first).await.unwrap();
     complete_fixture(&f, first, json!({"round":1})).await;
     let saved = f.persistence().activate(next).await.unwrap();
@@ -169,6 +192,7 @@ async fn workflow_activation_scopes_job_run_and_rejects_invalid_inputs() {
     ] {
         assert!(f.persistence().activate(bad).await.is_err());
         assert!(!activated(&f, request).await);
+        assert_charged(&f, 0).await;
     }
     let other = successor(&f, request, "next", 2).await;
     assert!(
@@ -189,6 +213,7 @@ async fn workflow_activation_scopes_job_run_and_rejects_invalid_inputs() {
             .unwrap();
         assert!(f.persistence().activate(request).await.is_err());
         assert!(!activated(&f, request).await);
+        assert_charged(&f, 0).await;
     }
 }
 
@@ -238,10 +263,11 @@ async fn workflow_activation_final_statement_failure_rolls_back_snapshot() {
     // Force a statement failure after freezing, exercising the transaction seam
     // used by bounded batches rather than an ordinary preflight rejection.
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    activate_on(&mut tx, request).await.unwrap();
+    activate_on(&mut tx, request).await.unwrap().unwrap();
     assert!(sqlx::query("SELECT 1 / 0").execute(&mut *tx).await.is_err());
     tx.commit().await.unwrap(); // PostgreSQL commits an aborted transaction as rollback.
     assert!(!activated(&f, request).await);
+    assert_charged(&f, 0).await;
     assert_eq!(
         f.persistence().activate(request).await.unwrap().inputs["value"],
         1
@@ -256,6 +282,7 @@ async fn workflow_activation_deadline_ordinal_and_output_bounds() {
     let next = successor(&f, first, "next", 2).await;
     assert!(f.persistence().activate(next).await.is_err());
     assert!(!activated(&f, next).await);
+    assert_charged(&f, 1).await;
     let over_limit = successor(&f, first, "start", 101).await;
     assert!(f.persistence().activate(over_limit).await.is_err());
     // Change created_at with deadline to preserve the existing run CHECK.
@@ -264,6 +291,7 @@ async fn workflow_activation_deadline_ordinal_and_output_bounds() {
     let expired = successor(&f, first, "start", 3).await;
     assert!(f.persistence().activate(expired).await.is_err());
     assert!(!activated(&f, expired).await);
+    assert_charged(&f, 1).await;
     // Reading already-frozen input is still not an ownership/execution grant.
     assert_eq!(
         f.persistence().activate(first).await.unwrap().inputs["value"],
@@ -355,4 +383,5 @@ async fn workflow_activation_waiting_on_run_lock_cannot_cross_deadline() {
     blocker.commit().await.unwrap();
     assert!(activation.await.is_err());
     assert!(!activated(&f, request).await);
+    assert_charged(&f, 0).await;
 }

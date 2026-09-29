@@ -1,6 +1,6 @@
 use super::*;
 
-struct FailingHandler(AtomicUsize);
+pub(super) struct FailingHandler(pub(super) AtomicUsize);
 #[async_trait]
 impl WorkflowHandler for FailingHandler {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
