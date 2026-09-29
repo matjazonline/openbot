@@ -1,18 +1,22 @@
 use super::*;
 
 /// Lock the actual owners, not a cached authorization result. Company-first is
-/// also the MCP owner's configuration lock order. Member/principal row locks
+/// also the MCP owner's configuration lock order. NO KEY UPDATE serializes
+/// authority changes while allowing runtime foreign-key KEY SHARE checks;
+/// FOR UPDATE here deadlocks completion holding a run against controls.
+/// Member/principal row locks
 /// prevent concurrent demotion/deletion until the workflow commit has finished.
 pub(super) async fn authorize_company(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     actor: WorkflowActor,
 ) -> AppResult<()> {
-    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR UPDATE")
-        .bind(company.as_uuid())
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or_else(missing)?;
+    let owner: Uuid =
+        sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+            .bind(company.as_uuid())
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or_else(missing)?;
     let role: String = sqlx::query_scalar(
         "SELECT member.role FROM company_members AS member \
          JOIN principals AS principal ON principal.company_id = member.company_id \

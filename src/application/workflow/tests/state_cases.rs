@@ -112,6 +112,8 @@ async fn cancellation_covers_nonterminal_and_preserves_all_terminal_states() {
         assert!(matches!(
             service(&store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id
@@ -144,6 +146,8 @@ async fn cancellation_covers_nonterminal_and_preserves_all_terminal_states() {
         assert_eq!(
             service(&store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id
@@ -170,6 +174,8 @@ async fn claim_and_cancel_serialize_without_reviving_cancelled_work() {
     let (claim, cancel) = tokio::join!(store.claim_ready(claim_request()), async {
         barrier.wait().await;
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id,
@@ -182,6 +188,13 @@ async fn claim_and_cancel_serialize_without_reviving_cancelled_work() {
         CancelResult::RevisionConflict { .. } => {
             assert!(matches!(
                 svc.cancel(CancelWorkflowRequest {
+                    expected_revision: store
+                        .head(company_id, run_id)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .revision,
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id
@@ -231,6 +244,8 @@ async fn claim_first_then_cancel_revokes_established_ownership() {
     assert_eq!(
         store
             .cancel(CancelCommand {
+                actor: actor(),
+                command_key: IdempotencyKey::parse("stale-cancel").unwrap(),
                 company_id,
                 run_id,
                 expected_revision: initial.revision
@@ -245,6 +260,8 @@ async fn claim_first_then_cancel_revokes_established_ownership() {
     assert_eq!(
         service(&store)
             .cancel(CancelWorkflowRequest {
+                expected_revision: claimed.revision,
+                command_key: IdempotencyKey::parse("cancel").unwrap(),
                 company_id,
                 actor: actor(),
                 run_id
@@ -279,6 +296,8 @@ async fn cancel_first_prevents_any_claim() {
     assert_eq!(
         service(&store)
             .cancel(CancelWorkflowRequest {
+                expected_revision: RunRevision(1),
+                command_key: IdempotencyKey::parse("cancel").unwrap(),
                 company_id,
                 actor: actor(),
                 run_id

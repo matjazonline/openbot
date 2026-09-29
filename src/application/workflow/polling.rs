@@ -11,6 +11,8 @@ pub struct PollCursor(pub Uuid);
 pub enum PollWork {
     Job,
     ExpiredLease,
+    ExpiredRun,
+    ExhaustedPending,
     Wait,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +56,8 @@ pub trait WorkflowPolling: Send + Sync {
     /// Scan strictly after the cursor; an empty final page resets it. A restarted
     /// worker starts at None, so losing the cursor never acknowledges durable work.
     async fn poll_work(&self, after: Option<PollCursor>, limit: u16) -> AppResult<PollPage>;
+    /// Atomically retire an overdue active run and its owned work.
+    async fn expire_run(&self, scope: ActivationRequest) -> AppResult<bool>;
     /// Resolve from the admitted immutable bundle, not mutable registry selection.
     async fn step_kind(&self, scope: ActivationRequest) -> AppResult<WorkflowStepKind>;
 }

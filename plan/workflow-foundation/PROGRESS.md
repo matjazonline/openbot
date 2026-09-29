@@ -4,6 +4,245 @@ Original plans remain authoritative. Each point carries the full named section/i
 
 ## Current execution (2026-09-28 resume)
 
+21:03Z root ACCEPTED03.9 controls after concrete parent-FK lock regression correction.
+15wakeup+26controls+411workflow tests PASS stock2MiB; migration/schema/SQLx prepare+
+check/offlinealltargets/Clippy/fmt/bothdiff/graft PASS; independent actual-code and
+final evidence PASS. Additive20260928210000 immutable lineage migration now IMMUTABLE.
+Exact evidence BRIEF-03.9 final verified handoff. No timeout/stack bound raised.
+USER-REQUESTED STOP for weekly allowance after current work; no later scope started.
+Next03.9 root budgets, capacity/fairness, combined full03 acceptance. TaskPG cleanly
+stopped, retained data preserved, all jobs done and workers quiescent. No commits.
+Root56621/25840021.91%21:03:20Z usage/runtime sources; implementer /root/controls_finish
+UUID01a0e9c5-018d-7b02-b503-d36c14eb9a01 parent102774/25840039.77%21:03:14Z;
+reviewer01a0e9c5-3827-7832-b7eb-f1d17f76b1f3 parent77618/25840030.04%21:02:23Z
+(token_count.info sources), both Astra/medium. RESUME carries fresh-session handoff.
+
+
+20:47Z fresh root resumed controls final verification. Root Astra/low runtime confirmed,
+UUID01a0e9c4-4a71-7330-b057-1b878839c8bb; startup21720/2584008.41%
+20:46:04Z, latest42178/25840016.32%20:46:44Z usage/runtime sources.
+Sole implementer /root/controls_finish Astra/medium UUID
+01a0e9c5-018d-7b02-b503-d36c14eb9a01 assigned isolated parent-wakeup lock diagnosis,
+remaining controls gates and nested independent review. Existing expansion retained;
+controls remain UNVERIFIED until acceptance. Root owns PROGRESS/RESUME; worker owns
+BRIEF/code/taskPG. Preserve all work and immutable migrations through20260928201000.
+No budgets/fairness/later scope before acceptance; no stage/commit/reset/deploy.
+
+
+20:35Z CAPACITY STOP: /root/controls_final required nested reviewer spawn rejected
+`agent thread limit reached`; no handle/close control, no edits/diagnostics by replacement.
+Skill prohibits self-review or retired worker substitution. All workers quiescent;
+root cleanly stopped retained taskPG. Controls UNVERIFIED:26focusedPASS, reviewPASS,
+407broadPASS/1wakeup timeoutFAIL, final static gates pending. Exact next steps RESUME
+and BRIEF-03.9 ending. Root56957/25840022.04%20:34:48Z usage/runtime, capacity not
+context stop. Replacement32380/25840012.53%20:34:42Z token_count.info sources.
+No stage/commit/reset/deploy. Fresh session required to continue requested topology.
+
+
+20:34Z controls acceptance worker retired/quiescent at owner-confirmed128872/258400
+49.87%20:33:26Z; reviewer106752/25840041.31%20:28:55Z token_count.info sources.
+All six missing groups now implemented;26focused stock2MiB PASS, whole-controls
+actual-code/callers and correction review PASS. Broader workflow::407PASS1FAIL:
+wakeup no-parent-lock test2s timeout, cause undiagnosed; final static gates not reached.
+BRIEF-03.9 ending holds exact seam/logs. Fresh /root/controls_final Astra/medium
+assigned isolated reproduction/lock diagnosis, remaining gates and independent review.
+Root52603/25840020.36%20:33:33Z usage/runtime. PG retained runningPID5022;
+no checks running. Whole controls still UNVERIFIED; no budgets/fairness/later scope.
+
+
+20:16Z fresh root resumed controls acceptance. Root Astra/low confirmed from runtime,
+UUID01a0e9a7-ec67-7302-9fc0-bab1d13e23b1; startup21720/2584008.41%
+20:15:09Z, latest42531/25840016.46%20:15:56Z usage/runtime sources.
+Sole implementer /root/verify_controls Astra/medium assigned six remaining controls
+acceptance groups from BRIEF-03.9 line778 onward, preserving prior verified scope.
+Root owns PROGRESS/RESUME; worker owns BRIEF/code/taskPG. All existing changes
+preserved; applied migrations through20260928201000 immutable. No stage/commit/reset/
+deploy. Controls remain IMPLEMENTED UNVERIFIED until complete gates and review.
+
+
+20:08Z CAPACITY STOP: replacement /root/verify_controls spawn rejected `agent thread
+limit reached`; no handle/close control. Skill prohibits retired-worker reuse or
+self-review substitution. All subtrees completed/quiescent. Root cleanly stopped
+retained taskPG, status confirms no server. No builds/tests remain. Fresh session
+must finish controls acceptance before budgets/fairness/full03. Maintenance VERIFIED;
+controls IMPLEMENTED UNVERIFIED10focusedPASS stock2MiB4.51s, SQLx18.29s and narrow
+correction review PASS only. BRIEF-03.9 ending records exact remaining six test/gate
+groups and proven company/run FK deadlock correction. Applied200000/201000 immutable.
+Root82349/25840031.87%20:07:17Z usage/runtime, not context stop. Retired implementer
+01a0e98f-2cfe-7e02-ad1d-b235237e25f3 parent124498/25840048.18%20:06:25Z;
+reviewer01a0e98f-6f90-7500-8fc8-c20f4421c465 parent101333/25840039.22%20:04:09Z
+(token_count.info sources). No stage/commit/reset/deploy. RESUME updated.
+
+
+19:56Z controls IMPLEMENTED UNVERIFIED in fresh /root/implement_controls Astra/medium
+UUID01a0e98f-2cfe-7e02-ad1d-b235237e25f3, nested reviewer
+01a0e98f-6f90-7500-8fc8-c20f4421c465 ready. Worker92271/25840035.71%19:55:20Z
+usage/runtime. Contracts/service/head/atomic adapter and additive200000 migration
+written; offlinealltargetcheck PASS44.47s, migration NOT applied and DB/review gates
+pending. Prior design-only /root/controls retired at parent98867/25840038.26%
+19:47:09Z; reviewer quiescent, no review performed. Root67275/25840026.04%
+19:47:18Z usage/runtime at reassignment. TaskPG retained running. No later scope.
+
+
+19:44Z root ACCEPTED concrete03.9 controls expansion: existing transition/service
+owner gains explicit revision/key/current authorization and durable cancel/safe retry;
+run-first atomic receipt/audit/job/attempt/wait changes; identity/budget/effect truth
+preserved. Child retry refused pending07 wakeup reconciliation, explicitly tested.
+/root/controls session01a0e989-7b83-76a0-b544-71a655c56550 Astra/medium parent77103/
+25840029.84%19:43:46Z; own reviewer01a0e989-bad4-7f83-9b7b-3721fa4f60fd ready
+21964/2584008.50%19:42:12Z token_count.info sources. Root64735/25840025.05%
+19:43:46Z usage/runtime. TaskPG transferred running;190000 immutable; controls
+IMPLEMENTING, budgets/fairness/full03 remain pending. Original expansion retained.
+
+
+19:41Z root ACCEPTED03.9 overdue maintenance fragment.12focused+139affectedDB
+PASS stock2MiB; migration/SQLx/offlinealltargets/Clippy/fmt/bothdiff/graft PASS;
+independent actual-code/correction/evidence PASS. Fixed late wait deadline crossing;
+exact guard-rejection tests prove retirement fence. BRIEF-03.9 holds full evidence.
+Migration190000 applied IMMUTABLE. Retired/quiescent /root/maintenance and its reviewer;
+implementer42.20%, reviewer35.94% owner-verified19:40:29Z. Root58689/25840022.71%
+19:40:16Z usage/runtime. TaskPG running PID92442 transferred for next controls worker;
+no builds/tests. Whole03.9 and full03 gates remain pending. No04 work or commits.
+
+
+19:27Z fresh root resumed maintenance verification under Full Access/never; prior
+sandbox approval wait is historical, routine taskPG work remains authorized.
+Root01a0e979-8d17-7852-97c1-057302141d13 Astra/low runtime confirmed;
+startup21720/2584008.41%19:24:29Z, latest47500/25840018.38%19:25:16Z
+(token_usage_record.usage/task_started.model_context_window).
+Sole implementer /root/maintenance Astra/medium session
+01a0e97a-748e-7ba2-b313-a76405ab7a4b startup21855/2584008.46%19:25:21Z,
+same sources; own nested reviewer spawned successfully. Existing expansion and
+maintenance scope accepted; finish tests/corrections/gates/review before controls,
+root budgets, fairness and combined03 acceptance. Root owns PROGRESS/RESUME;
+worker owns BRIEF/code/taskPG. Preserve all partial work and applied migrations;
+no stage/commit/reset/deploy. Maintenance remains UNVERIFIED.
+
+
+19:06Z APPROVAL CHECKPOINT: poison fragment VERIFIED this run; overdue maintenance
+PARTIAL UNVERIFIED. Poll/shared expiry/maintenance transaction/additive190000 code
+compiles offline alltargets19.06s; no tests authored, migration unapplied, remaining
+gates/review pending. BRIEF exact handoff. PG sandbox restart failed shmget EPERM;
+escalation waited475.8s then root interrupted; tool aborted, no rejection reason.
+No bypass or waived gate. TaskPG stopped retained; build finished; subtrees quiescent.
+Root60695/25840023.49%19:05:42Z usage/runtime; worker parent-confirmed82082/258400
+31.77%19:05:40Z token_count.info sources, reviewer startup-only9.28%. No commits.
+Fresh session resume partial maintenance tests/gates/review before controls/budgets/
+fairness. Applied174000 immutable; unapplied190000 preserved. No04 work.
+
+
+18:53Z early rotation before maintenance edits: prior subtree retired/quiescent,
+implementer parent-confirmed100413/25840038.86%18:52:15Z, reviewer36.69%.
+Root55257/25840021.38%18:52:18Z. Fresh /root/deadline_maintenance Astra/medium
+UUID01a0e95c-9d61-7c10-b402-84357930b8a2 startup23973/2584009.28%18:52:49Z;
+nested /root/deadline_maintenance/deadline_review Astra/medium UUID
+01a0e95c-efb0-7af1-b10d-2d67a68b2134 ready8.23%18:53:04Z.
+Maintenance scope accepted from BRIEF handoff; no controls/budgets/fairness yet.
+Worker owns BRIEF/code/taskPG; root owns queue acceptance and PROGRESS/RESUME.
+
+
+18:45Z root ACCEPTED03.9 poison fragment. NULL-safe latest-completed context filter
+corrected;127DB PASS stock2MiB plus migration/SQLx/offlinealltargetscheck/Clippy/
+fmt/bothdiff/graft PASS and independent actual-code/evidence PASS. Exact BRIEF-03.9.
+Root50360/25840019.49%18:44:53Z usage/runtime. Parent-verified implementer
+75447/25840029.20%18:44:48Z and reviewer94802/25840036.69%18:44:11Z
+(token_count.info sources). TaskPG stopped cleanly retained. Same eligible subtree
+assigned bounded overdue-maintenance fragment next, then separate controls/budgets/
+fairness/full03 gates. Whole03.9 remains unverified; no04 work.
+
+
+18:38Z fresh root resumed poison verification; root Astra/low runtime confirmed,
+UUID01a0e94e-045e-7801-93e7-dfc217b97b43 startup23945/2584009.27%
+18:36:54Z usage/runtime; latest47647/25840018.44%18:37:41Z same sources.
+Sole implementer /root/verify_recovery Astra/medium UUID
+01a0e94e-d453-7740-8ea1-0415804b904a startup23971/2584009.28%18:37:43Z
+usage/runtime. Nested reviewer creation succeeded. Existing expansion retained;
+finish corrected poison checks and independent review before later03.9 fragments.
+Root owns PROGRESS/RESUME; implementer owns BRIEF/code/taskPG. Preserve all work;
+no stage/commit/reset/deploy and migrations through174000 immutable.
+
+
+18:32Z verification approval stop:03.9 poison remains UNVERIFIED. Corrected malformed
+wait fixture and reviewer P1 final_error dependency poison; independent correction
+review PASS,12focusedPASS stock2MiB. Earlier127integrationPASS predates SQL correction.
+Final sequential integration/migration/SQLx/check/Clippy/fmt/diff/graft script did not
+start: escalated approval waited >9min; root interrupted to checkpoint and tool
+reported aborted. No rejection reason received; no gate waived or bypassed.
+Exact evidence in BRIEF-03.9. Root cleanly stopped taskPG with approved fast/wait;
+retained data unchanged, no live builds. Subtree completed/quiescent. No commits.
+Root58400/25840022.60%18:32:23Z usage/runtime; implementer103122/25840039.91%
+18:32:14Z token_count.info sources; reviewer92982/25840035.98%18:21Z same sources.
+Next: approve/run prepared final-check script after explicit taskPG restart, then
+independent evidence review and root acceptance before next03.9 fragment.
+
+
+18:14Z fresh root resumed pending03.9 poison verification. Root runtime Astra/low
+confirmed, UUID01a0e938-2c10-7083-84a3-4769e9a4ed82 startup23945/2584009.27%
+18:13:00Z token_usage_record.usage/task_started.model_context_window.
+Sole implementer /root/poison_verify Astra/medium session01a0e938-ce6e-7723-aa52-0d310c0b6bcc
+startup24022/2584009.30%18:13:38Z same sources; nested reviewer capacity SUCCEEDED.
+Existing BRIEF-03.9 expansion accepted; first finish failed poison tests and scoped
+independent review/static gates. No later fragment before acceptance. Root owns
+PROGRESS/RESUME; worker owns BRIEF/code/taskPG. Preserve all existing changes and
+immutable migrations through174000; no stage/commit/reset/deploy.
+
+
+18:12Z CAPACITY STOP: /root/poison_verify nested reviewer rejected `agent thread limit
+reached`; no handle/no close control, no edits/resources. Skill requires fresh session,
+no self-review/topology substitution. Worker UUID01a0e936-64da-78d0-815a-b85175e4a2c3
+24097/2584009.33%18:10:59Z usage/runtime, completed. All subtrees retired/stopped.
+03.9 policy+durable failure verified; poison fragment122PASS3FAIL unverified, exact
+correction handoff BRIEF-03.9/RESUME. TaskPG stopped, retained; no builds. No commits.
+
+
+18:11Z03.9 poison fragment IMPLEMENTED NOT VERIFIED;122PASS3FAIL integration.
+BRIEF-03.9 exact failures/partial review: invalid-wait expectation, polling timeout,
+and already-fixed stale assertion. Final SQLx/static/graft/corrected DB gates pending.
+/root/poison_recovery retired after checkpoint, parent129803/25840050.23%18:10:08Z;
+reviewer99756/25840038.61%18:07:28Z token_count.info sources, both completed.
+Root75170/25840029.09%18:10:19Z usage/runtime. TaskPG stopped/no builds.
+Fresh /root/poison_verify assigned corrections+verification with own nested reviewer.
+No new recovery fragment until accepted. Applied174000 immutable; preserve all edits.
+
+
+17:50Z root ACCEPTED03.9 durable classified-failure fragment: typed safety through
+fenced retirement, capped retry, terminal/reconciliation and shared final-error progression.
+8focused+63integration stock2MiB, migrations/SQLx/offlinecheck/Clippy/fmt/diff/graftPASS;
+independent correction code+testPASS. BRIEF-03.9 exact evidence. Whole03.9 remains pending.
+Migrations through20260928174000 immutable. TaskPG stopped; no builds. Subtree retired
+/root/durable_recovery parent127378/25840049.29%17:49:53Z; reviewer93342/25840036.12%
+17:48:18Z token_count.info sources. Root65591/25840025.38%17:50Z usage/runtime.
+Next pure/activation/output poison, sweeps/controls, root budgets/fairness/full03 gate.
+
+
+17:04Z root ACCEPTED03.9 pure recovery-policy fragment only:5focused+34domain tests
+stock2MiB, locked offlinealltargetcheck/Clippy/fmt/diff/graftPASS; independent final
+review PASS no findings. BRIEF-03.9 holds exact evidence; no production consumers yet.
+Whole03.9 recovery/control/budget/fairness and full03 acceptance remain pending.
+/root/recovery and its reviewer completed/retired; parent110098/25840042.61%
+17:03:35Z, reviewer50227/25840019.44%17:03:34Z token_count.info sources.
+Root53380/25840020.66%17:03:39Z usage/runtime. TaskPG confirmed stopped; no builds.
+Next fresh subtree wires typed failures into atomic durable recovery/shared progression.
+
+
+16:56Z root ACCEPTED03.9 expansion BRIEF-03.9: classified recovery, bounded maintenance,
+authorized safe controls, durable root budgets, DB-global capacity/tenant fairness and
+combined phase03 gates. First bounded recovery fragment assigned; whole03.9 unverified.
+Implementer parent sample90448/25840035.00%16:56:11Z token_count.info sources;
+reviewer UUID01a0e8ef-806a-7be2-a510-43b40fc1e0b3 measured startup9.19%, capacity confirmed.
+Root47296/25840018.30%16:56:13Z usage/runtime sources. Baseline now externally committed
+83bb29d4759b3dff00d5821864ffe8f6c8e0260b; preserve it. No source edits at expansion acceptance.
+
+
+16:53Z fresh root resumed03.9; Astra/low runtime verified, UUID01a0e8ee-643f-7f91-be05-563da9d8773f.
+Startup23945/2584009.27%16:52:28Z; latest45110/25840017.46%16:53:13Z,
+token_usage_record.usage/task_started.model_context_window. Sole implementer
+/root/recovery Astra/medium UUID01a0e8ef-3c44-7692-a070-e3dc2569a080; nested
+/root/recovery/reviewer capacity succeeded. Worker owns BRIEF-03.9 expansion/evidence
+and retained taskPG; root owns PROGRESS/RESUME.03.9 expansion pending, no acceptance yet.
+Preserve all prior work including external staging/commits; no stage/reset/deploy authorized.
+
+
 15:39Z CAPACITY STOP before03.9 expansion/code: /root/workflow_recovery required nested
 reviewer creation rejected `agent thread limit reached`; no handle/no close control.
 No substitute topology or retries.03.3–03.8 VERIFIED,03.9 not begun. Fresh session required.
@@ -703,3 +942,6 @@ All prior subtrees stopped. Root stopped taskPG successfully (sandbox escalation
 retained/private/tmp/workflow-admission-pg-e3aa for reuse. RESUME/README updated; whole03.1
 still IMPLEMENTING and03.2 not started. Latest root67,500/258,400=26.12%06:36:33.913Z
 (token_usage_record.usage/task_started.model_context_window), not context-threshold stop.
+
+Final root sample79976/25840030.95%18:12:07Z usage/runtime sources. Root confirmed
+taskPG no server running; final staged/unstaged whitespace checks PASS. Capacity stop.

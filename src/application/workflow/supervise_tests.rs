@@ -1,10 +1,11 @@
 use super::*;
 use crate::{
-    app_error::AppError,
+    app_error::{AppError, AppResult},
     application::workflow::{CompanyId, activation::*},
     domain::workflow::{ExecutionId, RunId, StepId},
 };
 use async_trait::async_trait;
+use serde_json::Value;
 use std::{
     pin::Pin,
     sync::{
@@ -76,7 +77,7 @@ struct Handler {
     dropped: Arc<AtomicBool>,
 }
 impl Future for Handler {
-    type Output = AppResult<Value>;
+    type Output = WorkflowHandlerResult;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.timer
             .as_mut()

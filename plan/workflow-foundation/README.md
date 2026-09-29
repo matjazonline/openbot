@@ -53,12 +53,19 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 and phase02 library scope (02.1–02.8) and03.1–03.8 are verified: admission,
-frozen activation, bounded pure batches, fenced I/O leases/actual-future cancellation,
-atomic fenced completion/replay, and durable event/timer parking/resumption. Independent code and integration review passed;
-latest13focused and2075full database tests passed at stock2MiB (22existing ignored),
-alongside migration/SQLx/offline check/Clippy/fmt/diff/graft gates.03.7–03.8 also verify run-first parent wakeups and durable polling;03.9 recovery is next; a host agent-thread limit blocked its required reviewer before any03.9 edits. Resume in a fresh session. [RESUME.md](RESUME.md) is the resume entry point;
-[PROGRESS.md](PROGRESS.md) and [BRIEF-03.8.md](BRIEF-03.8.md) hold current evidence.
+Phase01 and phase02 library scope (02.1–02.8) and03.1–03.8 are verified.03.9 now has
+verified recovery policy and durable classified-failure retry/final-error/reconciliation
+fragments (8focused+63integration stock2MiB plus migrations/SQLx/static gates and
+independent review). The poison-work fragment is verified:127database tests at stock2MiB plus
+migration/SQLx/static gates and independent actual-code/evidence review PASS.
+Resume from [RESUME.md](RESUME.md); [BRIEF-03.9.md](BRIEF-03.9.md) records evidence.
+Deadline maintenance and controls are verified. The parent-lock regression is fixed
+with an additive immutable-lineage migration; the unchanged two-second regression,
+15focused wakeup tests,26controls tests and411workflow tests pass at stock2MiB.
+Migration/SQLx/static gates and independent code/evidence review pass.
+User-requested stop after controls: durable root budgets, capacity/tenant fairness,
+and combined full phase03 acceptance remain pending. Resume from RESUME.md.
+[PROGRESS.md](PROGRESS.md) records accepted scope and handoffs.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
 inventories current owners and removal gates.
 

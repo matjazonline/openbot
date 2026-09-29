@@ -1,27 +1,29 @@
 # Workflow foundation resume
 
-## VERIFIED through03.8;03.9 blocked before expansion
+## VERIFIED through03.8;03.9 recovery, maintenance and controls VERIFIED
 
-2026-09-28 15:39Z: stopped on host agent-thread capacity, NOT a context threshold.
-This run completed and independently verified03.3–03.8: bounded pure batches,
-fenced I/O leases/actual-future cancellation, atomic fenced completion/replay,
-event/timer parking/resumption, run-first parent wakeups, and durable DB polling.
-Earlier01/02/03.1/03.2 acceptance remains preserved. BRIEF-03.3 through03.8 hold
-original criteria, review findings/resolutions and exact command/log evidence.
+2026-09-28 21:03Z USER-REQUESTED STOP after completing current controls work;
+weekly allowance conservation. Root accepted controls final verification. Parent-lock
+regression diagnosed with live PostgreSQL blockers: repeated revision-trigger run
+updates rechecked parent execution FK. Additive20260928210000 moves parent FK to
+immutable scoped child-owned lineage with reciprocal identity constraints. Existing
+2s regression unchanged and PASS; no resource bounds raised.
 
-Latest current-tree gate:13focused polling and2075fullDBPASS/22existingignored/0fail
-at stock2MiB; SQLx prepare, locked offlinealltarget check/Clippy, fmt/staged+unstaged
-diff/graftPASS. Isolated tests exercise fresh migrations; prior migration gates remain
-valid. Independent actual-code/corrections/combined review PASS. Earlier failed
-fixtures were corrected and superseded; no failed gate waived.
+Final15wakeup+26controls+411workflow tests PASS stock2MiB. Migration/schema,
+SQLx prepare/--check, locked offline all-target check, Clippy, fmt, staged/unstaged
+whitespace checks and graft refresh PASS. Independent actual-code/correction and
+final evidence review PASS, no unresolved findings. Exact evidence and script in
+BRIEF-03.9 final verified handoff21:03Z; logs /private/tmp/workflow-controls-finish-*.
 
-Next: expand/reconcile03.9 Failure/recovery and full phase03 acceptance from original
-03-durable-runtime-and-persistence.md + EXPANSION.md before source edits. No03.9 brief
-or source edits yet. Fresh /root/workflow_recovery could not create required nested
-reviewer (`agent thread limit reached`); no handle/no close control. Skill requires
-stop instead of self-review or topology substitution. Resume in fresh session with
-new measured root and implementation/review pair. All current subtrees retired;
-do not reuse their handles. Phase04 and beyond remain pending.
+NEXT: fresh session resumes03.9 durable root budgets, then global/per-company
+capacity and sustained tenant fairness, then combined full phase03 acceptance.
+Read BRIEF-03.9 contracts3–5 and acceptance matrix, original03 and existing EXPANSION.
+Reconcile concrete budget contracts before code; preserve existing execution/job/
+attempt owners and run-first lock order. No budgets/fairness/full03 or04 begun.
+All workers quiescent; taskPG stopped cleanly, retained data preserved. No outstanding
+build/test jobs. Root owns PROGRESS/RESUME; next worker BRIEF/code/taskPG.
+Applied migrations through20260928210000 IMMUTABLE, additive corrections only.
+No commits/deployment/reset. Preserve all staged/unstaged/untracked and website work.
 
 ## Governing decisions
 
@@ -30,7 +32,7 @@ do not reuse their handles. Phase04 and beyond remain pending.
 - Preserve ALL staged/unstaged/untracked work. External staging and website changes
   occurred; inspect actual source and staged+unstaged diff, not unstaged diff only.
   No stage/commit/reset/deploy was performed by this root/subtrees.
-- Applied migrations through20260928150500 IMMUTABLE; additive changes only.
+- Applied migrations through20260928210000 IMMUTABLE; additive changes only.
 - background_tasks/task_attempts remain sole job/attempt owners; shared completion
   writer owns pure/fenced/wait progression. No competing queue/result ledger.
 - A supervised result/fence is not effect permission.03.5 rechecks live ownership
@@ -43,20 +45,20 @@ do not reuse their handles. Phase04 and beyond remain pending.
 
 ## Resources and identities
 
-TaskPG STOPPED by root with fast/wait; pg_ctl status confirmed no server running.
-Retained /private/tmp/workflow-admission-pg-e3aa port55439 DBworkflow_admission,
-socket/private/tmp,max_connections200; log/private/tmp/workflow-admission-postgres.log.
-No live build/test/prepare jobs. Reuse only task-owned cluster, no database reset.
-Future DATABASE_URL and TEST_DATABASE_URL must both explicitly be
-postgres://mac03@127.0.0.1:55439/workflow_admission. SQLx prepare sequential with builds.
-The cluster was externally stopped/restarted during03.5; no data reset/removal.
+TaskPG STOPPED cleanly; retained/private/tmp/workflow-admission-pg-e3aa,
+log/private/tmp/workflow-admission-postgres.log. Current Full Access/never permits
+routine authorized taskPG commands normally, no escalation parameters. Read skill
+PostgreSQL reference. Never reset retained data. Restart explicitly:
+`pg_ctl -D /private/tmp/workflow-admission-pg-e3aa -l /private/tmp/workflow-admission-postgres.log -o '-h 127.0.0.1 -p 55439 -k /private/tmp -c max_connections=200' -w start`.
+BOTH DATABASE_URL and TEST_DATABASE_URL explicitly
+postgres://mac03@127.0.0.1:55439/workflow_admission. SQLx sequential with builds.
 
-Root01a0e81d-a106-7651-8b03-d0c253c67f38 runtime verified Astra/low; latest123293/258400
-47.71%15:38:11Z token_usage_record.usage/task_started.model_context_window.
-Retired latest verified implementer/root/workflow_polling
-UUID01a0e893-c15e-73e0-bba7-ecab22bfa506 Astra/medium parent120231/25840046.53%
-15:36:55Z token_count.info; nested reviewer01a0e893-ffed-76f3-9e26-c8d4f11109dc
-owner-verified32.80%, completed. BRIEF03.8 holds actual-code and final review evidence.
-Capacity-blocked/root/workflow_recovery UUID01a0e8a9-ef5a-7092-a9de-97738d69b06b
-Astra/medium parent22977/2584008.89%15:37:55Z token_count.info, completed, no reviewer.
-Root owns PROGRESS/RESUME; future worker owns new brief and restarted taskPG.
+Root01a0e9c4-4a71-7330-b057-1b878839c8bb Astra/low runtime confirmed,
+56621/25840021.91%21:03:20Z token_usage_record.usage/runtime capacity sources.
+Stopped at user request, not capacity/context failure.
+Implementer /root/controls_finish UUID01a0e9c5-018d-7b02-b503-d36c14eb9a01
+parent-confirmed102774/25840039.77%21:03:14Z; nested reviewer
+/root/controls_finish/controls_reviewer UUID01a0e9c5-3827-7832-b7eb-f1d17f76b1f3
+parent-confirmed77618/25840030.04%21:02:23Z; token_count.info sources.
+Both Astra/medium, completed/quiescent. Fresh workers on resume.
+All staged/unstaged/untracked work preserved; no stage/commit/reset/deploy.

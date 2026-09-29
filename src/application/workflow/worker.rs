@@ -3,7 +3,6 @@
 use super::{activation::*, batch::*, completion::*, lease::*, polling::*, supervise::*, waits::*};
 use crate::application::app_error::AppResult;
 use async_trait::async_trait;
-use serde_json::Value;
 use std::time::Duration;
 use tokio::{
     sync::Notify,
@@ -16,7 +15,11 @@ pub trait WorkflowHandler: Send + Sync {
     /// Missing subsystem support must not spend an execution attempt.
     fn supports(&self, kind: &WorkflowStepKind) -> bool;
     /// Effect permission, receipts and replay safety remain the handler's contract.
-    async fn execute(&self, kind: &WorkflowStepKind, claim: &ClaimedWorkflow) -> AppResult<Value>;
+    async fn execute(
+        &self,
+        kind: &WorkflowStepKind,
+        claim: &ClaimedWorkflow,
+    ) -> WorkflowHandlerResult;
 }
 
 pub struct WorkflowWorker<'a, P, H> {
@@ -88,12 +91,20 @@ where
     ) -> AppResult<()> {
         let scope = candidate.scope;
         match candidate.work {
+            PollWork::ExpiredRun => {
+                self.port.expire_run(scope).await?;
+                return Ok(());
+            }
             PollWork::Wait => {
                 self.port.resume_wait(scope).await?;
                 return Ok(());
             }
             PollWork::ExpiredLease => {
                 self.port.retire_expired_io(scope, self.lease).await?;
+                return Ok(());
+            }
+            PollWork::ExhaustedPending => {
+                self.port.retire_exhausted_work(scope, self.lease).await?;
                 return Ok(());
             }
             PollWork::Job => {}

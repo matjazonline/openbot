@@ -152,7 +152,7 @@ async fn workflow_wait_refuses_scope_kind_and_invalid_events() {
         let source = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
         let (f, scope) = fixture_source(source).await;
         let before = snapshot_all(&f).await;
-        assert!(f.persistence().park_wait(scope).await.is_err());
+        assert!(f.persistence().park_wait(scope).await.unwrap().is_none());
         assert_eq!(snapshot_all(&f).await, before);
     }
 }

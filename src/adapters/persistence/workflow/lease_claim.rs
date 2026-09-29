@@ -47,7 +47,9 @@ pub(super) async fn claim_on(
         return Ok(None);
     }
     // Box the activation boundary to keep debug/test stacks at stock 2 MiB.
-    let activation = Box::pin(activation::activate_on(db, scope)).await?;
+    let Some(activation) = Box::pin(pending_recovery::activate(db, scope)).await? else {
+        return Ok(None);
+    };
     let fence = WorkflowFence {
         scope,
         worker,

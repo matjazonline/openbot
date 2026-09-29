@@ -392,6 +392,11 @@ impl WorkflowInspection for MemoryStore {
 
 #[async_trait]
 impl WorkflowRunTransitions for MemoryStore {
+    async fn retry(&self, _: RetryCommand) -> AppResult<RetryResult> {
+        Err(AppError::BadRequest(
+            "memory fixture has no durable retry evidence".into(),
+        ))
+    }
     async fn cancel(&self, command: CancelCommand) -> AppResult<CancelResult> {
         let mut state = self.state.lock().unwrap();
         if state.fail_cancel {

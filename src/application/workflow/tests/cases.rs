@@ -207,6 +207,8 @@ async fn cancellation_checks_scope_and_expected_revision() {
     let svc = service(&store);
     assert_eq!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id: RunId::new(Uuid::new_v4())
@@ -232,6 +234,8 @@ async fn cancellation_checks_scope_and_expected_revision() {
     });
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -249,6 +253,8 @@ async fn cancellation_checks_scope_and_expected_revision() {
     });
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -275,6 +281,8 @@ async fn cancellation_checks_scope_and_expected_revision() {
     });
     assert_eq!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -303,6 +311,8 @@ async fn cancellation_preserves_errors_and_invalidates_pending_job() {
     store.state.lock().unwrap().fail_head = true;
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -314,6 +324,8 @@ async fn cancellation_preserves_errors_and_invalidates_pending_job() {
     store.state.lock().unwrap().fail_cancel = true;
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -324,6 +336,8 @@ async fn cancellation_preserves_errors_and_invalidates_pending_job() {
     store.state.lock().unwrap().fail_cancel = false;
     assert_eq!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id
@@ -341,6 +355,8 @@ async fn cancellation_preserves_errors_and_invalidates_pending_job() {
     );
     assert_eq!(
         svc.cancel(CancelWorkflowRequest {
+            expected_revision: RunRevision(1),
+            command_key: IdempotencyKey::parse("cancel").unwrap(),
             company_id,
             actor: actor(),
             run_id

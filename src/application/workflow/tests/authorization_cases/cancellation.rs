@@ -28,6 +28,8 @@ async fn cancel_uses_stored_association_and_reader_errors_propagate() {
     assert!(matches!(
         service(&store)
             .cancel(CancelWorkflowRequest {
+                expected_revision: RunRevision(1),
+                command_key: IdempotencyKey::parse("cancel").unwrap(),
                 company_id,
                 actor: actor(),
                 run_id
@@ -82,6 +84,8 @@ async fn cancellation_reader_failures(store: &MemoryStore, company_id: CompanyId
                 .association = association;
             service(store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id,
@@ -90,6 +94,8 @@ async fn cancellation_reader_failures(store: &MemoryStore, company_id: CompanyId
         } else {
             service(store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id,

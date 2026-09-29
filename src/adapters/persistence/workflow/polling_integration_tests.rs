@@ -6,9 +6,17 @@ impl WorkflowHandler for FailingHandler {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
         true
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> AppResult<Value> {
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
         self.0.fetch_add(1, Ordering::SeqCst);
-        Err(AppError::Conflict("scripted temporary failure".into()))
+        Err(WorkflowFailure {
+            failure: crate::domain::workflow::StepFailure::new(
+                crate::domain::workflow::FailureClass::Retryable,
+                crate::domain::workflow::FailureCode::parse("scripted.failure").unwrap(),
+                None,
+            )
+            .unwrap(),
+            safety: crate::domain::workflow::RetrySafety::SafeToRetry,
+        })
     }
 }
 #[tokio::test]
@@ -144,7 +152,7 @@ impl WorkflowHandler for UnsupportedTiming {
         self.0.lock().unwrap().push(Instant::now());
         false
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> AppResult<Value> {
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
         panic!("unsupported handler");
     }
 }

@@ -192,7 +192,12 @@ async fn workflow_wakeup_parent_composite_fk_rejects_valid_foreign_parent() {
 async fn remove_wakeup_schema(f: &AdmissionFixture) {
     // This database belongs only to this test. Restore the pre03.7 shape, retaining
     // real admitted runs/results, then exercise both immutable migration files.
-    sqlx::raw_sql("DROP TRIGGER workflow_allocate_wakeup ON workflow_runs;
+    sqlx::raw_sql("DROP TRIGGER workflow_parent_link ON workflow_runs;
+        DROP FUNCTION insert_workflow_parent_link();
+        DROP TABLE workflow_run_parents CASCADE;
+        DROP FUNCTION preserve_workflow_parent_link();
+        ALTER TABLE workflow_runs DROP CONSTRAINT workflow_run_parent_identity;
+        DROP TRIGGER workflow_allocate_wakeup ON workflow_runs;
         DROP TRIGGER workflow_validate_wakeup ON workflow_run_events;
         DROP TRIGGER workflow_terminal_parent_wakeup ON workflow_runs;
         DROP TRIGGER workflow_wakeup_immutable ON workflow_run_events;
@@ -231,6 +236,17 @@ async fn workflow_wakeup_migrations_reconcile_existing_terminal_and_queued_child
     .execute(f.fixture.persistence().pool())
     .await
     .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../../../../migrations/20260928210000_workflow_immutable_parent_links.sql"
+    ))
+    .execute(f.fixture.persistence().pool())
+    .await
+    .unwrap();
+    let links: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_run_parents")
+        .fetch_one(f.fixture.persistence().pool())
+        .await
+        .unwrap();
+    assert_eq!(links, 2);
     let saved = wakeups(&f.fixture, f.parent, f.first).await;
     assert_eq!(saved.len(), 1);
     assert_eq!(saved[0].state, ChildTerminalState::Succeeded);
@@ -263,3 +279,6 @@ async fn workflow_wakeup_migrations_reconcile_existing_terminal_and_queued_child
         1
     );
 }
+
+#[path = "wakeup_parent_link_tests.rs"]
+mod parent_link_tests;

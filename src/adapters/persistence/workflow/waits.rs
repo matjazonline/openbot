@@ -166,11 +166,24 @@ async fn park_on(
         scope.run.as_uuid(),
     )
     .await?;
-    let activation = activation::activate_on(db, scope).await?;
-    let spec = specification(binding.bundle(), &activation)?;
+    if !is_wait(db, scope, binding.bundle()).await? {
+        return Ok(None);
+    }
+    let Some(activation) = pending_recovery::activate(db, scope).await? else {
+        return Ok(None);
+    };
+    let spec = match specification(binding.bundle(), &activation) {
+        Ok(spec) => spec,
+        Err(_) => {
+            pending_recovery::settle(db, scope, pending_recovery::PendingFailure::InvalidInput)
+                .await?;
+            return Ok(None);
+        }
+    };
     let deadline = spec.deadline.min(run.deadline);
     if !spec.timer && deadline <= now {
-        return Err(lease::timed_out());
+        pending_recovery::settle(db, scope, pending_recovery::PendingFailure::InvalidInput).await?;
+        return Ok(None);
     }
     let id = Uuid::new_v4();
     let reason = if spec.timer { "timer" } else { "event" };
@@ -279,4 +292,31 @@ async fn select_due(pool: &sqlx::PgPool, limit: u16) -> AppResult<Vec<SweepCandi
             .bind(i64::from(limit)).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     Ok(rows)
+}
+
+async fn is_wait(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    bundle: &PublishedBundle,
+) -> AppResult<bool> {
+    let step: String = sqlx::query_scalar(
+        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    let step = StepId::parse(step).map_err(|_| invalid())?;
+    let definition = bundle
+        .compiled()
+        .graph()
+        .definition()
+        .steps
+        .get(&step)
+        .ok_or_else(invalid)?;
+    Ok(matches!(
+        definition.step_type.as_str(),
+        "wait.event" | "wait.timer"
+    ))
 }

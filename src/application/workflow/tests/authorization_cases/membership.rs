@@ -53,6 +53,8 @@ async fn admit_and_cancel_as_managers(
         assert!(matches!(
             service(store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id
@@ -92,6 +94,8 @@ async fn deny_members_before_reads(
         assert!(matches!(
             service(store)
                 .cancel(CancelWorkflowRequest {
+                    expected_revision: RunRevision(1),
+                    command_key: IdempotencyKey::parse("cancel").unwrap(),
                     company_id,
                     actor: actor(),
                     run_id

@@ -240,7 +240,6 @@ async fn workflow_batch_invalid_scope_lease_due_state_and_bounds_fail_closed() {
         "UPDATE background_tasks SET status = 'processing', worker_id = gen_random_uuid(), execution_generation = gen_random_uuid(), locked_at = clock_timestamp(), lock_expires_at = clock_timestamp() + interval '1 hour'",
         "UPDATE workflow_runs SET state = 'cancelled'",
         "UPDATE workflow_runs SET state = 'waiting',waiting_reason = 'timer'",
-        "UPDATE workflow_runs SET max_steps = 1",
     ] {
         let mut tx = f.persistence().pool().begin().await.unwrap();
         sqlx::raw_sql(statement).execute(&mut *tx).await.unwrap();
@@ -351,18 +350,22 @@ async fn workflow_batch_run_lock_contention_cannot_cross_deadline_or_timeout() {
 }
 
 #[tokio::test]
-async fn workflow_batch_output_schema_invalidates_entire_transaction() {
+async fn workflow_batch_output_schema_failure_preserves_progress_and_settles() {
     let mut source = source();
     source["output_schema"] = json!({"type":"string"});
     let (f, request) = fixture(source).await;
-    let before = snapshot(&f).await;
-    assert!(
-        f.persistence()
-            .advance_pure(request, budget(64))
-            .await
-            .is_err()
-    );
-    assert_eq!(snapshot(&f).await, before);
+    let saved = f
+        .persistence()
+        .advance_pure(request, budget(64))
+        .await
+        .unwrap();
+    assert_eq!(saved.disposition, BatchDisposition::Failed);
+    assert_eq!(saved.completed, 2);
+    let state = snapshot(&f).await;
+    assert_eq!(state["runs"][0]["state"], "failed");
+    assert_ne!(state["executions"][0]["completed_at"], Value::Null);
+    assert_ne!(state["executions"][1]["completed_at"], Value::Null);
+    assert_eq!(state["executions"][2]["completed_at"], Value::Null);
 }
 
 #[tokio::test]
@@ -391,3 +394,6 @@ async fn workflow_batch_sql_rejects_mutated_choice_route_successor_and_duplicate
         assert_eq!(snapshot(&f).await, before);
     }
 }
+
+#[path = "pending_recovery_tests.rs"]
+mod pending_recovery_tests;

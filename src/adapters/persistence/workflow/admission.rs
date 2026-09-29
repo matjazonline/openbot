@@ -23,6 +23,20 @@ impl WorkflowAdmission for PostgresPersistence {
             tx.commit().await?;
             return Ok(result);
         }
+        // Source authorization already holds the parent lock. Existing children
+        // replay above; cancellation must prevent only fresh child scheduling.
+        if let TriggerSource::Child { parent } = command.trigger().source() {
+            let cancelled: bool = sqlx::query_scalar(
+                "SELECT state='cancelled' FROM workflow_runs WHERE company_id=$1 AND id=$2",
+            )
+            .bind(command.company_id().as_uuid())
+            .bind(parent.execution().run_id().as_uuid())
+            .fetch_one(&mut *tx)
+            .await?;
+            if cancelled {
+                return Err(conflict());
+            }
+        }
         verify_current(&mut tx, command).await?;
         resources::check_readiness(&mut tx, command.binding()).await?;
         admission_write::create(&mut tx, command, &source).await?;

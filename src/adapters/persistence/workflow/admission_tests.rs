@@ -31,6 +31,9 @@ impl WorkflowAdmission for Capture {
 struct NoRuntime;
 #[async_trait]
 impl WorkflowRunTransitions for NoRuntime {
+    async fn retry(&self, _: RetryCommand) -> AppResult<RetryResult> {
+        panic!("admission must not call runtime retry")
+    }
     async fn cancel(&self, _: CancelCommand) -> AppResult<CancelResult> {
         panic!("admission must not call runtime cancellation")
     }

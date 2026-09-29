@@ -42,6 +42,8 @@ impl BatchBudget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BatchDisposition {
+    /// A deterministic failure was durably settled; poll any error successor.
+    Failed,
     Completed,
     Yielded,
     Boundary,

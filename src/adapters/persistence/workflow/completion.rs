@@ -78,10 +78,17 @@ pub(super) async fn complete_on(
     )
     .await?;
     let activation = activation::activate_on(db, scope).await?;
-    if activation.ordinal > u64::try_from(run.max_steps).map_err(|_| invalid())? {
-        return Err(lease::timed_out());
-    }
-    let completion = prepare_io(binding.bundle(), &activation, result.output)?;
+    let completion =
+        match prepare_result(binding.bundle(), &activation, result.output, run.max_steps) {
+            Ok(completion) => completion,
+            Err(cause) => {
+                // Pure schema/route validation failed after the handler returned. The
+                // retirement owner decides effect safety from the frozen step kind.
+                recovery::retire_on(db, result.fence, lease::Retirement::Interrupted(cause))
+                    .await?;
+                return Ok(None);
+            }
+        };
     let successor = batch_commit::complete(
         db,
         scope,
@@ -160,4 +167,26 @@ async fn replay(
         target,
         successor,
     }))
+}
+
+fn prepare_result(
+    bundle: &PublishedBundle,
+    activation: &crate::application::workflow::activation::ActivatedExecution,
+    output: serde_json::Value,
+    max_steps: i32,
+) -> Result<
+    crate::application::workflow::batch::PureCompletion,
+    crate::application::workflow::lease::LeaseReleaseCause,
+> {
+    use crate::application::workflow::lease::LeaseReleaseCause;
+    let limit = u64::try_from(max_steps).map_err(|_| LeaseReleaseCause::ActivationLimit)?;
+    if activation.ordinal > limit {
+        return Err(LeaseReleaseCause::ActivationLimit);
+    }
+    let completion =
+        prepare_io(bundle, activation, output).map_err(|_| LeaseReleaseCause::InvalidResult)?;
+    if completion.target != TransitionTarget::End && activation.ordinal >= limit {
+        return Err(LeaseReleaseCause::ActivationLimit);
+    }
+    Ok(completion)
 }

@@ -23,8 +23,10 @@ impl WorkflowPolling for PostgresPersistence {
             let rows = sqlx::query_as::<_, CandidateRow>(r#"
                 SELECT job.company_id, execution.run_id, execution.id AS execution_id,
                        job.id AS job_id,
-                       CASE WHEN wait.id IS NOT NULL THEN 'wait'
-                            WHEN job.status = 'processing' THEN 'expired' ELSE 'job' END AS work
+                       CASE WHEN run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp() THEN 'deadline'
+                            WHEN wait.id IS NOT NULL THEN 'wait'
+                            WHEN job.status = 'processing' THEN 'expired'
+                            WHEN job.retry_count >= job.max_retries THEN 'exhausted' ELSE 'job' END AS work
                 FROM background_tasks AS job
                 JOIN workflow_executions AS execution
                   ON execution.company_id = job.company_id AND execution.id = job.workflow_execution_id
@@ -36,10 +38,11 @@ impl WorkflowPolling for PostgresPersistence {
                 WHERE job.queue_kind = 'workflow' AND execution.completed_at IS NULL
                   AND ($1::uuid IS NULL OR job.id > $1)
                   AND (
-                    (wait.id IS NULL AND run.state IN ('queued','running')
+                    (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
+                    OR (wait.id IS NULL AND run.state IN ('queued','running')
                      AND run.deadline > clock_timestamp()
                      AND ((job.status = 'pending' AND job.run_at <= clock_timestamp()
-                           AND job.retry_count < job.max_retries)
+                           )
                           OR (job.status = 'processing' AND job.lock_expires_at <= clock_timestamp())))
                     OR (wait.id IS NOT NULL AND (
                         wait.deadline <= clock_timestamp() OR run.deadline <= clock_timestamp()
@@ -57,6 +60,16 @@ impl WorkflowPolling for PostgresPersistence {
             let candidates = rows.into_iter().map(candidate).collect::<AppResult<Vec<_>>>()?;
             Ok(PollPage { candidates, next })
         }).await.map_err(|_| lease::timed_out())?
+    }
+    async fn expire_run(&self, scope: ActivationRequest) -> AppResult<bool> {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            let mut tx = self.pool.begin().await?;
+            let changed = maintenance::expire_on(&mut tx, scope).await?;
+            tx.commit().await?;
+            Ok(changed)
+        })
+        .await
+        .map_err(|_| lease::timed_out())?
     }
     async fn step_kind(&self, scope: ActivationRequest) -> AppResult<WorkflowStepKind> {
         tokio::time::timeout(Duration::from_secs(2), async {
@@ -90,6 +103,8 @@ fn candidate(row: CandidateRow) -> AppResult<PollCandidate> {
         work: match row.work.as_str() {
             "job" => PollWork::Job,
             "expired" => PollWork::ExpiredLease,
+            "deadline" => PollWork::ExpiredRun,
+            "exhausted" => PollWork::ExhaustedPending,
             "wait" => PollWork::Wait,
             _ => return Err(invalid()),
         },

@@ -13,7 +13,7 @@ impl WorkflowHandler for Scripted {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
         self.supported
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> AppResult<Value> {
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
         self.calls.fetch_add(1, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(20)).await;
         Ok(json!({"items":[],"token_count":0}))
@@ -281,7 +281,7 @@ impl WorkflowHandler for DroppingHandler {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
         true
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> AppResult<Value> {
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
         let _witness = DropWitness(&self.dropped);
         self.started.notify_one();
         std::future::pending().await
@@ -429,3 +429,6 @@ async fn workflow_poll_unsupported_full_page_stays_bounded_and_later_work_progre
 
 #[path = "polling_integration_tests.rs"]
 mod integration_tests;
+
+#[path = "maintenance_worker_tests.rs"]
+mod maintenance_worker_tests;

@@ -1,5 +1,6 @@
 //! PostgreSQL is the sole owner of workflow authoring and runtime records.
 //!
+//! Authorized controls acquire company authority before the run, matching child admission.
 //! Runtime transitions lock the run before its executions, jobs/attempts, waits
 //! and events. Discovery reads grant no authority. Reacquiring an already-owned
 //! run is safe. Child admission/replay may lock parent then child, never the
@@ -66,3 +67,13 @@ fn write_error(error: sqlx::Error) -> AppError {
 }
 
 mod polling;
+
+mod recovery;
+
+mod pending_recovery;
+
+mod maintenance;
+
+mod control_retry;
+mod controls;
+mod inspection;

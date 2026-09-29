@@ -22,8 +22,11 @@ pub struct CommittedWorkflowStep {
 
 #[async_trait]
 pub trait WorkflowCompletion: Send + Sync {
-    /// None refuses an ineligible fence or conflicting replay without any writes.
-    /// Storage/validation errors propagate; they never represent successful work.
+    /// Some returns a committed successful result or its exact replay. None means
+    /// no successful result: either read-only fence/replay refusal, or durable
+    /// validation/budget failure retirement (possibly requiring reconciliation).
+    /// Storage failures propagate and roll back; callers must reread durable state
+    /// to distinguish refusal from settled failure and must not redispatch on None.
     async fn complete_io(
         &self,
         result: FencedWorkflowResult,

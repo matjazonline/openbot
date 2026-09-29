@@ -64,6 +64,7 @@ pub enum RelatedAssociation {
 pub enum WorkflowOperation {
     Admit,
     Cancel,
+    Retry,
     CopyTemplate,
     ManageDefinition,
     ManageBinding,

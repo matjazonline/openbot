@@ -217,9 +217,11 @@ impl RunHead {
     }
 }
 
-/// Compare-and-set cancellation must use this observed revision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A stable command key and caller-observed revision identify one authorized control.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CancelCommand {
+    pub actor: WorkflowActor,
+    pub command_key: IdempotencyKey,
     pub company_id: CompanyId,
     pub run_id: RunId,
     pub expected_revision: RunRevision,
@@ -235,9 +237,36 @@ pub enum CancelResult {
 }
 
 pub struct CancelWorkflowRequest {
+    pub expected_revision: RunRevision,
+    pub command_key: IdempotencyKey,
     pub company_id: CompanyId,
     pub actor: WorkflowActor,
     pub run_id: RunId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryCommand {
+    pub company_id: CompanyId,
+    pub actor: WorkflowActor,
+    pub run_id: RunId,
+    pub expected_revision: RunRevision,
+    pub command_key: IdempotencyKey,
+}
+
+pub struct RetryWorkflowRequest {
+    pub company_id: CompanyId,
+    pub actor: WorkflowActor,
+    pub run_id: RunId,
+    pub expected_revision: RunRevision,
+    pub command_key: IdempotencyKey,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetryResult {
+    Applied { revision: RunRevision },
+    Unsafe { revision: RunRevision },
+    RevisionConflict { current_revision: RunRevision },
+    NotFound,
 }
 
 pub const MAX_CLAIM_BATCH: u16 = 100;

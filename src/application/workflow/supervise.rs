@@ -1,7 +1,5 @@
 //! Own the actual future, including while persistence is slow or unavailable.
 use super::lease::*;
-use crate::app_error::AppResult;
-use serde_json::Value;
 use std::future::Future;
 use tokio::time::{Instant, sleep_until, timeout};
 
@@ -32,7 +30,7 @@ pub async fn supervise_io<P, H, C>(
 ) -> SupervisedResult
 where
     P: WorkflowLeases,
-    H: Future<Output = AppResult<Value>>,
+    H: Future<Output = WorkflowHandlerResult>,
     C: Future<Output = ()>,
 {
     let fence = claim.fence;
@@ -42,6 +40,7 @@ where
     let deadline = operation_deadline.min(claim.window.run_deadline);
     let mut expires = claim.window.expires;
     let mut heartbeat = Instant::now() + policy.heartbeat();
+    let mut failure = None;
     let outcome = loop {
         tokio::select! { biased;
             _ = &mut cancel => break SupervisedResult::Stopped(StopReason::Cancelled),
@@ -62,7 +61,7 @@ where
                 heartbeat = Instant::now()+policy.heartbeat();
             }
             output = &mut handler => {
-                let Ok(output) = output else { break SupervisedResult::Stopped(StopReason::HandlerFailed); };
+                let output = match output { Ok(output) => output, Err(error) => { failure = Some(error); break SupervisedResult::Stopped(StopReason::HandlerFailed); } };
                 if serde_json::to_vec(&output).map_or(true, |bytes| bytes.len()>claim.max_result_bytes) {
                     break SupervisedResult::Stopped(StopReason::OversizedResult);
                 }
@@ -86,7 +85,13 @@ where
         // exact-job recovery transition if storage refuses or cannot be reached.
         let _ = timeout(
             policy.persistence_timeout(),
-            port.release_io(fence, policy, reason.release_cause()),
+            port.release_io(
+                fence,
+                policy,
+                failure
+                    .map(LeaseReleaseCause::Classified)
+                    .unwrap_or_else(|| reason.release_cause()),
+            ),
         )
         .await;
     }

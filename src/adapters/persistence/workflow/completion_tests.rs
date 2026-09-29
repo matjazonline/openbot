@@ -328,14 +328,13 @@ async fn workflow_completion_reclaimed_generation_refuses() {
 }
 
 #[tokio::test]
-async fn workflow_completion_invalid_outputs_and_activation_budget_roll_back() {
-    let (f, claim) = claimed(chain()).await;
-    let before = state(&f).await;
+async fn workflow_completion_invalid_outputs_and_activation_budget_settle() {
     for output in [
         Value::Null,
         json!({"items":[],"token_count":-1}),
         json!({"items":[],"token_count":0,"extra":"x".repeat(70000)}),
     ] {
+        let (f, claim) = claimed(chain()).await;
         assert!(
             f.persistence()
                 .complete_io(FencedWorkflowResult {
@@ -343,23 +342,33 @@ async fn workflow_completion_invalid_outputs_and_activation_budget_roll_back() {
                     output
                 })
                 .await
-                .is_err()
+                .unwrap()
+                .is_none()
         );
-        assert_eq!(state(&f).await, before);
+        let saved = state(&f).await;
+        assert_eq!(saved["runs"][0]["state"], "failed");
+        assert_eq!(
+            saved["attempts"][0]["workflow_failure_code"],
+            "workflow.invalid_result"
+        );
     }
-    sqlx::query("UPDATE workflow_runs SET max_steps=1 WHERE id=$1")
-        .bind(claim.fence.scope.run.as_uuid())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
-    let before = state(&f).await;
+    let mut source = chain();
+    source["limits"]["max_steps"] = json!(1);
+    let (f, claim) = claimed(source).await;
     assert!(
         f.persistence()
             .complete_io(result(claim.fence))
             .await
-            .is_err()
+            .unwrap()
+            .is_none()
     );
-    assert_eq!(state(&f).await, before);
+    let saved = state(&f).await;
+    assert_eq!(saved["runs"][0]["state"], "failed");
+    assert_eq!(
+        saved["attempts"][0]["workflow_failure_code"],
+        "workflow.activation_limit"
+    );
+    assert_eq!(saved["jobs"].as_array().unwrap().len(), 1);
 }
 
 #[path = "completion_race_tests.rs"]

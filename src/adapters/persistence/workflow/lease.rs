@@ -169,41 +169,48 @@ pub(super) async fn live_window(
 pub(super) async fn retire(
     db: &mut PgConnection,
     fence: WorkflowFence,
-    policy: LeasePolicy,
+    _policy: LeasePolicy,
     reason: Retirement,
 ) -> AppResult<()> {
-    let closed = sqlx::query("UPDATE task_attempts SET status='failed', stop_reason=$5, finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND execution_generation=$3 AND worker_id=$4 AND status='processing'")
-        .bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0).bind(reason.as_str()).execute(&mut *db).await?;
-    if closed.rows_affected() != 1 {
-        return Err(invalid());
-    }
-    let released = sqlx::query("UPDATE background_tasks SET status='pending', retry_count=retry_count+1, run_at=clock_timestamp()+make_interval(secs => $5), worker_id=NULL, execution_generation=NULL, locked_at=NULL, lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND queue_kind='workflow' AND workflow_execution_id=$3 AND execution_generation=$4 AND worker_id=$6 AND retry_count+1=$7 AND status='processing' AND ($8 OR lock_expires_at > clock_timestamp()) AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$9 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
-        .bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(policy.retry_delay().as_secs_f64()).bind(fence.worker.0).bind(fence.attempt.0).bind(matches!(reason, Retirement::Expired)).bind(fence.scope.run.as_uuid()).execute(db).await?;
-    if released.rows_affected() != 1 {
-        return Err(invalid());
-    }
-    Ok(())
+    // Failure settlement is shared with expired ownership; the caller already holds
+    // the run/execution/job locks. Box the restore/progression boundary.
+    Box::pin(super::recovery::retire_on(db, fence, reason)).await
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(super) enum Retirement {
     Expired,
     Interrupted(LeaseReleaseCause),
 }
-impl Retirement {
-    fn as_str(self) -> Option<&'static str> {
-        match self {
-            Self::Expired | Self::Interrupted(LeaseReleaseCause::LeaseLost) => Some("lease_lost"),
-            Self::Interrupted(LeaseReleaseCause::Deadline) => Some("timed_out"),
-            // The current ledger has no unclassified interruption reason. NULL
-            // preserves unknown instead of inventing shutdown/retry classification.
-            Self::Interrupted(_) => None,
-        }
-    }
-}
 
 #[async_trait]
 impl WorkflowLeaseRecovery for PostgresPersistence {
+    async fn retire_exhausted_work(
+        &self,
+        scope: ActivationRequest,
+        policy: LeasePolicy,
+    ) -> AppResult<bool> {
+        tokio::time::timeout(policy.persistence_timeout(), async {
+            let mut tx = self.pool.begin().await?;
+            let Some((_, job)) = lock_scope(&mut tx, scope, policy).await? else {
+                return Ok(false);
+            };
+            if job.status != "pending" || job.retry_count < job.max_retries {
+                return Ok(false);
+            }
+            pending_recovery::settle(
+                &mut tx,
+                scope,
+                pending_recovery::PendingFailure::AttemptsExhausted,
+            )
+            .await?;
+            tx.commit().await?;
+            Ok(true)
+        })
+        .await
+        .map_err(|_| timed_out())?
+    }
+
     async fn retire_expired_io(
         &self,
         scope: ActivationRequest,

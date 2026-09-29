@@ -6,6 +6,9 @@ pub(super) async fn resume_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<WaitProgress> {
+    if maintenance::expire_on(db, scope).await? {
+        return Ok(WaitProgress::Expired(CommitDisposition::Committed));
+    }
     let Some(run) = waits::lock(db, scope).await? else {
         return Ok(WaitProgress::Refused);
     };
@@ -29,10 +32,10 @@ pub(super) async fn resume_on(
         _ => return Err(invalid()),
     }
     let now = waits::now(db).await?;
-    if run.state != "waiting"
-        || run.deadline <= now
-        || (wait.reason == "event" && wait.deadline <= now)
-    {
+    if run.deadline <= now && maintenance::expire_on(db, scope).await? {
+        return Ok(WaitProgress::Expired(CommitDisposition::Committed));
+    }
+    if run.state != "waiting" || (wait.reason == "event" && wait.deadline <= now) {
         return expire(db, scope, &run.state).await;
     }
     let event = if wait.reason == "timer" {

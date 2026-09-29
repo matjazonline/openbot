@@ -1,8 +1,9 @@
 use super::contracts::AdmissionSnapshots;
 use super::{
     AdmissionResult, AdmitWorkflowRequest, CancelCommand, CancelResult, CancelWorkflowRequest,
-    PreparedAdmission, WorkflowAdmission, WorkflowAuthorization, WorkflowBindings,
-    WorkflowInspection, WorkflowOperation, WorkflowRunTransitions, binding::ConfiguredBinding,
+    PreparedAdmission, RetryCommand, RetryResult, RetryWorkflowRequest, WorkflowAdmission,
+    WorkflowAuthorization, WorkflowBindings, WorkflowInspection, WorkflowOperation,
+    WorkflowRunTransitions, binding::ConfiguredBinding,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{
@@ -106,7 +107,49 @@ where
             .cancel(CancelCommand {
                 company_id: request.company_id,
                 run_id: request.run_id,
-                expected_revision: head.revision,
+                expected_revision: request.expected_revision,
+                actor: request.actor,
+                command_key: request.command_key,
+            })
+            .await
+    }
+
+    pub async fn retry(&self, request: RetryWorkflowRequest) -> AppResult<RetryResult> {
+        self.authorization
+            .authorize(
+                request.company_id,
+                request.actor,
+                super::RelatedAssociation::Company,
+                WorkflowOperation::Retry,
+            )
+            .await?;
+        let Some(head) = self
+            .inspection
+            .head(request.company_id, request.run_id)
+            .await?
+        else {
+            return Ok(RetryResult::NotFound);
+        };
+        if head.company_id() != request.company_id || head.run_id() != request.run_id {
+            return Err(AppError::Internal(
+                "workflow inspection returned mismatched run scope".into(),
+            ));
+        }
+        self.authorization
+            .authorize(
+                request.company_id,
+                request.actor,
+                head.association,
+                WorkflowOperation::Retry,
+            )
+            .await?;
+        self.transitions
+            .retry(RetryCommand {
+                company_id: request.company_id,
+                actor: request.actor,
+                run_id: request.run_id,
+                expected_revision: request.expected_revision,
+                command_key: request.command_key,
             })
             .await
     }

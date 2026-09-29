@@ -2,6 +2,7 @@
 //! the result transaction must recheck this fence and close the same attempt.
 use super::activation::{ActivatedExecution, ActivationRequest};
 use crate::app_error::{AppError, AppResult};
+use crate::domain::workflow::{RetrySafety, StepFailure};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::time::Duration;
@@ -63,14 +64,23 @@ pub struct ClaimedWorkflow {
     pub window: LeaseWindow,
     pub max_result_bytes: usize,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowFailure {
+    pub failure: StepFailure,
+    pub safety: RetrySafety,
+}
+pub type WorkflowHandlerResult = Result<Value, WorkflowFailure>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseReleaseCause {
     LocalInterruption,
     Deadline,
     LeaseLost,
     StorageFailure,
     InvalidResult,
+    ActivationLimit,
     HandlerFailure,
+    Classified(WorkflowFailure),
 }
 
 #[async_trait]
@@ -105,6 +115,12 @@ pub struct FencedWorkflowResult {
 /// and a worker may no longer provide the handler that originally claimed it.
 #[async_trait]
 pub trait WorkflowLeaseRecovery: Send + Sync {
+    /// Retire already-debited pending work without creating another attempt.
+    async fn retire_exhausted_work(
+        &self,
+        scope: ActivationRequest,
+        policy: LeasePolicy,
+    ) -> AppResult<bool>;
     async fn retire_expired_io(
         &self,
         scope: ActivationRequest,

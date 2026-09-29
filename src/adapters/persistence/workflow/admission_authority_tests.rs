@@ -237,3 +237,43 @@ async fn workflow_admit_sql_deactivated_replay_uses_saved_resources_not_current_
     assert!(matches!(p.admit(&saved).await, Err(AppError::NotFound(_))));
     assert_eq!(f.counts().await, before);
 }
+
+#[tokio::test]
+async fn workflow_control_allowlist_revocation_checks_current_access_before_replay() {
+    let f = AdmissionFixture::new().await;
+    let c = Conversation::new(&f).await;
+    let principal = restrict_channel(&f, &c).await;
+    let admission = f.prepare(c.request(&f, "restricted", c.message)).await;
+    f.persistence().admit(&admission).await.unwrap();
+    let head = f
+        .persistence()
+        .head(admission.company_id(), admission.proposed_run_id())
+        .await
+        .unwrap()
+        .unwrap();
+    let cmd = CancelCommand {
+        company_id: admission.company_id(),
+        run_id: admission.proposed_run_id(),
+        actor: f.binding.target.actor,
+        command_key: IdempotencyKey::parse("cancel").unwrap(),
+        expected_revision: head.revision,
+    };
+    let result = f.persistence().cancel(cmd.clone()).await.unwrap();
+    assert!(matches!(result, CancelResult::Applied { .. }));
+    let before: Value = sqlx::query_scalar("SELECT jsonb_build_object('run',(SELECT to_jsonb(run) FROM workflow_runs AS run),'receipts',(SELECT jsonb_agg(to_jsonb(receipt)) FROM workflow_control_commands AS receipt),'events',(SELECT jsonb_agg(to_jsonb(event) ORDER BY sequence) FROM workflow_run_events AS event))").fetch_one(f.persistence().pool()).await.unwrap();
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id=$1 AND principal_id=$2")
+        .bind(c.channel)
+        .bind(principal)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let revoke = async {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        tx.commit().await.unwrap();
+    };
+    let (_, replay) = tokio::join!(revoke, f.persistence().cancel(cmd));
+    assert!(matches!(replay, Err(AppError::NotFound(_))));
+    let after: Value = sqlx::query_scalar("SELECT jsonb_build_object('run',(SELECT to_jsonb(run) FROM workflow_runs AS run),'receipts',(SELECT jsonb_agg(to_jsonb(receipt)) FROM workflow_control_commands AS receipt),'events',(SELECT jsonb_agg(to_jsonb(event) ORDER BY sequence) FROM workflow_run_events AS event))").fetch_one(f.persistence().pool()).await.unwrap();
+    assert_eq!(before, after);
+}

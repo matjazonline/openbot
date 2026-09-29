@@ -382,3 +382,15 @@ mod wait_tests;
 
 #[path = "polling_tests.rs"]
 mod polling_tests;
+
+#[path = "recovery_tests.rs"]
+mod recovery_tests;
+
+#[path = "pending_io_tests.rs"]
+mod pending_io_tests;
+
+#[path = "maintenance_tests.rs"]
+mod maintenance_tests;
+
+#[path = "control_tests.rs"]
+mod control_tests;

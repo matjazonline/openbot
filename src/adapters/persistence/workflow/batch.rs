@@ -13,7 +13,6 @@ struct BatchRun {
 #[derive(sqlx::FromRow)]
 struct BatchExecution {
     step_id: String,
-    activation: i64,
     completed_at: Option<chrono::DateTime<chrono::Utc>>,
     committed_route: Option<String>,
     route_target: Option<String>,
@@ -130,11 +129,11 @@ async fn run_steps(
                 continuation: Some(current),
             });
         }
-        if row.activation > i64::from(max_steps) {
-            return Err(ineligible());
-        }
-        let activated = activation::activate_on(db, current).await?;
-        let completion = execute_pure(bundle, &activated)?.ok_or_else(invalid)?;
+        let Some((activated, completion)) =
+            pending_recovery::prepare_pure(db, current, bundle, max_steps).await?
+        else {
+            return Ok(failed(current, completed));
+        };
         let next = batch_commit::complete(
             db,
             current,
@@ -173,12 +172,17 @@ async fn lock_execution(
     request: ActivationRequest,
 ) -> AppResult<BatchExecution> {
     let row = sqlx::query_as::<_, BatchExecution>(
-        "SELECT step_id, activation, completed_at, committed_route, route_target, successor_execution_id \
+        "SELECT step_id, completed_at, committed_route, route_target, successor_execution_id \
          FROM workflow_executions WHERE company_id = $1 AND run_id = $2 AND id = $3 FOR UPDATE",
-    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(request.execution.as_uuid())
-        .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+    )
+    .bind(request.company.as_uuid())
+    .bind(request.run.as_uuid())
+    .bind(request.execution.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
     let job = sqlx::query_as::<_, BatchJob>(
-        "SELECT payload, status, (status = 'pending' AND run_at <= clock_timestamp() \
+        "SELECT payload, status, (status = 'pending' AND retry_count < max_retries AND run_at <= clock_timestamp() \
          AND worker_id IS NULL AND execution_generation IS NULL AND locked_at IS NULL AND lock_expires_at IS NULL) AS eligible \
          FROM background_tasks WHERE company_id = $1 AND id = $2 AND workflow_execution_id = $3 \
          AND queue_kind = 'workflow' FOR UPDATE",
@@ -188,7 +192,9 @@ async fn lock_execution(
         return Err(invalid());
     }
     if row.completed_at.is_some() {
-        if job.status != "completed" {
+        if job.status != "completed"
+            && !(job.status == "failed" && row.committed_route.as_deref() == Some("final_error"))
+        {
             return Err(ineligible());
         }
     } else if !job.eligible {
@@ -225,4 +231,13 @@ async fn replay(
 }
 fn ineligible() -> AppError {
     AppError::Conflict("Workflow batch is not runnable".into())
+}
+
+fn failed(last: ActivationRequest, completed: u8) -> BatchResult {
+    BatchResult {
+        disposition: BatchDisposition::Failed,
+        completed,
+        last,
+        continuation: None,
+    }
 }

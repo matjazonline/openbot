@@ -345,3 +345,53 @@ async fn workflow_admit_sql_parent_source_checks_run_execution_step_and_action_i
         AdmissionResult::Created(command.proposed_run_id())
     );
 }
+
+#[tokio::test]
+async fn workflow_control_head_restores_real_message_and_schedule_causality() {
+    let f = AdmissionFixture::new().await;
+    let c = Conversation::new(&f).await;
+    let occurrence = Occurrence::new(&f, f.binding.target.company, c.channel).await;
+    for request in [
+        c.request(&f, "message-head", c.message),
+        occurrence.request(&f, "schedule-head"),
+    ] {
+        let trigger = request.trigger.clone();
+        let association = request.association;
+        let correlation = request.correlation_id;
+        let command = f.prepare(request).await;
+        f.persistence().admit(&command).await.unwrap();
+        let head = f
+            .persistence()
+            .head(command.company_id(), command.proposed_run_id())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(head.causality.trigger(), &trigger);
+        assert_eq!(head.causality.correlation_id(), correlation);
+        assert_eq!(head.association, association);
+        assert_eq!(head.causality.run_id(), command.proposed_run_id());
+        let cancel = CancelCommand {
+            company_id: command.company_id(),
+            run_id: command.proposed_run_id(),
+            actor: f.binding.target.actor,
+            command_key: IdempotencyKey::parse(format!(
+                "control-{}",
+                command.proposed_run_id().as_uuid()
+            ))
+            .unwrap(),
+            expected_revision: head.revision,
+        };
+        assert!(matches!(
+            f.persistence().cancel(cancel).await.unwrap(),
+            CancelResult::Applied { .. }
+        ));
+        let saved = f
+            .persistence()
+            .head(command.company_id(), command.proposed_run_id())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.causality, head.causality);
+        assert_eq!(saved.association, head.association);
+    }
+}

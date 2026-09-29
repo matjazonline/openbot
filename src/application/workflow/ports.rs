@@ -1,6 +1,7 @@
 use super::{
     AdmissionResult, CancelCommand, CancelResult, ClaimRequest, ClaimedExecution, CompanyId,
-    IdempotencyKey, PreparedAdmission, RunHead, binding::ConfiguredBinding,
+    IdempotencyKey, PreparedAdmission, RetryCommand, RetryResult, RunHead,
+    binding::ConfiguredBinding,
 };
 use crate::application::app_error::AppResult;
 use crate::domain::workflow::{RunId, TriggerRef, WorkflowBindingId};
@@ -66,11 +67,13 @@ pub trait WorkflowAdmission: Send + Sync {
 /// does not promise rollback of an external effect already made. The port must
 /// compare the expected revision against current authoritative state, retain
 /// every terminal state unchanged, and preserve committed outputs and receipts.
-/// This trusted internal port receives a command only after the service checks
-/// current management access and the run's stored related association.
+/// The adapter rechecks current company and stored association authority under
+/// locks, including on exact replay. It preserves the caller-supplied revision.
 pub trait WorkflowRunTransitions: Send + Sync {
     /// CAS cancellation also invalidates pending jobs and ownership atomically.
     async fn cancel(&self, command: CancelCommand) -> AppResult<CancelResult>;
+    /// Reopens only durably safe failed work with unused original allowance.
+    async fn retry(&self, command: RetryCommand) -> AppResult<RetryResult>;
 }
 
 #[async_trait]

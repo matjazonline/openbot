@@ -173,15 +173,18 @@ async fn outputs(
     dependencies: &std::collections::BTreeSet<StepId>,
 ) -> AppResult<BTreeMap<StepId, Value>> {
     let steps: Vec<_> = dependencies.iter().map(|step| step.as_str()).collect();
+    // Select the latest activation before excluding failures: an earlier success
+    // must not become visible when the newest activation has no successful output.
     let mut rows = sqlx::query_as::<_, (String, Value)>(
         "SELECT requested.step_id, prior.committed_output \
          FROM unnest($4::text[]) AS requested(step_id) \
-         CROSS JOIN LATERAL (SELECT execution.committed_output \
+         CROSS JOIN LATERAL (SELECT execution.committed_output, execution.committed_route \
            FROM workflow_executions AS execution \
            WHERE execution.company_id = $1 AND execution.run_id = $2 \
              AND execution.activation < $3 AND execution.step_id = requested.step_id \
              AND execution.completed_at IS NOT NULL \
-           ORDER BY execution.activation DESC LIMIT 1) AS prior",
+           ORDER BY execution.activation DESC LIMIT 1) AS prior \
+         WHERE prior.committed_route IS DISTINCT FROM 'final_error'",
     )
     .bind(request.company.as_uuid())
     .bind(request.run.as_uuid())
@@ -192,9 +195,12 @@ async fn outputs(
     let mut remaining = limits.output_bytes;
     while let Some((step, value)) = rows.try_next().await? {
         let step = StepId::parse(step).map_err(|_| invalid())?;
-        validate_context_value(&value, limits).map_err(|_| invalid())?;
+        validate_context_value(&value, limits)
+            .map_err(|_| AppError::BadRequest("Workflow context limit reached".into()))?;
         let size = serde_json::to_vec(&value).map_err(|_| invalid())?.len();
-        remaining = remaining.checked_sub(size).ok_or_else(invalid)?;
+        remaining = remaining
+            .checked_sub(size)
+            .ok_or_else(|| AppError::BadRequest("Workflow context limit reached".into()))?;
         bundle
             .compiled()
             .validate_step_output(&step, &value)

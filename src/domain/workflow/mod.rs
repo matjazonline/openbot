@@ -9,6 +9,7 @@ mod expression;
 mod graph;
 mod ids;
 mod outcome;
+mod recovery;
 mod rule;
 mod state;
 mod transition;
@@ -34,6 +35,10 @@ pub use ids::{
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,
     OutcomeError, RetryEligibility, StepFailure, StepOutcome, resolve_outcome,
+};
+pub use recovery::{
+    AttemptBudget, RecoveryDecision, RecoveryLimit, RecoveryPolicy, RecoveryPolicyError,
+    RecoverySnapshot, RetrySafety,
 };
 pub use rule::{OrderedRule, RuleCase, RuleError};
 pub use state::{RunState, RunStateError, WaitingReason};

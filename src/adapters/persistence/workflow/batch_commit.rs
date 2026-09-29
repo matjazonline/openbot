@@ -23,7 +23,7 @@ pub(super) async fn complete(
     let route = match &completion.route {
         RouteSelection::Success => "success".to_owned(),
         RouteSelection::Choice(choice) => format!("choice:{}", choice.as_str()),
-        RouteSelection::FinalError => return Err(invalid()),
+        RouteSelection::FinalError => "final_error".to_owned(),
     };
     let target = match &completion.target {
         TransitionTarget::End => "$end",
@@ -49,7 +49,7 @@ pub(super) async fn complete(
     let changed = sqlx::query(
         "UPDATE workflow_runs SET state = $3, terminal_execution_id = $4 WHERE company_id = $1 AND id = $2 \
          AND state IN ('queued','running') AND deadline > clock_timestamp()",
-    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(match completion.state { RunState::Running => "running", RunState::Succeeded => "succeeded", _ => return Err(invalid()) })
+    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(match completion.state { RunState::Running => "running", RunState::Succeeded => "succeeded", RunState::Failed => "failed", _ => return Err(invalid()) })
         .bind(if next.is_none() { Some(request.execution.as_uuid()) } else { None }).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
         return Err(AppError::Conflict(
