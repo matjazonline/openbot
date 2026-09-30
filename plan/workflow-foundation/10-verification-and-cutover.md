@@ -31,6 +31,35 @@ Use scripted local model/provider endpoints and real PostgreSQL transactions. Co
 must use competing claimants, not only sequential mocks. Use dedicated test databases, and isolated
 fixtures for unscoped queue claims and whole-table assertions. Test poison batches explicitly.
 
+## Reconciliation stale-evidence and duplicate-candidate integration
+
+Required for Phase 10 acceptance, after phases 1–9. See the amended
+[SQL contract](CONTRACT-04.7-REMAINING-SQL-TESTS.md),
+[topology contract](CONTRACT-04.7-SQL-TOPOLOGY.md) and
+[A/C evidence](EVIDENCE-04.7-SQL-AC.md).
+
+1. Refresh the owner/caller inventory across completed reconciliation, worker,
+   recovery, operator and transport paths. Revisit earlier if a migration or writer
+   changes episode binding, witness lifetime or trigger ordering.
+2. Through supported application entry points and a scripted provider, prove that
+   historical/replayed evidence cannot authorize an additional external action.
+   Cover restart, duplicate submission, stale revision and competing claimants;
+   assert provider effects, attempts, evidence consumption and durable state.
+3. Reassess whether a supported path supplies authentic historical witnesses and a
+   fresh insertable episode identity satisfying all unrelated public constraints.
+4. If reachable, implement the original discriminator using the actual deferred
+   public trigger, exact historical-witness diagnostic, genuine positive control and
+   complete rollback, without reference-table substitution.
+5. If still unreachable, document the concrete obstruction and obtain independent
+   architectural review. Passing behavioral safety tests is not proof of the exact
+   public diagnostic. Later functionality does not guarantee reachability.
+6. Retain C's adversarial SQL test. If later owners legitimately permit multiple
+   live executions in a run, add an owner-created integration fixture and real
+   competing-worker coverage.
+
+Both the reassessment and behavioral integration tests are mandatory. Phase 10
+must not inherit fully-tested status from A's layered production-function coverage.
+
 ## CI and reproducibility
 
 Keep formatting, offline compilation, fresh migrations, SQLx metadata verification, database-backed

@@ -6,6 +6,9 @@ use tokio::{sync::Barrier, time::Instant};
 #[path = "capacity_tests.rs"]
 mod capacity_tests;
 
+#[path = "action_dispatch_tests.rs"]
+mod action_dispatch_tests;
+
 fn policy() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(3)).unwrap()
 }

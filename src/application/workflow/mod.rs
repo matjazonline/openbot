@@ -3,6 +3,7 @@
 //! Lifecycle authorization checks current membership and related visibility.
 //! Resource/effect authorization, production persistence and workers follow.
 
+pub mod actions;
 pub mod activation;
 mod authorization;
 pub mod batch;

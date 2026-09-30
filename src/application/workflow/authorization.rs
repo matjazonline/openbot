@@ -65,6 +65,7 @@ pub enum WorkflowOperation {
     Admit,
     Cancel,
     Retry,
+    Reconcile,
     CopyTemplate,
     ManageDefinition,
     ManageBinding,

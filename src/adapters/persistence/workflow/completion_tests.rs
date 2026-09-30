@@ -123,15 +123,30 @@ async fn workflow_completion_pure_io_supervision_and_terminal_io() {
     source["entry"] = json!("prepare");
     source["steps"]["prepare"] = json!({"type":"data.map","with":{"value":{"literal":10},"output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"start"}});
     let (f, scope) = fixture_source(source).await;
-    let boundary = f
+    // Force the legitimate budget yield without depending on database speed.
+    // The saved continuation must reach the I/O boundary on one further call.
+    let yielded = f
         .persistence()
         .advance_pure(
             scope,
+            BatchBudget::new(1, Duration::from_millis(100)).unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(yielded.disposition, BatchDisposition::Yielded);
+    assert_eq!(yielded.completed, 1);
+    let io = yielded.continuation.unwrap();
+    let boundary = f
+        .persistence()
+        .advance_pure(
+            io,
             BatchBudget::new(10, Duration::from_millis(100)).unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(boundary.disposition, BatchDisposition::Boundary);
+    assert_eq!(boundary.completed, 0);
+    assert_eq!(boundary.continuation, Some(io));
     let claim = f
         .persistence()
         .claim_io(boundary.continuation.unwrap(), worker(), policy())
@@ -152,13 +167,17 @@ async fn workflow_completion_pure_io_supervision_and_terminal_io() {
         panic!("handler failed")
     };
     let saved = f.persistence().complete_io(result).await.unwrap().unwrap();
-    f.persistence()
+    let finished = f
+        .persistence()
         .advance_pure(
             saved.successor.unwrap(),
             BatchBudget::new(10, Duration::from_millis(100)).unwrap(),
         )
         .await
         .unwrap();
+    assert_eq!(finished.disposition, BatchDisposition::Completed);
+    assert_eq!(finished.completed, 1);
+    assert!(finished.continuation.is_none());
     assert_eq!(state(&f).await["runs"][0]["state"], "succeeded");
     let (f, scope) = fixture().await;
     let claim = f

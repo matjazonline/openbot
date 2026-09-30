@@ -1,0 +1,15 @@
+# 04.7 claim recovery and accepted results — implementation checkpoint
+
+Queue2d Direct; no04.8, no full04.7/V1/foundation acceptance. Original README/Execution6/BRIEF04.7 and accepted CLAIM-BUDGET govern. Frozen evidence `/private/tmp/workflow-04.7-claim-recovery-01a0f89d/HANDOFF.md`. Root owns acceptance; independent Astra review pending.
+
+Three new database-backed tests PASS at stock2097152,0failed/ignored, final stable source. Genuine commit/discarded claim response, natural3s lease expiry, competing actual recovery owners, real2s backoff and competing ordinary automatic retry at model equality; saved parent Granted reservation replays without mutation. The discarded response simulates acknowledgement loss after successful API commit, not an actual process restart or network fault. Old binding remains inapplicable, attempt2 retires safely once, attempt3 is genuine.
+
+Late receipt case tests live and naturally expired fences. Real proof entry/provider accepted effect precedes actual sibling Granted2/Exhausted1; bounded receipt persists afterward. Live fence returns receipt/completes; expired retired fence stores receipt without output/successor and stale completion is inert. Separate test obtains the valid receipt before genuine sibling exhaustion, then successfully completes already accepted work. Shared usage/accounting/episode/refusal/action facts remain preserved where applicable; parent execution comparisons are exact and nonvacuous.
+
+Accepted pending-new receipt-only model-headroom gate is reused from `workflow_action_reconciliation_claim_boundary_receipt_only_model_headroom`; explicit ordinary saved retry from episode_lifecycle is unchanged. Fairness/upgrade/SQLA/C/original matrices stay open. No production edits or bound raises.
+
+Final focused command/result/full log: commands.jsonl, logs/focused-final.log in freeze. Earlier failures were test Debug diagnostic compile error, then whole-table execution comparison including newly admitted child, then attempted reuse of helper requiring first-attempt-only state; all corrected before final3PASS. No production defect inferred. Required broader dispatch/affected recovery suites, fmt-check/whitespace, locked offline alltargets, strictClippy, migrate/info, live checksums/schema equivalence, SQLxprepare/check, explicit graftbuild remain NOT RUN in this worker; fresh verifier must complete them. `cargo fmt` ran; graft auto-refreshed during skeleton lookup but does not substitute final build.
+
+Preservation manifests prove inherited Rust/migrations/cache unchanged except declared private child registration;53applied migrations/45SQLxcache files immutable. Retained PG18.6/system7691265791172745923/data/private/tmp/workflow-admission-pg-e3aa/DBworkflow_admission/usermac03/55439/socket/private/tmp/max_connections200 verified before authorized restart and cleanly stopped at checkpoint. No retained reset/drop, commit/stage/publish/deploy.
+
+Worker UUID01a0f89d-2d58-7612-98e8-a5aaca2804ca. Fresh context49.11%=126910/258400@18:12:57Z; final saved sample in freeze. Rotate before further work. Graph output estimates only, no spend savings inferred.

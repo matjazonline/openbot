@@ -46,6 +46,9 @@ pub(super) async fn claim_on(
     if !due {
         return Ok(None);
     }
+    if !reconciliation_budget_eligible(db, scope).await? {
+        return Ok(None);
+    }
     // Box the activation boundary to keep debug/test stacks at stock 2 MiB.
     let Some(activation) = Box::pin(pending_recovery::activate(db, scope)).await? else {
         return Ok(None);
@@ -117,4 +120,55 @@ async fn install(
     .execute(db)
     .await?;
     Ok(())
+}
+
+// Only the first claim of the exact scheduled episode gets this gate. A later
+// ordinary retry keeps its saved logical reservations and existing policy.
+async fn reconciliation_budget_eligible(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> AppResult<bool> {
+    let episode: Option<String> =
+        sqlx::query_scalar("SELECT workflow_action_pending_claim_episode($1,$2,$3,$4)")
+            .bind(scope.company.as_uuid())
+            .bind(scope.run.as_uuid())
+            .bind(scope.execution.as_uuid())
+            .bind(scope.job.0)
+            .fetch_one(&mut *db)
+            .await?;
+    let Some(command_key) = episode else {
+        return Ok(true);
+    };
+    // Requesting run, execution and job are already locked. Never lock the root
+    // run: only its shared usage serializes descendant reservations and claims.
+    sqlx::query("SELECT usage.root_run_id FROM workflow_root_budget_usage AS usage JOIN workflow_run_budgets AS link ON link.company_id=usage.company_id AND link.root_run_id=usage.root_run_id WHERE link.company_id=$1 AND link.run_id=$2 FOR UPDATE OF usage")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    let active: bool = sqlx::query_scalar("SELECT state IN ('queued','running') AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+    if !active {
+        return Err(timed_out());
+    }
+    // A fresh statement after the usage wait observes the committed competitor.
+    let eligible: bool =
+        sqlx::query_scalar("SELECT workflow_action_reconciliation_budget_eligible($1,$2)")
+            .bind(scope.company.as_uuid())
+            .bind(scope.run.as_uuid())
+            .fetch_one(&mut *db)
+            .await?;
+    if eligible {
+        return Ok(true);
+    }
+    // This is no accounting request: preserve all prior debit/attempt facts.
+    Box::pin(pending_recovery::settle(
+        db,
+        scope,
+        pending_recovery::PendingFailure::RootBudgetExhausted,
+    ))
+    .await?;
+    let refusal = sqlx::query("INSERT INTO workflow_action_claim_budget_refusals(company_id,run_id,execution_id,job_id,command_key,retired_attempt,audit_sequence) SELECT company_id,run_id,execution_id,job_id,command_key,retired_attempt,audit_sequence FROM workflow_action_claim_retirement_witnesses WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND job_id=$4 AND command_key=$5 AND transaction_id=pg_current_xact_id() AND retirement_confirmed AND audit_sequence IS NOT NULL")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).bind(command_key).execute(&mut *db).await?;
+    if refusal.rows_affected() != 1 {
+        return Err(invalid());
+    }
+    Ok(false)
 }

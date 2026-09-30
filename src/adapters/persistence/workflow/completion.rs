@@ -70,6 +70,36 @@ pub(super) async fn complete_on(
     {
         return Ok(None);
     }
+    if action_uncertainty::conflicted_on(
+        db,
+        crate::application::workflow::actions::ActionScope {
+            company: scope.company,
+            run: scope.run,
+            execution: scope.execution,
+        },
+    )
+    .await?
+    {
+        let failure = crate::application::workflow::lease::WorkflowFailure {
+            failure: crate::domain::workflow::StepFailure::new(
+                crate::domain::workflow::FailureClass::Terminal,
+                crate::domain::workflow::FailureCode::parse("action.evidence_conflict")
+                    .map_err(|_| invalid())?,
+                None,
+            )
+            .map_err(|_| invalid())?,
+            safety: crate::domain::workflow::RetrySafety::EffectOutcomeUnknown,
+        };
+        recovery::retire_on(
+            db,
+            result.fence,
+            lease::Retirement::Interrupted(
+                crate::application::workflow::lease::LeaseReleaseCause::Classified(failure),
+            ),
+        )
+        .await?;
+        return Ok(None);
+    }
     let binding = admission_binding::read_saved_binding(
         db,
         scope.company,

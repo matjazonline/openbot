@@ -17,6 +17,7 @@ pub(super) async fn resume_on(
     };
     match wait.state.as_str() {
         "completed" => return replay(db, scope).await,
+        "cancelled" => return Ok(WaitProgress::Refused),
         "expired" => return Ok(WaitProgress::Expired(CommitDisposition::Replayed)),
         "failed" => {
             return Ok(WaitProgress::Failed {

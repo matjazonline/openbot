@@ -1,0 +1,20 @@
+# Row 3d validation subgroup — implemented, acceptance pending
+
+2026-10-05. Seven new tests, two new children and exact registrations only. Full row3d and full04.7 remain incomplete; no04.8. Existing831source bodies are preserved after normalizing only those registrations; current833source paths and125protected hashes are frozen.
+
+New unit child `src/application/workflow/actions/reconciliation/boundary_tests.rs` exercises exact canonical envelope16384/16385, recovered result65536/65537 with an allowing object schema, observation at marker-before-entry versus exact entry, validity equality/+1ns/+24h/+24h+1ns, and verification5s/+1ns. Literal byte expectations catch a future raised limit. Recovered oversize retains Applied truth and reports InvalidRecoveredResult. These are unit issuance boundaries; they do not certify independent SQL JSON-text limits or native COMMIT.
+
+New persistence child `src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs` exercises seven initially inserted native-valid but semantically malformed outcomes through real service replay, zero verification and complete public-row equality; a valid initial RevisionConflict replay control; installed wrong-id, actual foreign-company and genuine changed-target registrations rejected before verification with all public facts unchanged; a matching real Unknown control; and real marker/entry chronology with an approved verifier seam, complete rollback before entry and natural service settlement at exact entry time. Both frozen actions for source comparison are prepared through actual owners while live, before parking. Foreign-company mismatch is not claimed to isolate company alone from its different operation signature.
+
+Evidence directory: `/Volumes/ssd1/dev/workflow-recovery-20261005/continuation-20261005-token-efficient/`.
+
+- `row3d-unit-focused.log`:4PASS; `row3d-service-focused-final.log`:3PASS.
+- `row3d-application.log`:14PASS, including the4new unit tests. Application14 and persistence3 are17 distinct fresh scoped PASS.
+- `row3d-gates.json`: formatting/whitespace, locked offline all-target compilation, strict all-target Clippy, live all-target SQLx prepare/check and explicit graft build PASS. Source833/protected125 hashes match throughout. Fresh53migration native SHA384/schema gates from accepted row3c are reusable only while protected bytes remain identical; no new DDL exists.
+- `row3d-admission-current.log`: broader434-test gate started at59.76% context; its final result belongs in the checkpoint handoff. Do not infer448combinedPASS until it drains successfully.
+
+Two failed constructor runs remain retained. `row3d-preparation-correction.md` explains the source-derived corrections: stored-outcome decoder returns Database("Invalid stored workflow record"), whereas verifier/time rejection returns BadRequest("Invalid workflow reconciliation evidence"); dispatch authority cannot be read after parking; and an audit-less Scheduled candidate hits the native episode-witness guard before decoding, so wrong-typed AppliedRecorded.receipt is used instead. Native masks are not counted as decode evidence; no guard is changed or disabled. The source/static gates apply to corrected final bytes.
+
+Independent implementation review, broader integration acceptance and full original row3d are pending. Remaining row3d work includes native diagnostic/command/result shape and exact SQL bounds, native time/validity guards with genuine prospective ownership, and explicit safe-storage projection. Persisted evidence has native relational guards; no nonexistent JSON-to-VerifiedEvidence decoder or arbitrary trusted-diagnostic secret sanitizer is claimed. Original3e naturalCOMMIT/full logical/injected-position rollback and3f populated upgrades remain open.
+
+The root reached the plan's60% context checkpoint at155483/258400=60.17%; only the already-running admission gate drains before preservation/handoff closure. No further implementation or new validation gate begins after that detection. Original damaged PG55439 is untouched/unrecovered. No staging/commit/deploy/production/applied-schema/dependency/cache/bound changes.

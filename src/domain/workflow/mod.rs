@@ -6,6 +6,7 @@ mod budget;
 mod causality;
 mod context;
 mod definition;
+mod evidence;
 mod expression;
 mod graph;
 mod ids;
@@ -27,12 +28,14 @@ pub use context::{
 pub use definition::{
     ExecutionLimits, ResourceRequirement, Routes, StepDefinition, WorkflowDefinition,
 };
+pub use evidence::*;
 pub use graph::{GraphError, ValidatedWorkflow, validate};
 pub use ids::{
-    ActionInvocationId, BindingRevision, BindingStateRevision, ChoiceName, CompanyId,
-    DraftRevision, ExecutionId, FailureCode, NameError, ResourceName, RunId, RuntimeResourceId,
-    ScheduleId, ScheduleOccurrenceId, StepId, TemplateId, TemplateRevision, TriggerId, TypeName,
-    VersionId, WaitId, WorkflowBindingId, WorkflowId,
+    ActionEvidenceId, ActionInvocationId, ActionReconciliationCommandId, ActionRemoteAttemptId,
+    ActionRemoteEntryId, ActionRemoteMarkerId, BindingRevision, BindingStateRevision, ChoiceName,
+    CompanyId, DraftRevision, ExecutionId, FailureCode, NameError, ResourceName, RunId,
+    RuntimeResourceId, ScheduleId, ScheduleOccurrenceId, StepId, TemplateId, TemplateRevision,
+    TriggerId, TypeName, VersionId, WaitId, WorkflowBindingId, WorkflowId,
 };
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,

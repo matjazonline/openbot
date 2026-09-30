@@ -60,8 +60,23 @@ the stock2MiB stack (2191passed,0failed,22existing optional/developer ignores),
 plus migration/schema, SQLx, offline compilation, Clippy and formatting checks.
 Independent combined actual-code and final evidence review passed; root accepted phase03.
 [BRIEF-03-FINAL.md](BRIEF-03-FINAL.md) records the exact gate and limitations.
-The user requested a handoff and stop after03. Phase04 has not started.
-Resume from [RESUME.md](RESUME.md) only in the next authorized session.
+Phase04.1 preparation and04.2 authorization-observation foundations are verified:
+14actiontests at stock2MiB and required static/SQLx gates passed, with independent
+review. Production dispatch/adapters/integration and the combined phase04 gate
+remain open; [BRIEF-04.1.md](BRIEF-04.1.md) and [BRIEF-04.2.md](BRIEF-04.2.md)
+record the exact scope. 04.3 durable dispatch foundation is also verified with29stock2MiB action tests
+and independent actual-code/criteria/gates PASS; [BRIEF-04.3.md](BRIEF-04.3.md)
+records exact scope. 04.4 approved-provider-contract foundation is verified with36stock2MiB action tests
+and independent review; [BRIEF-04.4.md](BRIEF-04.4.md) records mandatory04.5 supported
+replay integration. 04.5 receipt/supported-replay foundation is verified with52action and97affected
+stock2MiB integration tests, all required gates and independent overall PASS;
+[BRIEF-04.5.md](BRIEF-04.5.md) records exact scope. 04.6 uncertainty parking/audit is
+verified with62action and268affected stock2MiB tests, all required gates and independent
+PASS; [BRIEF-04.6.md](BRIEF-04.6.md) records exact scope.04.7 evidence settlement is
+partially implemented and UNVERIFIED. The resumed 34-test reconciliation subset
+passes at stock 2 MiB with independent scoped review, but remaining bounds, recovery,
+provenance and final gates are still open. Proof reservation/entry bounds and genuine 128/129 prior-entry coverage now pass independent scoped review. A next-claim shared-budget defect led to a scoped foundation and owner-lifecycle correction; lifecycle and real claim/debit race checks pass independent review. Remaining SQL provenance, runtime, upgrade and final acceptance gates stay open. No 04.7 completion is inferred.
+[RESUME.md](RESUME.md) records the current state and first next action.
 [PROGRESS.md](PROGRESS.md) records accepted scope and handoffs.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
 inventories current owners and removal gates.

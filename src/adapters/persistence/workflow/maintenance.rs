@@ -36,6 +36,9 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
     sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     waits::audit(db, scope, "run_deadline_expired").await?;
+    let code = crate::domain::workflow::FailureCode::parse("workflow.run_deadline")
+        .map_err(|_| invalid())?;
+    action_uncertainty::record(db, scope.company, scope.run, None, &code).await?;
     Ok(true)
 }
 

@@ -38,7 +38,21 @@ pub(super) async fn retire_on(
     let graph = binding.bundle().compiled().graph();
     let step = StepId::parse(job.step_id).map_err(|_| invalid())?;
     let definition = graph.definition().steps.get(&step).ok_or_else(invalid)?;
-    let report = report(&reason, definition.step_type.as_str())?;
+    let mut report = report(&reason, definition.step_type.as_str())?;
+    // One DB predicate owns historical action scheduling for Rust retirement,
+    // deferred SQL retirement, and operator reopen. It never grants provider I/O.
+    let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
+        .bind(scope.company.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .fetch_one(&mut *db)
+        .await?;
+    if let Some(safe) = action_safe {
+        report.safety = if safe {
+            RetrySafety::SafeToRetry
+        } else {
+            RetrySafety::EffectOutcomeUnknown
+        };
+    }
     let attempts = AttemptBudget::new(
         u32::try_from(fence.attempt.0).map_err(|_| invalid())?,
         u32::try_from(job.max_retries).map_err(|_| invalid())?,
@@ -68,6 +82,16 @@ pub(super) async fn retire_on(
         settle_run(db, scope, decision).await?;
     }
     finish_job(db, fence, decision, &reason).await?;
+    if decision == RecoveryDecision::Reconcile {
+        action_uncertainty::record(
+            db,
+            scope.company,
+            scope.run,
+            Some(scope.execution),
+            report.failure.code(),
+        )
+        .await?;
+    }
     Ok(())
 }
 

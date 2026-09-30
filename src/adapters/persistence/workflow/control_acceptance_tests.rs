@@ -452,3 +452,68 @@ async fn workflow_control_foreign_scope_and_conflicting_authorized_actor_run_key
     ));
     assert_eq!(control_state(&f).await, before);
 }
+
+#[tokio::test]
+async fn workflow_control_ordinary_retry_owner_cascade_preserves_live_witnesses() {
+    let (f, scope) = fixture().await;
+    failed(&f, scope, RetrySafety::SafeToRetry).await;
+    let cmd = retry(command(&f, scope, "retry-before-owner-delete").await);
+    assert!(matches!(
+        f.persistence().retry(cmd).await.unwrap(),
+        RetryResult::Applied { .. }
+    ));
+    for table in [
+        "workflow_action_state_witnesses",
+        "workflow_action_schedule_witnesses",
+    ] {
+        let count: i64 =
+            sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE company_id=$1"))
+                .bind(scope.company.as_uuid())
+                .fetch_one(f.persistence().pool())
+                .await
+                .unwrap();
+        assert!(count > 0, "populated {table}");
+        for statement in [
+            format!("DELETE FROM {table} WHERE company_id=$1"),
+            format!("UPDATE {table} SET run_id=run_id WHERE company_id=$1"),
+        ] {
+            let error = sqlx::query(&statement)
+                .bind(scope.company.as_uuid())
+                .execute(f.persistence().pool())
+                .await
+                .unwrap_err();
+            assert!(
+                error
+                    .as_database_error()
+                    .unwrap()
+                    .message()
+                    .contains("append-only")
+            );
+        }
+    }
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(scope.company.as_uuid())
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
+    for table in [
+        "workflow_runs",
+        "workflow_executions",
+        "background_tasks",
+        "workflow_control_commands",
+        "workflow_action_state_witnesses",
+        "workflow_action_schedule_witnesses",
+        "workflow_run_events",
+    ] {
+        let count: i64 =
+            sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE company_id=$1"))
+                .bind(scope.company.as_uuid())
+                .fetch_one(f.persistence().pool())
+                .await
+                .unwrap();
+        assert_eq!(count, 0, "owned {table}");
+    }
+}
+
+#[path = "control_wait_order_tests.rs"]
+mod wait_order_tests;

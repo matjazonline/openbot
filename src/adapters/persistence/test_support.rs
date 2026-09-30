@@ -285,6 +285,17 @@ impl Drop for OwnDatabase {
 /// skips. Migrations run once per database rather than once per binary, which is what the isolation
 /// costs: the database starts empty, so the test states every row that exists in it.
 pub async fn own_database() -> Option<OwnDatabase> {
+    // Keep the additional migration-selection seam off stock test stacks.
+    Box::pin(own_database_with_migrations(&sqlx::migrate!(
+        "./migrations"
+    )))
+    .await
+}
+
+/// A task-owned database at an exact historical migration prefix, without schema reconstruction.
+pub async fn own_database_with_migrations(
+    migrations: &sqlx::migrate::Migrator,
+) -> Option<OwnDatabase> {
     let url = test_database_url()?;
     // Generated, so it needs no quoting beyond the identifier quotes: `CREATE DATABASE` takes no
     // parameters.
@@ -300,16 +311,16 @@ pub async fn own_database() -> Option<OwnDatabase> {
         .connect(&with_database_name(&url, &name))
         .await
         .expect("a database this test just created accepts connections");
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("a fresh database accepts this checkout's migrations");
-
-    Some(OwnDatabase {
+    let database = OwnDatabase {
         pool,
         name,
         admin_url,
-    })
+    };
+    migrations
+        .run(&database.pool)
+        .await
+        .expect("a fresh database accepts the selected migration history");
+    Some(database)
 }
 
 /// Run one statement against the maintenance database. `CREATE`/`DROP DATABASE` cannot run inside

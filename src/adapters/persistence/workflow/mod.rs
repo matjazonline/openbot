@@ -8,6 +8,12 @@
 //! child-owned wakeup fact; parent consumption must use a separate transaction.
 //! Foreign-key checks count as locks too: never insert a parent reference while
 //! completing the child. Parent linkage is immutable and established at admission.
+mod action_authority;
+pub mod action_dispatch;
+mod action_receipts;
+pub mod action_reconciliation;
+mod action_uncertainty;
+mod actions;
 mod activation;
 mod admission;
 mod admission_binding;
@@ -30,10 +36,14 @@ mod fair_polling;
 mod fairness;
 mod lease;
 mod lease_claim;
+// Exact historical owner is compiled only for pre-episode migration fixtures.
 mod resources;
 mod rows;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "action_reconciliation_upgrade_legacy_claim.rs"]
+mod upgrade_legacy_claim;
 mod wait_commit;
 mod waits;
 mod wakeups;

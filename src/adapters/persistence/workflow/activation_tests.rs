@@ -3,6 +3,9 @@ use crate::adapters::persistence::workflow::activation::activate_on;
 use crate::application::workflow::activation::*;
 use tokio::sync::Barrier;
 
+#[path = "action_tests.rs"]
+mod action_tests;
+
 async fn fixture() -> (AdmissionFixture, ActivationRequest) {
     let mut source: Value =
         serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();

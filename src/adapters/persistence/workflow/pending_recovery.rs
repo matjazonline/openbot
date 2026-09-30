@@ -51,8 +51,18 @@ pub(super) async fn settle(
 ) -> AppResult<()> {
     // Pre-activation failures cannot fabricate frozen inputs. Already activated
     // failures can take their immutable error edge through the one progression writer.
-    let reconcile =
-        matches!(failure, PendingFailure::AttemptsExhausted) && unknown_effect(db, scope).await?;
+    let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
+        .bind(scope.company.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .fetch_one(&mut *db)
+        .await?;
+    let reconcile = match action_safe {
+        Some(safe) => !safe,
+        None => {
+            matches!(failure, PendingFailure::AttemptsExhausted)
+                && unknown_effect(db, scope).await?
+        }
+    };
     let routed = if !reconcile
         && matches!(
             failure,
@@ -76,6 +86,12 @@ pub(super) async fn settle(
     // Pure/activation validation has no worker attempt. Do not invent an attempt
     // or alter the already-consumed allowance when retiring exhausted pending work.
     waits::audit(db, scope, failure.code()).await?;
+    if reconcile {
+        let code =
+            crate::domain::workflow::FailureCode::parse(failure.code()).map_err(|_| invalid())?;
+        action_uncertainty::record(db, scope.company, scope.run, Some(scope.execution), &code)
+            .await?;
+    }
     Ok(())
 }
 
