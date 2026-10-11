@@ -1,6 +1,9 @@
 //! Execution-wide safety must not hide an unresolved remote invocation.
 use super::*;
 
+#[path = "action_reconciliation_commit_final_tests.rs"]
+pub(super) mod commit_final_tests;
+
 #[path = "action_reconciliation_sibling_boundary_tests.rs"]
 mod boundary_tests;
 
@@ -20,7 +23,7 @@ mod revision_tests;
 mod revision_overflow_tests;
 
 #[path = "action_reconciliation_receipt_sql_tests.rs"]
-mod receipt_sql_tests;
+pub(super) mod receipt_sql_tests;
 
 #[derive(Clone, Copy)]
 enum SiblingTruth {

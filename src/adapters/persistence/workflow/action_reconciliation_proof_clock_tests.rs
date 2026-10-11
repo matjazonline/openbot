@@ -85,6 +85,44 @@ async fn closed(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Arc<Le
     ledger
 }
 
+async fn expiry_diagnostic(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Value {
+    sqlx::query_scalar(include_str!(
+        "action_reconciliation_proof_clock_diagnostic.sql"
+    ))
+    .bind(request.fence.scope.company.as_uuid())
+    .bind(request.fence.scope.run.as_uuid())
+    .bind(request.fence.scope.execution.as_uuid())
+    .bind(request.fence.scope.job.0)
+    .bind(request.fence.worker.0)
+    .bind(request.fence.generation.0)
+    .bind(request.fence.attempt.0)
+    .bind(request.subject.invocation.as_uuid())
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap()
+}
+
+async fn diagnosed_expired_dispatch(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    provider: &LedgerProvider,
+) -> AppResult<RemoteDispatchObservation> {
+    let before = expiry_diagnostic(f, request).await;
+    let started = Instant::now();
+    let result = invoke(f, request, provider).await;
+    let elapsed = started.elapsed();
+    let after = expiry_diagnostic(f, request).await;
+    let diagnostic = result
+        .as_ref()
+        .map(|_| "Ok")
+        .map_err(|error| format!("{error:?}"));
+    eprintln!(
+        "proof_expiry_dispatch elapsed={elapsed:?} result={diagnostic:?} calls={} before={before} after={after}",
+        provider.calls.load(Ordering::SeqCst)
+    );
+    result
+}
+
 #[tokio::test]
 async fn workflow_action_reconciliation_proof_expiry_reservation_enter_and_successful_replay() {
     for before_enter in [false, true] {
@@ -154,8 +192,12 @@ async fn workflow_action_reconciliation_proof_expiry_reservation_enter_and_succe
             "expired successful replay is immutable"
         );
         let provider = LedgerProvider::new(&f, Delivery::Pending);
+        eprintln!("proof_expiry_dispatch before_enter={before_enter}");
         assert!(matches!(
-            invoke(&f, &request, &provider).await.unwrap(),
+            // Box the diagnostic seam to preserve the stock two-MiB test stack.
+            Box::pin(diagnosed_expired_dispatch(&f, &request, &provider))
+                .await
+                .unwrap(),
             RemoteDispatchObservation::PossibleDispatchExists
         ));
         assert_eq!(provider.calls.load(Ordering::SeqCst), 0);

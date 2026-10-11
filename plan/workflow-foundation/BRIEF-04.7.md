@@ -1,5 +1,14 @@
 # 04.7 — authorized reconciliation evidence and settlement
 
+Status: **VERIFIED / root-accepted 2026-10-12 for current user-authorized04.7 scope**.
+Independent final actual-code/criteria/integration PASS and all required gates PASS.
+[Final handoff](HANDOFF-04.7-COMPLETE-20261012.md) records the exact tested artifact,
+historical failure, authorized A/C limits, user-dropped row3f and future obligations.
+STOP after04.7; no04.8 or migration squash.
+
+### Historical preparation status
+
+
 Status: concrete affected expansion independently PASS after grouped R1 corrections;
 root ACCEPTED 2026-09-30 18:57Z.
 Expansion assignment completed without implementation/PG. A partial typed boundary now

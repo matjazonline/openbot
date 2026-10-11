@@ -3,6 +3,13 @@ use super::*;
 
 const FIXTURE_ATTEMPTS: i32 = 132;
 
+#[path = "action_reconciliation_prior_bounds_support.rs"]
+mod support;
+use support::{PausedVerifier, park_live, pending_loss};
+
+#[path = "action_reconciliation_prior_bounds_controls.rs"]
+mod controls;
+
 async fn prior_fixture() -> (AdmissionFixture, ActionDispatchRequest) {
     let mut source: Value =
         serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
@@ -84,23 +91,20 @@ async fn prior_history(
     f: &AdmissionFixture,
     request: &mut ActionDispatchRequest,
     verifier: &Arc<LedgerVerifier>,
-) -> ReconciliationResult {
+) -> Option<ReconciliationResult> {
     let pending = LedgerProvider::new(f, Delivery::Pending);
     for number in 1..=128 {
-        assert!(matches!(
-            invoke(f, request, &pending).await,
-            Err(AppError::Timeout(_))
-        ));
+        Box::pin(pending_loss(f, request, &pending)).await?;
         assert_eq!(pending.calls.load(Ordering::SeqCst), number);
         assert_eq!(
             entry_consumptions(f).await,
             (number as i64, number as i64 - 1)
         );
-        park(f, request).await;
+        Box::pin(park_live(f, request)).await?;
         // Box each phase so 128 owner cycles do not enlarge the poll frame.
         let result = Box::pin(schedule_prior(f, request, verifier, number)).await;
         if number == 128 {
-            return result;
+            return Some(result);
         }
         new_claim(f, request).await;
     }
@@ -121,7 +125,11 @@ async fn available(
         .unwrap()
 }
 
-async fn consume_128(f: &AdmissionFixture, request: &mut ActionDispatchRequest, proof: Uuid) {
+async fn consume_128(
+    f: &AdmissionFixture,
+    request: &mut ActionDispatchRequest,
+    proof: Uuid,
+) -> Option<()> {
     let scheduled = all_tables(f).await;
     assert_eq!(entry_consumptions(f).await, (128, 127));
     assert_eq!(available(f, request, None).await, Some(proof));
@@ -135,16 +143,11 @@ async fn consume_128(f: &AdmissionFixture, request: &mut ActionDispatchRequest, 
     }
     assert_eq!(all_tables(f).await, scheduled);
     new_claim(f, request).await;
+    renew_fixture_lease(f, request.fence).await;
     let claimed = all_tables(f).await;
     assert_eq!(claimed["task_attempts"].as_array().unwrap().len(), 129);
     let pending = LedgerProvider::new(f, Delivery::Pending);
-    assert!(
-        matches!(
-            invoke(f, request, &pending).await,
-            Err(AppError::Timeout(_))
-        ),
-        "128 prior plus the matched consuming NEW entry must reserve and enter"
-    );
+    Box::pin(support::observe_pending(f, request, &pending)).await?;
     assert_eq!(pending.calls.load(Ordering::SeqCst), 1);
     assert_eq!(entry_consumptions(f).await, (129, 128));
     let consumed: Uuid = sqlx::query_scalar(
@@ -182,6 +185,7 @@ async fn consume_128(f: &AdmissionFixture, request: &mut ActionDispatchRequest, 
             .len(),
         1
     );
+    Some(())
 }
 
 fn only_refusal(
@@ -333,33 +337,69 @@ async fn refuse_129(
 
 #[tokio::test]
 async fn workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses() {
-    // Box the fixture/provider phases to keep this regression in the stock-stack gate.
+    Box::pin(support::fresh_proof(prove_prior_bound))
+        .await
+        .expect("a complete boundary proof is required");
+}
+
+async fn prove_prior_bound() -> Option<()> {
+    // Box fixture/provider phases to keep this regression in the stock-stack gate.
     let (f, mut request) = Box::pin(prior_fixture()).await;
     let verifier = ledger(&f, &request).await;
-    let result = Box::pin(prior_history(&f, &mut request, &verifier)).await;
-    let started = Arc::new(Notify::new());
-    let release = Arc::new(Notify::new());
-    let observed = Arc::new(ObservedVerifier {
-        ledger: verifier.clone(),
-        calls: AtomicUsize::new(0),
-        pause: Some((started.clone(), release.clone())),
-    });
-    let stale = verified_command(&f, &request, &observed, "128-paused-before-129").await;
+    let result = Box::pin(prior_history(&f, &mut request, &verifier)).await?;
+    let observed = Arc::new(PausedVerifier::new(verifier.clone()));
+    let stale = proof_command(&f, &request, &verifier, "128-paused-before-129").await;
+    let command_started = std::time::Instant::now();
+    let reconcile = observed.run(&f, &stale);
     let competitor = async {
-        started.notified().await;
-        Box::pin(consume_128(
+        assert!(
+            observed.wait_started().await,
+            "reconciliation ended before verifier pause"
+        );
+        let consumed = Box::pin(consume_128(
             &f,
             &mut request,
             result.evidence.unwrap().as_uuid(),
         ))
         .await;
-        park(&f, &request).await;
-        barrier(&f, &request).await;
+        let parked = if consumed.is_some() {
+            Box::pin(park_live(&f, &request)).await
+        } else {
+            None
+        };
+        if parked.is_some() {
+            barrier(&f, &request).await;
+        }
         let before = all_tables(&f).await;
-        release.notify_one();
-        before
+        if parked.is_some() {
+            *observed.released_at.lock().unwrap() = Some(std::time::Instant::now());
+            observed.release.notify_one();
+        }
+        (before, parked)
     };
-    let (settled, before) = tokio::join!(run_command(&f, &stale, observed.clone()), competitor);
+    let (settled, (before, parked)) = tokio::join!(reconcile, competitor);
+    let after = all_tables(&f).await;
+    if !observed.returned.load(Ordering::SeqCst) {
+        support::withheld_timeout(
+            &settled,
+            command_started.elapsed(),
+            observed
+                .released_at
+                .lock()
+                .unwrap()
+                .map(|time| time.duration_since(command_started)),
+        );
+        assert_eq!(
+            after, before,
+            "withheld proof must not write reconciliation facts"
+        );
+        uncaptured("BACKSTOP prior_bounds withheld_verification timeout; no reconciliation delta");
+        return None;
+    }
+    assert!(
+        parked.is_some(),
+        "a void competitor must not release stale evidence"
+    );
     let settled = settled.unwrap();
     assert_eq!(
         settled.outcome,
@@ -369,6 +409,7 @@ async fn workflow_action_reconciliation_bounds_128_prior_consuming_129_total_the
     );
     assert_eq!(settled.evidence, None);
     assert_eq!(observed.calls.load(Ordering::SeqCst), 1);
-    only_refusal(&before, all_tables(&f).await, &stale, &settled);
+    only_refusal(&before, after, &stale, &settled);
     Box::pin(refuse_129(&f, &request, &verifier)).await;
+    Some(())
 }

@@ -72,10 +72,13 @@ replay integration. 04.5 receipt/supported-replay foundation is verified with52a
 stock2MiB integration tests, all required gates and independent overall PASS;
 [BRIEF-04.5.md](BRIEF-04.5.md) records exact scope. 04.6 uncertainty parking/audit is
 verified with62action and268affected stock2MiB tests, all required gates and independent
-PASS; [BRIEF-04.6.md](BRIEF-04.6.md) records exact scope.04.7 evidence settlement is
-partially implemented and UNVERIFIED. The resumed 34-test reconciliation subset
-passes at stock 2 MiB with independent scoped review, but remaining bounds, recovery,
-provenance and final gates are still open. Proof reservation/entry bounds and genuine 128/129 prior-entry coverage now pass independent scoped review. A next-claim shared-budget defect led to a scoped foundation and owner-lifecycle correction; lifecycle and real claim/debit race checks pass independent review. Remaining SQL provenance, runtime, upgrade and final acceptance gates stay open. No 04.7 completion is inferred.
+PASS; [BRIEF-04.6.md](BRIEF-04.6.md) records exact scope. 04.7 authorized evidence settlement is now verified and
+root-accepted for the current user-authorized scope: final stock2MiB full library
+2532passed/0failed/22unchangedignored, lease-budget87passed, all required static,
+SQLx, fresh53migration/schema and graft gates passed, with independent final review.
+[Final04.7 handoff](HANDOFF-04.7-COMPLETE-20261012.md) preserves the earlier unexplained
+failure and established scope/future-phase limits. Work stops here as requested;
+04.8 and migration squash have not started.
 [RESUME.md](RESUME.md) records the current state and first next action.
 [PROGRESS.md](PROGRESS.md) records accepted scope and handoffs.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)

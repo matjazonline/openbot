@@ -2,6 +2,9 @@
 //! application serialize on the provider's durable operation row, not a local lease.
 use super::*;
 
+#[path = "action_reconciliation_commit_tests.rs"]
+mod commit_tests;
+
 enum Delivery {
     Pending,
     Apply {

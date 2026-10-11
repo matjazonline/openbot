@@ -4,15 +4,17 @@ use super::*;
 #[path = "action_reconciliation_command_probe_tests.rs"]
 mod command_probe_tests;
 
-struct CompanyReceipt {
-    fixture: AdmissionFixture,
-    request: ActionDispatchRequest,
-    marker: Uuid,
-    evidence: Uuid,
-    entry: Uuid,
+pub(in super::super::super) struct CompanyReceipt {
+    pub(in super::super::super) fixture: AdmissionFixture,
+    pub(in super::super::super) request: ActionDispatchRequest,
+    pub(in super::super::super) marker: Uuid,
+    pub(in super::super::super) evidence: Uuid,
+    pub(in super::super::super) entry: Uuid,
 }
 
-async fn foreign_action(f: &AdmissionFixture) -> (AdmissionFixture, ActionDispatchRequest) {
+pub(in super::super::super) async fn foreign_action(
+    f: &AdmissionFixture,
+) -> (AdmissionFixture, ActionDispatchRequest) {
     let fixture = Fixture::in_database(
         f.binding.fixture._db.clone(),
         &format!("-receipt-company-{}", Uuid::new_v4().simple()),
@@ -54,7 +56,7 @@ async fn foreign_action(f: &AdmissionFixture) -> (AdmissionFixture, ActionDispat
     .await
 }
 
-async fn applied_history(
+pub(in super::super::super) async fn applied_history(
     fixture: AdmissionFixture,
     request: ActionDispatchRequest,
     verifier: Arc<LedgerVerifier>,

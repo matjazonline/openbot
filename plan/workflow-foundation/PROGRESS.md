@@ -1,5 +1,21 @@
 # Workflow foundation execution progress
 
+## 04.7 COMPLETE — 2026-10-12, STOP
+
+**Current user-authorized04.7 VERIFIED and root-accepted.** Independent final
+actual-code/criteria/integration PASS; stock library2532PASS/0FAIL/22unchangedignored,
+lease87PASS/max35.7%<50%, all required static/SQLx/fresh53schema/graft gates PASS.
+Read [final handoff](HANDOFF-04.7-COMPLETE-20261012.md) for exact evidence, artifacts,
+retained historical failure and scope dispositions. No04.8 or migration squash.
+All workers/resources quiescent; retained NEWPG55440 running, damaged55439 untouched.
+Preserve all WIP. User instructed STOP after04.7; further work needs a new instruction.
+
+## Historical continuation records
+
+Earlier incomplete/checkpoint statuses below are superseded by this acceptance;
+their evidence and limitations remain preserved.
+
+
 ## Current acceptance — SQL A/C, 2026-10-02
 
 **A/C verified under the user-authorized amended criteria. Full 04.7 remains

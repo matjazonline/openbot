@@ -376,3 +376,12 @@ async fn workflow_action_reconciliation_native_diagnostic_scalar_and_controls() 
 }
 #[path = "action_reconciliation_native_object_tests.rs"]
 mod native_object_tests;
+
+#[path = "action_reconciliation_native_fk_tests.rs"]
+mod native_fk_tests;
+
+#[path = "action_reconciliation_native_command_tests.rs"]
+mod native_command_tests;
+
+#[path = "action_reconciliation_native_attribution_tests.rs"]
+mod native_attribution_tests;

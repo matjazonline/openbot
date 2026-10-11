@@ -1,5 +1,78 @@
 # Workflow foundation resume
 
+## 04.7 COMPLETE — 2026-10-12, STOP
+
+**Current user-authorized04.7 VERIFIED and root-accepted.** Independent final
+actual-code/criteria/integration PASS; stock library2532PASS/0FAIL/22unchangedignored,
+lease87PASS/max35.7%<50%, all required static/SQLx/fresh53schema/graft gates PASS.
+Read [final handoff](HANDOFF-04.7-COMPLETE-20261012.md) for exact evidence, artifacts,
+retained historical failure and scope dispositions. No04.8 or migration squash.
+All workers/resources quiescent; retained NEWPG55440 running, damaged55439 untouched.
+Preserve all WIP. User instructed STOP after04.7; further work needs a new instruction.
+
+## Historical continuation records
+
+Earlier incomplete/checkpoint statuses below are superseded by this acceptance;
+their evidence and limitations remain preserved.
+
+
+## Latest checkpoint — 2026-10-12, root01a12ecd
+
+**Full04.7 incomplete.** Read [handoff](HANDOFF-20261012-cont.md), then
+[current continuation](CONTINUATION-20261012-astra.md). Fullrow3e, evidence/coverage
+3FK, command3FK/Scheduled CHECK and immediate attribution15 are VERIFIED with
+independent closure and all scoped gates. Latest affected62PASS, accepted27file
+freeze be3b7016…529550c. Next approved deferred coverage subgroup, documentation
+nits and final broad original04.7 integration. No04.8/squash.
+Root context checkpoint; all14workers quiescent, no owned resources/approvals.
+Fresh root/workers required. Preserve HEAD6436ecb and allWIP, authorized NEWPG55440
+running/unchanged, damaged55439 untouched. Exact evidence/resources in handoff.
+
+## Current continuation — 2026-10-12, second Astra-reviewed root
+
+Read [current continuation](CONTINUATION-20261012-astra.md) before older records.
+Full original row3e VERIFIED: Applied5/Final4 injections plus all positive/native
+and calibration controls, independent combined code/coverage/integration PASS and
+all scoped gates. Latest focused18/affected51PASS, frozen source64cbbbea…ac1807a.
+Evidence/coverage three-FK residual group also VERIFIED:12cells/affected54PASS,
+all scoped gates and independent closure PASS, freeze dd20c652…fead99.
+Command3FK/Scheduled CHECK also VERIFIED:22cells/affected59PASS, all scoped gates
+and independent closure PASS, freeze a49c2966…123798d8. Full04.7 incomplete.
+Next attribution/coverage guards, documentation and broad final integration.
+No04.8 or migration squash.
+Preserve HEAD6436ecb and all accepted uncommitted source; NEWPG55440 retained,
+damaged55439 untouched. Evidence `/private/tmp/workflow-foundation-20261012-cont/`.
+
+## Latest checkpoint — 2026-10-12, Astra reviewed
+
+**Full04.7 incomplete. Full row3d and first row3e Applied subgroup VERIFIED.**
+Read [HANDOFF-20261012-astra.md](HANDOFF-20261012-astra.md) and current continuation.
+Row3d204×5/213×3/full-library2500/lease87 and independent integration PASS.
+Row3e Applied positive/native naturalCOMMIT rollback/observer calibration accepted
+after31affectedPASS, all scoped gates and independent final closure PASS.
+Next Applied5 injected cells, Final4+native/positive, new-conflict native/positive,
+then final04.7 residuals/integration. Nothing waived; no full04.7 completion claim.
+
+Coordinator checkpoint near skill60%; all workers quiescent, no owned processes,
+clients/disposableDBs/pending approvals. Fresh root/workers required. Preserve
+HEAD6436ecb and accepted uncommitted v2 patch1e1d82cd…78a6. Exact resource/freeze
+and evidence in handoff. User: finish04.7 then handoffSTOP; no04.8/squash.
+
+## Current continuation — 2026-10-11, Astra reviewed
+
+**Full original row3d VERIFIED; full04.7 still incomplete.** See
+[current continuation](CONTINUATION-20261011-astra.md). Five204-test greens,
+three213-test greens, stock-stack2500PASS/0FAIL/22existingignored and lease87PASS
+(maxwork35.4%<50%) on unchanged reviewed source; independent original-row3d
+integration closure PASS. Prior-bound fixture/classifier corrections and all
+scoped static/SQLx/fresh53migration/schema/preservation gates passed.
+
+Next: row3e naturalCOMMIT/full logical/injected rollback, final04.7 integration
+and remaining out-of-row3d gaps. **User: when04.7 complete, write handoff and STOP;
+no04.8 or queued migration squash in this continuation.** Exact evidence and
+resource/session records in current continuation. NEWPG55440 retained, damaged
+55439 untouched. HEAD0ace8dc5ce0aa67ef304d93fcd217b44d27de2f6, no stage/commit.
+
 ## Latest checkpoint — 2026-10-11, root 8bab464f (stopped at 66.9% context)
 
 **Full original 04.7 incomplete; no 04.8.** Read the "FINAL HANDOFF" section at

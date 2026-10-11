@@ -2,7 +2,7 @@
 use super::*;
 
 #[path = "action_reconciliation_receipt_company_tests.rs"]
-mod company_tests;
+pub(in super::super) mod company_tests;
 
 struct ReceiptHistory {
     fixture: AdmissionFixture,

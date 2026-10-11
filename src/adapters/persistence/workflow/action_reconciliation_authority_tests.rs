@@ -17,6 +17,9 @@ mod proof_tests;
 #[path = "action_reconciliation_association_tests.rs"]
 mod association_tests;
 
+#[path = "action_reconciliation_commit_conflict_tests.rs"]
+mod commit_conflict;
+
 #[tokio::test]
 async fn workflow_action_reconciliation_current_owner_admin_and_denied_principals() {
     let (f, request, verifier) = prepared().await;

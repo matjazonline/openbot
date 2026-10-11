@@ -167,8 +167,9 @@ impl<'a> SettledIo<'a> {
     /// while there is no winner: at least one reported a definite NotApplied, and every
     /// other result is a non-winning `Ok`. A non-winning claim may itself have committed
     /// settles (expiry retirement, activation, a refusal row), so the re-poll is a further
-    /// claimant against that settled state, as a worker's next poll would be. An `Err` of any other kind, Unknown included, is
-    /// never re-polled. Beside a winner, a NotApplied claimant lost: it waited out its bound
+    /// claimant against that settled state, as a worker's next poll would be. An `Err` of
+    /// any other kind, Unknown included, is never re-polled. Beside a winner, a NotApplied
+    /// claimant lost: it waited out its bound
     /// behind the winner and wrote nothing, so it is returned as the losing `T::default()`
     /// (`None` or `false`), which keeps the caller's exactly-one-winner assertion intact.
     async fn competing<T: Default, Fut>(
