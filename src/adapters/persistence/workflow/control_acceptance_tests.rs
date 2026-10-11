@@ -73,6 +73,7 @@ async fn workflow_control_cancel_claim_competitors_have_one_owner_and_dispositio
             let claim = claim.unwrap();
             assert!(
                 f.persistence()
+                    .settled()
                     .validate_io(claim.fence, policy())
                     .await
                     .unwrap()
@@ -94,6 +95,7 @@ async fn workflow_control_cancel_failure_competitors_close_attempt_once() {
         let (f, scope) = fixture().await;
         let claim = f
             .persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()
@@ -260,6 +262,7 @@ async fn workflow_control_cancel_deferred_faults_roll_back_complete_state() {
     ] {
         let (f, scope) = fixture().await;
         f.persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()

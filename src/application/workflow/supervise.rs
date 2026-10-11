@@ -39,26 +39,28 @@ where
     let mut cancel = Box::pin(cancel);
     let deadline = operation_deadline.min(claim.window.run_deadline);
     let mut expires = claim.window.expires;
-    let mut heartbeat = Instant::now() + policy.heartbeat();
+    let mut heartbeat = next_heartbeat(Instant::now(), claim.window, policy);
     let mut failure = None;
     let outcome = loop {
         tokio::select! { biased;
             _ = &mut cancel => break SupervisedResult::Stopped(StopReason::Cancelled),
             _ = sleep_until(deadline) => break SupervisedResult::Stopped(StopReason::Deadline),
             _ = sleep_until(expires) => break SupervisedResult::Stopped(StopReason::LeaseLost),
-            _ = sleep_until(heartbeat) => {
+            _ = sleep_until(heartbeat.unwrap_or(expires)), if heartbeat.is_some() => {
                 let renewed = tokio::select! { biased;
                     _ = &mut cancel => break SupervisedResult::Stopped(StopReason::Cancelled),
                     _ = sleep_until(deadline) => break SupervisedResult::Stopped(StopReason::Deadline),
                     _ = sleep_until(expires) => break SupervisedResult::Stopped(StopReason::LeaseLost),
-                    result = timeout(policy.persistence_timeout(),port.renew_io(fence,policy)) => result,
+                    result = timeout(policy.supervision_guard(),port.renew_io(fence,policy)) => result,
                 };
                 match renewed {
-                    Ok(Ok(Some(window))) => expires=window.expires,
+                    Ok(Ok(Some(window))) => {
+                        expires = window.expires;
+                        heartbeat = next_heartbeat(Instant::now(), window, policy);
+                    }
                     Ok(Ok(None)) => break SupervisedResult::Stopped(StopReason::LeaseLost),
                     _ => break SupervisedResult::Stopped(StopReason::Persistence),
                 }
-                heartbeat = Instant::now()+policy.heartbeat();
             }
             output = &mut handler => {
                 let output = match output { Ok(output) => output, Err(error) => { failure = Some(error); break SupervisedResult::Stopped(StopReason::HandlerFailed); } };
@@ -69,10 +71,10 @@ where
                     _ = &mut cancel => break SupervisedResult::Stopped(StopReason::Cancelled),
                     _ = sleep_until(deadline) => break SupervisedResult::Stopped(StopReason::Deadline),
                     _ = sleep_until(expires) => break SupervisedResult::Stopped(StopReason::LeaseLost),
-                    result = timeout(policy.persistence_timeout(),port.validate_io(fence,policy)) => result,
+                    result = timeout(policy.supervision_guard(),port.validate_io(fence,policy)) => result,
                 };
                 break match valid {
-                    Ok(Ok(true)) if Instant::now()<expires && Instant::now()<deadline => SupervisedResult::Ready(FencedWorkflowResult { fence, output }),
+                    Ok(Ok(true)) if Instant::now()<expires && Instant::now()<deadline => SupervisedResult::Ready(FencedWorkflowResult { fence, output, policy }),
                     Ok(Ok(_)) => SupervisedResult::Stopped(StopReason::LeaseLost),
                     _ => SupervisedResult::Stopped(StopReason::Persistence),
                 };
@@ -84,7 +86,7 @@ where
         // Cleanup is best effort and bounded; expired ownership is charged by the
         // exact-job recovery transition if storage refuses or cannot be reached.
         let _ = timeout(
-            policy.persistence_timeout(),
+            policy.supervision_guard(),
             port.release_io(
                 fence,
                 policy,
@@ -96,6 +98,22 @@ where
         .await;
     }
     outcome
+}
+
+/// Windows are anchored at the operation's start, but this runs after it returned. So
+/// renew no later than one full persistence deadline before expiry: a renewal may then
+/// take its whole bound and still land. A window capped at the run deadline cannot be
+/// extended; renewing it again would only loop on the global capacity lock, so stop and
+/// let the deadline or expiry end supervision.
+fn next_heartbeat(now: Instant, window: LeaseWindow, policy: LeasePolicy) -> Option<Instant> {
+    if window.expires >= window.run_deadline {
+        return None;
+    }
+    let latest = window
+        .expires
+        .checked_sub(policy.persistence_deadline())
+        .unwrap_or(now);
+    Some((now + policy.heartbeat()).min(latest).max(now))
 }
 
 #[cfg(test)]

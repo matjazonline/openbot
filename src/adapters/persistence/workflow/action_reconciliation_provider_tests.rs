@@ -118,14 +118,86 @@ async fn marker(f: &AdmissionFixture) -> Uuid {
         .await
         .unwrap()
 }
+/// A definite NotApplied (`DatabaseTimeout`) reported before the provider was called wrote
+/// nothing (a resolved reservation abort included), so it is retried as the worker would;
+/// every other outcome is returned as is.
 async fn invoke(
     f: &AdmissionFixture,
     request: &ActionDispatchRequest,
     provider: &LedgerProvider,
 ) -> AppResult<RemoteDispatchObservation> {
-    ActionService::new(adapter(f, 0))
-        .dispatch_remote(request, provider, &CancellationToken::new())
+    let started = std::time::Instant::now();
+    loop {
+        let calls = provider.calls.load(Ordering::SeqCst);
+        match ActionService::new(adapter(f, 0))
+            .dispatch_remote(request, provider, &CancellationToken::new())
+            .await
+        {
+            Err(AppError::DatabaseTimeout(error))
+                if provider.calls.load(Ordering::SeqCst) == calls =>
+            {
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "dispatch never settled before the provider: {error}"
+                );
+            }
+            result => return result,
+        }
+    }
+}
+/// Logs a void attempt past libtest's output capture, so every run's log lists it.
+fn void_attempt(scenario: &str, attempt: usize, cause: &str) {
+    uncaptured(&format!(
+        "VOID attempt scenario={scenario} attempt={attempt} {cause}"
+    ));
+}
+fn reserve_unknown(error: &AppError) -> bool {
+    matches!(error, AppError::Conflict(message)
+        if message == "Workflow action.reserve_remote commit outcome unknown")
+}
+async fn invocation_rows(f: &AdmissionFixture, request: &ActionDispatchRequest) -> (i64, i64) {
+    sqlx::query_as("SELECT (SELECT count(*) FROM workflow_action_dispatches WHERE invocation_id=$1),(SELECT count(*) FROM workflow_action_remote_entries WHERE invocation_id=$1)")
+        .bind(request.subject.invocation.as_uuid())
+        .fetch_one(f.persistence().pool())
         .await
+        .unwrap()
+}
+/// Q2(b) backstop for a fail-closed reserve_remote Unknown: no provider call followed it,
+/// and the possibly committed reservation is never adopted. If its entry exists, the next
+/// reservation of the same invocation answers PossibleDispatchExists; otherwise it wrote
+/// nothing (`rows_before` are the invocation's (markers, entries) before the call).
+/// Returns whether the entry committed.
+async fn assert_reserve_unknown_backstop(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    contract: Option<&ProviderReplayContract>,
+    rows_before: (i64, i64),
+    provider_calls: (usize, usize),
+) -> bool {
+    assert_eq!(
+        provider_calls.0, provider_calls.1,
+        "no provider call after an unknown reservation"
+    );
+    let rows = invocation_rows(f, request).await;
+    if rows.1 > rows_before.1 {
+        assert!(
+            matches!(
+                adapter(f, 0)
+                    .reserve_remote(request, contract)
+                    .await
+                    .unwrap(),
+                RemoteReservationResult::PossibleDispatchExists
+            ),
+            "a committed unknown reservation is never adopted"
+        );
+        true
+    } else {
+        assert_eq!(
+            rows, rows_before,
+            "an unknown reservation without entry wrote nothing"
+        );
+        false
+    }
 }
 async fn effects(f: &AdmissionFixture) -> i64 {
     sqlx::query_scalar("SELECT count(*) FROM fixture_provider_effects")
@@ -176,7 +248,12 @@ async fn workflow_action_reconciliation_provider_lost_applied_restart_without_io
     assert_eq!(effects(&f).await, 1);
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: request.fence,
                 output: receipt.result
             })

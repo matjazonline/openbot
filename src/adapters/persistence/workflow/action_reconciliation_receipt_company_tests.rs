@@ -40,6 +40,7 @@ async fn foreign_action(f: &AdmissionFixture) -> (AdmissionFixture, ActionDispat
     };
     let claim = foreign
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

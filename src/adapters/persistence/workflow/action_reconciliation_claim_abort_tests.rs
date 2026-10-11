@@ -1,6 +1,6 @@
 //! Public claim deadline waits and commit failures leave no partial public facts.
 use super::*;
-use std::{future::Future, pin::Pin};
+use std::pin::Pin;
 
 #[path = "action_reconciliation_claim_abort_probes.rs"]
 mod probes;
@@ -9,34 +9,16 @@ use probes::{ProbeKind, install_probe, remove_probe};
 #[path = "action_reconciliation_claim_cancellation_tests.rs"]
 mod cancellation_tests;
 
+use super::super::super::super::control_serialization_tests::contention::{
+    try_wait_for_lock, wait_for_lock,
+};
+use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::gated_policy;
+
+/// Only a hang guard for joins and drains; outcomes and server lock state are the signals.
+const HANG_GUARD: Duration = Duration::from_secs(10);
+
 const USAGE_WAIT: &str = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
 const RUN_WAIT: &str = "SELECT binding_id, max_context_bytes FROM workflow_runs";
-
-async fn wait_for_lock<T: std::fmt::Debug>(
-    observer: &mut sqlx::PgConnection,
-    blocker: i32,
-    statement: &str,
-    mut contender: Pin<&mut impl Future<Output = T>>,
-) -> i32 {
-    let observe = async {
-        loop {
-            sqlx::query("SELECT pg_stat_clear_snapshot()")
-                .execute(&mut *observer)
-                .await
-                .unwrap();
-            let pid = sqlx::query_scalar("SELECT activity.pid FROM pg_stat_activity AS activity WHERE activity.datname=current_database() AND activity.state='active' AND activity.wait_event_type='Lock' AND position($1 IN activity.query)>0 AND $2=ANY(pg_blocking_pids(activity.pid))")
-                .bind(statement).bind(blocker).fetch_optional(&mut *observer).await.unwrap();
-            if let Some(pid) = pid {
-                return pid;
-            }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    };
-    tokio::select! {
-        result = contender.as_mut() => panic!("claim completed before exact blocker {blocker}, statement {statement}: {result:?}"),
-        result = tokio::time::timeout(Duration::from_millis(300), observe) => result.expect("exact PostgreSQL lock wait must be observed promptly"),
-    }
-}
 
 async fn live_deadline(observer: &mut sqlx::PgConnection, s: &Scheduled) -> bool {
     sqlx::query_scalar(
@@ -66,33 +48,75 @@ async fn usage_gate(s: &Scheduled) -> UsageGate<'_> {
     UsageGate { tx, pid }
 }
 
-async fn deadline_crossing(s: &Scheduled) {
-    // A fixture deadline, before the snapshot, leaves a strict margin below the
-    // unchanged one-second persistence timeout; missing that margin fails.
-    sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+interval '450 milliseconds' WHERE company_id=$1 AND id=$2")
-        .bind(s.request.scope().company.as_uuid()).bind(s.request.scope().run.as_uuid())
-        .execute(s.fixture.persistence().pool()).await.unwrap();
-    let before = all_tables(&s.fixture).await;
+/// `true` when the crossing was proven; `false` when the attempt is void: a claimant reached
+/// its first statement only after the A/2 deadline had already passed (under load), so it
+/// was correctly refused without waiting. The void is asserted (refusals only, every public
+/// fact unchanged) and logged; the caller rebuilds the fixture.
+async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
+    // Derived from the claimants' own policy (the 6 s gate policy: A = 2 s). The run
+    // deadline falls at A/2, set right before the snapshot and the claimants (the gate and
+    // observer are acquired first), so both claimants queue before it and it passes well
+    // before the release cutoff at A·3/4, below their server lock bound A.
+    let crossing = gated_policy();
     let gate = usage_gate(s).await;
     let mut observer = s.fixture.persistence().pool().acquire().await.unwrap();
+    sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+make_interval(secs => $3) WHERE company_id=$1 AND id=$2")
+        .bind(s.request.scope().company.as_uuid()).bind(s.request.scope().run.as_uuid())
+        .bind((crossing.attempt_bound() / 2).as_secs_f64())
+        .execute(s.fixture.persistence().pool()).await.unwrap();
+    let before = all_tables(&s.fixture).await;
     let first = s
         .fixture
         .persistence()
-        .claim_io(s.request.fence.scope, worker(), policy());
+        .claim_io(s.request.fence.scope, worker(), crossing);
     let second = s
         .fixture
         .persistence()
-        .claim_io(s.request.fence.scope, worker(), policy());
+        .claim_io(s.request.fence.scope, worker(), crossing);
     tokio::pin!(first, second);
     let started = Instant::now();
-    let first_pid = wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, first.as_mut()).await;
+    let first_pid =
+        match try_wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, first.as_mut()).await {
+            Ok(pid) => pid,
+            Err(early) => {
+                void_crossing(
+                    s,
+                    attempt,
+                    "first",
+                    early,
+                    &mut observer,
+                    gate,
+                    second,
+                    &before,
+                )
+                .await;
+                return false;
+            }
+        };
     assert!(
         live_deadline(&mut observer, s).await,
         "usage wait reached before DB deadline"
     );
     let second_pid = tokio::select! {
         result = first.as_mut() => panic!("first claimant escaped usage wait: {result:?}"),
-        pid = wait_for_lock(&mut observer, first_pid, RUN_WAIT, second.as_mut()) => pid,
+        pid = try_wait_for_lock(&mut observer, first_pid, RUN_WAIT, second.as_mut()) => pid,
+    };
+    let second_pid = match second_pid {
+        Ok(pid) => pid,
+        Err(early) => {
+            void_crossing(
+                s,
+                attempt,
+                "second",
+                early,
+                &mut observer,
+                gate,
+                first,
+                &before,
+            )
+            .await;
+            return false;
+        }
     };
     assert_ne!(first_pid, second_pid);
     assert!(
@@ -103,6 +127,9 @@ async fn deadline_crossing(s: &Scheduled) {
         "live DB deadline: usage waiter {first_pid} blocked by {}, run waiter {second_pid} blocked by {first_pid}",
         gate.pid
     );
+    // Three quarters of the claimants' attempt bound: their server lock timeout is what
+    // remains of it, so the gate must be released with room for the refusal to run.
+    let cutoff = crossing.attempt_bound() * 3 / 4;
     let expired = async {
         while live_deadline(&mut observer, s).await {
             tokio::time::sleep(Duration::from_millis(5)).await;
@@ -111,10 +138,10 @@ async fn deadline_crossing(s: &Scheduled) {
     tokio::select! {
         result = first.as_mut() => panic!("first completed before observed DB expiry: {result:?}"),
         result = second.as_mut() => panic!("second completed before observed DB expiry: {result:?}"),
-        result = tokio::time::timeout_at(started+Duration::from_millis(750), expired) => result.expect("DB expiry must precede persistence timeout"),
+        result = tokio::time::timeout_at(started + cutoff, expired) => result.expect("DB expiry must precede persistence timeout"),
     }
     assert!(
-        started.elapsed() < Duration::from_millis(750),
+        started.elapsed() < cutoff,
         "release before persistence cutoff"
     );
     eprintln!(
@@ -122,13 +149,12 @@ async fn deadline_crossing(s: &Scheduled) {
         started.elapsed()
     );
     gate.tx.rollback().await.unwrap();
-    let (first, second) = tokio::time::timeout_at(started + Duration::from_millis(900), async {
-        tokio::join!(first, second)
-    })
-    .await
-    .expect("deadline rejection must complete before outer timeout");
+    let (first, second) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(first, second) })
+        .await
+        .expect("deadline rejection completes within the hang guard");
+    eprintln!("deadline rejection settled at {:?}", started.elapsed());
     assert!(
-        matches!(first, Err(AppError::Conflict(ref message)) if message=="Workflow lease transaction timed out"),
+        matches!(first, Err(AppError::Conflict(ref message)) if message=="Workflow lease claim refused: run or lease window closed"),
         "usage-after-wait rejects expired active snapshot: {first:?}"
     );
     assert!(
@@ -142,10 +168,50 @@ async fn deadline_crossing(s: &Scheduled) {
         all_tables(&s.fixture).await,
         "expired install/refusal and every public fact roll back"
     );
+    true
+}
+
+/// The void branch of `deadline_crossing`: the early claimant was refused (Ok(None)) and the
+/// DB deadline had passed, the other claimant is released and must be refused too, and no
+/// public fact changed.
+#[allow(clippy::too_many_arguments)]
+async fn void_crossing(
+    s: &Scheduled,
+    attempt: usize,
+    label: &str,
+    early: AppResult<Option<ClaimedWorkflow>>,
+    observer: &mut sqlx::PgConnection,
+    gate: UsageGate<'_>,
+    other: Pin<&mut impl Future<Output = AppResult<Option<ClaimedWorkflow>>>>,
+    before: &Value,
+) {
+    assert!(
+        matches!(early, Ok(None)) && !live_deadline(observer, s).await,
+        "{label} claimant completed before its observed wait while the deadline was live: {early:?}"
+    );
+    gate.tx.rollback().await.unwrap();
+    let other = tokio::time::timeout(HANG_GUARD, other)
+        .await
+        .expect("the other claimant settles within the hang guard");
+    assert!(
+        matches!(&other, Ok(None))
+            || matches!(&other, Err(AppError::Conflict(message)) if message=="Workflow lease claim refused: run or lease window closed"),
+        "the other claimant is refused after the deadline: {other:?}"
+    );
+    assert_eq!(
+        *before,
+        all_tables(&s.fixture).await,
+        "a void crossing writes nothing"
+    );
+    void_attempt(
+        "claim_abort_deadline_crossing",
+        attempt,
+        &format!("early={label} outcome=Ok(None) deadline_passed=true other={other:?}"),
+    );
 }
 
 async fn assert_quiescent(observer: &mut sqlx::PgConnection, pids: &[i32]) {
-    tokio::time::timeout(Duration::from_millis(500), async {
+    tokio::time::timeout(HANG_GUARD, async {
         loop {
             sqlx::query("SELECT pg_stat_clear_snapshot()")
                 .execute(&mut *observer).await.unwrap();
@@ -169,16 +235,16 @@ async fn persistence_cutoff(s: &Scheduled) {
     tokio::pin!(claim);
     let started = Instant::now();
     let pid = wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, claim.as_mut()).await;
-    let result = tokio::time::timeout_at(started + Duration::from_millis(1500), claim)
+    let result = tokio::time::timeout_at(started + policy().supervision_guard(), claim)
         .await
-        .expect("existing one-second persistence/SQL timers remain bounded");
+        .expect("the claim's own persistence and SQL bounds settle before the supervision guard");
     // The outer Tokio timer and PostgreSQL lock/statement timers legitimately
     // race. Both supported errors abort; neither an empty result nor a claim does.
     assert!(
         matches!(result, Err(AppError::DatabaseTimeout(ref message)) if matches!(message.as_str(),
             "error returned from database: canceling statement due to lock timeout"
                 | "error returned from database: canceling statement due to statement timeout"))
-            || matches!(result, Err(AppError::Conflict(ref message)) if message=="Workflow lease transaction timed out"),
+            || matches!(result, Err(AppError::DatabaseTimeout(ref message)) if message=="Workflow lease.claim not applied: persistence bound elapsed before commit"),
         "unsupported timeout outcome: {result:?}"
     );
     eprintln!(
@@ -200,11 +266,25 @@ async fn persistence_cutoff(s: &Scheduled) {
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_abort_usage_deadline_and_timeout() {
     // Box real provider/action fixture seams to retain stock 2 MiB test stacks.
-    let eligible = Box::pin(scheduled()).await;
-    deadline_crossing(&eligible).await;
-    let exhausted = Box::pin(scheduled()).await;
-    Box::pin(exhaust(&exhausted)).await;
-    deadline_crossing(&exhausted).await;
+    // Each variant must be proven on a fresh fixture within three attempts; void attempts
+    // (asserted refusals that wrote nothing) are logged and rebuilt.
+    for exhausted in [false, true] {
+        let mut proven = false;
+        for attempt in 1..=3 {
+            let s = Box::pin(scheduled()).await;
+            if exhausted {
+                Box::pin(exhaust(&s)).await;
+            }
+            if deadline_crossing(&s, attempt).await {
+                proven = true;
+                break;
+            }
+        }
+        assert!(
+            proven,
+            "deadline crossing (exhausted={exhausted}) never proven in 3 attempts"
+        );
+    }
     let untimed = Box::pin(scheduled()).await;
     persistence_cutoff(&untimed).await;
 }
@@ -225,6 +305,7 @@ async fn successful_claim(s: &Scheduled, before: &Value) {
     let claim = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(s.request.fence.scope, worker(), policy())
         .await
         .unwrap()
@@ -233,6 +314,7 @@ async fn successful_claim(s: &Scheduled, before: &Value) {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -311,6 +393,7 @@ async fn workflow_action_reconciliation_claim_abort_deferred_refusal() {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, worker(), policy())
             .await
             .unwrap()

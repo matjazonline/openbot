@@ -156,6 +156,7 @@ async fn workflow_action_reconciliation_claim_sql_deferred_greater_attempt_refus
         scheduled
             .fixture
             .persistence()
+            .settled()
             .claim_io(scheduled.request.fence.scope, worker(), policy())
             .await
             .unwrap()

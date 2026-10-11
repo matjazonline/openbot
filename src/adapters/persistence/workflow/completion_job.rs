@@ -59,7 +59,8 @@ async fn finish_fenced(db: &mut PgConnection, fence: WorkflowFence) -> AppResult
     let timely: bool = sqlx::query_scalar("SELECT $3>clock_timestamp() AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(expiry).fetch_one(db).await?;
     if closed.rows_affected() != 1 || !timely {
-        return Err(lease::timed_out());
+        // Rolled back by the caller: the lease or the run deadline closed meanwhile.
+        return Err(super::persistence_bound::refused("completion"));
     }
     Ok(())
 }

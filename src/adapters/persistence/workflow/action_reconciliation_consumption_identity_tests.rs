@@ -331,17 +331,54 @@ async fn reject_identity(attack: IdentityAttack) {
     f.persistence().pool().close().await;
 }
 
+/// The positive premise: a genuine same-transaction reservation. A fail-closed
+/// reserve_remote Unknown is never retried with a new key (it may have committed the very
+/// rows this checks): its backstop is asserted, the attempt is void and a new proof owner is
+/// built (at most three attempts, and at least one must prove the premise).
 async fn positive_reservation() {
+    for attempt in 1..=3 {
+        if Box::pin(try_positive_reservation(attempt)).await {
+            return;
+        }
+    }
+    panic!("positive_reservation: every attempt was void (fail-closed reserve_remote Unknown)");
+}
+
+async fn try_positive_reservation(attempt: usize) -> bool {
     let owner = Box::pin(proof_owner()).await;
     let f = &owner.fixture;
     let catalog = native_catalog(f).await;
     let before = all_tables(f).await;
     let writer = adapter(f, 0);
-    let RemoteReservationResult::Reserved(reserved) = writer
+    let rows = invocation_rows(f, &owner.request).await;
+    let calls = owner.provider.inner.calls.load(Ordering::SeqCst);
+    let reserved = match writer
         .reserve_remote(&owner.request, Some(&owner.provider.contract))
         .await
-        .unwrap()
-    else {
+    {
+        Err(error) if reserve_unknown(&error) => {
+            let committed = assert_reserve_unknown_backstop(
+                f,
+                &owner.request,
+                Some(&owner.provider.contract),
+                rows,
+                (calls, owner.provider.inner.calls.load(Ordering::SeqCst)),
+            )
+            .await;
+            if !committed {
+                assert_eq!(all_tables(f).await, before, "nothing written");
+            }
+            void_attempt(
+                "positive_reservation",
+                attempt,
+                &format!("reserve_remote=unknown entry_committed={committed}"),
+            );
+            f.persistence().pool().close().await;
+            return false;
+        }
+        reserved => reserved.unwrap(),
+    };
+    let RemoteReservationResult::Reserved(reserved) = reserved else {
         panic!("genuine same-transaction reserve");
     };
     assert_eq!(entry_consumptions(f).await, (2, 1));
@@ -360,6 +397,7 @@ async fn positive_reservation() {
     assert_eq!(effects(f).await, 0);
     assert_eq!(native_catalog(f).await, catalog);
     f.persistence().pool().close().await;
+    true
 }
 
 #[tokio::test]

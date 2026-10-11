@@ -78,6 +78,7 @@ async fn replay_observation(
 }
 
 async fn refused_continuation(h: &MixedTruth, effect_count: i64) {
+    heartbeat(h).await;
     Box::pin(live_recovery(h, false)).await;
     let live = all_tables(&h.fixture).await;
     park(&h.fixture, &h.requests[0]).await;
@@ -87,14 +88,15 @@ async fn refused_continuation(h: &MixedTruth, effect_count: i64) {
 }
 
 async fn refused_probes(h: &MixedTruth, before: &Value, effect_count: i64) {
-    let (left, right) = tokio::join!(
-        h.fixture
-            .persistence()
-            .claim_io(h.requests[0].fence.scope, worker(), policy()),
-        h.fixture
-            .persistence()
-            .claim_io(h.requests[0].fence.scope, worker(), policy())
-    );
+    let [left, right] = h
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.requests[0].fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(left.unwrap().is_none() && right.unwrap().is_none());
     let service = ActionService::new(mixed_writer(&h.fixture));
     assert!(matches!(
@@ -105,7 +107,12 @@ async fn refused_probes(h: &MixedTruth, before: &Value, effect_count: i64) {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: h.requests[0].fence,
                 output: good(),
             })
@@ -128,6 +135,7 @@ async fn refused_probes(h: &MixedTruth, before: &Value, effect_count: i64) {
 async fn verified_conflict() {
     let h = Box::pin(seeded(UnusableResult::Missing)).await;
     Box::pin(record_live(&h)).await;
+    heartbeat(&h).await;
     let before = all_tables(&h.fixture).await;
     let canonical = rows(&before, "workflow_action_receipts")[0].clone();
     let prior = ActionEvidenceId::new(
@@ -175,6 +183,7 @@ async fn verified_conflict() {
     Box::pin(replay_observation(&h, &command, later, &saved)).await;
     // Recover only availability of the already applied sibling result. With both
     // Reconcile siblings receipted and SafeRepeat supported, conflict alone vetoes.
+    heartbeat(&h).await;
     let before_retrieval = all_tables(&h.fixture).await;
     sqlx::query("UPDATE fixture_evidence_ledger SET recover_result=true,observed_at=clock_timestamp() WHERE invocation_id=$1")
         .bind(h.requests[1].subject.invocation.as_uuid()).execute(h.fixture.persistence().pool()).await.unwrap();
@@ -210,6 +219,7 @@ async fn unknown_after_positive(index: usize) {
     } else {
         "applied_without_result"
     };
+    heartbeat(&h).await;
     let before = all_tables(&h.fixture).await;
     let later = Arc::new(LaterVerifier {
         ledger: h.ledger.clone(),
@@ -295,6 +305,7 @@ async fn available_proof(h: &MixedTruth) -> Option<Uuid> {
 
 async fn unknown_after_final() {
     let h = Box::pin(seeded_final()).await;
+    heartbeat(&h).await;
     Box::pin(live_recovery(&h, false)).await;
     let live = all_tables(&h.fixture).await;
     park(&h.fixture, &h.requests[0]).await;

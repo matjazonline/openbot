@@ -75,11 +75,11 @@ async fn expire_proof(f: &AdmissionFixture) {
 
 async fn closed(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Arc<LedgerVerifier> {
     let ledger = ledger(f, request).await;
-    assert!(
-        invoke(f, request, &LedgerProvider::new(f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(f, Delivery::Pending);
+    assert!(invoke(f, request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(f, request).await;
     barrier(f, request).await;
     ledger
@@ -92,7 +92,15 @@ async fn workflow_action_reconciliation_proof_expiry_reservation_enter_and_succe
         let ledger = closed(&f, &request).await;
         let c = proof_command(&f, &request, &ledger, "short-final").await;
         let mut short = ControlledVerifier::new(ledger);
-        short.lifetime = Some(Duration::from_millis(500));
+        // Two wall-clock windows meet here: the proof must outlive the steps up to the
+        // reservation that consumes it (reconciliation commit, claim, reservation), and it
+        // must lapse inside the lease that claim takes, so the replay after it still runs
+        // under that lease. Split the lease: each side gets d/2, at least the persistence
+        // deadline T of one bounded operation (equal at d = 3 s). expire_proof then waits
+        // for the expiry on the DB clock.
+        let lifetime = policy().duration() / 2;
+        assert!(lifetime >= policy().persistence_deadline());
+        short.lifetime = Some(lifetime);
         let verifier = Arc::new(short);
         let saved = run_command(&f, &c, verifier.clone()).await.unwrap();
         assert!(matches!(
@@ -163,7 +171,10 @@ async fn workflow_action_reconciliation_proof_expiry_while_settlement_waits_for_
     let started = Arc::new(Notify::new());
     let locked = Arc::new(Notify::new());
     let mut short = ControlledVerifier::new(ledger);
-    short.lifetime = Some(Duration::from_millis(300));
+    // The proof must survive the lock holder's own bounded transaction start (begin plus
+    // one FOR UPDATE) while the verifier pauses, and lapse while settlement waits.
+    let lifetime = policy().persistence_deadline();
+    short.lifetime = Some(lifetime);
     short.pause = Some((started.clone(), locked.clone()));
     let verifier = Arc::new(short);
     let before = all_tables(&f).await;
@@ -176,7 +187,30 @@ async fn workflow_action_reconciliation_proof_expiry_while_settlement_waits_for_
             .await
             .unwrap();
         locked.notify_one();
-        tokio::time::sleep(Duration::from_millis(450)).await;
+        // Structural, not a fixed sleep: hold the run until settlement is observed queued
+        // behind it, then for one whole proof lifetime, which began before this wait.
+        let holder: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        let guard = Instant::now();
+        loop {
+            sqlx::query("SELECT pg_stat_clear_snapshot()")
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+            let queued: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid)))")
+                .bind(holder).fetch_one(&mut *tx).await.unwrap();
+            if queued {
+                break;
+            }
+            assert!(
+                guard.elapsed() < Duration::from_secs(10),
+                "settlement never queued on the run"
+            );
+            tokio::time::sleep(lifetime / 100).await;
+        }
+        tokio::time::sleep(lifetime).await;
         tx.commit().await.unwrap();
     };
     let (result, ()) = tokio::join!(run_command(&f, &c, verifier.clone()), lock_holder);
@@ -224,6 +258,10 @@ async fn execute_budget(
     .await
 }
 
+/// The reconciliation service's own verification ceiling (service.rs `reconcile`), which
+/// applies whatever budget the caller passes.
+const VERIFICATION_CEILING: Duration = Duration::from_secs(5);
+
 #[derive(Clone, Copy, Debug)]
 enum StopVerification {
     Budget,
@@ -246,8 +284,10 @@ async fn assert_stopped(
     let verifier = Arc::new(controlled);
     let cancellation = CancellationToken::new();
     let before = all_tables(f).await;
+    // The caller's budget includes the bounded authority and snapshot reads before the
+    // verifier starts; each may take up to the persistence deadline T.
     let budget = if matches!(stop, StopVerification::Budget) {
-        Duration::from_millis(100)
+        policy().persistence_deadline() * 2
     } else {
         Duration::from_secs(10)
     };
@@ -283,13 +323,18 @@ async fn assert_stopped(
         } else {
             assert!(matches!(result, Err(AppError::Timeout(_))));
         }
+        // The independent five-second ceiling is observed at no less than this.
+        let ceiling_floor = Duration::from_secs(4);
         if matches!(stop, StopVerification::Ceiling) {
-            assert!(clock.elapsed() >= Duration::from_secs(4));
+            assert!(clock.elapsed() >= ceiling_floor);
         }
         let elapsed_bound = if matches!(stop, StopVerification::Budget) {
-            // Ten times the caller's budget allows scheduler delay while still
-            // rejecting a regression to the independent five-second ceiling.
-            Duration::from_secs(1)
+            // The caller's budget stopped it, not the ceiling: at or after the budget and
+            // strictly before the ceiling itself. Both timers start inside the operation,
+            // after `clock`, so a ceiling stop is never observed before VERIFICATION_CEILING.
+            assert!(budget < VERIFICATION_CEILING);
+            assert!(clock.elapsed() >= budget);
+            VERIFICATION_CEILING
         } else {
             Duration::from_secs(6)
         };

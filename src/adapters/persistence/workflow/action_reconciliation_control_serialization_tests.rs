@@ -196,6 +196,7 @@ async fn assert_result(
     let before = all_tables(f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

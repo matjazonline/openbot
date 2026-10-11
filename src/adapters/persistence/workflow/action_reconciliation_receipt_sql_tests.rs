@@ -96,15 +96,15 @@ async fn provider_histories(
             },
             _ => Delivery::Pending,
         };
+        let setup_provider = LedgerProvider::new(fixture, delivery);
         assert!(
-            Box::pin(invoke(
-                fixture,
-                request,
-                &LedgerProvider::new(fixture, delivery)
-            ))
-            .await
-            .is_err()
+            Box::pin(invoke(fixture, request, &setup_provider))
+                .await
+                .is_err()
         );
+        // Setup premise: the provider was called and its outcome is uncertain. A reservation
+        // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+        assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
         if matches!(truth, SiblingTruth::Final) {
             barrier(fixture, request).await;
         }
@@ -194,12 +194,15 @@ async fn workflow_action_reconciliation_receipt_sql_remote_source_xor() {
 #[tokio::test]
 async fn workflow_action_reconciliation_receipt_sql_local_has_neither_source() {
     let h = Box::pin(history()).await;
-    let before = all_tables(&h.fixture).await;
     for source in [
         json!({"remote_entry_id":h.entries[0]}),
         json!({"reconciliation_evidence_id":h.evidence[0]}),
         json!({"remote_entry_id":h.entries[0],"reconciliation_evidence_id":h.evidence[0]}),
     ] {
+        // The local dispatch's commit guard needs its live fence: renew it as its worker
+        // would, before the snapshot this attack is compared with.
+        renew_fixture_lease(&h.fixture, h.local.fence).await;
+        let before = all_tables(&h.fixture).await;
         let mut tx = h.fixture.persistence().pool().begin().await.unwrap();
         let marker = Uuid::new_v4();
         Dispatch::insert(&mut tx, &h.local, marker, "local", json!({}))

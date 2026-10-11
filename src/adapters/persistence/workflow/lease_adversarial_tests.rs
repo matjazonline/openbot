@@ -8,6 +8,7 @@ async fn workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline() {
         let before = snapshot(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()
@@ -29,6 +30,7 @@ async fn workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline() {
         let before = snapshot(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()
@@ -43,6 +45,7 @@ async fn workflow_io_real_renew_reclaim_cancel_contenders_serialize_run_first() 
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -83,6 +86,7 @@ async fn workflow_io_real_renew_reclaim_cancel_contenders_serialize_run_first() 
     assert!(reclaimed.is_none());
     assert!(
         !f.persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -142,6 +146,7 @@ async fn workflow_io_pure_boundary_claim_freeze_supervised_result_integration() 
     let next = batch.continuation.unwrap();
     let claim = f
         .persistence()
+        .settled()
         .claim_io(next, worker(), policy())
         .await
         .unwrap()
@@ -178,6 +183,7 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
             .unwrap();
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -199,6 +205,7 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
         let before = snapshot(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(wrong, worker(), policy())
                 .await
                 .unwrap()
@@ -210,14 +217,22 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
         };
         assert!(
             f.persistence()
+                .settled()
                 .renew_io(fence, policy())
                 .await
                 .unwrap()
                 .is_none()
         );
-        assert!(!f.persistence().validate_io(fence, policy()).await.unwrap());
         assert!(
             !f.persistence()
+                .settled()
+                .validate_io(fence, policy())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !f.persistence()
+                .settled()
                 .release_io(fence, policy(), LeaseReleaseCause::LocalInterruption)
                 .await
                 .unwrap()
@@ -236,6 +251,7 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
         let before = snapshot(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .renew_io(claim.fence, policy())
                 .await
                 .unwrap()
@@ -243,12 +259,14 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
         );
         assert!(
             !f.persistence()
+                .settled()
                 .validate_io(claim.fence, policy())
                 .await
                 .unwrap()
         );
         assert!(
             !f.persistence()
+                .settled()
                 .release_io(claim.fence, policy(), LeaseReleaseCause::LocalInterruption)
                 .await
                 .unwrap()
@@ -262,6 +280,7 @@ async fn workflow_io_contended_renewal_never_resurrects_expired_lease() {
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

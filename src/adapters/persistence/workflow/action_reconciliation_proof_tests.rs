@@ -236,6 +236,7 @@ async fn refuse_consumed(
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -309,6 +310,9 @@ async fn workflow_action_reconciliation_proof_competing_commands_claimants_loss_
     let ledger = ledger(&f, &request).await;
     let old = LedgerProvider::new(&f, Delivery::Pending);
     assert!(invoke(&f, &request, &old).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(old.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     // Box the provider/DB phase seams to retain the stock2MiB stack budget.
@@ -321,11 +325,11 @@ async fn workflow_action_reconciliation_proof_competing_commands_claimants_loss_
 async fn workflow_action_reconciliation_proof_new_consumed_entry_applied_recovery_is_legitimate() {
     let (f, mut request) = setup().await;
     let ledger = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     assert!(matches!(
@@ -346,6 +350,9 @@ async fn workflow_action_reconciliation_proof_new_consumed_entry_applied_recover
         },
     );
     assert!(invoke(&f, &request, &new).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(new.calls.load(Ordering::SeqCst), 1);
     assert_eq!(entry_consumptions(&f).await, (2, 1));
     park(&f, &request).await;
     let recovered = reconcile(&f, &request, marker(&f).await, ledger, "new-applied").await;
@@ -376,11 +383,11 @@ async fn workflow_action_reconciliation_proof_provider_barrier_competes_with_del
     for _ in 0..3 {
         let (f, request) = setup().await;
         let ledger = ledger(&f, &request).await;
-        assert!(
-            invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-                .await
-                .is_err()
-        );
+        let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+        assert!(invoke(&f, &request, &setup_provider).await.is_err());
+        // Setup premise: the provider was called and its outcome is uncertain. A reservation
+        // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+        assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
         park(&f, &request).await;
         let ready = Barrier::new(2);
         let (applied, ()) = tokio::join!(
@@ -423,11 +430,11 @@ async fn workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_ori
         let resource = support::resources(&f).await;
         let admin = support::principal(&f, Some("admin")).await;
         let ledger = ledger(&f, &request).await;
-        assert!(
-            invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-                .await
-                .is_err()
-        );
+        let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+        assert!(invoke(&f, &request, &setup_provider).await.is_err());
+        // Setup premise: the provider was called and its outcome is uncertain. A reservation
+        // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+        assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
         park(&f, &request).await;
         barrier(&f, &request).await;
         let mut c = proof_command(&f, &request, &ledger, "admin-final").await;

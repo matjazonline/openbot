@@ -187,6 +187,7 @@ async fn workflow_poll_lost_claim_recovers_with_positive_backoff() {
     let (f, scope) = fixture().await;
     let p = f.persistence();
     let first = p
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -200,7 +201,12 @@ async fn workflow_poll_lost_claim_recovers_with_positive_backoff() {
     assert_eq!(expired.work, PollWork::ExpiredLease);
     runner.process(expired, &cancel).await.unwrap();
     assert!(p.poll_work(None, 2).await.unwrap().candidates.is_empty());
-    assert!(!p.validate_io(first.fence, policy()).await.unwrap());
+    assert!(
+        !p.settled()
+            .validate_io(first.fence, policy())
+            .await
+            .unwrap()
+    );
     let wakeup = Notify::new();
     tokio::join!(runner.run(&wakeup, &cancel), async {
         until_state(p, scope, "succeeded").await;
@@ -386,18 +392,23 @@ async fn workflow_poll_unsupported_full_page_stays_bounded_and_later_work_progre
     // One run already completed its I/O; its pure successor is available among
     // unsupported work. No handler can execute the remaining I/O boundary.
     let claim = p
+        .settled()
         .claim_io(other_scope, worker(), policy())
         .await
         .unwrap()
         .unwrap();
-    use crate::application::workflow::completion::WorkflowCompletion;
-    p.complete_io(FencedWorkflowResult {
-        fence: claim.fence,
-        output: json!({"items":[],"token_count":0}),
-    })
-    .await
-    .unwrap()
-    .unwrap();
+    p.settled()
+        .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
+            fence: claim.fence,
+            output: json!({"items":[],"token_count":0}),
+        })
+        .await
+        .unwrap()
+        .unwrap();
     let handler = Scripted {
         calls: AtomicUsize::new(0),
         supported: false,

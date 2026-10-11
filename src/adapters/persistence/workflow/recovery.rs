@@ -181,7 +181,8 @@ async fn finish_job(
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
         .bind(matches!(reason,Retirement::Expired)).bind(if retry_at.is_some(){"pending"}else{"failed"}).bind(retry_at).execute(db).await?;
     if changed.rows_affected() != 1 {
-        return Err(lease::timed_out());
+        // Rolled back by the caller: the fence moved on or its lease is no longer live.
+        return Err(super::persistence_bound::refused("lease retirement"));
     }
     Ok(())
 }

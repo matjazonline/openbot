@@ -351,6 +351,7 @@ async fn workflow_action_reconciliation_paused_association_revocation_reauthoriz
         );
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()

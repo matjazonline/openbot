@@ -1,5 +1,16 @@
 # Workflow foundation resume
 
+## Latest checkpoint — 2026-10-11, root 8bab464f (stopped at 66.9% context)
+
+**Full original 04.7 incomplete; no 04.8.** Read the "FINAL HANDOFF" section at
+the end of [current continuation](CONTINUATION-20261009-dcb1b27c.md). Accepted
+this root: all row3d point work, the user-approved production lease fix (incl.
+reserve_remote option (ii) and explicit rollback) and the test-only sweep —
+frozen as lease-prod-k7q2/prod-diff.patch a3526207…0879 on SSD. Row3d 196-set
+acceptance reached 3 consecutive greens before external load (bizi44) voided the
+series; broad ×3 and budgets pending. Row 3f dropped (user); plans 05–10 carry a
+"Schema and data" reset rule; migration squash queued after 04.7.
+
 ## Latest checkpoint — 2026-10-05, Astra-reviewed root 01a10bcd
 
 **Full original 04.7 is incomplete; no 04.8.** Read

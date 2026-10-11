@@ -5,6 +5,14 @@
 Depends on phases 1–5. Make agent preparation visible and reusable, retain durable Rig execution,
 and remove hidden orchestration from the harness boundary.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## Rig integration
 
 Standardize on Rig and its existing durable model-turn/tool-call checkpoints. Remove the

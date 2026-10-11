@@ -7,7 +7,8 @@ mod acceptance_tests;
 
 async fn denied(p: &PostgresPersistence, scope: ActivationRequest, requester: WorkflowWorkerId) {
     assert!(
-        p.claim_io(scope, requester, lease())
+        p.settled()
+            .claim_io(scope, requester, lease())
             .await
             .unwrap()
             .is_none()
@@ -36,8 +37,14 @@ async fn workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry() {
     p.configure_capacity(WorkflowCapacityPolicy::new(2, 1).unwrap())
         .await
         .unwrap();
-    let ca = p.claim_io(a, worker(), lease()).await.unwrap().unwrap();
+    let ca = p
+        .settled()
+        .claim_io(a, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let cb = p
+        .settled()
         .claim_io(admit(&b, "owner").await, worker(), lease())
         .await
         .unwrap()
@@ -72,6 +79,7 @@ async fn workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry() {
     }
     assert_eq!(ticket(p, q.company).await, offered);
     let cq = PostgresPersistence::new(p.pool().clone())
+        .settled()
         .claim_io(q, w, lease())
         .await
         .unwrap()
@@ -79,7 +87,8 @@ async fn workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry() {
     finish(p, &cq).await;
     finish(p, &cb).await;
     assert!(
-        p.claim_io(next_noise, worker(), lease())
+        p.settled()
+            .claim_io(next_noise, worker(), lease())
             .await
             .unwrap()
             .is_some()
@@ -95,7 +104,12 @@ async fn workflow_fairness_open_offer_survives_older_company_becoming_uncapped()
     p.configure_capacity(WorkflowCapacityPolicy::new(3, 1).unwrap())
         .await
         .unwrap();
-    let ca = p.claim_io(a, worker(), lease()).await.unwrap().unwrap();
+    let ca = p
+        .settled()
+        .claim_io(a, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let a2 = admit(&f, "older-capped").await;
     denied(p, a2, worker()).await;
     assert!(ticket(p, a.company).await.1.is_none());
@@ -104,8 +118,14 @@ async fn workflow_fairness_open_offer_survives_older_company_becoming_uncapped()
     // the remaining global slots with independent real claims.
     let c1 = admit(&c, "owner-c").await;
     let d = tenant(&f).await;
-    let cc = p.claim_io(c1, worker(), lease()).await.unwrap().unwrap();
+    let cc = p
+        .settled()
+        .claim_io(c1, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let cd = p
+        .settled()
         .claim_io(admit(&d, "owner-d").await, worker(), lease())
         .await
         .unwrap()
@@ -121,10 +141,21 @@ async fn workflow_fairness_open_offer_survives_older_company_becoming_uncapped()
     denied(p, a2, worker()).await;
     assert_eq!(ticket(p, b1.company).await, offered);
     assert!(ticket(p, a.company).await.1.is_none());
-    let quiet = p.claim_io(b1, bw, lease()).await.unwrap().unwrap();
+    let quiet = p
+        .settled()
+        .claim_io(b1, bw, lease())
+        .await
+        .unwrap()
+        .unwrap();
     finish(p, &quiet).await;
     finish(p, &cd).await;
-    assert!(p.claim_io(a2, worker(), lease()).await.unwrap().is_some());
+    assert!(
+        p.settled()
+            .claim_io(a2, worker(), lease())
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -137,8 +168,14 @@ async fn workflow_fairness_abandoned_offer_and_stale_withdrawal_are_bounded() {
     p.configure_capacity(WorkflowCapacityPolicy::new(2, 1).unwrap())
         .await
         .unwrap();
-    let ca = p.claim_io(a, worker(), lease()).await.unwrap().unwrap();
+    let ca = p
+        .settled()
+        .claim_io(a, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let cb = p
+        .settled()
         .claim_io(admit(&b, "owner").await, worker(), lease())
         .await
         .unwrap()
@@ -158,7 +195,12 @@ async fn workflow_fairness_abandoned_offer_and_stale_withdrawal_are_bounded() {
     sqlx::query("UPDATE workflow_dispatch_demand SET opportunity_until=clock_timestamp()-interval '1 second' WHERE ticket=$1")
         .bind(old).execute(p.pool()).await.unwrap();
     denied(p, n, worker()).await; // Retire expired offer, never recycle its old age.
-    let cn = p.claim_io(n, worker(), lease()).await.unwrap().unwrap();
+    let cn = p
+        .settled()
+        .claim_io(n, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     denied(p, q, qw).await;
     let replacement = ticket(p, q.company).await.0;
     assert!(replacement > old);
@@ -166,7 +208,13 @@ async fn workflow_fairness_abandoned_offer_and_stale_withdrawal_are_bounded() {
     assert_eq!(ticket(p, q.company).await.0, replacement);
     finish(p, &cn).await;
     finish(p, &cb).await;
-    assert!(p.claim_io(q, qw, lease()).await.unwrap().is_some());
+    assert!(
+        p.settled()
+            .claim_io(q, qw, lease())
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -260,8 +308,14 @@ async fn workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history
     p.configure_capacity(WorkflowCapacityPolicy::new(2, 1).unwrap())
         .await
         .unwrap();
-    let ca = p.claim_io(a, worker(), lease()).await.unwrap().unwrap();
-    p.claim_io(admit(&b, "owner").await, worker(), lease())
+    let ca = p
+        .settled()
+        .claim_io(a, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
+    p.settled()
+        .claim_io(admit(&b, "owner").await, worker(), lease())
         .await
         .unwrap()
         .unwrap();
@@ -293,7 +347,8 @@ async fn workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history
         .bind(n.company.as_uuid()).execute(p.pool()).await.unwrap();
     denied(p, fresh, worker()).await;
     assert!(
-        p.claim_io(fresh, worker(), lease())
+        p.settled()
+            .claim_io(fresh, worker(), lease())
             .await
             .unwrap()
             .is_some()

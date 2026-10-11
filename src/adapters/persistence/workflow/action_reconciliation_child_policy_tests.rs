@@ -18,11 +18,11 @@ async fn uncertain(f: AdmissionFixture, scope: ActivationRequest) -> ChildProof 
     ))
     .await;
     let verifier = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let command = proof_command(&f, &request, &verifier, "child-policy-proof").await;
@@ -187,6 +187,7 @@ async fn workflow_action_reconciliation_claim_fairness_child_policy_records_proo
     assert_eq!(effects(&f).await, 0);
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

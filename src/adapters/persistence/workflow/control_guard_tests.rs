@@ -5,6 +5,7 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -19,7 +20,12 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
     .unwrap();
     let result = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claim.fence,
             output: json!({"items":[],"token_count":0}),
         })
@@ -53,6 +59,7 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
 async fn workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes() {
     let (f, scope) = fixture().await;
     f.persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

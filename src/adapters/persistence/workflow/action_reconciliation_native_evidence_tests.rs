@@ -4,6 +4,8 @@ use std::sync::Mutex;
 
 #[path = "action_reconciliation_native_diagnostic_tests.rs"]
 mod native_diagnostic_tests;
+#[path = "action_reconciliation_native_projection_tests.rs"]
+mod native_projection_tests;
 
 struct CapturedVerifier {
     ledger: Arc<LedgerVerifier>,

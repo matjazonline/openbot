@@ -8,12 +8,16 @@ mod prior_bounds_tests;
 async fn overflow_sibling(f: &AdmissionFixture, request: &ActionDispatchRequest) {
     assert!(
         f.persistence()
+            .settled()
             .renew_io(request.fence, policy())
             .await
             .unwrap()
             .is_some()
     );
     let extra = sibling(f, request, 9129).await;
+    // Heartbeat between building the sibling and dispatching it, as the worker would, so
+    // the dispatch window does not also pay for the sibling's setup.
+    renew_fixture_lease(f, request.fence).await;
     let provider = LedgerProvider::new(
         f,
         Delivery::Apply {
@@ -118,12 +122,14 @@ async fn scheduled_limit() -> (AdmissionFixture, ActionDispatchRequest) {
     for number in 1..128 {
         assert!(
             f.persistence()
+                .settled()
                 .renew_io(request.fence, policy())
                 .await
                 .unwrap()
                 .is_some()
         );
         let other = sibling(&f, &request, number + 2000).await;
+        renew_fixture_lease(&f, request.fence).await;
         assert!(matches!(
             invoke(&f, &other, &receipt).await.unwrap(),
             RemoteDispatchObservation::Committed(_)

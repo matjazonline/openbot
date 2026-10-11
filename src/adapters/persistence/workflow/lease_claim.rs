@@ -1,15 +1,20 @@
+use super::persistence_bound::{Evidence, WriteBound, refused};
 use super::{lease::*, *};
 use crate::application::workflow::{activation::*, lease::*};
 use tokio::time::Instant;
 
 pub(super) async fn claim_on(
     db: &mut PgConnection,
-    scope: ActivationRequest,
-    worker: WorkflowWorkerId,
+    claim: ClaimIdentity,
+    bound: &WriteBound,
     policy: LeasePolicy,
-    started: Instant,
 ) -> AppResult<Option<ClaimedWorkflow>> {
-    let Some((run, job)) = lock_scope(db, scope, policy).await? else {
+    let ClaimIdentity {
+        scope,
+        worker,
+        generation,
+    } = claim;
+    let Some((run, job)) = lock_scope(db, scope, bound.server_timeout()).await? else {
         return Ok(None);
     };
     let binding = admission_binding::read_saved_binding(
@@ -59,19 +64,72 @@ pub(super) async fn claim_on(
     let fence = WorkflowFence {
         scope,
         worker,
-        generation: WorkflowGeneration(Uuid::new_v4()),
+        generation,
         attempt: WorkflowAttempt(job.retry_count.checked_add(1).ok_or_else(invalid)?),
     };
     install(db, fence, policy).await?;
-    let window = live_window(db, fence, started)
+    let window = live_window(db, fence, bound.started())
         .await?
-        .ok_or_else(timed_out)?;
+        .ok_or_else(|| refused("lease claim"))?;
     Ok(Some(ClaimedWorkflow {
         fence,
         activation,
         window,
         max_result_bytes: usize::try_from(run.max_context_bytes).map_err(|_| invalid())?,
     }))
+}
+
+/// Resolution of an ambiguous claim. Waits on the original's run, execution and job locks
+/// until it commits or aborts, then classifies on the immutable attempt row of this exact
+/// generation: a third party (run cancel, expiry) may already have retired the claim, which
+/// still applied and was charged. Adopts only a claim whose window is still live.
+pub(super) async fn claimed_on(
+    db: &mut PgConnection,
+    claim: ClaimIdentity,
+    bound: &WriteBound,
+    started: Instant,
+) -> AppResult<Evidence<Option<ClaimedWorkflow>>> {
+    let ClaimIdentity {
+        scope,
+        worker,
+        generation,
+    } = claim;
+    let locked = lock_scope(db, scope, bound.server_timeout()).await?;
+    let job_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM background_tasks WHERE id=$1)")
+            .bind(scope.job.0)
+            .fetch_one(&mut *db)
+            .await?;
+    if !job_exists {
+        return Ok(Evidence::Applied(None));
+    }
+    let attempt: Option<i32> = sqlx::query_scalar("SELECT attempt_number FROM task_attempts WHERE task_id=$1 AND execution_generation=$2 AND worker_id=$3")
+        .bind(scope.job.0).bind(generation.0).bind(worker.0).fetch_optional(&mut *db).await?;
+    // No attempt row: the install did not commit, but the claim's other writes may have
+    // (expired-lease retirement, a budget refusal, activation, fairness). Settled, and
+    // nothing is owned; never "not applied", which would claim that nothing was written.
+    let Some(attempt) = attempt else {
+        return Ok(Evidence::Applied(None));
+    };
+    let fence = WorkflowFence {
+        scope,
+        worker,
+        generation,
+        attempt: WorkflowAttempt(attempt),
+    };
+    let (Some((run, _)), Some(window)) = (locked, live_window(db, fence, started).await?) else {
+        return Ok(Evidence::Applied(None));
+    };
+    // The applied claim froze its inputs in the same transaction: this only reads them.
+    let Some(activation) = Box::pin(super::activation::activate_on(db, scope)).await? else {
+        return Ok(Evidence::Applied(None));
+    };
+    Ok(Evidence::Applied(Some(ClaimedWorkflow {
+        fence,
+        activation,
+        window,
+        max_result_bytes: usize::try_from(run.max_context_bytes).map_err(|_| invalid())?,
+    })))
 }
 
 pub(super) async fn recover_expired(
@@ -108,7 +166,7 @@ async fn install(
     let changed = sqlx::query("UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND retry_count < max_retries AND run_at <= clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(policy.duration().as_secs_f64()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
-        return Err(timed_out());
+        return Err(refused("lease claim"));
     }
     sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,'workflow',clock_timestamp())")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0).execute(&mut *db).await?;
@@ -146,7 +204,7 @@ async fn reconciliation_budget_eligible(
     let active: bool = sqlx::query_scalar("SELECT state IN ('queued','running') AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
     if !active {
-        return Err(timed_out());
+        return Err(refused("lease claim"));
     }
     // A fresh statement after the usage wait observes the committed competitor.
     let eligible: bool =

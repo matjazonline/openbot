@@ -191,7 +191,8 @@ async fn workflow_fairness_deleted_company_hints_are_inert_and_cursors_retire() 
             .all(|candidate| candidate.scope.company == second.company)
     );
     assert!(
-        p.claim_io(second, worker(), lease())
+        p.settled()
+            .claim_io(second, worker(), lease())
             .await
             .unwrap()
             .is_some()

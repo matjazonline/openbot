@@ -109,7 +109,8 @@ async fn workflow_poll_complete_chain_and_competing_wait_consumption() {
 async fn workflow_poll_unsupported_expired_lease_retires_once_without_fresh_claim() {
     let (f, scope) = fixture().await;
     let p = f.persistence();
-    p.claim_io(scope, worker(), policy())
+    p.settled()
+        .claim_io(scope, worker(), policy())
         .await
         .unwrap()
         .unwrap();

@@ -1,4 +1,5 @@
 //! Receipts retain effect truth independently of current execution ownership.
+use super::persistence_bound::{Attempt, End, Evidence, WriteBound};
 use super::{action_dispatch::*, *};
 use crate::application::workflow::actions::*;
 use serde_json::Value;
@@ -169,39 +170,87 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         entry: RemoteEntry,
         result: Value,
     ) -> AppResult<RemoteDispatchObservation> {
-        let receipt = tokio::time::timeout(entry.request.lease.persistence_timeout(), async {
-            let mut tx = self.persistence.pool().begin().await?;
-            // Same run-first order, deliberately no live-fence/access guard: late
-            // bounded truth remains auditable after cancellation or ownership loss.
-            sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
-                .bind(entry.request.scope().company.as_uuid())
-                .bind(entry.request.scope().run.as_uuid())
-                .execute(&mut *tx)
-                .await?;
-            Self::verify_entry_on(
-                &mut tx,
-                &entry.request,
-                entry.marker,
-                entry.entry,
-                &entry.action,
-                &entry.provider,
-            )
-            .await?;
-            let result = validate_action_result(&entry.action, result)?;
-            Self::insert_receipt_on(&mut tx, &entry, result).await?;
-            let receipt = self
-                .receipt_on(&mut tx, &entry.request, &entry.action)
-                .await?
-                .ok_or_else(invalid)?;
-            tx.commit().await?;
-            Ok::<_, AppError>(receipt)
-        })
-        .await
-        .map_err(|_| lease::timed_out())??;
+        let first = WriteBound::start("action.commit_remote", entry.request.lease);
+        let receipt = match Box::pin(self.commit_once(&first, &entry, result.clone())).await? {
+            Some(receipt) => receipt,
+            // The provider already applied the effect and this receipt definitely wrote
+            // nothing: one more try within what remains of the same deadline T (both inserts
+            // are idempotent). Still not applied, the error leaves the marker to the
+            // reconciliation path, as before.
+            None => {
+                let retry = WriteBound::within(
+                    "action.commit_remote",
+                    entry.request.lease,
+                    first.deadline(),
+                );
+                Box::pin(self.commit_once(&retry, &entry, result))
+                    .await?
+                    .ok_or_else(|| retry.not_applied())?
+            }
+        };
         if !self.return_authorized(&entry).await? {
             return Ok(RemoteDispatchObservation::Interrupted);
         }
         Ok(RemoteDispatchObservation::Committed(receipt))
+    }
+
+    /// One bounded receipt transaction: `None` when it definitely wrote nothing (the attempt
+    /// elapsed or the server bound fired before COMMIT, or resolution proved it aborted).
+    async fn commit_once(
+        &self,
+        bound: &WriteBound,
+        entry: &RemoteEntry,
+        result: Value,
+    ) -> AppResult<Option<ActionReceipt>> {
+        let raw = result.clone();
+        let attempt = bound
+            .attempt(Box::pin(async {
+                // After the external effect: wait for a connection for the rest of the
+                // attempt, not the pre-effect acquire bound.
+                let mut conn = bound.acquire_for_attempt(self.persistence.pool()).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                let receipt = async {
+                    // Same run-first order, deliberately no live-fence/access guard: late
+                    // bounded truth remains auditable after cancellation or ownership loss.
+                    sqlx::query(
+                        "SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE",
+                    )
+                    .bind(entry.request.scope().company.as_uuid())
+                    .bind(entry.request.scope().run.as_uuid())
+                    .execute(&mut *tx)
+                    .await?;
+                    super::persistence_bound::locks_held();
+                    Self::verify_entry_on(
+                        &mut tx,
+                        &entry.request,
+                        entry.marker,
+                        entry.entry,
+                        &entry.action,
+                        &entry.provider,
+                    )
+                    .await?;
+                    let result = validate_action_result(&entry.action, result)?;
+                    Self::insert_receipt_on(&mut tx, entry, result).await?;
+                    let receipt = self
+                        .receipt_on(&mut tx, &entry.request, &entry.action)
+                        .await?
+                        .ok_or_else(invalid)?;
+                    Ok(End::Commit(receipt))
+                }
+                .await;
+                bound.end(tx, receipt).await
+            }))
+            .await;
+        match attempt {
+            Attempt::Done(receipt) => Ok(Some(receipt)),
+            Attempt::Failed(AppError::DatabaseTimeout(_)) => Ok(None),
+            Attempt::Failed(error) => Err(error),
+            Attempt::Ambiguous => {
+                bound
+                    .resolve_retryable(Box::pin(self.observed_on(bound, entry, raw)))
+                    .await
+            }
+        }
     }
 
     async fn insert_receipt_on(
@@ -229,32 +278,75 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         Ok(())
     }
 
+    /// Resolution of an ambiguous receipt commit: the same run lock first, then the
+    /// observation row of this exact entry and result, which the original inserted.
+    async fn observed_on(
+        &self,
+        bound: &WriteBound,
+        entry: &RemoteEntry,
+        raw: Value,
+    ) -> AppResult<Evidence<ActionReceipt>> {
+        let result = validate_action_result(&entry.action, raw)?;
+        let mut conn = bound.acquire(self.persistence.pool()).await?;
+        let mut tx = bound.begin(&mut conn).await?;
+        let receipt = async {
+            sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
+                .bind(entry.request.scope().company.as_uuid())
+                .bind(entry.request.scope().run.as_uuid())
+                .execute(&mut *tx)
+                .await?;
+            let observed: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_action_actual_receipt_observations WHERE company_id=$1 AND remote_entry_id=$2 AND result=$3)")
+                .bind(entry.request.scope().company.as_uuid()).bind(entry.entry).bind(&result)
+                .fetch_one(&mut *tx).await?;
+            if observed {
+                self.receipt_on(&mut tx, &entry.request, &entry.action)
+                    .await
+            } else {
+                Ok(None)
+            }
+        }
+        .await;
+        let receipt = bound.roll_back(tx, receipt).await?;
+        Ok(receipt.map_or(Evidence::NotApplied, Evidence::Applied))
+    }
+
     async fn return_authorized(&self, entry: &RemoteEntry) -> AppResult<bool> {
-        tokio::time::timeout(entry.request.lease.persistence_timeout(), async {
-            let started = Instant::now();
-            let mut tx = self.persistence.pool().begin().await?;
-            // Known ownership loss suppresses output; operational failures remain errors.
-            if !lease::lock_fence(&mut tx, entry.request.fence, entry.request.lease).await?
-                || lease::live_window(&mut tx, entry.request.fence, started)
-                    .await?
-                    .is_none()
-            {
-                return Ok(false);
-            }
-            let authorized = self.authorize_on(&mut tx, &entry.request).await?;
-            if authorized.approval_required
-                || action_uncertainty::conflicted_on(&mut tx, entry.request.scope()).await?
-            {
-                return Ok(false);
-            }
-            let window = lease::live_window(&mut tx, entry.request.fence, started).await?;
-            tx.commit().await?;
-            Ok::<_, AppError>(
-                window
-                    .is_some_and(|w| Instant::now() < w.expires && Instant::now() < w.run_deadline),
-            )
-        })
-        .await
-        .map_err(|_| lease::timed_out())?
+        let bound = WriteBound::read_only("action.return_authorized", entry.request.lease);
+        bound
+            .read(Box::pin(async {
+                let started = Instant::now();
+                let mut conn = bound.acquire(self.persistence.pool()).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                let window = async {
+                    // Known ownership loss suppresses output; operational failures remain errors.
+                    if !lease::lock_fence(&mut tx, entry.request.fence, bound.server_timeout())
+                        .await?
+                        || lease::live_window(&mut tx, entry.request.fence, started)
+                            .await?
+                            .is_none()
+                    {
+                        return Ok(None);
+                    }
+                    let authorized = self
+                        .authorize_on(&mut tx, &entry.request, bound.server_timeout())
+                        .await?;
+                    if authorized.approval_required
+                        || action_uncertainty::conflicted_on(&mut tx, entry.request.scope()).await?
+                    {
+                        return Ok(None);
+                    }
+                    lease::live_window(&mut tx, entry.request.fence, started).await
+                }
+                .await;
+                // Read-only: ROLLBACK on every path, including a known ownership loss, so the
+                // run lock lock_fence took is released before the caller sees `false`.
+                let window = bound.roll_back(tx, window).await?;
+                Ok::<_, AppError>(
+                    window.is_some_and(|w| {
+                        Instant::now() < w.expires && Instant::now() < w.run_deadline
+                    }),
+                )
+            }))
+            .await
     }
 }

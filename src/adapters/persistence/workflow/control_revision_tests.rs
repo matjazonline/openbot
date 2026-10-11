@@ -14,6 +14,7 @@ async fn workflow_control_revision_material_transitions_and_heartbeat_noops() {
     );
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -21,6 +22,7 @@ async fn workflow_control_revision_material_transitions_and_heartbeat_noops() {
     let claimed = command(&f, scope, "claimed").await.expected_revision;
     assert!(claimed > activated);
     f.persistence()
+        .settled()
         .renew_io(claim.fence, policy())
         .await
         .unwrap()
@@ -45,7 +47,12 @@ async fn workflow_control_revision_material_transitions_and_heartbeat_noops() {
         claimed
     );
     f.persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claim.fence,
             output: json!({"items":[],"token_count":0}),
         })
@@ -157,6 +164,7 @@ async fn workflow_control_forged_cancellation_retirement_fails_own_guard() {
     ] {
         let (f, scope) = fixture().await;
         f.persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()
@@ -213,6 +221,7 @@ async fn workflow_control_direct_retry_without_receipt_fails_own_guard() {
 async fn workflow_control_cancel_commit_crossing_lease_expiry_preserves_retirement() {
     let (f, scope) = fixture().await;
     f.persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

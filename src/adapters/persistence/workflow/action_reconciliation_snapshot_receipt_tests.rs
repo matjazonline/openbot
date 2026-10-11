@@ -240,6 +240,7 @@ async fn verify_continuation(
     match observation {
         Observation::Unknown => assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()

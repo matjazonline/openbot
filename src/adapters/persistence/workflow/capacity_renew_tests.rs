@@ -19,7 +19,12 @@ async fn workflow_capacity_uncommitted_renewal_serializes_claim_across_old_expir
         .await
         .unwrap();
     let next = admit(&f, "contender").await;
-    let claim = p.claim_io(scope, worker(), lease()).await.unwrap().unwrap();
+    let claim = p
+        .settled()
+        .claim_io(scope, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let mut gate = p.pool().begin().await.unwrap();
     let gate_pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(&mut *gate)

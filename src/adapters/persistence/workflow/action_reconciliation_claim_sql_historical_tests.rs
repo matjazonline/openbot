@@ -174,7 +174,7 @@ async fn workflow_action_reconciliation_claim_sql_historical_audit_with_current_
     install_probe(&mut tx, &s, &history, &name).await;
     let scope = s.request.fence.scope;
     assert!(
-        lease::lock_scope(&mut tx, scope, policy())
+        lease::lock_scope(&mut tx, scope, policy().attempt_bound())
             .await
             .unwrap()
             .is_some()

@@ -320,7 +320,25 @@ pub async fn own_database_with_migrations(
         .run(&database.pool)
         .await
         .expect("a fresh database accepts the selected migration history");
+    prewarm(&database.pool).await;
     Some(database)
+}
+
+/// Opens every connection of a test's pool up front, concurrently, and returns them idle.
+///
+/// This models a warm steady-state production pool: bounded workflow persistence operations
+/// then measure lock waits and statements, not backend startup on a loaded host (which a cold
+/// pool would charge to the first acquires of each test). It hides nothing the tests check:
+/// a test that exhausts the pool still holds every connection, and the persistence recorder
+/// still reports each acquire. Production still opens connections cold after `max_lifetime`
+/// recycling; the post-effect receipt commit waits for a connection for its whole attempt
+/// for that reason.
+async fn prewarm(pool: &PgPool) {
+    let size = pool.options().get_max_connections();
+    let connections = futures::future::try_join_all((0..size).map(|_| pool.acquire()))
+        .await
+        .expect("a database this test just created accepts its pool's connections");
+    drop(connections);
 }
 
 /// Run one statement against the maintenance database. `CREATE`/`DROP DATABASE` cannot run inside

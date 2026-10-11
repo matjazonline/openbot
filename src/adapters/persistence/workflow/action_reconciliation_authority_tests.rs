@@ -157,6 +157,7 @@ async fn workflow_action_reconciliation_verified_unknown_restart_and_retry() {
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -185,6 +186,9 @@ async fn workflow_action_reconciliation_admin_truth_cannot_replace_dispatch_acto
         },
     );
     assert!(invoke(&f, &request, &provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     let mut c = verified_command(&f, &request, &verifier, "admin-applied").await;
     c.actor = admin;
@@ -264,6 +268,7 @@ async fn workflow_action_reconciliation_paused_verifier_rechecks_revocation_and_
         assert_eq!(evidence, 0);
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()
@@ -327,6 +332,7 @@ async fn workflow_action_reconciliation_paused_verifier_cancel_and_deadline_pres
         );
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()

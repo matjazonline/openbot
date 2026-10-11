@@ -135,6 +135,7 @@ async fn workflow_action_uncertainty_sql_remote_receipt_guard_and_append_only() 
     ));
     assert!(
         f.persistence()
+            .settled()
             .release_io(request.fence, policy(), classified())
             .await
             .unwrap()
@@ -290,6 +291,7 @@ async fn terminal_audit(code: &str) {
     assert_eq!(effect_count(&f).await, 3);
     assert!(
         !f.persistence()
+            .settled()
             .release_io(request.fence, policy(), classified())
             .await
             .unwrap()

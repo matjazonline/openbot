@@ -42,8 +42,28 @@ impl LeasePolicy {
     pub fn heartbeat(self) -> Duration {
         self.duration / 3
     }
-    pub fn persistence_timeout(self) -> Duration {
-        Duration::from_secs(1)
+    /// Write operations, from start to the end of COMMIT. Persistence bounds detect a sick
+    /// database and limit lock holding (renew holds the global capacity row); lease length
+    /// expresses handler tolerance, not database latency, so they are capped.
+    pub fn attempt_bound(self) -> Duration {
+        (self.duration / 3).min(Duration::from_secs(2))
+    }
+    /// A read-only re-read that settles whether an ambiguous COMMIT applied.
+    pub fn resolution_bound(self) -> Duration {
+        (self.duration / 6).min(Duration::from_secs(1))
+    }
+    /// The whole client bound of one persistence operation: attempt plus resolution.
+    pub fn persistence_deadline(self) -> Duration {
+        self.attempt_bound() + self.resolution_bound()
+    }
+    /// Pool acquisition, counted inside the attempt. Its elapse is definitely not applied.
+    pub fn acquire_bound(self) -> Duration {
+        (self.attempt_bound() / 2).min(Duration::from_secs(1))
+    }
+    /// Application backstop around an adapter call; above the deadline, so the adapter
+    /// always settles its own outcome first.
+    pub fn supervision_guard(self) -> Duration {
+        self.persistence_deadline() + (self.duration / 12).min(Duration::from_millis(500))
     }
     pub fn retry_delay(self) -> Duration {
         Duration::from_secs(2)
@@ -109,6 +129,8 @@ pub trait WorkflowLeases: Send + Sync {
 pub struct FencedWorkflowResult {
     pub fence: WorkflowFence,
     pub output: Value,
+    /// Bounds the completion transaction like every other fenced persistence operation.
+    pub policy: LeasePolicy,
 }
 
 /// Retire spent ownership without granting a new attempt. Discovery can be stale,
@@ -127,3 +149,7 @@ pub trait WorkflowLeaseRecovery: Send + Sync {
         policy: LeasePolicy,
     ) -> AppResult<bool>;
 }
+
+#[cfg(test)]
+#[path = "lease_bounds_tests.rs"]
+mod bounds_tests;

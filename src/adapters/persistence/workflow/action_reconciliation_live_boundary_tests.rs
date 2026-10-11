@@ -22,6 +22,7 @@ async fn live_snapshot(h: &HeldTruth) -> Value {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .validate_io(h.request.fence, policy())
             .await
             .unwrap()
@@ -184,6 +185,7 @@ async fn retire_live(h: &HeldTruth, before: &Value, effect_count: i64) {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .release_io(
                 h.request.fence,
                 policy(),
@@ -282,18 +284,20 @@ fn retired_attempts(h: &HeldTruth, before: &Value, after: &Value) {
 
 async fn inert_live(h: &HeldTruth, saved: &Value, effect_count: i64) {
     assert!(!retry_safe(&h.fixture, &h.request).await);
-    let (a, b) = tokio::join!(
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy())
-    );
+    let [a, b] = h
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(a.unwrap().is_none() && b.unwrap().is_none());
     assert!(
         !h.fixture
             .persistence()
+            .settled()
             .validate_io(h.request.fence, policy())
             .await
             .unwrap()
@@ -301,6 +305,7 @@ async fn inert_live(h: &HeldTruth, saved: &Value, effect_count: i64) {
     assert!(
         !h.fixture
             .persistence()
+            .settled()
             .release_io(
                 h.request.fence,
                 policy(),
@@ -310,16 +315,24 @@ async fn inert_live(h: &HeldTruth, saved: &Value, effect_count: i64) {
             .unwrap()
     );
     let provider = LedgerProvider::new(&h.fixture, Delivery::Pending);
+    let refused = Box::pin(invoke(&h.fixture, &h.request, &provider))
+        .await
+        .err()
+        .expect("a refusal, not a dispatch");
     assert!(
-        Box::pin(invoke(&h.fixture, &h.request, &provider))
-            .await
-            .is_err()
+        matches!(&refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+        "expected refusal: {refused:?}"
     );
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: h.request.fence,
                 output: h.result.clone()
             })
@@ -395,7 +408,12 @@ async fn workflow_action_reconciliation_live_return_without_conflict_commits() {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: h.request.fence,
                 output: result
             })

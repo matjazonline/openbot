@@ -125,13 +125,13 @@ async fn held_run<T: std::fmt::Debug>(
     );
     let observed = tokio::select! {
         result = first.as_mut() => panic!("first owner escaped execution gate during run probe: {result:?}"),
-        result = tokio::time::timeout(Duration::from_millis(300), probe_run(observer, command, &phase)) => result,
+        result = tokio::time::timeout(LOCK_WAIT_HANG_GUARD, probe_run(observer, command, &phase)) => result,
     };
     if observed.is_err() {
         // Use the retained execution gate connection to capture actual backend
         // state before panic force-drops this isolated fixture. It never supplies
         // authorization or a business transition, and has the same300ms bound.
-        let state = tokio::time::timeout(Duration::from_millis(300), sqlx::query_scalar::<_, Value>("SELECT COALESCE(jsonb_agg(jsonb_build_object('pid',activity.pid,'state',activity.state,'query',activity.query,'wait_type',activity.wait_event_type,'wait',activity.wait_event,'blockers',pg_blocking_pids(activity.pid))),'[]'::jsonb) FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1)")
+        let state = tokio::time::timeout(LOCK_WAIT_HANG_GUARD, sqlx::query_scalar::<_, Value>("SELECT COALESCE(jsonb_agg(jsonb_build_object('pid',activity.pid,'state',activity.state,'query',activity.query,'wait_type',activity.wait_event_type,'wait',activity.wait_event,'blockers',pg_blocking_pids(activity.pid))),'[]'::jsonb) FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1)")
             .bind([first_pid,backends.gate_pid,backends.observer_pid].as_slice()).fetch_one(&mut *backends.gate)).await;
         panic!(
             "bounded exact run probe phase={} elapsed_us={} first_pid={first_pid} gate_pid={} observer_pid={} backend_state={state:?}",
@@ -144,12 +144,32 @@ async fn held_run<T: std::fmt::Debug>(
     require_probe(observed.unwrap(), RunProbe::Held).unwrap();
 }
 
+/// Only a hang guard, for lock observation, run probes and owner joins alike. The contender
+/// arms, probe results and owner outcomes are the correctness signals: an owner that
+/// finishes before its lock wait is observed fails at once, so a loaded host that is slow
+/// to reach the wait (or to flush a commit) is measured rather than failed.
+const LOCK_WAIT_HANG_GUARD: Duration = Duration::from_secs(10);
+
 pub(in super::super) async fn wait_for_lock<T: std::fmt::Debug>(
     observer: &mut sqlx::PgConnection,
     blocker: i32,
     statement: &str,
-    mut contender: Pin<&mut impl Future<Output = T>>,
+    contender: Pin<&mut impl Future<Output = T>>,
 ) -> i32 {
+    match try_wait_for_lock(observer, blocker, statement, contender).await {
+        Ok(pid) => pid,
+        Err(result) => panic!("owner completed before observed lock competition: {result:?}"),
+    }
+}
+
+/// Like `wait_for_lock`, but a contender that completes before its wait is observed is
+/// returned as `Err(output)` for the caller to classify.
+pub(in super::super) async fn try_wait_for_lock<T>(
+    observer: &mut sqlx::PgConnection,
+    blocker: i32,
+    statement: &str,
+    mut contender: Pin<&mut impl Future<Output = T>>,
+) -> Result<i32, T> {
     let observe = async {
         loop {
             sqlx::query("SELECT pg_stat_clear_snapshot()")
@@ -164,10 +184,18 @@ pub(in super::super) async fn wait_for_lock<T: std::fmt::Debug>(
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     };
-    tokio::select! {
-        result = contender.as_mut() => panic!("owner completed before observed lock competition: {result:?}"),
-        result = tokio::time::timeout(Duration::from_millis(300), observe) => result.expect("exact competing PostgreSQL lock wait"),
-    }
+    let started = Instant::now();
+    let pid = tokio::select! {
+        result = contender.as_mut() => return Err(result),
+        result = tokio::time::timeout(LOCK_WAIT_HANG_GUARD, observe) => result.unwrap_or_else(|_| panic!(
+            "exact competing PostgreSQL lock wait on {statement:?} blocked by {blocker}: not observed within hang guard {LOCK_WAIT_HANG_GUARD:?}"
+        )),
+    };
+    eprintln!(
+        "observed lock wait statement={statement:?} blocker={blocker} pid={pid} elapsed_ms={} hang_guard={LOCK_WAIT_HANG_GUARD:?}",
+        started.elapsed().as_millis()
+    );
+    Ok(pid)
 }
 
 async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
@@ -238,12 +266,9 @@ async fn inspect_finished_owners(
 ) {
     let phase = Cell::new("not_polled");
     require_probe(
-        tokio::time::timeout(
-            Duration::from_millis(300),
-            probe_run(observer, command, &phase),
-        )
-        .await
-        .expect("both owners release the exact run"),
+        tokio::time::timeout(LOCK_WAIT_HANG_GUARD, probe_run(observer, command, &phase))
+            .await
+            .expect("both owners release the exact run"),
         RunProbe::Free,
     )
     .unwrap();
@@ -309,7 +334,7 @@ pub(super) async fn race(
     let free_phase = Cell::new("not_polled");
     require_probe(
         tokio::time::timeout(
-            Duration::from_millis(300),
+            LOCK_WAIT_HANG_GUARD,
             probe_run(&mut observer, command, &free_phase),
         )
         .await
@@ -334,7 +359,7 @@ pub(super) async fn race(
     )
     .await;
     gate.rollback().await.unwrap();
-    let (result, terminal) = tokio::time::timeout(Duration::from_millis(900), async {
+    let (result, terminal) = tokio::time::timeout(LOCK_WAIT_HANG_GUARD, async {
         tokio::join!(reconcile, terminal)
     })
     .await
@@ -382,7 +407,7 @@ async fn workflow_action_reconciliation_control_serialization_probe_negative_con
         .unwrap();
     let phase = Cell::new("not_polled");
     let unlocked = tokio::time::timeout(
-        Duration::from_millis(300),
+        LOCK_WAIT_HANG_GUARD,
         probe_run(&mut observer, &command, &phase),
     )
     .await
@@ -397,7 +422,7 @@ async fn workflow_action_reconciliation_control_serialization_probe_negative_con
     let mut missing = command.clone();
     missing.scope.run = crate::domain::workflow::RunId::new(Uuid::new_v4());
     let absent = tokio::time::timeout(
-        Duration::from_millis(300),
+        LOCK_WAIT_HANG_GUARD,
         probe_run(&mut observer, &missing, &phase),
     )
     .await

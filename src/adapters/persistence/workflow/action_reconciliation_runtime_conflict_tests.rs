@@ -66,6 +66,7 @@ async fn workflow_action_reconciliation_runtime_conflicted_sibling_vetoes_all_re
     let before_claim = all_tables(&f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(requests[0].fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -135,12 +136,25 @@ async fn workflow_action_reconciliation_runtime_conflict_after_return_before_com
     let verifier = accepted_before_conflict(&f, &request).await;
     contradict(&f, &request, verifier).await;
     let before = all_tables(&f).await;
-    assert!(adapter(&f, 0).reserve_remote(&request, None).await.is_err());
+    let refused = adapter(&f, 0)
+        .reserve_remote(&request, None)
+        .await
+        .err()
+        .expect("a refusal, not a dispatch");
+    assert!(
+        matches!(&refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+        "expected refusal: {refused:?}"
+    );
     assert_eq!(before, all_tables(&f).await);
     // No heartbeat runs first: shared completion itself must reject the returned result.
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: request.fence,
                 output: good()
             })
@@ -172,6 +186,7 @@ async fn workflow_action_reconciliation_runtime_conflict_after_return_before_com
     );
     assert!(
         f.persistence()
+            .settled()
             .renew_io(request.fence, policy())
             .await
             .unwrap()
@@ -187,7 +202,12 @@ async fn workflow_action_reconciliation_runtime_completion_before_conflict_prese
     let verifier = accepted_before_conflict(&f, &request).await;
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: request.fence,
                 output: good()
             })
@@ -214,6 +234,7 @@ async fn workflow_action_reconciliation_runtime_completion_before_conflict_prese
     let before_claim = all_tables(&f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

@@ -65,6 +65,58 @@ fn cancelled(s: &Scheduled, before: &Value, after: &Value) {
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_cancellation_cancel_first() {
+    for attempt in 1..=3 {
+        if Box::pin(cancel_first(attempt)).await {
+            return;
+        }
+    }
+    panic!("every cancel_first attempt was void");
+}
+
+/// The claim's own attempt bound runs from its first poll. If it elapses before the claim's
+/// wait is observed, or while the claim queues behind a cancel COMMIT that stalls on the
+/// shared disk, the claim reports a definite NotApplied and the order under test is
+/// unproven. That attempt is void, with its evidence and backstop asserted in
+/// `void_claim`. The release guard is the production supervision guard G, derived from the
+/// policy, rather than a fixed 900 ms.
+fn release_guard() -> Duration {
+    policy().supervision_guard()
+}
+
+fn not_applied<T>(result: &AppResult<T>) -> bool {
+    matches!(result, Err(AppError::DatabaseTimeout(_)))
+}
+
+/// Backstop for a void attempt: the NotApplied claimant wrote no attempt, and when the
+/// cancel ran, it applied: nothing of the claim's reached the run.
+async fn void_claim<T: std::fmt::Debug>(
+    s: &Scheduled,
+    scenario: &str,
+    attempt: usize,
+    claimant: WorkflowWorkerId,
+    claim: &AppResult<T>,
+    cancel: Option<AppResult<CancelResult>>,
+) {
+    let attempts: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM task_attempts WHERE task_id=$1 AND worker_id=$2")
+            .bind(s.request.fence.scope.job.0)
+            .bind(claimant.0)
+            .fetch_one(s.fixture.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(attempts, 0, "the NotApplied claimant wrote no attempt");
+    if let Some(cancel) = cancel {
+        assert!(
+            matches!(cancel, Ok(CancelResult::Applied { .. })),
+            "a cancel beside a NotApplied claim applies: {cancel:?}"
+        );
+    }
+    uncaptured(&format!(
+        "VOID attempt scenario={scenario} attempt={attempt} evidence=claim_not_applied claim={claim:?}"
+    ));
+}
+
+async fn cancel_first(attempt: usize) -> bool {
     // Box real fixture/action seams to retain the stock 2 MiB test stack.
     let s = Box::pin(scheduled()).await;
     let command = cancel_command(&s, "episode-cancel-first").await;
@@ -82,23 +134,42 @@ async fn workflow_action_reconciliation_claim_cancellation_cancel_first() {
         .unwrap();
     let mut observer = s.fixture.persistence().pool().acquire().await.unwrap();
     let cancel = s.fixture.persistence().cancel(command);
+    let claimant = worker();
     let claim = s
         .fixture
         .persistence()
-        .claim_io(s.request.fence.scope, worker(), policy());
+        .claim_io(s.request.fence.scope, claimant, policy());
     tokio::pin!(cancel, claim);
     let cancel_pid = wait_for_lock(&mut observer, blocker, EXECUTION_WAIT, cancel.as_mut()).await;
+    let mut early = None;
     let claim_pid = tokio::select! {
         result = cancel.as_mut() => panic!("cancel escaped execution gate: {result:?}"),
-        pid = wait_for_lock(&mut observer, cancel_pid, RUN_WAIT, claim.as_mut()) => pid,
+        pid = try_wait_for_lock(&mut observer, cancel_pid, RUN_WAIT, claim.as_mut()) => match pid {
+            Ok(pid) => Some(pid),
+            Err(output) if not_applied(&output) => {
+                early = Some(output);
+                None
+            }
+            Err(output) => panic!("claim completed before its observed lock wait: {output:?}"),
+        },
     };
-    assert_ne!(cancel_pid, claim_pid);
+    assert_ne!(Some(cancel_pid), claim_pid);
     gate.rollback().await.unwrap();
-    let (cancel, claim) = tokio::time::timeout(Duration::from_millis(900), async {
-        tokio::join!(cancel, claim)
+    let (cancel, claim) = tokio::time::timeout(release_guard(), async {
+        tokio::join!(cancel, async {
+            match early {
+                Some(output) => output,
+                None => claim.as_mut().await,
+            }
+        })
     })
     .await
     .expect("real cancel and claim complete after gate release");
+    if not_applied(&claim) {
+        void_claim(&s, "cancel_first", attempt, claimant, &claim, Some(cancel)).await;
+        return false;
+    }
+    let claim_pid = claim_pid.unwrap();
     assert!(matches!(cancel.unwrap(), CancelResult::Applied { .. }));
     assert!(claim.unwrap().is_none());
     assert_quiescent(&mut observer, &[cancel_pid, claim_pid]).await;
@@ -114,6 +185,7 @@ async fn workflow_action_reconciliation_claim_cancellation_cancel_first() {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -124,33 +196,73 @@ async fn workflow_action_reconciliation_claim_cancellation_cancel_first() {
         all_tables(&s.fixture).await,
         "terminal polling is inert"
     );
+    true
 }
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_cancellation_claim_first() {
+    for attempt in 1..=3 {
+        if Box::pin(claim_first(attempt)).await {
+            return;
+        }
+    }
+    panic!("every claim_first attempt was void");
+}
+
+async fn claim_first(attempt: usize) -> bool {
     let s = Box::pin(scheduled()).await;
     let command = cancel_command(&s, "episode-stale-cancel").await;
     let before = all_tables(&s.fixture).await;
     let gate = usage_gate(&s).await;
     let mut observer = s.fixture.persistence().pool().acquire().await.unwrap();
+    let claimant = worker();
     let claim = s
         .fixture
         .persistence()
-        .claim_io(s.request.fence.scope, worker(), policy());
+        .claim_io(s.request.fence.scope, claimant, policy());
     let cancel = s.fixture.persistence().cancel(command);
     tokio::pin!(claim, cancel);
-    let claim_pid = wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, claim.as_mut()).await;
+    let claim_pid =
+        match try_wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, claim.as_mut()).await {
+            Ok(pid) => pid,
+            Err(output) if not_applied(&output) => {
+                // The cancel was never polled, so nothing at all ran besides the claim.
+                gate.tx.rollback().await.unwrap();
+                void_claim(&s, "claim_first", attempt, claimant, &output, None).await;
+                assert_eq!(before, all_tables(&s.fixture).await);
+                return false;
+            }
+            Err(output) => panic!("claim completed before its observed lock wait: {output:?}"),
+        };
+    let mut early = None;
     let cancel_pid = tokio::select! {
-        result = claim.as_mut() => panic!("claim escaped usage gate: {result:?}"),
-        pid = wait_for_lock(&mut observer, claim_pid, CANCEL_RUN_WAIT, cancel.as_mut()) => pid,
+        result = claim.as_mut() => {
+            assert!(not_applied(&result), "claim escaped usage gate: {result:?}");
+            early = Some(result);
+            None
+        }
+        pid = wait_for_lock(&mut observer, claim_pid, CANCEL_RUN_WAIT, cancel.as_mut()) => Some(pid),
     };
-    assert_ne!(claim_pid, cancel_pid);
+    assert_ne!(Some(claim_pid), cancel_pid);
     gate.tx.rollback().await.unwrap();
-    let (claim, cancel) = tokio::time::timeout(Duration::from_millis(900), async {
-        tokio::join!(claim, cancel)
+    let (claim, cancel) = tokio::time::timeout(release_guard(), async {
+        tokio::join!(
+            async {
+                match early {
+                    Some(output) => output,
+                    None => claim.as_mut().await,
+                }
+            },
+            cancel
+        )
     })
     .await
     .expect("real claim and cancel complete after gate release");
+    if not_applied(&claim) {
+        void_claim(&s, "claim_first", attempt, claimant, &claim, Some(cancel)).await;
+        return false;
+    }
+    let cancel_pid = cancel_pid.unwrap();
     let claim = claim.unwrap().expect("claim wins the requesting run lock");
     assert!(matches!(
         cancel.unwrap(),
@@ -163,6 +275,7 @@ async fn workflow_action_reconciliation_claim_cancellation_claim_first() {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -178,6 +291,7 @@ async fn workflow_action_reconciliation_claim_cancellation_claim_first() {
     assert!(
         !s.fixture
             .persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -185,12 +299,14 @@ async fn workflow_action_reconciliation_claim_cancellation_claim_first() {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, worker(), policy())
             .await
             .unwrap()
             .is_none()
     );
     assert_eq!(after, all_tables(&s.fixture).await);
+    true
 }
 
 fn claimed_once(s: &Scheduled, before: &Value, claimed: &Value, fence: WorkflowFence) {
@@ -248,6 +364,7 @@ async fn recover_unchanged(s: &Scheduled, before: &Value) {
         assert!(
             s.fixture
                 .persistence()
+                .settled()
                 .claim_io(s.request.fence.scope, worker(), policy())
                 .await
                 .unwrap()
@@ -262,7 +379,46 @@ async fn recover_unchanged(s: &Scheduled, before: &Value) {
     }
 }
 
-async fn drop_waiting(s: &Scheduled) {
+/// The drop or abort must end the claim inside its own attempt bound, or the bound, not the
+/// cancellation, ended it. When the bound elapsed first (the claim completed with a definite
+/// NotApplied before its wait was observed, or observation itself took the whole bound),
+/// the attempt is void: the gate is released and every public table must still equal
+/// `before` (the backstop), and the caller retries on a fresh fixture.
+async fn void_waiting(
+    s: &Scheduled,
+    scenario: &str,
+    attempt: usize,
+    before: &Value,
+    evidence: &str,
+) {
+    assert_eq!(
+        before,
+        &all_tables(&s.fixture).await,
+        "a void {scenario} wrote nothing"
+    );
+    uncaptured(&format!(
+        "VOID attempt scenario={scenario} attempt={attempt} evidence={evidence}"
+    ));
+}
+
+async fn waiting_proven(
+    scenario: &str,
+    exhausted: bool,
+    run: impl AsyncFn(&Scheduled, usize) -> bool,
+) {
+    for attempt in 1..=3 {
+        let s = Box::pin(scheduled()).await;
+        if exhausted {
+            Box::pin(exhaust(&s)).await;
+        }
+        if run(&s, attempt).await {
+            return;
+        }
+    }
+    panic!("every {scenario} attempt was void");
+}
+
+async fn drop_waiting(s: &Scheduled, attempt: usize) -> bool {
     let before = all_tables(&s.fixture).await;
     let gate = usage_gate(s).await;
     let mut observer = s.fixture.persistence().pool().acquire().await.unwrap();
@@ -272,8 +428,28 @@ async fn drop_waiting(s: &Scheduled) {
         policy(),
     ));
     let started = Instant::now();
-    let pid = wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, claim.as_mut()).await;
-    assert!(started.elapsed() < policy().persistence_timeout());
+    let observed = try_wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, claim.as_mut()).await;
+    let elapsed = started.elapsed();
+    let pid = match observed {
+        Ok(pid) if elapsed < policy().attempt_bound() => pid,
+        observed => {
+            let evidence = match observed {
+                Ok(_) => format!("observed_after_bound elapsed_ms={}", elapsed.as_millis()),
+                Err(output) => {
+                    assert!(
+                        not_applied(&output),
+                        "claim completed before its observed lock wait: {output:?}"
+                    );
+                    format!("claim_not_applied {output:?}")
+                }
+            };
+            drop(claim);
+            gate.tx.rollback().await.unwrap();
+            drop(observer);
+            void_waiting(s, "dropped_usage_wait", attempt, &before, &evidence).await;
+            return false;
+        }
+    };
     assert!(live_deadline(&mut observer, s).await);
     // Dropping the pinned future itself cancels the real claim transaction.
     drop(claim);
@@ -286,9 +462,10 @@ async fn drop_waiting(s: &Scheduled) {
         "dropped claim leaves every public table exact"
     );
     recover_unchanged(s, &before).await;
+    true
 }
 
-async fn abort_waiting(s: &Scheduled) {
+async fn abort_waiting(s: &Scheduled, attempt: usize) -> bool {
     let before = all_tables(&s.fixture).await;
     let gate = usage_gate(s).await;
     let mut observer = s.fixture.persistence().pool().acquire().await.unwrap();
@@ -299,8 +476,33 @@ async fn abort_waiting(s: &Scheduled) {
     let mut task =
         tokio::spawn(async move { persistence.claim_io(scope, worker(), policy()).await });
     let started = Instant::now();
-    let pid = wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, Pin::new(&mut task)).await;
-    assert!(started.elapsed() < policy().persistence_timeout());
+    let observed =
+        try_wait_for_lock(&mut observer, gate.pid, USAGE_WAIT, Pin::new(&mut task)).await;
+    let elapsed = started.elapsed();
+    let pid = match observed {
+        Ok(pid) if elapsed < policy().attempt_bound() => pid,
+        observed => {
+            let evidence = match observed {
+                Ok(_) => {
+                    task.abort();
+                    let _ = (&mut task).await;
+                    format!("observed_after_bound elapsed_ms={}", elapsed.as_millis())
+                }
+                Err(output) => {
+                    let output = output.expect("the claim task was not aborted yet");
+                    assert!(
+                        not_applied(&output),
+                        "claim completed before its observed lock wait: {output:?}"
+                    );
+                    format!("claim_not_applied {output:?}")
+                }
+            };
+            gate.tx.rollback().await.unwrap();
+            drop(observer);
+            void_waiting(s, "aborted_task_usage_wait", attempt, &before, &evidence).await;
+            return false;
+        }
+    };
     assert!(live_deadline(&mut observer, s).await);
     task.abort();
     assert!(
@@ -316,22 +518,17 @@ async fn abort_waiting(s: &Scheduled) {
         "aborted claim leaves every public table exact"
     );
     recover_unchanged(s, &before).await;
+    true
 }
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_cancellation_dropped_usage_wait() {
-    let eligible = Box::pin(scheduled()).await;
-    drop_waiting(&eligible).await;
-    let exhausted = Box::pin(scheduled()).await;
-    Box::pin(exhaust(&exhausted)).await;
-    drop_waiting(&exhausted).await;
+    waiting_proven("dropped_usage_wait", false, drop_waiting).await;
+    waiting_proven("dropped_usage_wait", true, drop_waiting).await;
 }
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_cancellation_aborted_task_usage_wait() {
-    let eligible = Box::pin(scheduled()).await;
-    abort_waiting(&eligible).await;
-    let exhausted = Box::pin(scheduled()).await;
-    Box::pin(exhaust(&exhausted)).await;
-    abort_waiting(&exhausted).await;
+    waiting_proven("aborted_task_usage_wait", false, abort_waiting).await;
+    waiting_proven("aborted_task_usage_wait", true, abort_waiting).await;
 }

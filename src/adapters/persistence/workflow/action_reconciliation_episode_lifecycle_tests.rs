@@ -14,15 +14,11 @@ async fn episode_fixture() -> EpisodeFixture {
     // Box the real fixture/service seam to preserve stock 2 MiB test stacks.
     let (fixture, request) = Box::pin(limited()).await;
     let verifier = ledger(&fixture, &request).await;
-    assert!(
-        invoke(
-            &fixture,
-            &request,
-            &LedgerProvider::new(&fixture, Delivery::Pending)
-        )
-        .await
-        .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&fixture, Delivery::Pending);
+    assert!(invoke(&fixture, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&fixture, &request).await;
     barrier(&fixture, &request).await;
     let command = proof_command(&fixture, &request, &verifier, "lifecycle-first").await;
@@ -175,7 +171,9 @@ async fn workflow_action_reconciliation_episode_lifecycle_revision_keeps_binding
             .persistence()
             .claim_io(s.request.fence.scope, worker(), policy())
     );
-    assert!(a.unwrap().is_none() && b.unwrap().is_none());
+    for claim in [a, b] {
+        assert!(Box::pin(settled_claim(s, claim)).await.is_none());
+    }
     let refused = all_tables(&s.fixture).await;
     assert_refusal(&exhausted, &refused, &s.request, &s.command);
     preserved(
@@ -184,6 +182,28 @@ async fn workflow_action_reconciliation_episode_lifecycle_revision_keeps_binding
         &["task_attempts", "workflow_root_budget_usage"],
     );
     assert_eq!(entry_consumptions(&s.fixture).await, (1, 0));
+}
+
+/// A claimant queued behind the other's run lock (or a slow pool) may report a definite
+/// NotApplied within its own attempt bound: it wrote nothing, so it re-polls as a worker
+/// would. Anything else is returned as is; the hang guard is only a guard.
+async fn settled_claim(
+    s: &Scheduled,
+    mut claim: AppResult<Option<ClaimedWorkflow>>,
+) -> Option<ClaimedWorkflow> {
+    let started = std::time::Instant::now();
+    while let Err(AppError::DatabaseTimeout(error)) = &claim {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "claim never settled within the hang guard: {error}"
+        );
+        claim = s
+            .fixture
+            .persistence()
+            .claim_io(s.request.fence.scope, worker(), policy())
+            .await;
+    }
+    claim.unwrap()
 }
 
 async fn safely_retire(s: &Scheduled) -> Value {
@@ -199,6 +219,7 @@ async fn safely_retire(s: &Scheduled) -> Value {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .release_io(s.request.fence, policy(), cause)
             .await
             .unwrap()
@@ -256,6 +277,7 @@ async fn safe_retry(s: &mut Scheduled) {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .validate_io(s.request.fence, policy())
             .await
             .unwrap()
@@ -280,11 +302,15 @@ async fn workflow_action_reconciliation_episode_lifecycle_consumed_allows_saved_
     let claimed = all_tables(&s.fixture).await;
     preserved(&before, &claimed, SAVED_FACTS);
     attempts_preserved(&before, &claimed);
+    // The new claim's worker heartbeats before its next work; `claimed` is not compared
+    // with anything after this point.
+    renew_fixture_lease(&s.fixture, s.request.fence).await;
     let charge = BudgetCharge::new(BudgetResource::ModelCall, 2).unwrap();
     let key = BudgetReservationKey::parse("lifecycle-saved-operation").unwrap();
     assert_eq!(
         s.fixture
             .persistence()
+            .settled()
             .reserve_budget(
                 BudgetReservation::new(s.request.fence, key.clone(), charge).unwrap(),
                 policy()
@@ -301,6 +327,7 @@ async fn workflow_action_reconciliation_episode_lifecycle_consumed_allows_saved_
     assert_eq!(
         s.fixture
             .persistence()
+            .settled()
             .reserve_budget(
                 BudgetReservation::new(s.request.fence, key, charge).unwrap(),
                 policy()

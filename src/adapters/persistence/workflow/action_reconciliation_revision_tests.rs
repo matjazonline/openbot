@@ -317,6 +317,7 @@ async fn audit_case(state: State, truth: SiblingTruth) {
     let saved = all_tables(&f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

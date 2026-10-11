@@ -108,11 +108,14 @@ async fn seed_siblings(
             },
             _ => Delivery::Pending,
         };
-        assert!(
-            invoke(&f, request, &LedgerProvider::new(&f, delivery))
-                .await
-                .is_err()
-        );
+        // The siblings share the setup fence: heartbeat it before each dispatch, as the
+        // worker would (no snapshot is taken while seeding).
+        renew_fixture_lease(&f, request.fence).await;
+        let setup_provider = LedgerProvider::new(&f, delivery);
+        assert!(invoke(&f, request, &setup_provider).await.is_err());
+        // Setup premise: the provider was called and its outcome is uncertain. A reservation
+        // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+        assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
         if matches!(truth, SiblingTruth::Final) {
             barrier(&f, request).await;
         }
@@ -234,7 +237,12 @@ async fn continue_siblings(
     }
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence,
                 output: good()
             })
@@ -296,6 +304,7 @@ async fn workflow_action_reconciliation_siblings_unknown_and_applied_without_out
         let before = all_tables(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(requests[0].fence.scope, worker(), policy())
                 .await
                 .unwrap()

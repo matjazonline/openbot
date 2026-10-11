@@ -23,6 +23,7 @@ async fn limited() -> (AdmissionFixture, ActivationRequest) {
 }
 async fn claim(f: &AdmissionFixture, scope: ActivationRequest) -> WorkflowFence {
     f.persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -69,6 +70,7 @@ async fn workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry() 
         let exhausted = request(fence, resource, "over", 1);
         assert_eq!(
             f.persistence()
+                .settled()
                 .reserve_budget(exhausted.clone(), policy())
                 .await
                 .unwrap(),
@@ -92,6 +94,7 @@ async fn workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry() 
         assert_eq!(state["executions"].as_array().unwrap().len(), 1);
         assert_eq!(
             f.persistence()
+                .settled()
                 .reserve_budget(exhausted, policy())
                 .await
                 .unwrap(),
@@ -176,6 +179,7 @@ async fn workflow_budget_runtime_scope_fence_expiry_and_cancel() {
     ] {
         assert_eq!(
             f.persistence()
+                .settled()
                 .reserve_budget(request(bad, BudgetResource::ModelCall, "op", 1), policy())
                 .await
                 .unwrap(),
@@ -185,6 +189,7 @@ async fn workflow_budget_runtime_scope_fence_expiry_and_cancel() {
     }
     let req = request(fence, BudgetResource::ModelCall, "op", 1);
     f.persistence()
+        .settled()
         .reserve_budget(req.clone(), policy())
         .await
         .unwrap();
@@ -192,6 +197,7 @@ async fn workflow_budget_runtime_scope_fence_expiry_and_cancel() {
     let saved = accounting(&f).await;
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::ModelCall, "fresh", 1),
                 policy()
@@ -208,11 +214,16 @@ async fn workflow_budget_runtime_scope_fence_expiry_and_cancel() {
         CancelResult::Applied { .. }
     ));
     assert_eq!(
-        f.persistence().reserve_budget(req, policy()).await.unwrap(),
+        f.persistence()
+            .settled()
+            .reserve_budget(req, policy())
+            .await
+            .unwrap(),
         BudgetReservationResult::Replayed(BudgetDisposition::Granted)
     );
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::ModelCall, "fresh", 1),
                 policy()
@@ -231,17 +242,27 @@ async fn workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge
     let req = request(fence, BudgetResource::ModelCall, "op", 1);
     let saved = accounting(&f).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    reserve_on(&mut tx, &req, policy()).await.unwrap();
+    reserve_on(&mut tx, &req, policy().attempt_bound())
+        .await
+        .unwrap();
     tx.rollback().await.unwrap();
     assert_eq!(accounting(&f).await, saved);
     let fresh = PostgresPersistence::new(f.persistence().pool().clone());
     assert_eq!(
-        fresh.reserve_budget(req.clone(), policy()).await.unwrap(),
+        fresh
+            .settled()
+            .reserve_budget(req.clone(), policy())
+            .await
+            .unwrap(),
         BudgetReservationResult::Recorded(BudgetDisposition::Granted)
     );
     let fresh = PostgresPersistence::new(f.persistence().pool().clone());
     assert_eq!(
-        fresh.reserve_budget(req.clone(), policy()).await.unwrap(),
+        fresh
+            .settled()
+            .reserve_budget(req.clone(), policy())
+            .await
+            .unwrap(),
         BudgetReservationResult::Replayed(BudgetDisposition::Granted)
     );
     let saved = accounting(&f).await;
@@ -254,7 +275,13 @@ async fn workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge
         .unwrap(),
         safety: RetrySafety::SafeToRetry,
     });
-    assert!(fresh.release_io(fence, policy(), cause).await.unwrap());
+    assert!(
+        fresh
+            .settled()
+            .release_io(fence, policy(), cause)
+            .await
+            .unwrap()
+    );
     assert!(matches!(
         fresh
             .retry(retry(command(&f, scope, "retry-safe").await))
@@ -266,6 +293,7 @@ async fn workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge
     assert_ne!(next.generation, fence.generation);
     assert_eq!(
         fresh
+            .settled()
             .reserve_budget(request(next, BudgetResource::ModelCall, "op", 1), policy())
             .await
             .unwrap(),
@@ -274,6 +302,7 @@ async fn workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge
     assert_eq!(accounting(&f).await, saved);
     assert_eq!(
         fresh
+            .settled()
             .reserve_budget(
                 request(next, BudgetResource::ModelCall, "second", 1),
                 policy()
@@ -324,3 +353,6 @@ async fn workflow_budget_runtime_conflicting_competitors_debit_one_payload() {
 
 #[path = "budget_race_tests.rs"]
 mod race_tests;
+
+#[path = "budget_resolution_tests.rs"]
+mod resolution_tests;

@@ -36,6 +36,7 @@ mod fair_polling;
 mod fairness;
 mod lease;
 mod lease_claim;
+mod persistence_bound;
 // Exact historical owner is compiled only for pre-episode migration fixtures.
 mod resources;
 mod rows;

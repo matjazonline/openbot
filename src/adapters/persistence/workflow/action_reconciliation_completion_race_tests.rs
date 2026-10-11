@@ -6,6 +6,8 @@ use crate::application::workflow::completion::CommitDisposition;
 mod assertions;
 #[path = "action_reconciliation_completion_race_lock_support.rs"]
 mod locks;
+#[path = "action_reconciliation_completion_race_queue_support.rs"]
+mod queue;
 
 #[derive(Clone, Copy, Debug)]
 enum Winner {
@@ -46,7 +48,15 @@ async fn usable_result(h: &HeldTruth) -> Value {
     state
 }
 
-async fn case(first: Winner) {
+/// One race on a fresh fixture, with every table before and after it.
+struct Attempt {
+    h: HeldTruth,
+    before: Value,
+    after: Value,
+    raced: locks::Raced,
+}
+
+async fn attempt(first: Winner) -> Attempt {
     let mut h = Box::pin(live_retry()).await;
     let mut gate = h.fixture.persistence().pool().acquire().await.unwrap();
     locks::install_pause(&h, &mut gate).await;
@@ -54,16 +64,86 @@ async fn case(first: Winner) {
     // Positive pause-isolation control: holding the gate for OLD cannot prevent
     // genuine NEW receipt persistence/return. No fixture writes supply truth.
     let before = Box::pin(usable_result(&h)).await;
-    let result = Box::pin(locks::race(&mut h, first, &mut gate)).await;
+    let raced = Box::pin(locks::race(&mut h, first, &mut gate)).await;
     locks::remove_pause(&mut gate).await;
     drop(gate);
     let after = all_tables(&h.fixture).await;
     assertions::truth(&h, &before, &after);
+    Attempt {
+        h,
+        before,
+        after,
+        raced,
+    }
+}
+
+/// At most 3 fresh fixtures, and at least one must prove the order. Only a receipt-first
+/// completion whose bound elapsed behind the receipt's COMMIT is void (`locks::Raced`), so a
+/// persistent defect still fails every attempt.
+async fn case(first: Winner) {
+    for n in 1..=3 {
+        let Attempt {
+            h,
+            before,
+            after,
+            raced,
+        } = Box::pin(attempt(first)).await;
+        match raced {
+            locks::Raced::Proven(result) => {
+                proven(&h, &before, &after, first, result);
+                Box::pin(assertions::inert(&h, &after, first)).await;
+                uncaptured(&format!(
+                    "PROVEN scenario=completion_race order={first:?} attempt={n}"
+                ));
+                return;
+            }
+            locks::Raced::Void(evidence) => {
+                assert!(
+                    matches!(first, Winner::Receipt),
+                    "completion first is strict"
+                );
+                completion_wrote_nothing(&h, &before, &after);
+                uncaptured(&format!(
+                    "VOID attempt scenario=completion_race order={first:?} attempt={n} {evidence}"
+                ));
+            }
+        }
+    }
+    panic!("every completion_race attempt for {first:?} was void");
+}
+
+/// The void backstop. `truth` already holds: the receipt committed its observation and
+/// conflict. The NotApplied completion wrote nothing: the execution is not completed, our job
+/// and attempt are still processing and unchanged, and the run changed only in the revision
+/// the receipt bumps. Nothing retired the attempt, which in a proven race the completion does.
+fn completion_wrote_nothing(h: &HeldTruth, before: &Value, after: &Value) {
+    unchanged_tables(
+        before,
+        after,
+        &[
+            "workflow_runs",
+            "workflow_action_actual_receipt_observations",
+            "workflow_action_evidence_conflicts",
+        ],
+    );
+    same_table_except(
+        &before["workflow_runs"],
+        &after["workflow_runs"],
+        &json!(h.request.scope().run.as_uuid()),
+        &["revision"],
+    );
+    assert!(
+        after["workflow_runs"][0]["revision"].as_i64().unwrap()
+            > before["workflow_runs"][0]["revision"].as_i64().unwrap()
+    );
+}
+
+fn proven(h: &HeldTruth, before: &Value, after: &Value, first: Winner, result: locks::RaceResult) {
     match first {
         Winner::Receipt => {
             assert!(result.completion.is_none());
             assert!(result.completed_before_receipt.is_none());
-            assertions::retired(&h, &before, &after);
+            assertions::retired(h, before, after);
         }
         Winner::Completion => {
             let committed = result.completion.unwrap();
@@ -71,12 +151,12 @@ async fn case(first: Winner) {
             assert_eq!(committed.output, h.result);
             assert!(committed.successor.is_none());
             let completed = result.completed_before_receipt.unwrap();
-            assertions::completed(&h, &before, &completed);
+            assertions::completed(h, before, &completed);
             // The opposite owner subsequently adds authentic conflict audit; all
             // already committed execution/job/attempt/output/route history stays exact.
             unchanged_tables(
                 &completed,
-                &after,
+                after,
                 &[
                     "workflow_runs",
                     "workflow_action_actual_receipt_observations",
@@ -95,7 +175,6 @@ async fn case(first: Winner) {
             );
         }
     }
-    Box::pin(assertions::inert(&h, &after, first)).await;
 }
 
 #[tokio::test]

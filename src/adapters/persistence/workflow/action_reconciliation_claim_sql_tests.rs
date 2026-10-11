@@ -43,11 +43,11 @@ async fn scheduled() -> Scheduled {
     // Box the real action service seam to retain stock 2 MiB test stacks.
     let (f, request) = Box::pin(limited()).await;
     let verifier = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let command = proof_command(&f, &request, &verifier, "claim-sql-scheduled").await;
@@ -69,6 +69,7 @@ async fn exhaust(s: &Scheduled) {
     let claim = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -113,10 +114,14 @@ async fn refusal(
 async fn current_retirement(tx: &mut Transaction<'_, Postgres>, s: &Scheduled) -> i64 {
     let scope = s.request.fence.scope;
     assert!(
-        crate::adapters::persistence::workflow::lease::lock_scope(&mut *tx, scope, policy(),)
-            .await
-            .unwrap()
-            .is_some()
+        crate::adapters::persistence::workflow::lease::lock_scope(
+            &mut *tx,
+            scope,
+            policy().attempt_bound(),
+        )
+        .await
+        .unwrap()
+        .is_some()
     );
     // Reuse the production pending retirement owner. Database triggers, rather
     // than supplied provenance, capture OLD pending state and current xid.
@@ -208,6 +213,7 @@ async fn workflow_action_reconciliation_claim_sql_consumed_episode_refusal() {
     let claim = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(s.request.fence.scope, worker(), policy())
         .await
         .unwrap()
@@ -314,6 +320,7 @@ async fn workflow_action_reconciliation_claim_sql_actual_refusal_later_audit_pro
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, worker(), policy())
             .await
             .unwrap()

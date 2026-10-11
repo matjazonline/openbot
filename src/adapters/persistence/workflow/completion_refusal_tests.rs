@@ -68,6 +68,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
     for phase in ["live", "completed"] {
         if phase == "completed" {
             f.persistence()
+                .settled()
                 .complete_io(result(claim.fence))
                 .await
                 .unwrap()
@@ -77,6 +78,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
         for wrong in wrong_fences(claim.fence, other) {
             assert!(
                 f.persistence()
+                    .settled()
                     .complete_io(result(wrong))
                     .await
                     .unwrap()
@@ -94,6 +96,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
     let before = state(&f).await;
     assert_eq!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()
@@ -107,6 +110,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
     let before = state(&f).await;
     assert_eq!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()
@@ -131,6 +135,7 @@ async fn workflow_completion_unclaimed_pure_and_legacy_refuse() {
         let before = state(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(result(fence))
                 .await
                 .unwrap()
@@ -164,6 +169,7 @@ async fn workflow_completion_unclaimed_pure_and_legacy_refuse() {
     };
     assert!(
         f.persistence()
+            .settled()
             .complete_io(result(fence))
             .await
             .unwrap()

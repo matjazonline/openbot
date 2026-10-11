@@ -83,6 +83,7 @@ async fn setup_action_on_fixture(
 ) -> (AdmissionFixture, ActionDispatchRequest) {
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -424,7 +425,10 @@ async fn workflow_action_dispatch_sql_commit_expiry_and_append_only_facts() {
         action,
         current_policy: policy,
         approval_required: protected,
-    } = writer.authorize_on(&mut tx, &request).await.unwrap();
+    } = writer
+        .authorize_on(&mut tx, &request, request.lease.attempt_bound())
+        .await
+        .unwrap();
     assert!(!protected);
     let marker = Uuid::new_v4();
     PostgresActionDispatch::<Authority, Effect>::insert(&mut tx, &request, marker, "local", policy)
@@ -470,6 +474,9 @@ mod replay_tests;
 
 #[path = "action_receipt_tests.rs"]
 mod action_receipt_tests;
+
+#[path = "action_dispatch_resolution_tests.rs"]
+mod resolution_tests;
 
 #[path = "action_evidence_binding_tests.rs"]
 mod action_evidence_binding_tests;

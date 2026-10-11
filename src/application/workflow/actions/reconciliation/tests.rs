@@ -73,7 +73,9 @@ fn attestation(
         authoritative_reference: EvidenceRecordReference::parse("record/1").unwrap(),
         observed_at: snapshot.database_now,
         valid_until: snapshot.database_now + chrono::Duration::hours(1),
-        diagnostic: json!({}),
+        diagnostic: AttestationDiagnostic::new(
+            EvidenceProviderId::parse("fixture.ledger").unwrap(),
+        ),
     }
 }
 
@@ -218,7 +220,7 @@ fn workflow_action_reconciliation_coverage_binds_marker_and_all_request_provenan
 #[test]
 fn workflow_action_reconciliation_verifier_binding_and_times_fail_closed() {
     let (command, snapshot, registration) = fixture();
-    for variant in 0..9 {
+    for variant in 0..8 {
         let mut registered = registration.clone();
         let mut attested = attestation(&snapshot, VerifiedDisposition::FinalNotApplied);
         let mut verified_at = snapshot.database_now;
@@ -252,8 +254,7 @@ fn workflow_action_reconciliation_verifier_binding_and_times_fail_closed() {
                 attested.valid_until =
                     verified_at + chrono::Duration::hours(24) + chrono::Duration::seconds(1)
             }
-            7 => verified_at += chrono::Duration::seconds(6),
-            _ => attested.diagnostic = json!({"oversized":"x".repeat(MAX_EVIDENCE_ENVELOPE_BYTES)}),
+            _ => verified_at += chrono::Duration::seconds(6),
         }
         assert!(
             VerifiedEvidence::issue(&command, &snapshot, &registered, attested, verified_at)

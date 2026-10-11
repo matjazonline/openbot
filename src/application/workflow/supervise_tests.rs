@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::{
     pin::Pin,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
@@ -26,6 +26,10 @@ enum Renewal {
 }
 struct Port {
     renewal: Renewal,
+    /// How long a successful renewal takes, and the run deadline that caps its window.
+    delay: Duration,
+    run_deadline: Option<Instant>,
+    renewals: Mutex<Vec<Instant>>,
     calls: AtomicUsize,
     dropped: Arc<AtomicBool>,
     valid: bool,
@@ -45,12 +49,20 @@ impl WorkflowLeases for Port {
         _: WorkflowFence,
         policy: LeasePolicy,
     ) -> AppResult<Option<LeaseWindow>> {
+        let started = Instant::now();
+        self.renewals.lock().unwrap().push(started);
         self.calls.fetch_add(1, Ordering::SeqCst);
         match self.renewal {
-            Renewal::Success => Ok(Some(LeaseWindow {
-                expires: Instant::now() + policy.duration(),
-                run_deadline: Instant::now() + Duration::from_secs(30),
-            })),
+            Renewal::Success => {
+                tokio::time::sleep(self.delay).await;
+                let run_deadline = self
+                    .run_deadline
+                    .unwrap_or(started + Duration::from_secs(30));
+                Ok(Some(LeaseWindow {
+                    expires: (started + policy.duration()).min(run_deadline),
+                    run_deadline,
+                }))
+            }
             Renewal::Refuse => Ok(None),
             Renewal::Error => Err(AppError::Database("injected".into())),
             Renewal::Hang => std::future::pending().await,
@@ -121,6 +133,9 @@ fn fixture(renewal: Renewal, duration: u64) -> (Port, ClaimedWorkflow, Handler) 
     (
         Port {
             renewal,
+            delay: Duration::ZERO,
+            run_deadline: None,
+            renewals: Mutex::new(Vec::new()),
             calls: AtomicUsize::new(0),
             dropped: dropped.clone(),
             valid: true,
@@ -226,4 +241,103 @@ async fn workflow_io_supervision_ready_result_loses_to_cancel_expiry_and_run_dea
         .await;
         assert!(matches!(result, SupervisedResult::Stopped(_)));
     }
+}
+
+fn lease(seconds: u64) -> LeasePolicy {
+    LeasePolicy::new(Duration::from_secs(seconds)).unwrap()
+}
+
+/// (k) A renewal that settles just inside its persistence deadline keeps the lease.
+#[tokio::test(start_paused = true)]
+async fn workflow_io_supervision_renewal_settling_inside_its_deadline_continues() {
+    let policy = lease(3);
+    let (mut port, claim, handler) = fixture(Renewal::Success, 5);
+    port.delay = policy.persistence_deadline() - Duration::from_millis(1);
+    let fence = claim.fence;
+    let result = supervise_io(
+        &port,
+        claim,
+        policy,
+        Instant::now() + Duration::from_secs(20),
+        handler,
+        std::future::pending(),
+    )
+    .await;
+    assert!(matches!(result, SupervisedResult::Ready(result) if result.fence == fence));
+    assert!(port.calls.load(Ordering::SeqCst) >= 3);
+}
+
+/// (n) Windows are anchored at the operation's start: a claim that returns a full
+/// deadline late renews at once, a renewal inside the remaining window keeps the lease,
+/// and one slower than it ends as LeaseLost, never as a late Ready. T = d/2 for 3–6 s.
+#[tokio::test(start_paused = true)]
+async fn workflow_io_supervision_renews_at_once_after_a_full_deadline_claim() {
+    for seconds in [3, 6] {
+        let policy = lease(seconds);
+        let deadline = policy.persistence_deadline();
+        assert_eq!(deadline, policy.duration() / 2);
+        for (delay, landed) in [(policy.attempt_bound(), true), (deadline, false)] {
+            let (mut port, mut claim, handler) = fixture(Renewal::Success, 1);
+            port.delay = delay;
+            let entered = Instant::now();
+            claim.window.expires = entered + (policy.duration() - deadline);
+            let result = supervise_io(
+                &port,
+                claim,
+                policy,
+                entered + Duration::from_secs(20),
+                handler,
+                std::future::pending(),
+            )
+            .await;
+            assert_eq!(
+                port.renewals.lock().unwrap().first(),
+                Some(&entered),
+                "{seconds}s"
+            );
+            if landed {
+                assert!(
+                    matches!(result, SupervisedResult::Ready(_)),
+                    "{seconds}s {result:?}"
+                );
+            } else {
+                assert!(
+                    matches!(result, SupervisedResult::Stopped(StopReason::LeaseLost)),
+                    "{seconds}s {result:?}"
+                );
+            }
+        }
+    }
+}
+
+/// (p) A window capped at the run deadline cannot be extended: renew at most once in
+/// the final stretch instead of looping on the global capacity lock.
+#[tokio::test(start_paused = true)]
+async fn workflow_io_supervision_stops_renewing_a_deadline_capped_window() {
+    let policy = lease(3);
+    let (mut port, mut claim, handler) = fixture(Renewal::Success, 10);
+    let start = Instant::now();
+    let run_deadline = start + Duration::from_secs(4);
+    port.run_deadline = Some(run_deadline);
+    claim.window.run_deadline = run_deadline;
+    let result = supervise_io(
+        &port,
+        claim,
+        policy,
+        start + Duration::from_secs(20),
+        handler,
+        std::future::pending(),
+    )
+    .await;
+    assert!(
+        matches!(result, SupervisedResult::Stopped(StopReason::Deadline)),
+        "{result:?}"
+    );
+    let renewals = port.renewals.lock().unwrap();
+    let final_stretch = run_deadline - policy.persistence_deadline();
+    assert!(
+        renewals.iter().filter(|at| **at >= final_stretch).count() <= 1,
+        "{renewals:?}"
+    );
+    assert_eq!(renewals.len(), 1, "{renewals:?}");
 }

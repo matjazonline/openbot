@@ -33,6 +33,7 @@ async fn failed(
 ) -> ClaimedWorkflow {
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -48,6 +49,7 @@ async fn failed(
     });
     assert!(
         f.persistence()
+            .settled()
             .release_io(claim.fence, policy(), cause)
             .await
             .unwrap()
@@ -64,6 +66,7 @@ async fn workflow_control_competing_cancel_replay_closes_exact_expired_attempt()
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -87,6 +90,7 @@ async fn workflow_control_competing_cancel_replay_closes_exact_expired_attempt()
     assert_eq!(snapshot(&f).await, state);
     assert!(
         !f.persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -143,6 +147,7 @@ async fn workflow_control_competing_retry_preserves_identity_facts_and_remaining
     }
     let next = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -207,12 +212,18 @@ async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_an
         if kind == 3 {
             let claim = f
                 .persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()
                 .unwrap();
             f.persistence()
+                .settled()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3),
+                    )
+                    .unwrap(),
                     fence: claim.fence,
                     output: json!({"items":[],"token_count":0}),
                 })
@@ -257,6 +268,7 @@ async fn workflow_control_revision_covers_claim_and_stale_caller_cannot_cancel()
     let stale = command(&f, scope, "stale").await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -269,6 +281,7 @@ async fn workflow_control_revision_covers_claim_and_stale_caller_cannot_cancel()
     ));
     assert!(
         f.persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()
@@ -292,6 +305,7 @@ async fn workflow_control_cancel_completion_competitors_preserve_winning_result(
         let (f, scope) = fixture().await;
         let claim = f
             .persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()
@@ -306,6 +320,10 @@ async fn workflow_control_cancel_completion_competitors_preserve_winning_result(
             barrier.wait().await;
             f.persistence()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3),
+                    )
+                    .unwrap(),
                     fence: claim.fence,
                     output: json!({"items":[],"token_count":0}),
                 })
@@ -344,6 +362,7 @@ async fn workflow_control_cancel_actual_handler_future_is_dropped_by_heartbeat()
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

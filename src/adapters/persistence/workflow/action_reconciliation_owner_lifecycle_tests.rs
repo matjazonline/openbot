@@ -176,11 +176,11 @@ async fn workflow_action_reconciliation_owner_lifecycle_scheduled_and_refused() 
         // Box extended fixture/verification seams to retain stock 2 MiB test stacks.
         let (f, request) = Box::pin(limited()).await;
         let verifier = ledger(&f, &request).await;
-        assert!(
-            invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-                .await
-                .is_err()
-        );
+        let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+        assert!(invoke(&f, &request, &setup_provider).await.is_err());
+        // Setup premise: the provider was called and its outcome is uncertain. A reservation
+        // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+        assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
         park(&f, &request).await;
         barrier(&f, &request).await;
         let c = proof_command(&f, &request, &verifier, "owner-delete-schedule").await;
@@ -195,6 +195,7 @@ async fn workflow_action_reconciliation_owner_lifecycle_scheduled_and_refused() 
             let descendant = child(&f, request.fence.scope).await;
             let claim = f
                 .persistence()
+                .settled()
                 .claim_io(descendant, worker(), policy())
                 .await
                 .unwrap()
@@ -202,6 +203,7 @@ async fn workflow_action_reconciliation_owner_lifecycle_scheduled_and_refused() 
             debit(&f, claim.fence).await;
             assert!(
                 f.persistence()
+                    .settled()
                     .claim_io(request.fence.scope, worker(), policy())
                     .await
                     .unwrap()

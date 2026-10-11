@@ -8,6 +8,7 @@ async fn workflow_budget_runtime_unknown_effect_exhaustion_reconciles() {
     let (f, scope) = fixture_source(source).await;
     let fence = claim(&f, scope).await;
     f.persistence()
+        .settled()
         .reserve_budget(
             request(fence, BudgetResource::ModelCall, "ambiguous", 1),
             policy(),
@@ -16,6 +17,7 @@ async fn workflow_budget_runtime_unknown_effect_exhaustion_reconciles() {
         .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::ModelCall, "over", 1),
                 policy()
@@ -47,6 +49,7 @@ async fn workflow_budget_runtime_usage_wait_crossing_lease_or_deadline_rolls_bac
             let fence = claim(&f, scope).await;
             if consumed {
                 f.persistence()
+                    .settled()
                     .reserve_budget(
                         request(fence, BudgetResource::ModelCall, "used", 2),
                         policy(),
@@ -92,6 +95,7 @@ async fn workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_re
         let fence = claim(&f, scope).await;
         if consumed {
             f.persistence()
+                .settled()
                 .reserve_budget(
                     request(fence, BudgetResource::ModelCall, "used", 2),
                     policy(),
@@ -143,7 +147,12 @@ async fn workflow_budget_runtime_reservation_competes_with_cancel_and_completion
             } else {
                 assert!(
                     f.persistence()
+                        .settled()
                         .complete_io(FencedWorkflowResult {
+                            policy: crate::application::workflow::lease::LeasePolicy::new(
+                                std::time::Duration::from_secs(3)
+                            )
+                            .unwrap(),
                             fence,
                             output: json!({"items":[],"token_count":0})
                         })
@@ -166,6 +175,7 @@ async fn workflow_budget_runtime_reservation_competes_with_cancel_and_completion
         );
         assert_eq!(
             f.persistence()
+                .settled()
                 .reserve_budget(
                     request(fence, BudgetResource::ModelCall, "after", 1),
                     policy()
@@ -216,6 +226,7 @@ async fn workflow_budget_runtime_descendants_share_without_locking_root_or_paren
     let parent_fence = claim(&f, parent).await;
     let fence = claim(&f, descendant).await;
     f.persistence()
+        .settled()
         .reserve_budget(
             request(parent_fence, BudgetResource::ModelCall, "parent", 1),
             policy(),
@@ -237,6 +248,7 @@ async fn workflow_budget_runtime_descendants_share_without_locking_root_or_paren
         .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::ModelCall, "child", 1),
                 policy()
@@ -247,6 +259,7 @@ async fn workflow_budget_runtime_descendants_share_without_locking_root_or_paren
     );
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::Repetition, "child", 2),
                 policy()
@@ -257,6 +270,7 @@ async fn workflow_budget_runtime_descendants_share_without_locking_root_or_paren
     );
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(
                 request(fence, BudgetResource::ModelCall, "over", 1),
                 policy()

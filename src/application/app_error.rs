@@ -12,7 +12,8 @@ pub enum AppError {
     /// the same work can succeed once the contention clears. Kept apart from [`Self::Timeout`],
     /// which is an execution deadline the task worker treats as final, so a busy database never
     /// ends a task for good. A caller that bounded its own transaction turns this into a
-    /// `Timeout` that says what did not happen.
+    /// `Timeout` that says what did not happen. A workflow persistence bound that elapses
+    /// before COMMIT was sent is this class too: definitely not applied, safe to retry.
     #[error("Database timed out: {0}")]
     DatabaseTimeout(String),
 

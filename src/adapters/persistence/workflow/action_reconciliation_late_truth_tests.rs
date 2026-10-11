@@ -5,6 +5,9 @@ use crate::application::workflow::{CancelCommand, CancelResult};
 #[path = "action_reconciliation_live_boundary_tests.rs"]
 mod live_boundary_tests;
 
+#[path = "action_reconciliation_conflict_immutable_tests.rs"]
+mod conflict_immutable_tests;
+
 struct HeldTruth {
     fixture: AdmissionFixture,
     request: ActionDispatchRequest,
@@ -225,26 +228,38 @@ fn same_job(before: &Value, after: &Value) {
 
 async fn inert(h: &HeldTruth, saved: &Value) {
     assert!(!retry_safe(&h.fixture, &h.request).await);
-    let (a, b) = tokio::join!(
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy())
-    );
+    let [a, b] = h
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(a.unwrap().is_none() && b.unwrap().is_none());
     let provider = LedgerProvider::new(&h.fixture, Delivery::Pending);
     let outcome = Box::pin(invoke(&h.fixture, &h.request, &provider)).await;
-    assert!(matches!(
-        outcome,
-        Err(_) | Ok(RemoteDispatchObservation::Interrupted)
-    ));
+    match &outcome {
+        Err(refused) => assert!(
+            matches!(refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+            "expected refusal: {refused:?}"
+        ),
+        Ok(observation) => assert!(
+            matches!(observation, RemoteDispatchObservation::Interrupted),
+            "inert dispatch: refused or interrupted before the provider"
+        ),
+    }
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: h.request.fence,
                 output: h.result.clone(),
             })

@@ -200,7 +200,12 @@ async fn workflow_action_reconciliation_upgrade_populated_preserves_completed_hi
     assert_eq!(restart.calls.load(Ordering::SeqCst), 0);
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: request.fence,
                 output: receipt.result,
             })

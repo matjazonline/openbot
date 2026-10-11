@@ -15,11 +15,11 @@ struct PreparedSchedule {
 
 async fn prepare_schedule(f: AdmissionFixture, request: ActionDispatchRequest) -> PreparedSchedule {
     let verifier = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let command = proof_command(&f, &request, &verifier, "episode-checkpoint").await;
@@ -40,13 +40,19 @@ async fn successor_schedule() -> (PreparedSchedule, ActivationRequest) {
     let (f, first) = fixture_source(source).await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(first, worker(), policy())
         .await
         .unwrap()
         .unwrap();
     let completed = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claim.fence,
             output: json!({"items":[],"token_count":0}),
         })
@@ -79,6 +85,7 @@ async fn second_attempt_schedule() -> PreparedSchedule {
     });
     assert!(
         f.persistence()
+            .settled()
             .release_io(request.fence, policy(), cause)
             .await
             .unwrap()
@@ -106,6 +113,7 @@ async fn second_attempt_schedule() -> PreparedSchedule {
     ));
     let next = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -329,6 +337,7 @@ async fn workflow_action_reconciliation_claim_sql_historical_genuine_retirement_
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, worker(), policy())
             .await
             .unwrap()

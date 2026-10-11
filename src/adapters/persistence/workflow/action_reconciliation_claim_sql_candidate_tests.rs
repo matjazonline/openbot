@@ -38,6 +38,7 @@ async fn second_action(
 ) -> ActionDispatchRequest {
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -80,9 +81,33 @@ async fn second_action(
     request
 }
 
-async fn retire(f: &AdmissionFixture, request: &ActionDispatchRequest) {
+/// Retires the step through a pending provider. `false` when the dispatch was a fail-closed
+/// reserve_remote Unknown whose backstop held: the attempt is then void.
+async fn retire(f: &AdmissionFixture, request: &ActionDispatchRequest, attempt: usize) -> bool {
+    // Heartbeat as the worker would: the premise is the provider's own Timeout, not a lease
+    // that lapsed before the dispatch. No snapshot pair straddles this point.
+    renew_fixture_lease(f, request.fence).await;
     let provider = LedgerProvider::new(f, Delivery::Pending);
+    let rows = invocation_rows(f, request).await;
     let observed = invoke(f, request, &provider).await;
+    if let Err(error) = &observed
+        && reserve_unknown(error)
+    {
+        let committed = assert_reserve_unknown_backstop(
+            f,
+            request,
+            None,
+            rows,
+            (0, provider.calls.load(Ordering::SeqCst)),
+        )
+        .await;
+        void_attempt(
+            "multiple_applicable_candidates",
+            attempt,
+            &format!("reserve_remote=unknown entry_committed={committed}"),
+        );
+        return false;
+    }
     assert!(
         matches!(&observed, Err(AppError::Timeout(_))),
         "fixture provider must report uncertainty for {:?}; error={:?}, calls={}",
@@ -93,6 +118,7 @@ async fn retire(f: &AdmissionFixture, request: &ActionDispatchRequest) {
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     park(f, request).await;
     barrier(f, request).await;
+    true
 }
 
 async fn schedule_candidate(
@@ -239,15 +265,33 @@ async fn attack(
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_sql_multiple_applicable_candidates() {
+    // A fail-closed reserve_remote Unknown while retiring voids the attempt (its backstop is
+    // asserted); the scenario is rebuilt on fresh state, at most three times.
+    for attempt in 1..=3 {
+        if Box::pin(multiple_applicable_candidates(attempt)).await {
+            Box::pin(normal_control()).await;
+            return;
+        }
+    }
+    panic!("multiple_applicable_candidates: every attempt was void");
+}
+
+async fn multiple_applicable_candidates(attempt: usize) -> bool {
     // Box extended real owner/provider seams to retain stock 2 MiB test stacks.
     let (f, first) = Box::pin(limited()).await;
     let verifier = ledger(&f, &first).await;
     let catalog = capture_catalog(&f).await;
-    Box::pin(retire(&f, &first)).await;
+    if !Box::pin(retire(&f, &first, attempt)).await {
+        f.persistence().pool().close().await;
+        return false;
+    }
     let second_scope = prepare_second(&f, &first).await;
     let second = Box::pin(second_action(&f, &first, second_scope)).await;
     let second_verifier = verifier_for(&f, &second).await;
-    Box::pin(retire(&f, &second)).await;
+    if !Box::pin(retire(&f, &second, attempt)).await {
+        f.persistence().pool().close().await;
+        return false;
+    }
     assert_distinct_histories(&f, &first, &second).await;
     let first_command = Box::pin(schedule_candidate(&f, &first, &verifier, "candidate-1")).await;
     assert_eq!(job_status(&f, second_scope).await, "failed");
@@ -267,5 +311,5 @@ async fn workflow_action_reconciliation_claim_sql_multiple_applicable_candidates
     drop(verifier);
     drop(second_verifier);
     drop(f);
-    Box::pin(normal_control()).await;
+    true
 }

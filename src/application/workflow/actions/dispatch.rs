@@ -173,7 +173,7 @@ pub(crate) async fn supervise_remote(
                 let valid = tokio::select! { biased;
                     _ = cancel.cancelled() => break Ok(None),
                     _ = sleep_until(deadline) => break Ok(None),
-                    result = timeout(request.lease.persistence_timeout(), writer.owns_remote(request)) => result,
+                    result = timeout(request.lease.supervision_guard(), writer.owns_remote(request)) => result,
                 };
                 match valid {
                     Ok(Ok(true)) => heartbeat = Instant::now() + request.lease.heartbeat(),

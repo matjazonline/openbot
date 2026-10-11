@@ -98,6 +98,32 @@ async fn seeded(unusable: UnusableResult) -> MixedTruth {
     }
 }
 
+/// What a real worker does while it owns the step: renew the one scenario lease through the
+/// production renew path, here at points that no before/after snapshot pair straddles. A
+/// renewal moves only lock_expires_at, which the run-revision trigger ignores, so no saved
+/// command's expected revision changes. A definite NotApplied leaves the old window, which
+/// must then still be live by the DB clock.
+async fn heartbeat(h: &MixedTruth) {
+    let fence = h.requests[0].fence;
+    match h.fixture.persistence().renew_io(fence, policy()).await {
+        Ok(window) => assert!(
+            window.is_some(),
+            "the scenario lease lapsed between heartbeats"
+        ),
+        Err(AppError::DatabaseTimeout(_)) => {
+            let live: bool = sqlx::query_scalar(
+                "SELECT lock_expires_at > clock_timestamp() FROM background_tasks WHERE id=$1",
+            )
+            .bind(fence.scope.job.0)
+            .fetch_one(h.fixture.persistence().pool())
+            .await
+            .unwrap();
+            assert!(live, "the scenario lease lapsed between heartbeats");
+        }
+        Err(error) => panic!("heartbeat: {error:?}"),
+    }
+}
+
 async fn evidence_command(h: &MixedTruth, index: usize, key: &str) -> ReconcileActionCommand {
     let request = &h.requests[index];
     let mut command = command(
@@ -115,6 +141,7 @@ async fn evidence_command(h: &MixedTruth, index: usize, key: &str) -> ReconcileA
 }
 
 async fn record_live(h: &MixedTruth) -> ReconcileActionCommand {
+    heartbeat(h).await;
     let first = evidence_command(h, 0, "mixed-genuine-first").await;
     let before = all_tables(&h.fixture).await;
     let recorded = Box::pin(run_command(&h.fixture, &first, h.ledger.clone()))
@@ -131,6 +158,7 @@ async fn record_live(h: &MixedTruth) -> ReconcileActionCommand {
         &recorded,
         EvidenceChange::Receipt,
     );
+    heartbeat(h).await;
     let second = evidence_command(h, 1, "mixed-unusable-result").await;
     let before = all_tables(&h.fixture).await;
     let recorded = Box::pin(run_command(
@@ -160,6 +188,7 @@ async fn record_live(h: &MixedTruth) -> ReconcileActionCommand {
     assert_eq!(rows(&after, "workflow_action_receipts").len(), 1);
     assert_eq!(rows(&after, "workflow_action_evidence_conflicts").len(), 0);
     assert_eq!(effects(&h.fixture).await, 2);
+    heartbeat(h).await;
     Box::pin(live_recovery(h, false)).await;
     second
 }
@@ -214,6 +243,7 @@ async fn live_recovery(h: &MixedTruth, expected: bool) {
 }
 
 async fn blocked(h: &MixedTruth) {
+    heartbeat(h).await;
     let live = all_tables(&h.fixture).await;
     park(&h.fixture, &h.requests[0]).await;
     let parked = all_tables(&h.fixture).await;
@@ -230,14 +260,15 @@ async fn blocked(h: &MixedTruth) {
     );
     let before = all_tables(&h.fixture).await;
     evidence_boundary(&parked, &before, &command, &recorded, EvidenceChange::Audit);
-    let (left, right) = tokio::join!(
-        h.fixture
-            .persistence()
-            .claim_io(h.requests[0].fence.scope, worker(), policy()),
-        h.fixture
-            .persistence()
-            .claim_io(h.requests[0].fence.scope, worker(), policy())
-    );
+    let [left, right] = h
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.requests[0].fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(left.unwrap().is_none() && right.unwrap().is_none());
     let service = ActionService::new(mixed_writer(&h.fixture));
     assert!(!matches!(
@@ -249,7 +280,12 @@ async fn blocked(h: &MixedTruth) {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: h.requests[0].fence,
                 output: good(),
             })
@@ -394,7 +430,12 @@ async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence)
     let committed = h
         .fixture
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence,
             output: good(),
         })
@@ -413,7 +454,12 @@ async fn completed_replay(h: &MixedTruth, done: &Value, fence: WorkflowFence) {
     let replay = h
         .fixture
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence,
             output: good(),
         })
@@ -433,6 +479,7 @@ async fn completed_replay(h: &MixedTruth, done: &Value, fence: WorkflowFence) {
     assert!(
         h.fixture
             .persistence()
+            .settled()
             .claim_io(fence.scope, worker(), policy())
             .await
             .unwrap()

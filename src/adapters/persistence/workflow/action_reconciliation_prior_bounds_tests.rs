@@ -290,13 +290,21 @@ async fn refuse_129(
     let before_recovery = all_tables(f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
             .is_none()
     );
     let provider = LedgerProvider::new(f, Delivery::Pending);
-    assert!(invoke(f, request, &provider).await.is_err());
+    let refused = invoke(f, request, &provider)
+        .await
+        .err()
+        .expect("a refusal, not a dispatch");
+    assert!(
+        matches!(&refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+        "expected refusal: {refused:?}"
+    );
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     assert_eq!(effects(f).await, 0);
     assert_eq!(

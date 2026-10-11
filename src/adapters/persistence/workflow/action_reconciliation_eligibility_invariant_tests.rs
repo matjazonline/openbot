@@ -1,8 +1,7 @@
 //! Coupled schema shapes and public refusal without invented action/attempt history.
 use super::*;
 use crate::application::workflow::{
-    activation::WorkflowActivation, completion::WorkflowCompletion, lease::FencedWorkflowResult,
-    polling::PollWork,
+    activation::WorkflowActivation, lease::FencedWorkflowResult, polling::PollWork,
 };
 use tokio::sync::Barrier;
 
@@ -90,7 +89,12 @@ async fn completion_control() {
     };
     let result = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: request.fence,
             output: receipt.result,
         })
@@ -296,14 +300,19 @@ async fn exhausted_retirement(f: &AdmissionFixture, scope: ActivationRequest) {
     assert_eq!(page.candidates.len(), 1);
     assert_eq!(page.candidates[0].work, PollWork::ExhaustedPending);
     let barrier = Barrier::new(2);
-    let retire = || async {
-        barrier.wait().await;
-        f.persistence()
-            .retire_exhausted_work(scope, policy())
-            .await
-            .unwrap()
-    };
-    let (a, b) = tokio::join!(retire(), retire());
+    let barrier = &barrier;
+    let [a, b] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| async move {
+                barrier.wait().await;
+                p.retire_exhausted_work(scope, policy()).await
+            },
+            |retired: &bool| *retired,
+        )
+        .await;
+    let (a, b) = (a.unwrap(), b.unwrap());
     assert_ne!(a, b, "exactly one normal owner retires the pending job");
     let after = all_tables(f).await;
     no_action_history(&after);
@@ -340,6 +349,7 @@ async fn exhausted_retirement(f: &AdmissionFixture, scope: ActivationRequest) {
     }
     assert!(
         !f.persistence()
+            .settled()
             .retire_exhausted_work(scope, policy())
             .await
             .unwrap()
@@ -354,6 +364,7 @@ async fn exhausted_retirement(f: &AdmissionFixture, scope: ActivationRequest) {
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()

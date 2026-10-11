@@ -99,6 +99,33 @@ fn dedup<'a>(
         result: json!({"written":true}),
     }
 }
+/// reserve_remote fails closed only on an ambiguous COMMIT. A definite NotApplied
+/// (`DatabaseTimeout`) reported before the provider was called wrote nothing, so the caller
+/// retries it as the worker does; every other outcome is returned as is.
+async fn dispatch_settled(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    provider: &DeduplicatingProvider<'_>,
+) -> AppResult<RemoteDispatchObservation> {
+    let started = std::time::Instant::now();
+    loop {
+        let calls = provider.calls.load(Ordering::SeqCst);
+        match ActionService::new(adapter(f, 0))
+            .dispatch_remote(request, provider, &CancellationToken::new())
+            .await
+        {
+            Err(AppError::DatabaseTimeout(error))
+                if provider.calls.load(Ordering::SeqCst) == calls =>
+            {
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "dispatch never settled before the provider: {error}"
+                );
+            }
+            result => return result,
+        }
+    }
+}
 async fn effect_count(f: &AdmissionFixture) -> i64 {
     sqlx::query_scalar("SELECT count(*) FROM fixture_remote_effects")
         .fetch_one(f.persistence().pool())
@@ -116,18 +143,21 @@ async fn reclaim(f: &AdmissionFixture, request: &mut ActionDispatchRequest) {
     expire(f, request.fence.scope).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
             .is_none()
     );
     due(f, request.fence.scope).await;
-    let (a, b) = tokio::join!(
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy()),
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy())
-    );
+    let [a, b] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     let claims = [a.unwrap(), b.unwrap()];
     assert_eq!(claims.iter().filter(|x| x.is_some()).count(), 1);
     request.fence = claims.into_iter().flatten().next().unwrap().fence;
@@ -198,10 +228,7 @@ async fn workflow_action_receipt_lost_actual_effect_supported_reclaim_and_compet
 async fn workflow_action_receipt_restart_model_link_no_registration_and_current_access() {
     let (f, request, contract) = receipt_fixture(ActionRecovery::ProviderIdempotency, false).await;
     let provider = dedup(&f, contract, false);
-    let receipt = ActionService::new(adapter(&f, 0))
-        .dispatch_remote(&request, &provider, &CancellationToken::new())
-        .await
-        .unwrap();
+    let receipt = dispatch_settled(&f, &request, &provider).await.unwrap();
     let RemoteDispatchObservation::Committed(receipt) = receipt else {
         panic!("receipt before output")
     };
@@ -224,10 +251,10 @@ async fn workflow_action_receipt_restart_model_link_no_registration_and_current_
     assert!(restart.replayed);
     assert_eq!(intent.approval_subject(), request.subject);
     let no_registration = dedup(&f, None, false);
-    let RemoteDispatchObservation::Committed(replayed) = ActionService::new(adapter(&f, 0))
-        .dispatch_remote(&request, &no_registration, &CancellationToken::new())
-        .await
-        .unwrap()
+    let RemoteDispatchObservation::Committed(replayed) =
+        dispatch_settled(&f, &request, &no_registration)
+            .await
+            .unwrap()
     else {
         panic!("durable receipt replay")
     };
@@ -307,11 +334,90 @@ async fn workflow_action_receipt_deferred_rollback_returns_no_success() {
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
 }
 
+/// Whether the exact run is lockable right now, observed from another OS thread while this
+/// runtime's only thread waits for the answer. No task of this runtime can run in between,
+/// including sqlx's return-to-pool flush of a dropped transaction's queued ROLLBACK, so only
+/// a ROLLBACK the operation awaited before returning can have released the run.
+fn run_lockable_now(f: &AdmissionFixture, request: &ActionDispatchRequest) -> bool {
+    use sqlx::Connection as _;
+    let options = (*f.persistence().pool().connect_options()).clone();
+    let company = request.scope().company.as_uuid().to_owned();
+    let run = request.scope().run.as_uuid().to_owned();
+    std::thread::spawn(move || {
+        let observe = async {
+            let mut observer = sqlx::PgConnection::connect_with(&options).await.unwrap();
+            let mut tx = observer.begin().await.unwrap();
+            // SKIP LOCKED never waits on the row; a relation-level wait fails on the server.
+            sqlx::query("SELECT set_config('lock_timeout','100ms',true)")
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+            let (visible, lockable): (Uuid, Option<Uuid>) = sqlx::query_as(
+                "SELECT visible.id, (SELECT locked.id FROM workflow_runs AS locked \
+                 WHERE locked.company_id=visible.company_id AND locked.id=visible.id \
+                 FOR UPDATE OF locked SKIP LOCKED) \
+                 FROM workflow_runs AS visible WHERE visible.company_id=$1 AND visible.id=$2",
+            )
+            .bind(company)
+            .bind(run)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            tx.rollback().await.unwrap();
+            observer.close().await.unwrap();
+            assert_eq!(visible, run);
+            lockable == Some(run)
+        };
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                tokio::time::timeout(Duration::from_secs(10), observe)
+                    .await
+                    .expect("exact run observation hung past its 10 s guard")
+            })
+    })
+    .join()
+    .unwrap()
+}
+
+/// A refused return (the fence still names us but its window lapsed, so lock_fence took
+/// the run, execution and job locks) ends in ROLLBACK before finish_remote returns.
+#[tokio::test]
+async fn workflow_action_receipt_refused_return_releases_run_before_returning() {
+    let (f, request, contract) = receipt_fixture(ActionRecovery::Reconcile, false).await;
+    let provider = dedup(&f, contract, false);
+    let writer = adapter(&f, 0);
+    let RemoteReservationResult::Reserved(reservation) =
+        writer.reserve_remote(&request, None).await.unwrap()
+    else {
+        panic!("reserved")
+    };
+    let entry = writer.enter_remote(*reservation).await.unwrap();
+    let output = provider
+        .invoke(&entry.action, &entry.provider)
+        .await
+        .unwrap();
+    expire(&f, request.fence.scope).await;
+    assert!(matches!(
+        writer.finish_remote(entry, output).await.unwrap(),
+        RemoteDispatchObservation::Interrupted
+    ));
+    assert!(
+        run_lockable_now(&f, &request),
+        "a refused return left the exact run locked after finish_remote returned"
+    );
+}
+
 #[path = "action_history_tests.rs"]
 mod history_tests;
 
 #[path = "action_receipt_acceptance_tests.rs"]
 mod acceptance_tests;
+
+#[path = "action_receipt_resolution_tests.rs"]
+mod resolution_tests;
 
 #[path = "action_uncertainty_tests.rs"]
 mod uncertainty_tests;

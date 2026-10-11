@@ -1,6 +1,6 @@
 //! Actual reservation/claim competitors queued in both shared-usage lock orders.
+use super::super::super::control_serialization_tests::contention::try_wait_for_lock;
 use super::*;
-use std::{future::Future, pin::Pin};
 
 #[derive(Clone, Copy, Debug)]
 enum UsageOrder {
@@ -22,6 +22,9 @@ async fn scheduled() -> ScheduledRace {
     let verifier = ledger(&f, &request).await;
     let provider = LedgerProvider::new(&f, Delivery::Pending);
     assert!(invoke(&f, &request, &provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let command = proof_command(&f, &request, &verifier, "claim-budget-race").await;
@@ -34,6 +37,7 @@ async fn scheduled() -> ScheduledRace {
     let scope = child(&f, request.fence.scope).await;
     let descendant = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -47,53 +51,17 @@ async fn scheduled() -> ScheduledRace {
     }
 }
 
-async fn wait_for_lock<T: std::fmt::Debug>(
-    observer: &mut sqlx::PgConnection,
-    blocker: i32,
-    statement: &str,
-    mut contender: Pin<&mut impl Future<Output = T>>,
-) -> i32 {
-    let observed = async {
-        loop {
-            sqlx::query("SELECT pg_stat_clear_snapshot()")
-                .execute(&mut *observer)
-                .await
-                .unwrap();
-            let pid = sqlx::query_scalar::<_, i32>(
-                "SELECT activity.pid FROM pg_stat_activity AS activity WHERE activity.datname=current_database() AND activity.pid<>pg_backend_pid() AND activity.state='active' AND activity.wait_event_type='Lock' AND position($1 IN activity.query)>0 AND $2=ANY(pg_blocking_pids(activity.pid))",
-            )
-            .bind(statement)
-            .bind(blocker)
-            .fetch_optional(&mut *observer)
-            .await
-            .unwrap();
-            if let Some(pid) = pid {
-                return pid;
-            }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    };
-    // Drive the actual API until its statement is demonstrably blocked. The
-    // predicate has its own deadline; elapsed time alone never proves overlap.
-    let result = tokio::select! {
-        result = contender.as_mut() => Err(format!("contender completed before its expected lock wait: {result:?}")),
-        result = tokio::time::timeout(Duration::from_secs(1), observed) => result.map_err(|_| "contender did not reach its exact PostgreSQL lock wait".to_owned()),
-    };
-    match result {
-        Ok(pid) => pid,
-        Err(reason) => {
-            sqlx::query("SELECT pg_stat_clear_snapshot()")
-                .execute(&mut *observer)
-                .await
-                .unwrap();
-            let waits: Value = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(jsonb_build_object('pid',activity.pid,'query',activity.query,'wait',activity.wait_event_type,'blockers',pg_blocking_pids(activity.pid))),'[]'::jsonb) FROM pg_stat_activity AS activity WHERE activity.datname=current_database() AND activity.pid<>pg_backend_pid()")
-                .fetch_one(observer).await.unwrap();
-            panic!("{reason}; expected blocker {blocker}, statement {statement}; activity {waits}");
-        }
-    }
+/// One race on fresh state. A racer whose own attempt bound elapsed while it was queued
+/// (before or after the gate released) reports a definite NotApplied: the order under test
+/// is then unproven, so the attempt is void. The backstop is asserted first: the NotApplied
+/// racers wrote nothing and the claim stayed exclusive. Any other early completion fails as
+/// before.
+enum Contest {
+    Proven(Option<WorkflowFence>),
+    Void,
 }
 
-async fn compete(race: &ScheduledRace, order: UsageOrder) -> Option<WorkflowFence> {
+async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Contest {
     let f = &race.fixture;
     let before = all_tables(f).await;
     let mut gate = f.persistence().pool().begin().await.unwrap();
@@ -112,38 +80,156 @@ async fn compete(race: &ScheduledRace, order: UsageOrder) -> Option<WorkflowFenc
         BudgetCharge::new(BudgetResource::ModelCall, 2).unwrap(),
     )
     .unwrap();
+    let workers = [worker(), worker()];
     let debit = f.persistence().reserve_budget(reservation, policy());
     let first = f
         .persistence()
-        .claim_io(race.request.fence.scope, worker(), policy());
+        .claim_io(race.request.fence.scope, workers[0], policy());
     let second = f
         .persistence()
-        .claim_io(race.request.fence.scope, worker(), policy());
+        .claim_io(race.request.fence.scope, workers[1], policy());
     tokio::pin!(debit, first, second);
     let claim_statement = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
     let debit_statement = "INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)";
-    let first_pid = match order {
-        UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
-            let debit_pid =
-                wait_for_lock(&mut observer, gate_pid, debit_statement, debit.as_mut()).await;
-            wait_for_lock(&mut observer, debit_pid, claim_statement, first.as_mut()).await
+    let (mut early_debit, mut early_first, mut early_second) = (None, None, None);
+    let early: Option<&str> = 'observe: {
+        let first_pid = match order {
+            UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
+                let debit_pid = match try_wait_for_lock(
+                    &mut observer,
+                    gate_pid,
+                    debit_statement,
+                    debit.as_mut(),
+                )
+                .await
+                {
+                    Ok(pid) => pid,
+                    Err(output) => {
+                        early_debit = Some(output);
+                        break 'observe Some("debit");
+                    }
+                };
+                match try_wait_for_lock(&mut observer, debit_pid, claim_statement, first.as_mut())
+                    .await
+                {
+                    Ok(pid) => pid,
+                    Err(output) => {
+                        early_first = Some(output);
+                        break 'observe Some("first");
+                    }
+                }
+            }
+            UsageOrder::ClaimFirst => {
+                let pid = match try_wait_for_lock(
+                    &mut observer,
+                    gate_pid,
+                    claim_statement,
+                    first.as_mut(),
+                )
+                .await
+                {
+                    Ok(pid) => pid,
+                    Err(output) => {
+                        early_first = Some(output);
+                        break 'observe Some("first");
+                    }
+                };
+                if let Err(output) =
+                    try_wait_for_lock(&mut observer, pid, debit_statement, debit.as_mut()).await
+                {
+                    early_debit = Some(output);
+                    break 'observe Some("debit");
+                }
+                pid
+            }
+        };
+        if let Err(output) = try_wait_for_lock(
+            &mut observer,
+            first_pid,
+            "SELECT binding_id, max_context_bytes FROM workflow_runs",
+            second.as_mut(),
+        )
+        .await
+        {
+            early_second = Some(output);
+            break 'observe Some("second");
         }
-        UsageOrder::ClaimFirst => {
-            let pid = wait_for_lock(&mut observer, gate_pid, claim_statement, first.as_mut()).await;
-            wait_for_lock(&mut observer, pid, debit_statement, debit.as_mut()).await;
-            pid
-        }
+        None
     };
-    wait_for_lock(
-        &mut observer,
-        first_pid,
-        "SELECT binding_id, max_context_bytes FROM workflow_runs",
-        second.as_mut(),
-    )
-    .await;
     drop(observer);
     gate.rollback().await.unwrap();
-    let (debit, first, second) = tokio::join!(debit, first, second);
+    let (debit, first, second) = tokio::join!(
+        async {
+            match early_debit {
+                Some(output) => output,
+                None => debit.as_mut().await,
+            }
+        },
+        async {
+            match early_first {
+                Some(output) => output,
+                None => first.as_mut().await,
+            }
+        },
+        async {
+            match early_second {
+                Some(output) => output,
+                None => second.as_mut().await,
+            }
+        },
+    );
+    let not_applied = [
+        matches!(debit, Err(AppError::DatabaseTimeout(_))),
+        matches!(first, Err(AppError::DatabaseTimeout(_))),
+        matches!(second, Err(AppError::DatabaseTimeout(_))),
+    ];
+    if let Some(racer) = early {
+        let index = ["debit", "first", "second"]
+            .iter()
+            .position(|name| *name == racer)
+            .unwrap();
+        assert!(
+            not_applied[index],
+            "{racer} completed before its observed lock wait: debit={debit:?} first={first:?} second={second:?}"
+        );
+    }
+    if not_applied.iter().any(|timed_out| *timed_out) {
+        // Void only when the NotApplied racers are the only deviation: every other claimant
+        // answered, and a debit that did not elapse has its expected outcome. An Unknown, a
+        // deadlock or any other error beside a NotApplied still fails.
+        for (index, claim) in [&first, &second].into_iter().enumerate() {
+            assert!(
+                not_applied[index + 1] || claim.is_ok(),
+                "a void race must not hide another claimant's outcome: {claim:?}"
+            );
+        }
+        if !not_applied[0] {
+            let expected = match order {
+                UsageOrder::DebitRollback => matches!(&debit, Err(error)
+                    if error.to_string().contains("injected racing debit commit")),
+                _ => matches!(
+                    &debit,
+                    Ok(BudgetReservationResult::Recorded(
+                        BudgetDisposition::Granted
+                    ))
+                ),
+            };
+            assert!(
+                expected,
+                "a void race must not hide the debit's outcome: {debit:?}"
+            );
+        }
+        void_race(
+            race,
+            order,
+            attempt,
+            &not_applied,
+            workers,
+            [&first, &second],
+        )
+        .await;
+        return Contest::Void;
+    }
     match order {
         UsageOrder::DebitRollback => {
             let error = debit.unwrap_err();
@@ -160,7 +246,71 @@ async fn compete(race: &ScheduledRace, order: UsageOrder) -> Option<WorkflowFenc
     let claims = [first.unwrap(), second.unwrap()];
     let after = all_tables(f).await;
     assert_race_history(&before, &after, race, order, &claims);
-    claims.into_iter().flatten().next().map(|claim| claim.fence)
+    Contest::Proven(claims.into_iter().flatten().next().map(|claim| claim.fence))
+}
+
+async fn void_race(
+    race: &ScheduledRace,
+    order: UsageOrder,
+    attempt: usize,
+    not_applied: &[bool; 3],
+    workers: [WorkflowWorkerId; 2],
+    claims: [&AppResult<Option<ClaimedWorkflow>>; 2],
+) {
+    let pool = race.fixture.persistence().pool();
+    if not_applied[0] {
+        let debits: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM workflow_budget_receipts WHERE reservation_key='actual-racing-debit'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        assert_eq!(debits, 0, "a NotApplied debit wrote no receipt");
+    }
+    for (index, worker) in workers.into_iter().enumerate() {
+        if not_applied[index + 1] {
+            let attempts: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM task_attempts WHERE task_id=$1 AND worker_id=$2",
+            )
+            .bind(race.request.fence.scope.job.0)
+            .bind(worker.0)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+            assert_eq!(attempts, 0, "a NotApplied claimant wrote no attempt");
+        }
+    }
+    assert!(
+        claims
+            .iter()
+            .filter(|claim| matches!(claim, Ok(Some(_))))
+            .count()
+            <= 1,
+        "the claim stays exclusive"
+    );
+    uncaptured(&format!(
+        "VOID attempt scenario=claim_race order={order:?} attempt={attempt} not_applied=debit:{} first:{} second:{}",
+        not_applied[0], not_applied[1], not_applied[2]
+    ));
+}
+
+/// Runs `order` on at most 3 fresh races and returns the first proven one; every attempt
+/// void fails the test, so the order is proven at least once per run.
+async fn proven_race(
+    order: UsageOrder,
+    rolled_back: bool,
+) -> (ScheduledRace, Option<WorkflowFence>) {
+    for attempt in 1..=3 {
+        let race = Box::pin(scheduled()).await;
+        if rolled_back {
+            sqlx::raw_sql("CREATE FUNCTION reject_racing_debit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.reservation_key='actual-racing-debit' THEN RAISE EXCEPTION 'injected racing debit commit'; END IF; RETURN NEW; END $$; CREATE CONSTRAINT TRIGGER reject_racing_debit AFTER INSERT ON workflow_budget_receipts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_racing_debit()")
+                .execute(race.fixture.persistence().pool()).await.unwrap();
+        }
+        if let Contest::Proven(fence) = Box::pin(compete(&race, order, attempt)).await {
+            return (race, fence);
+        }
+    }
+    panic!("every claim_race attempt for {order:?} was void");
 }
 
 fn assert_race_history(
@@ -271,16 +421,13 @@ async fn dispatch_claim(race: &mut ScheduledRace, fence: WorkflowFence) {
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_race_debit_first_refuses_both_claimants() {
-    let race = Box::pin(scheduled()).await;
-    assert!(
-        Box::pin(compete(&race, UsageOrder::DebitFirst))
-            .await
-            .is_none()
-    );
+    let (race, fence) = Box::pin(proven_race(UsageOrder::DebitFirst, false)).await;
+    assert!(fence.is_none());
     let before = all_tables(&race.fixture).await;
     assert!(
         race.fixture
             .persistence()
+            .settled()
             .claim_io(race.request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -291,20 +438,14 @@ async fn workflow_action_reconciliation_claim_race_debit_first_refuses_both_clai
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_race_claim_first_dispatches_once() {
-    let mut race = Box::pin(scheduled()).await;
-    let fence = Box::pin(compete(&race, UsageOrder::ClaimFirst))
-        .await
-        .unwrap();
+    let (mut race, fence) = Box::pin(proven_race(UsageOrder::ClaimFirst, false)).await;
+    let fence = fence.unwrap();
     Box::pin(dispatch_claim(&mut race, fence)).await;
 }
 
 #[tokio::test]
 async fn workflow_action_reconciliation_claim_race_rolled_back_debit_preserves_allowance() {
-    let mut race = Box::pin(scheduled()).await;
-    sqlx::raw_sql("CREATE FUNCTION reject_racing_debit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.reservation_key='actual-racing-debit' THEN RAISE EXCEPTION 'injected racing debit commit'; END IF; RETURN NEW; END $$; CREATE CONSTRAINT TRIGGER reject_racing_debit AFTER INSERT ON workflow_budget_receipts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_racing_debit()")
-        .execute(race.fixture.persistence().pool()).await.unwrap();
-    let fence = Box::pin(compete(&race, UsageOrder::DebitRollback))
-        .await
-        .unwrap();
+    let (mut race, fence) = Box::pin(proven_race(UsageOrder::DebitRollback, true)).await;
+    let fence = fence.unwrap();
     Box::pin(dispatch_claim(&mut race, fence)).await;
 }

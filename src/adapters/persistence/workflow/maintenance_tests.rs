@@ -7,6 +7,7 @@ async fn overdue(f: &AdmissionFixture, scope: ActivationRequest) {
 }
 async fn claimed(f: &AdmissionFixture, scope: ActivationRequest) -> ClaimedWorkflow {
     f.persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -124,13 +125,19 @@ async fn workflow_maintenance_live_expired_and_spent_attempts_debit_once() {
         assert_eq!(after["attempts"][0]["workflow_retirement"], "deadline");
         assert!(
             !f.persistence()
+                .settled()
                 .validate_io(claim.fence, policy())
                 .await
                 .unwrap()
         );
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3)
+                    )
+                    .unwrap(),
                     fence: claim.fence,
                     output: json!({"items":[],"token_count":0})
                 })
@@ -183,6 +190,10 @@ async fn workflow_maintenance_competes_with_expiry_completion_and_heartbeat() {
         barrier.wait().await;
         f.persistence()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3),
+                )
+                .unwrap(),
                 fence: claim.fence,
                 output: json!({"items":[],"token_count":0}),
             })
@@ -331,6 +342,7 @@ async fn workflow_maintenance_preserves_existing_ambiguous_attempt_truth() {
     };
     assert!(
         f.persistence()
+            .settled()
             .release_io(
                 claim.fence,
                 policy(),

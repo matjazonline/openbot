@@ -208,7 +208,54 @@ impl SiblingDispatchDiagnostic {
     }
 }
 
+/// Exactly 128 accepted markers. A fail-closed reserve_remote Unknown on the way leaves a
+/// possibly committed marker that the bound counts, so it cannot be retried with a new key:
+/// its backstop is asserted and the attempt is void; the scenario is rebuilt on fresh state
+/// (at most three attempts, and at least one must prove the premise).
 pub(super) async fn accepted_limit() -> (AdmissionFixture, ActionDispatchRequest, LedgerProvider) {
+    for attempt in 1..=3 {
+        if let Some(limit) = Box::pin(try_accepted_limit(attempt)).await {
+            return limit;
+        }
+    }
+    panic!("accepted_limit: every attempt was void (fail-closed reserve_remote Unknown)");
+}
+
+/// One dispatch of the accepted-limit build; `None` when it was a fail-closed reserve_remote
+/// Unknown whose backstop held (the attempt is then void).
+async fn accepted_dispatch(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    delivery: &LedgerProvider,
+    attempt: usize,
+    number: usize,
+) -> Option<RemoteDispatchObservation> {
+    let rows = invocation_rows(f, request).await;
+    let calls = delivery.calls.load(Ordering::SeqCst);
+    match invoke(f, request, delivery).await {
+        Err(error) if reserve_unknown(&error) => {
+            let committed = assert_reserve_unknown_backstop(
+                f,
+                request,
+                None,
+                rows,
+                (calls, delivery.calls.load(Ordering::SeqCst)),
+            )
+            .await;
+            void_attempt(
+                "accepted_limit",
+                attempt,
+                &format!("iteration={number} reserve_remote=unknown entry_committed={committed}"),
+            );
+            None
+        }
+        outcome => Some(outcome.unwrap()),
+    }
+}
+
+async fn try_accepted_limit(
+    attempt: usize,
+) -> Option<(AdmissionFixture, ActionDispatchRequest, LedgerProvider)> {
     let (f, request) = setup().await;
     let _verifier = ledger(&f, &request).await;
     let delivery = LedgerProvider::new(
@@ -220,22 +267,26 @@ pub(super) async fn accepted_limit() -> (AdmissionFixture, ActionDispatchRequest
         },
     );
     assert!(matches!(
-        invoke(&f, &request, &delivery).await.unwrap(),
+        accepted_dispatch(&f, &request, &delivery, attempt, 0).await?,
         RemoteDispatchObservation::Committed(_)
     ));
     for number in 1..128 {
         let renewal_started = tokio::time::Instant::now();
         let window = f
             .persistence()
+            .settled()
             .renew_io(request.fence, policy())
             .await
             .unwrap();
         let renewal_finished = tokio::time::Instant::now();
         assert!(window.is_some());
         let sibling = sibling(&f, &request, number + 1000).await;
+        // Heartbeat right before the dispatch, as the worker would. The diagnostic window
+        // stays the loop's first renewal, so its offsets remain conservative.
+        renew_fixture_lease(&f, request.fence).await;
         let sibling_ready = tokio::time::Instant::now();
         let calls_before = delivery.calls.load(Ordering::SeqCst);
-        let outcome = invoke(&f, &sibling, &delivery).await.unwrap();
+        let outcome = accepted_dispatch(&f, &sibling, &delivery, attempt, number).await?;
         let invoke_finished = tokio::time::Instant::now();
         let calls_after = delivery.calls.load(Ordering::SeqCst);
         assert!(
@@ -265,7 +316,7 @@ pub(super) async fn accepted_limit() -> (AdmissionFixture, ActionDispatchRequest
         reader.snapshot(&c).await.unwrap(),
         ReconciliationPreparation::Snapshot(_)
     ));
-    (f, request, delivery)
+    Some((f, request, delivery))
 }
 
 #[tokio::test]
@@ -275,12 +326,14 @@ async fn workflow_action_reconciliation_siblings_128_and_129_snapshot_and_actual
     let reader = PostgresActionReconciliation::new(f.persistence().clone(), Resources);
     assert!(
         f.persistence()
+            .settled()
             .renew_io(request.fence, policy())
             .await
             .unwrap()
             .is_some()
     );
     let overflow = sibling(&f, &request, 1128).await;
+    renew_fixture_lease(&f, request.fence).await;
     assert!(matches!(
         invoke(&f, &overflow, &delivery).await.unwrap(),
         RemoteDispatchObservation::Committed(_)
@@ -319,6 +372,7 @@ async fn workflow_action_reconciliation_siblings_128_and_129_snapshot_and_actual
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

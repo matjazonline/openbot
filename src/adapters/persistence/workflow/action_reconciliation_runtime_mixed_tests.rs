@@ -115,16 +115,17 @@ async fn seed_mixed(f: &AdmissionFixture, requests: &[ActionDispatchRequest]) {
             .await
             .is_err()
     );
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(receipt.calls.load(Ordering::SeqCst), 1);
+    let pending = LedgerProvider::new(f, Delivery::Pending);
     assert!(
         service
-            .dispatch_remote(
-                &requests[1],
-                &LedgerProvider::new(f, Delivery::Pending),
-                &CancellationToken::new()
-            )
+            .dispatch_remote(&requests[1], &pending, &CancellationToken::new())
             .await
             .is_err()
     );
+    assert_eq!(pending.calls.load(Ordering::SeqCst), 1);
     barrier(f, &requests[1]).await;
     let supported = RegisteredLedger::new(f, &requests[2], Delivery::Pending).await;
     assert!(
@@ -133,6 +134,7 @@ async fn seed_mixed(f: &AdmissionFixture, requests: &[ActionDispatchRequest]) {
             .await
             .is_err()
     );
+    assert_eq!(supported.inner.calls.load(Ordering::SeqCst), 1);
     park(f, &requests[0]).await;
 }
 async fn continue_mixed(f: &AdmissionFixture, requests: &mut [ActionDispatchRequest]) {
@@ -189,7 +191,12 @@ async fn continue_mixed(f: &AdmissionFixture, requests: &mut [ActionDispatchRequ
     assert_eq!(effects(f).await, 3);
     assert!(
         f.persistence()
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: requests[0].fence,
                 output: good()
             })

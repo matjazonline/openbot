@@ -26,6 +26,7 @@ async fn reserve(
     .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(reservation, policy())
             .await
             .unwrap(),
@@ -40,11 +41,11 @@ async fn schedule(
 ) -> Scheduled {
     let verifier = ledger(&fixture, &request).await;
     let receipt_only = matches!(&delivery, Delivery::Apply { .. });
-    assert!(
-        invoke(&fixture, &request, &LedgerProvider::new(&fixture, delivery))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&fixture, delivery);
+    assert!(invoke(&fixture, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&fixture, &request).await;
     if !receipt_only {
         barrier(&fixture, &request).await;
@@ -66,13 +67,36 @@ async fn schedule(
 
 async fn claims(s: &Scheduled) -> Vec<WorkflowFence> {
     let scope = s.request.fence.scope;
-    let (a, b) = tokio::join!(
-        s.fixture.persistence().claim_io(scope, worker(), policy()),
-        s.fixture.persistence().claim_io(scope, worker(), policy())
-    );
-    [a.unwrap(), b.unwrap()]
+    let started = std::time::Instant::now();
+    let (a, b) = loop {
+        let (a, b) = tokio::join!(
+            s.fixture.persistence().claim_io(scope, worker(), policy()),
+            s.fixture.persistence().claim_io(scope, worker(), policy())
+        );
+        // Under load both claimants can report a definite NotApplied: each wrote nothing,
+        // so the pair re-polls as workers would (the hang guard is only a guard).
+        if !matches!(
+            (&a, &b),
+            (
+                Err(AppError::DatabaseTimeout(_)),
+                Err(AppError::DatabaseTimeout(_))
+            )
+        ) {
+            break (a, b);
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "no claimant settled within the hang guard: {a:?} {b:?}"
+        );
+    };
+    // A claimant waiting behind the other's run lock within its own attempt bound may report
+    // a definite NotApplied (nothing written) instead of None.
+    [a, b]
         .into_iter()
-        .flatten()
+        .filter_map(|claim| match claim {
+            Err(AppError::DatabaseTimeout(_)) => None,
+            claim => claim.unwrap(),
+        })
         .map(|claim| claim.fence)
         .collect()
 }
@@ -169,6 +193,7 @@ async fn workflow_action_reconciliation_claim_boundary_receipt_only_model_headro
         let claim = s
             .fixture
             .persistence()
+            .settled()
             .claim_io(sibling, worker(), policy())
             .await
             .unwrap()
@@ -239,6 +264,7 @@ async fn admit_root(f: &AdmissionFixture, key: &str) -> ActivationRequest {
 async fn exhaust_root(f: &AdmissionFixture, scope: ActivationRequest) {
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()

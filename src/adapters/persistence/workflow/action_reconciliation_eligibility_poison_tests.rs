@@ -23,6 +23,7 @@ async fn retired(code: &str) -> Retired {
     .unwrap();
     assert!(
         f.persistence()
+            .settled()
             .release_io(
                 request.fence,
                 policy(),
@@ -164,6 +165,7 @@ async fn poison_case(code: &str) {
     assert_eq!(effects(&f).await, 0);
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

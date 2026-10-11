@@ -5,6 +5,14 @@
 Depends on phases 1–8. Complete the user journey using the existing server-rendered UI/HTMX
 architecture. Application commands already exist; pages do not introduce parallel business logic.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## Authoring and setup
 
 - Workflow library: select a shipped template, create a company copy, or create a draft.

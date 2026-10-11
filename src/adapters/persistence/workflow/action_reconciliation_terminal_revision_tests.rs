@@ -99,6 +99,7 @@ async fn fail_live(pending: &PendingAction) -> Value {
     });
     assert!(
         f.persistence()
+            .settled()
             .release_io(pending.request.fence, policy(), cause.clone())
             .await
             .unwrap()
@@ -106,6 +107,7 @@ async fn fail_live(pending: &PendingAction) -> Value {
     let failed = all_tables(f).await;
     assert!(
         !f.persistence()
+            .settled()
             .release_io(pending.request.fence, policy(), cause)
             .await
             .unwrap()
@@ -253,6 +255,7 @@ async fn failed_case(history: FailedAction, truth: SiblingTruth) {
     let saved = all_tables(f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(pending.request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -335,6 +338,7 @@ async fn succeeded_case(truth: SiblingTruth) {
     let saved = all_tables(f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(pending.request.fence.scope, worker(), policy())
             .await
             .unwrap()

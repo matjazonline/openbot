@@ -171,6 +171,7 @@ async fn workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_r
     expire(&f, request.fence.scope).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -187,6 +188,7 @@ async fn workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_r
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

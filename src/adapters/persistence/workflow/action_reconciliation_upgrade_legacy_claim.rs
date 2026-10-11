@@ -9,7 +9,7 @@ pub(super) async fn claim_on(
     policy: LeasePolicy,
     started: Instant,
 ) -> AppResult<Option<ClaimedWorkflow>> {
-    let Some((run, job)) = lock_scope(db, scope, policy).await? else {
+    let Some((run, job)) = lock_scope(db, scope, policy.attempt_bound()).await? else {
         return Ok(None);
     };
     let binding = admission_binding::read_saved_binding(

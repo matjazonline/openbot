@@ -116,6 +116,9 @@ async fn supported_positive(
     )
     .await;
     assert!(registered_invoke(f, request, &provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(provider.inner.calls.load(Ordering::SeqCst), 1);
     rust_sql_equivalence(f, request, true).await;
     let verifier: Arc<dyn ActionEvidenceVerifier> = if invalid {
         Arc::new(InvalidRecovery(ledger))
@@ -140,6 +143,7 @@ async fn supported_positive(
     let before = all_tables(f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -209,7 +213,12 @@ async fn workflow_action_reconciliation_runtime_supported_positive_veto_then_gen
         assert_eq!(entry_consumptions(&f).await, (1, 0));
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3)
+                    )
+                    .unwrap(),
                     fence: request.fence,
                     output: good()
                 })
@@ -226,12 +235,29 @@ mod mixed_tests;
 #[path = "action_reconciliation_runtime_conflict_tests.rs"]
 mod conflict_tests;
 
+/// A definite NotApplied (`DatabaseTimeout`) reported before the provider was called wrote
+/// nothing, so it is retried as the worker would; every other outcome is returned as is.
 async fn registered_invoke(
     f: &AdmissionFixture,
     request: &ActionDispatchRequest,
     provider: &RegisteredLedger,
 ) -> AppResult<RemoteDispatchObservation> {
-    ActionService::new(adapter(f, 0))
-        .dispatch_remote(request, provider, &CancellationToken::new())
-        .await
+    let started = std::time::Instant::now();
+    loop {
+        let calls = provider.inner.calls.load(Ordering::SeqCst);
+        match ActionService::new(adapter(f, 0))
+            .dispatch_remote(request, provider, &CancellationToken::new())
+            .await
+        {
+            Err(AppError::DatabaseTimeout(error))
+                if provider.inner.calls.load(Ordering::SeqCst) == calls =>
+            {
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "dispatch never settled before the provider: {error}"
+                );
+            }
+            result => return result,
+        }
+    }
 }

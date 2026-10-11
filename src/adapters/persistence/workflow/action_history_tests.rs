@@ -320,6 +320,7 @@ async fn workflow_action_history_direct_sql_reopen_rechecks_current_retention() 
     insert_history(&mut tx, &request, evidence).await;
     tx.commit().await.unwrap();
     f.persistence()
+        .settled()
         .release_io(
             request.fence,
             policy(),

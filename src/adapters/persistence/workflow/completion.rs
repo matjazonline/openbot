@@ -1,8 +1,8 @@
+use super::persistence_bound::{Attempt, End, Evidence, WriteBound};
 use super::*;
 use crate::application::workflow::{activation::*, completion::*, lease::*};
 use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
 use serde_json::Value;
-use std::time::Duration;
 
 #[derive(sqlx::FromRow)]
 struct CompletionRun {
@@ -24,15 +24,48 @@ impl WorkflowCompletion for PostgresPersistence {
         &self,
         result: FencedWorkflowResult,
     ) -> AppResult<Option<CommittedWorkflowStep>> {
-        tokio::time::timeout(Duration::from_secs(1), async {
-            let mut tx = self.pool.begin().await?;
-            // Box at the activation/restore boundary to preserve stock-stack tests.
-            let saved = Box::pin(complete_on(&mut tx, result)).await?;
-            tx.commit().await?;
-            Ok(saved)
-        })
-        .await
-        .map_err(|_| lease::timed_out())?
+        let bound = WriteBound::start("completion", result.policy);
+        let (fence, output, policy) = (result.fence, result.output.clone(), result.policy);
+        let attempt = bound
+            .attempt(Box::pin(async {
+                let mut conn = bound.acquire(&self.pool).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                // Box at the activation/restore boundary to preserve stock-stack tests.
+                let saved = Box::pin(complete_on(&mut tx, result)).await;
+                bound.end(tx, saved.map(End::Commit)).await
+            }))
+            .await;
+        match attempt {
+            Attempt::Done(saved) => Ok(saved),
+            Attempt::Failed(error) => Err(error),
+            // complete_on replays an already completed execution without writing, so under
+            // the same lock order it is exactly the evidence of the original. Otherwise our
+            // attempt row tells a committed retirement from nothing written.
+            Attempt::Ambiguous => {
+                bound
+                    .resolve(Box::pin(async {
+                        let mut conn = bound.acquire(&self.pool).await?;
+                        let mut tx = bound.begin(&mut conn).await?;
+                        let retry = FencedWorkflowResult {
+                            fence,
+                            output,
+                            policy,
+                        };
+                        let evidence = async {
+                            Ok(match completed(&mut tx, fence).await? {
+                                Settled::Completed => {
+                                    Evidence::Applied(Box::pin(complete_on(&mut tx, retry)).await?)
+                                }
+                                Settled::Retired => Evidence::Applied(None),
+                                Settled::Owned => Evidence::NotApplied,
+                            })
+                        }
+                        .await;
+                        bound.roll_back(tx, evidence).await
+                    }))
+                    .await
+            }
+        }
     }
 }
 
@@ -40,8 +73,7 @@ pub(super) async fn complete_on(
     db: &mut PgConnection,
     result: FencedWorkflowResult,
 ) -> AppResult<Option<CommittedWorkflowStep>> {
-    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
-        .execute(&mut *db).await?;
+    // The caller's transaction already carries the server lock/statement bound.
     let scope = result.fence.scope;
     let run = sqlx::query_as::<_, CompletionRun>(
         "SELECT binding_id,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE",
@@ -61,6 +93,7 @@ pub(super) async fn complete_on(
     if !lock_job(db, result.fence, &row).await? {
         return Ok(None);
     }
+    super::persistence_bound::locks_held();
     if row.completed_at.is_some() {
         return replay(db, result, row).await;
     }
@@ -137,6 +170,40 @@ pub(super) async fn complete_on(
         target: completion.target,
         successor,
     }))
+}
+
+/// What an ambiguous completion left behind.
+enum Settled {
+    /// The execution completed: replay classifies the saved step.
+    Completed,
+    /// Not completed, and our attempt is no longer processing (or is gone): the original
+    /// retired it (evidence conflict, invalid result) or a third party did. Nothing is owned.
+    Retired,
+    /// Not completed and our attempt still processing: nothing was written.
+    Owned,
+}
+
+/// Waits on the original's run and execution locks, in complete_on's order, then reads the
+/// execution and our attempt row. complete_on can commit a retirement without completing.
+async fn completed(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<Settled> {
+    let scope = fence.scope;
+    sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .execute(&mut *db)
+        .await?;
+    let done: Option<bool> = sqlx::query_scalar("SELECT completed_at IS NOT NULL FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+    if done == Some(true) {
+        return Ok(Settled::Completed);
+    }
+    let processing: Option<bool> = sqlx::query_scalar("SELECT status='processing' FROM task_attempts WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4")
+        .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).fetch_optional(db).await?;
+    Ok(if processing == Some(true) {
+        Settled::Owned
+    } else {
+        Settled::Retired
+    })
 }
 
 async fn lock_job(

@@ -5,6 +5,14 @@
 Depends on phases 1–4. Implement a general human task returning a choice, feedback, and optional
 structured data. Approve/reject is one configuration, not the underlying domain model.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## Decision contract
 
 `decision.human` declares the proposal/context to review, an authorized reviewer or reviewer group,

@@ -5,6 +5,14 @@
 Depends on phases 1–6. Reuse workflows as steps or agent tools and implement iterative human
 feedback without confusing a new revision with a technical retry.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## Child calls and workflow tools
 
 `workflow.call` invokes a pinned company workflow version with explicit schema-validated inputs.

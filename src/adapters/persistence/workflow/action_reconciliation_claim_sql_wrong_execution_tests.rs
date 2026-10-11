@@ -23,13 +23,19 @@ async fn scheduled_successor() -> (Scheduled, ActivationRequest) {
     let (f, first) = fixture_source(two_step_source()).await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(first, worker(), policy())
         .await
         .unwrap()
         .unwrap();
     let completed = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claim.fence,
             output: json!({"items":[],"token_count":0}),
         })
@@ -50,11 +56,11 @@ async fn scheduled_successor() -> (Scheduled, ActivationRequest) {
     ))
     .await;
     let verifier = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let command = proof_command(&f, &request, &verifier, "wrong-execution-scheduled").await;
@@ -124,6 +130,7 @@ async fn exhaust_shared_root(s: &Scheduled, first: ActivationRequest) {
     let claim = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(descendant, worker(), policy())
         .await
         .unwrap()

@@ -57,13 +57,19 @@ async fn owner(case: AuditCase) -> AuditOwner {
     let (f, first) = Box::pin(fixture_source(source())).await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(first, worker(), policy())
         .await
         .unwrap()
         .unwrap();
     let completed = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claim.fence,
             output: good(),
         })

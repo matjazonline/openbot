@@ -38,6 +38,7 @@ async fn debit(f: &AdmissionFixture, fence: WorkflowFence) {
     .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(reservation, policy())
             .await
             .unwrap(),
@@ -83,11 +84,11 @@ async fn child(f: &AdmissionFixture, parent: ActivationRequest) -> ActivationReq
 async fn workflow_action_reconciliation_eligibility_root_model_budget_blocks_schedule() {
     let (f, request) = Box::pin(limited()).await;
     let verifier = ledger(&f, &request).await;
-    assert!(
-        invoke(&f, &request, &LedgerProvider::new(&f, Delivery::Pending))
-            .await
-            .is_err()
-    );
+    let setup_provider = LedgerProvider::new(&f, Delivery::Pending);
+    assert!(invoke(&f, &request, &setup_provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(setup_provider.calls.load(Ordering::SeqCst), 1);
     debit(&f, request.fence).await;
     park(&f, &request).await;
     barrier(&f, &request).await;
@@ -113,6 +114,7 @@ async fn workflow_action_reconciliation_eligibility_root_model_budget_blocks_sch
     let saved = all_tables(&f).await;
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -127,6 +129,9 @@ async fn workflow_action_reconciliation_eligibility_claim_rechecks_shared_root_b
     let verifier = ledger(&f, &request).await;
     let provider = LedgerProvider::new(&f, Delivery::Pending);
     assert!(invoke(&f, &request, &provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     barrier(&f, &request).await;
     let c = proof_command(&f, &request, &verifier, "before-shared-debit").await;
@@ -139,6 +144,7 @@ async fn workflow_action_reconciliation_eligibility_claim_rechecks_shared_root_b
     let descendant = child(&f, request.fence.scope).await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(descendant, worker(), policy())
         .await
         .unwrap()
@@ -149,12 +155,14 @@ async fn workflow_action_reconciliation_eligibility_claim_rechecks_shared_root_b
     assert_eq!(before["workflow_run_budgets"].as_array().unwrap().len(), 2);
     assert_eq!(before["workflow_root_budget_usage"][0]["model_calls"], 2);
     assert_eq!(before["workflow_root_budgets"][0]["model_calls"], 2);
-    let (a, b) = tokio::join!(
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy()),
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy())
-    );
+    let [a, b] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     let claims = [a.unwrap(), b.unwrap()];
     assert_eq!(
         claims.iter().filter(|claim| claim.is_some()).count(),
@@ -273,6 +281,7 @@ async fn refused_retries(
     for _ in 0..2 {
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()

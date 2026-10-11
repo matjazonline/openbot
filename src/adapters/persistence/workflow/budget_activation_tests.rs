@@ -149,11 +149,43 @@ async fn workflow_budget_activation_usage_wait_deadline_rolls_back() {
         .execute(&mut *held)
         .await
         .unwrap();
-    sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+interval '250 milliseconds' WHERE id=$1").bind(scope.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
+    // Activation must reach its usage wait before the deadline: one persistence attempt (A).
+    let reach = crate::application::workflow::lease::LeasePolicy::new(Duration::from_secs(3))
+        .unwrap()
+        .attempt_bound();
+    let holder: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *held)
+        .await
+        .unwrap();
+    let deadline: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("UPDATE workflow_runs SET deadline=clock_timestamp()+make_interval(secs => $2) WHERE id=$1 RETURNING deadline")
+        .bind(scope.run.as_uuid()).bind(reach.as_secs_f64()).fetch_one(f.persistence().pool()).await.unwrap();
     let before = accounting(&f).await;
     let activate = f.persistence().activate(scope);
     tokio::pin!(activate);
-    tokio::select! { result=&mut activate=>panic!("must block on usage: {result:?}"), _=tokio::time::sleep(Duration::from_millis(350))=>{} }
+    // Structural: activation is observed blocked on usage, and the deadline then passes by
+    // the DB clock while it still waits.
+    let mut observer = f.persistence().pool().acquire().await.unwrap();
+    let crossed = async {
+        let guard = std::time::Instant::now();
+        loop {
+            sqlx::query("SELECT pg_stat_clear_snapshot()")
+                .execute(&mut *observer)
+                .await
+                .unwrap();
+            let (queued, passed): (bool, bool) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid))), clock_timestamp() > $2")
+                .bind(holder).bind(deadline).fetch_one(&mut *observer).await.unwrap();
+            if queued && passed {
+                return;
+            }
+            assert!(
+                guard.elapsed() < Duration::from_secs(10),
+                "activation never waited past the deadline"
+            );
+            tokio::time::sleep(reach / 100).await;
+        }
+    };
+    tokio::select! { result=&mut activate=>panic!("must block on usage: {result:?}"), () = crossed=>{} }
+    drop(observer);
     held.rollback().await.unwrap();
     assert!(activate.await.is_err());
     assert_eq!(accounting(&f).await, before);
@@ -221,6 +253,10 @@ async fn workflow_budget_activation_successful_io_and_wait_replay_charge_once() 
         .unwrap()
         .unwrap();
     let result = || FencedWorkflowResult {
+        policy: crate::application::workflow::lease::LeasePolicy::new(
+            std::time::Duration::from_secs(3),
+        )
+        .unwrap(),
         fence: claimed.fence,
         output: json!({"items":[],"token_count":0}),
     };

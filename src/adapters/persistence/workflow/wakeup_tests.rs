@@ -178,6 +178,10 @@ async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
         .unwrap();
     f.persistence()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: claimed.fence,
             output: json!({"items":[],"token_count":0}),
         })

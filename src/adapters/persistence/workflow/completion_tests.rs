@@ -6,6 +6,10 @@ fn output() -> Value {
 }
 fn result(fence: WorkflowFence) -> FencedWorkflowResult {
     FencedWorkflowResult {
+        policy: crate::application::workflow::lease::LeasePolicy::new(
+            std::time::Duration::from_secs(3),
+        )
+        .unwrap(),
         fence,
         output: output(),
     }
@@ -21,6 +25,7 @@ async fn claimed(source: Value) -> (AdmissionFixture, ClaimedWorkflow) {
     let (f, scope) = fixture_source(source).await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -80,6 +85,7 @@ async fn workflow_completion_competing_results_lost_ack_and_saved_replay() {
     different.output["token_count"] = json!(1);
     assert!(
         f.persistence()
+            .settled()
             .complete_io(different)
             .await
             .unwrap()
@@ -106,6 +112,7 @@ async fn workflow_completion_competing_results_lost_ack_and_saved_replay() {
     let reconnect = PostgresPersistence::new(pool.clone());
     let before = state(&f).await;
     let replay = reconnect
+        .settled()
         .complete_io(result(claim.fence))
         .await
         .unwrap()
@@ -149,6 +156,7 @@ async fn workflow_completion_pure_io_supervision_and_terminal_io() {
     assert_eq!(boundary.continuation, Some(io));
     let claim = f
         .persistence()
+        .settled()
         .claim_io(boundary.continuation.unwrap(), worker(), policy())
         .await
         .unwrap()
@@ -166,7 +174,13 @@ async fn workflow_completion_pure_io_supervision_and_terminal_io() {
     let SupervisedResult::Ready(result) = supervised else {
         panic!("handler failed")
     };
-    let saved = f.persistence().complete_io(result).await.unwrap().unwrap();
+    let saved = f
+        .persistence()
+        .settled()
+        .complete_io(result)
+        .await
+        .unwrap()
+        .unwrap();
     let finished = f
         .persistence()
         .advance_pure(
@@ -182,12 +196,14 @@ async fn workflow_completion_pure_io_supervision_and_terminal_io() {
     let (f, scope) = fixture().await;
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
         .unwrap();
     assert!(
         f.persistence()
+            .settled()
             .complete_io(super::completion_tests::result(claim.fence))
             .await
             .unwrap()
@@ -228,6 +244,7 @@ async fn workflow_completion_rolls_back_every_write_boundary() {
         .unwrap();
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(result(claim.fence))
                 .await
                 .unwrap()
@@ -270,6 +287,7 @@ async fn workflow_completion_rejects_wrong_fences() {
     ] {
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(result(wrong))
                 .await
                 .unwrap()
@@ -285,6 +303,7 @@ async fn workflow_completion_reclaimed_generation_refuses() {
     expire(&f, claim.fence.scope).await;
     assert!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()
@@ -292,6 +311,7 @@ async fn workflow_completion_reclaimed_generation_refuses() {
     );
     assert!(
         f.persistence()
+            .settled()
             .claim_io(claim.fence.scope, claim.fence.worker, policy())
             .await
             .unwrap()
@@ -300,6 +320,7 @@ async fn workflow_completion_reclaimed_generation_refuses() {
     due(&f, claim.fence.scope).await;
     let replacement = f
         .persistence()
+        .settled()
         .claim_io(claim.fence.scope, claim.fence.worker, policy())
         .await
         .unwrap()
@@ -307,6 +328,7 @@ async fn workflow_completion_reclaimed_generation_refuses() {
     let before = state(&f).await;
     assert!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()
@@ -314,12 +336,14 @@ async fn workflow_completion_reclaimed_generation_refuses() {
     );
     assert_eq!(state(&f).await, before);
     f.persistence()
+        .settled()
         .complete_io(result(replacement.fence))
         .await
         .unwrap()
         .unwrap();
     assert!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()
@@ -356,7 +380,12 @@ async fn workflow_completion_invalid_outputs_and_activation_budget_settle() {
         let (f, claim) = claimed(chain()).await;
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3)
+                    )
+                    .unwrap(),
                     fence: claim.fence,
                     output
                 })
@@ -376,6 +405,7 @@ async fn workflow_completion_invalid_outputs_and_activation_budget_settle() {
     let (f, claim) = claimed(source).await;
     assert!(
         f.persistence()
+            .settled()
             .complete_io(result(claim.fence))
             .await
             .unwrap()

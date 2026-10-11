@@ -99,7 +99,34 @@ pub struct EvidenceAttestation {
     pub authoritative_reference: EvidenceRecordReference,
     pub observed_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
-    pub diagnostic: Value,
+    pub diagnostic: AttestationDiagnostic,
+}
+
+/// Closed verifier diagnostic: a verifier cannot place raw or transport payload in evidence.
+/// Serializes as `{"version":1,"ledger":<id>}`; the version is a constant, not a field.
+/// Any future field must be an enum or an `evidence_text!` grammar type, never `Value` or
+/// `String`, so the evidence envelope stays bounded by construction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttestationDiagnostic {
+    ledger: EvidenceProviderId,
+}
+
+impl AttestationDiagnostic {
+    const VERSION: u8 = 1;
+
+    pub fn new(ledger: EvidenceProviderId) -> Self {
+        Self { ledger }
+    }
+}
+
+impl serde::Serialize for AttestationDiagnostic {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut diagnostic = serializer.serialize_struct("AttestationDiagnostic", 2)?;
+        diagnostic.serialize_field("version", &Self::VERSION)?;
+        diagnostic.serialize_field("ledger", &self.ledger)?;
+        diagnostic.end()
+    }
 }
 
 #[async_trait]

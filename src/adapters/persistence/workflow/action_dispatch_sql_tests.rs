@@ -85,7 +85,10 @@ async fn workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_r
         action,
         current_policy: policy,
         ..
-    } = writer.authorize_on(&mut tx, &request).await.unwrap();
+    } = writer
+        .authorize_on(&mut tx, &request, request.lease.attempt_bound())
+        .await
+        .unwrap();
     let marker = Uuid::new_v4();
     Dispatch::insert(&mut tx, &request, marker, "local", policy)
         .await

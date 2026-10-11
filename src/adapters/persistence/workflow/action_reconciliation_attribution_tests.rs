@@ -92,7 +92,7 @@ async fn marker_only(f: &AdmissionFixture, request: &ActionDispatchRequest) {
     let before = all_tables(f).await;
     let writer = adapter(f, 0);
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    let authorized = Box::pin(writer.authorize_on(&mut tx, request))
+    let authorized = Box::pin(writer.authorize_on(&mut tx, request, request.lease.attempt_bound()))
         .await
         .unwrap();
     assert!(!authorized.approval_required);
@@ -249,19 +249,25 @@ async fn veto_and_replay(
             .unwrap()
     );
     tx.rollback().await.unwrap();
-    let (left, right) = tokio::join!(
-        f.persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-        f.persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-    );
+    let [left, right] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(left.unwrap().is_none() && right.unwrap().is_none());
     let provider = LedgerProvider::new(f, Delivery::Pending);
     // This retired-fence refusal is supplemental; it does not isolate the conflict gate.
-    assert!(matches!(
-        Box::pin(invoke(f, &h.request, &provider)).await,
-        Err(AppError::Conflict(_))
-    ));
+    let refused = Box::pin(invoke(f, &h.request, &provider))
+        .await
+        .err()
+        .expect("a refusal, not a dispatch");
+    assert!(
+        matches!(&refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+        "expected refusal: {refused:?}"
+    );
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     let replayed = Box::pin(run_command(f, command, verifier.clone()))
         .await

@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::workflow::{capacity::*, completion::*};
+use crate::application::workflow::capacity::*;
 
 async fn admit(f: &AdmissionFixture, key: &str) -> ActivationRequest {
     let command = f.prepare(f.request(key, f.manual())).await;
@@ -36,13 +36,18 @@ fn lease() -> LeasePolicy {
 }
 
 async fn finish(p: &PostgresPersistence, claim: &ClaimedWorkflow) {
-    p.complete_io(FencedWorkflowResult {
-        fence: claim.fence,
-        output: json!({"items":[],"token_count":0}),
-    })
-    .await
-    .unwrap()
-    .unwrap();
+    p.settled()
+        .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
+            fence: claim.fence,
+            output: json!({"items":[],"token_count":0}),
+        })
+        .await
+        .unwrap()
+        .unwrap();
 }
 
 async fn budget(p: &PostgresPersistence, scope: ActivationRequest) -> Value {
@@ -67,7 +72,11 @@ async fn workflow_capacity_sql_bounds_and_implicit_default_are_enforced() {
             Some("23514")
         );
     }
-    p.claim_io(scope, worker(), lease()).await.unwrap().unwrap();
+    p.settled()
+        .claim_io(scope, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     let installed: (i32, i32) = sqlx::query_as(
         "SELECT global_limit,company_limit FROM workflow_capacity_policy WHERE singleton",
     )
@@ -118,13 +127,18 @@ async fn workflow_capacity_policy_is_global_immutable_and_bounded() {
             Some("23514")
         );
     }
-    let claim = p.claim_io(scope, worker(), lease()).await.unwrap().unwrap();
+    let claim = p
+        .settled()
+        .claim_io(scope, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(
         p.configure_capacity(WorkflowCapacityPolicy::new(5, 1).unwrap())
             .await
             .is_err()
     );
-    assert!(p.validate_io(claim.fence, lease()).await.unwrap());
+    assert!(p.settled().validate_io(claim.fence, lease()).await.unwrap());
 }
 
 #[tokio::test]
@@ -181,7 +195,8 @@ async fn workflow_capacity_competing_distinct_runs_enforce_both_maxima_and_relea
     assert_eq!(accounting["usage"][0]["activations"], 1);
     assert_eq!(accounting["receipts"].as_array().unwrap().len(), 1);
     assert!(
-        p.claim_io(*denied, worker(), lease())
+        p.settled()
+            .claim_io(*denied, worker(), lease())
             .await
             .unwrap()
             .is_none()
@@ -194,6 +209,7 @@ async fn workflow_capacity_competing_distinct_runs_enforce_both_maxima_and_relea
     let fresh = PostgresPersistence::new(p.pool().clone());
     assert!(
         fresh
+            .settled()
             .claim_io(*denied, worker(), lease())
             .await
             .unwrap()
@@ -210,19 +226,43 @@ async fn workflow_capacity_expiry_restart_releases_without_refunding_attempts() 
         .await
         .unwrap();
     let next = admit(&f, "next").await;
-    let old = p.claim_io(scope, worker(), lease()).await.unwrap().unwrap();
-    assert!(p.claim_io(next, worker(), lease()).await.unwrap().is_none());
+    let old = p
+        .settled()
+        .claim_io(scope, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        p.settled()
+            .claim_io(next, worker(), lease())
+            .await
+            .unwrap()
+            .is_none()
+    );
     expire(&f, scope).await;
     let fresh = PostgresPersistence::new(p.pool().clone());
     let replacement = fresh
+        .settled()
         .claim_io(next, worker(), lease())
         .await
         .unwrap()
         .unwrap();
-    assert!(fresh.renew_io(old.fence, lease()).await.unwrap().is_none());
     assert!(
         fresh
+            .settled()
+            .renew_io(old.fence, lease())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        fresh
+            .settled()
             .complete_io(FencedWorkflowResult {
+                policy: crate::application::workflow::lease::LeasePolicy::new(
+                    std::time::Duration::from_secs(3)
+                )
+                .unwrap(),
                 fence: old.fence,
                 output: json!({"items":[],"token_count":0})
             })
@@ -230,8 +270,20 @@ async fn workflow_capacity_expiry_restart_releases_without_refunding_attempts() 
             .unwrap()
             .is_none()
     );
-    assert!(fresh.retire_expired_io(scope, lease()).await.unwrap());
-    assert!(!fresh.retire_expired_io(scope, lease()).await.unwrap());
+    assert!(
+        fresh
+            .settled()
+            .retire_expired_io(scope, lease())
+            .await
+            .unwrap()
+    );
+    assert!(
+        !fresh
+            .settled()
+            .retire_expired_io(scope, lease())
+            .await
+            .unwrap()
+    );
     let debit: i32 = sqlx::query_scalar("SELECT retry_count FROM background_tasks WHERE id=$1")
         .bind(scope.job.0)
         .fetch_one(p.pool())
@@ -241,6 +293,7 @@ async fn workflow_capacity_expiry_restart_releases_without_refunding_attempts() 
     finish(&fresh, &replacement).await;
     due(&f, scope).await;
     let retry = fresh
+        .settled()
         .claim_io(scope, worker(), lease())
         .await
         .unwrap()
@@ -261,11 +314,17 @@ async fn workflow_capacity_count_prunes_retained_terminal_history() {
         } else {
             admit(&f, &format!("history-{index}")).await
         };
-        let claim = p.claim_io(scope, worker(), lease()).await.unwrap().unwrap();
+        let claim = p
+            .settled()
+            .claim_io(scope, worker(), lease())
+            .await
+            .unwrap()
+            .unwrap();
         finish(p, &claim).await;
     }
     let current = admit(&f, "current").await;
-    p.claim_io(current, worker(), lease())
+    p.settled()
+        .claim_io(current, worker(), lease())
         .await
         .unwrap()
         .unwrap();

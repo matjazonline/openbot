@@ -205,6 +205,9 @@ pub(super) async fn prepared() -> (
     let verifier = Arc::new(ObservedVerifier::new(ledger(&f, &request).await));
     let provider = LedgerProvider::new(&f, Delivery::Pending);
     assert!(invoke(&f, &request, &provider).await.is_err());
+    // Setup premise: the provider was called and its outcome is uncertain. A reservation
+    // Unknown or a definite NotApplied leaves no call, so the test must not continue.
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     park(&f, &request).await;
     (f, request, verifier)
 }

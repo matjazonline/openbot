@@ -84,16 +84,24 @@ async fn reject(f: &AdmissionFixture, sql: &str, company: Uuid, alternate_entry:
 
 async fn immutable_matrix(f: &AdmissionFixture, request: &ActionDispatchRequest) {
     let company = request.scope().company.as_uuid();
-    let before = all_tables(f).await;
+    let mut before = all_tables(f).await;
     let coverage = &before["workflow_action_evidence_coverage"][0];
     let consumption = &before["workflow_action_evidence_consumptions"][0];
     assert_ne!(coverage["remote_entry_id"], consumption["remote_entry_id"]);
     assert_eq!(coverage["evidence_id"], consumption["evidence_id"]);
+    let (coverage_entry, consumption_entry) = (
+        coverage["remote_entry_id"].clone(),
+        consumption["remote_entry_id"].clone(),
+    );
     for fact in FACTS {
+        // The reserved entry's real owner keeps its lease between facts; each fact's
+        // rejections are then compared with the state right after that heartbeat.
+        renew_fixture_lease(f, request.fence).await;
+        before = all_tables(f).await;
         assert_eq!(before[fact.table].as_array().unwrap().len(), 1);
         let alternate_entry = match fact.table {
-            "workflow_action_evidence_coverage" => Some(consumption["remote_entry_id"].clone()),
-            "workflow_action_evidence_consumptions" => Some(coverage["remote_entry_id"].clone()),
+            "workflow_action_evidence_coverage" => Some(consumption_entry.clone()),
+            "workflow_action_evidence_consumptions" => Some(coverage_entry.clone()),
             _ => None,
         }
         .map(|value| serde_json::from_value::<Uuid>(value).unwrap());
@@ -110,8 +118,15 @@ async fn immutable_matrix(f: &AdmissionFixture, request: &ActionDispatchRequest)
             format!("DELETE FROM {} WHERE company_id=$1", fact.table),
             upsert(fact, ConflictAction::Update),
         ] {
+            // Each attack compares its own before/after pair, so a heartbeat between
+            // attacks is quiescent.
+            renew_fixture_lease(f, request.fence).await;
             reject(f, &sql, company, None).await;
         }
+        // The rejections above each left every row unchanged; the matching control below is
+        // compared with the state right after this heartbeat.
+        renew_fixture_lease(f, request.fence).await;
+        before = all_tables(f).await;
         // Matching INSERT candidate, scopes, keys and native BEFORE INSERT guards
         // all pass. Only the conflict action differs from the attack above.
         let mut tx = f.persistence().pool().begin().await.unwrap();
@@ -208,6 +223,7 @@ async fn workflow_action_reconciliation_append_only_mutation_delete_upsert_and_o
     };
     assert_eq!(entry_consumptions(&f).await, (2, 1));
     Box::pin(immutable_matrix(&f, &request)).await;
+    renew_fixture_lease(&f, request.fence).await;
     // Rejected changes leave the actual reserved entry usable by its real owner.
     let entered = writer.enter_remote(*reserved).await.unwrap();
     let applied = LedgerProvider::new(

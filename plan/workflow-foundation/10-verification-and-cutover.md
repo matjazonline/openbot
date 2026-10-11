@@ -5,6 +5,14 @@
 Depends on phases 1–9. Verify the whole architecture, retire obsolete paths, and prepare a deliberate
 fresh-database deployment. This phase does not introduce backward compatibility or data conversion.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## End-to-end acceptance matrix
 
 | Scenario | Required evidence |

@@ -90,7 +90,7 @@ impl ActionEvidenceVerifier for LedgerVerifier {
             authoritative_reference: reference.clone(),
             observed_at: now,
             valid_until: now + chrono::Duration::minutes(10),
-            diagnostic: json!({"version":1,"ledger":"fixture"}),
+            diagnostic: AttestationDiagnostic::new(EvidenceProviderId::parse("fixture").unwrap()),
         })
     }
 }
@@ -107,7 +107,12 @@ async fn ledger(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Arc<Le
         .execute(f.persistence().pool()).await.unwrap();
     sqlx::raw_sql("CREATE TABLE fixture_provider_operations(invocation_id uuid PRIMARY KEY,provider_key text NOT NULL,marker_closed bool NOT NULL DEFAULT false); CREATE TABLE fixture_provider_effects(entry_id uuid PRIMARY KEY,result jsonb NOT NULL)")
         .execute(f.persistence().pool()).await.unwrap();
-    register_ledger(f, request).await
+    let verifier = register_ledger(f, request).await;
+    // Every caller dispatches next on the setup claim; heartbeat it as its worker would, so
+    // the dispatch window is measured from here rather than from the claim. Creating the
+    // ledger tables already changes every snapshot, so no before/after pair straddles this.
+    renew_lease(f, request.fence, request.lease).await;
+    verifier
 }
 async fn register_ledger(
     f: &AdmissionFixture,
@@ -191,6 +196,7 @@ async fn reconcile(
 async fn park(f: &AdmissionFixture, request: &ActionDispatchRequest) {
     assert!(
         f.persistence()
+            .settled()
             .release_io(
                 request.fence,
                 policy(),
@@ -200,16 +206,104 @@ async fn park(f: &AdmissionFixture, request: &ActionDispatchRequest) {
             .unwrap()
     );
 }
-async fn new_claim(f: &AdmissionFixture, request: &mut ActionDispatchRequest) {
-    let (a, b) = tokio::join!(
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy()),
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy())
+/// What a real worker does while it owns the step: renew the fixture lease through the
+/// production renew path, at points that no before/after snapshot pair straddles (the
+/// pattern approved for the retained-truth scenarios). A renewal moves only
+/// lock_expires_at, which the run-revision trigger ignores, so no saved command's expected
+/// revision changes; that is asserted here. A definite NotApplied keeps the old window,
+/// which must then still be live by the DB clock.
+async fn renew_fixture_lease(f: &AdmissionFixture, fence: WorkflowFence) {
+    renew_lease(f, fence, policy()).await;
+}
+async fn renew_lease(f: &AdmissionFixture, fence: WorkflowFence, lease: LeasePolicy) {
+    let revision = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT revision FROM workflow_runs WHERE company_id=$1 AND id=$2",
+        )
+        .bind(fence.scope.company.as_uuid())
+        .bind(fence.scope.run.as_uuid())
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap()
+    };
+    let before = revision().await;
+    match f.persistence().renew_io(fence, lease).await {
+        Ok(window) => assert!(
+            window.is_some(),
+            "the fixture lease lapsed between heartbeats"
+        ),
+        Err(AppError::DatabaseTimeout(_)) => {
+            let live: bool = sqlx::query_scalar(
+                "SELECT lock_expires_at > clock_timestamp() FROM background_tasks WHERE id=$1",
+            )
+            .bind(fence.scope.job.0)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+            assert!(live, "the fixture lease lapsed between heartbeats");
+        }
+        Err(error) => panic!("heartbeat: {error:?}"),
+    }
+    assert_eq!(
+        revision().await,
+        before,
+        "a heartbeat moved the run revision"
     );
-    let claims = [a.unwrap(), b.unwrap()];
+}
+async fn new_claim(f: &AdmissionFixture, request: &mut ActionDispatchRequest) {
+    let workers = [worker(), worker()];
+    let scope = request.fence.scope;
+    // Under load a claimant can report a definite NotApplied (it wrote nothing): beside the
+    // winner it lost, and with no claim at all the pair re-polls as workers would.
+    let claims = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, claimant| p.claim_io(scope, workers[claimant], policy()),
+            Option::is_some,
+        )
+        .await;
+    let winner = claims.iter().any(|claim| matches!(claim, Ok(Some(_))));
+    let claims = claims.map(|claim| match claim {
+        // A fail-closed unknown COMMIT (Q2(b)) is accepted only beside a winner: the claim is
+        // exclusive, so the unknown claimant cannot hold the lease. That is asserted below
+        // from the job and its attempts, not assumed.
+        Err(AppError::Conflict(message))
+            if message.contains("commit outcome unknown") && winner =>
+        {
+            uncaptured(
+                "BACKSTOP unknown=lease.claim scenario=new_claim (winner and loser asserted below)",
+            );
+            None
+        }
+        claim => claim.unwrap(),
+    });
+    // Exactly one claims.
     assert_eq!(claims.iter().filter(|claim| claim.is_some()).count(), 1);
     request.fence = claims.into_iter().flatten().next().unwrap().fence;
+    let (owner, generation): (Uuid, Uuid) =
+        sqlx::query_as("SELECT worker_id,execution_generation FROM background_tasks WHERE id=$1")
+            .bind(request.fence.scope.job.0)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        (owner, generation),
+        (request.fence.worker.0, request.fence.generation.0),
+        "the winner holds the lease"
+    );
+    let loser = workers
+        .into_iter()
+        .find(|claimant| *claimant != request.fence.worker)
+        .unwrap();
+    let loser_attempts: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM task_attempts WHERE task_id=$1 AND worker_id=$2")
+            .bind(request.fence.scope.job.0)
+            .bind(loser.0)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(loser_attempts, 0, "the losing claimant wrote no attempt");
 }
 async fn projection(f: &AdmissionFixture) -> (String, bool) {
     sqlx::query_as("SELECT effect_state,evidence_conflict FROM workflow_action_effect_states")
@@ -271,7 +365,12 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
         if completed {
             assert!(
                 f.persistence()
+                    .settled()
                     .complete_io(FencedWorkflowResult {
+                        policy: crate::application::workflow::lease::LeasePolicy::new(
+                            std::time::Duration::from_secs(3)
+                        )
+                        .unwrap(),
                         fence: request.fence,
                         output: json!({"items":[],"token_count":0})
                     })
@@ -318,7 +417,12 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
             );
             assert!(
                 f.persistence()
+                    .settled()
                     .complete_io(FencedWorkflowResult {
+                        policy: crate::application::workflow::lease::LeasePolicy::new(
+                            std::time::Duration::from_secs(3)
+                        )
+                        .unwrap(),
                         fence: request.fence,
                         output: json!({"items":[],"token_count":0})
                     })
@@ -330,7 +434,12 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
         }
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3)
+                    )
+                    .unwrap(),
                     fence: request.fence,
                     output: json!({"written":true})
                 })

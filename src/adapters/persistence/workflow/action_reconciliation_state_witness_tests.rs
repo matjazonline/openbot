@@ -80,6 +80,7 @@ async fn failed_source(
     });
     assert!(
         f.persistence()
+            .settled()
             .release_io(request.fence, policy(), cause)
             .await
             .unwrap()

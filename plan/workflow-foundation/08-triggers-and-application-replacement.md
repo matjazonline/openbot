@@ -5,6 +5,14 @@
 Depends on phases 1–7. Route all supported business execution through workflow admission and
 remove the old dispatch/configuration model without a compatibility layer.
 
+## Schema and data
+
+Pre-release: nothing is deployed, so existing data is not preserved. Schema changes in this phase
+edit the squashed init migration (`migrations/20260817000000_init_schema.sql`) in place, and the
+development and test databases are dropped and recreated rather than upgraded. Do not add additive
+migrations, backfills, compatibility shims, or populated-upgrade tests; verify against a freshly
+migrated schema.
+
 ## Channels and ingress
 
 Keep channel identity, provider bindings, access policy, participants, and message/thread storage.

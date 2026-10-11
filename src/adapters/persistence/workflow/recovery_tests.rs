@@ -15,6 +15,7 @@ fn failure(class: FailureClass, safety: RetrySafety) -> LeaseReleaseCause {
 }
 async fn claim(f: &AdmissionFixture, scope: ActivationRequest) -> ClaimedWorkflow {
     f.persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -37,18 +38,24 @@ async fn workflow_failure_retry_debits_once_preserves_input_and_poison_backoff()
     let (f, scope) = fixture().await;
     let first = claim(&f, scope).await;
     let barrier = Barrier::new(2);
-    let fail = || async {
-        barrier.wait().await;
-        f.persistence()
-            .release_io(
-                first.fence,
-                policy(),
-                failure(FailureClass::Retryable, RetrySafety::SafeToRetry),
-            )
-            .await
-            .unwrap()
-    };
-    let (a, b) = tokio::join!(fail(), fail());
+    let barrier = &barrier;
+    let [a, b] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| async move {
+                barrier.wait().await;
+                p.release_io(
+                    first.fence,
+                    policy(),
+                    failure(FailureClass::Retryable, RetrySafety::SafeToRetry),
+                )
+                .await
+            },
+            |released: &bool| *released,
+        )
+        .await;
+    let (a, b) = (a.unwrap(), b.unwrap());
     assert_ne!(a, b);
     let saved = snapshot(&f).await;
     assert_eq!(saved["jobs"][0]["retry_count"], 1);
@@ -80,6 +87,7 @@ async fn workflow_failure_terminal_routes_or_fails_without_reexecuting() {
         let owned = claim(&f, scope).await;
         assert!(
             f.persistence()
+                .settled()
                 .release_io(
                     owned.fence,
                     policy(),
@@ -117,6 +125,7 @@ async fn workflow_failure_terminal_routes_or_fails_without_reexecuting() {
         );
         assert!(
             !f.persistence()
+                .settled()
                 .release_io(
                     owned.fence,
                     policy(),
@@ -190,6 +199,10 @@ async fn workflow_failure_competes_with_completion_without_duplicate_successor()
             barrier.wait().await;
             f.persistence()
                 .complete_io(FencedWorkflowResult {
+                    policy: crate::application::workflow::lease::LeasePolicy::new(
+                        std::time::Duration::from_secs(3),
+                    )
+                    .unwrap(),
                     fence: owned.fence,
                     output: json!({"items":[],"token_count":0}),
                 })
@@ -241,6 +254,7 @@ async fn workflow_failure_interrupted_and_expired_effects_cannot_replay() {
             expire(&f, scope).await;
             assert!(
                 f.persistence()
+                    .settled()
                     .retire_expired_io(scope, policy())
                     .await
                     .unwrap()
@@ -248,6 +262,7 @@ async fn workflow_failure_interrupted_and_expired_effects_cannot_replay() {
         } else {
             assert!(
                 f.persistence()
+                    .settled()
                     .release_io(owned.fence, policy(), LeaseReleaseCause::LocalInterruption)
                     .await
                     .unwrap()
@@ -259,6 +274,7 @@ async fn workflow_failure_interrupted_and_expired_effects_cannot_replay() {
         assert_eq!(saved["jobs"][0]["retry_count"], 1);
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()

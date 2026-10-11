@@ -1,8 +1,6 @@
 use super::*;
 use crate::adapters::persistence::workflow::{action_uncertainty, pending_recovery};
-use crate::application::workflow::{
-    budget::*, completion::WorkflowCompletion, polling::WorkflowPolling,
-};
+use crate::application::workflow::{budget::*, polling::WorkflowPolling};
 use crate::domain::workflow::{
     BudgetCharge, BudgetResource, FailureClass, FailureCode, RetrySafety, StepFailure,
 };
@@ -51,12 +49,14 @@ async fn parked(f: &AdmissionFixture, request: &ActionDispatchRequest, code: &st
         observations[0]["invocation_id"],
         request.subject.invocation.as_uuid().to_string()
     );
-    let (a, b) = tokio::join!(
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy()),
-        f.persistence()
-            .claim_io(request.fence.scope, worker(), policy())
-    );
+    let [a, b] = f
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(a.unwrap().is_none() && b.unwrap().is_none());
     assert_eq!(snapshot(f).await, saved);
 }
@@ -79,19 +79,26 @@ async fn workflow_action_uncertainty_actual_effect_errors_and_exact_retirement()
         assert_eq!(state(&f).await, "possible_dispatch");
         let (code, class) = match mode {
             0 | 1 => {
-                let (a, b) = tokio::join!(
-                    f.persistence()
-                        .release_io(request.fence, policy(), classified()),
-                    f.persistence()
-                        .release_io(request.fence, policy(), classified())
-                );
+                let [a, b] = f
+                    .persistence()
+                    .settled()
+                    .competing(
+                        |p, _| p.release_io(request.fence, policy(), classified()),
+                        |released: &bool| *released,
+                    )
+                    .await;
                 assert_eq!(usize::from(a.unwrap()) + usize::from(b.unwrap()), 1);
                 ("provider.rejected", "terminal")
             }
             2 => {
                 assert!(
                     f.persistence()
+                        .settled()
                         .complete_io(FencedWorkflowResult {
+                            policy: crate::application::workflow::lease::LeasePolicy::new(
+                                std::time::Duration::from_secs(3)
+                            )
+                            .unwrap(),
                             fence: request.fence,
                             output: json!("invalid handler output")
                         })
@@ -104,6 +111,7 @@ async fn workflow_action_uncertainty_actual_effect_errors_and_exact_retirement()
             3 => {
                 assert!(
                     f.persistence()
+                        .settled()
                         .release_io(request.fence, policy(), LeaseReleaseCause::Deadline)
                         .await
                         .unwrap()
@@ -113,6 +121,7 @@ async fn workflow_action_uncertainty_actual_effect_errors_and_exact_retirement()
             4 => {
                 assert!(
                     f.persistence()
+                        .settled()
                         .release_io(
                             request.fence,
                             policy(),
@@ -127,6 +136,7 @@ async fn workflow_action_uncertainty_actual_effect_errors_and_exact_retirement()
                 expire(&f, request.fence.scope).await;
                 assert!(
                     f.persistence()
+                        .settled()
                         .claim_io(request.fence.scope, worker(), policy())
                         .await
                         .unwrap()
@@ -166,6 +176,7 @@ async fn workflow_action_uncertainty_root_budget_overrides_read_handler_default(
     .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(reservation, policy())
             .await
             .unwrap(),
@@ -179,6 +190,7 @@ async fn workflow_action_uncertainty_root_budget_overrides_read_handler_default(
     .unwrap();
     assert_eq!(
         f.persistence()
+            .settled()
             .reserve_budget(reservation, policy())
             .await
             .unwrap(),
@@ -210,6 +222,7 @@ async fn workflow_action_uncertainty_pending_failures_consult_expired_action_pro
         expire(&f, request.fence.scope).await;
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(request.fence.scope, worker(), policy())
                 .await
                 .unwrap()
@@ -282,6 +295,7 @@ async fn workflow_action_uncertainty_parked_deadline_cancel_and_late_receipt_tru
             .unwrap();
         assert!(
             f.persistence()
+                .settled()
                 .release_io(request.fence, policy(), classified())
                 .await
                 .unwrap()

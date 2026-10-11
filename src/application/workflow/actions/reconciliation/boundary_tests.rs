@@ -31,12 +31,6 @@ impl Issuance {
         )
     }
 
-    fn final_evidence(&self, padding: usize) -> AppResult<VerifiedEvidence> {
-        let mut attested = attestation(&self.snapshot, VerifiedDisposition::FinalNotApplied);
-        attested.diagnostic = json!({"padding": "x".repeat(padding)});
-        self.issue(attested, self.snapshot.database_now)
-    }
-
     fn cover_entry(&mut self) -> chrono::DateTime<Utc> {
         let created_at = self.snapshot.database_now - chrono::Duration::seconds(1);
         self.snapshot.entries.push(ReconciliationEntry {
@@ -71,29 +65,80 @@ fn invalid_evidence(result: AppResult<VerifiedEvidence>) {
 }
 
 #[test]
-fn workflow_action_reconciliation_boundary_outer_envelope_exact_bytes() {
-    let issuance = Issuance::new();
-    let empty = issuance.final_evidence(0).unwrap();
+fn workflow_action_reconciliation_boundary_attestation_diagnostic_is_closed() {
+    let diagnostic = AttestationDiagnostic::new(EvidenceProviderId::parse("fixture").unwrap());
+    assert_eq!(
+        serde_json::to_string(&diagnostic).unwrap(),
+        r#"{"version":1,"ledger":"fixture"}"#
+    );
+    // Stored canonical bytes match the pre-typed fixture diagnostic.
+    let stored = super::super::super::freeze::canonical(
+        &serde_json::to_value(&diagnostic).unwrap(),
+        MAX_EVIDENCE_ENVELOPE_BYTES,
+    )
+    .unwrap();
+    assert_eq!(stored.to_string(), r#"{"ledger":"fixture","version":1}"#);
+}
+
+#[test]
+fn workflow_action_reconciliation_boundary_max_envelope_literal_bytes() {
+    // Every envelope field at its widest: 128-byte grammar ids, 9-digit fractional
+    // timestamps and the longest reason classify can emit. Adding a field or widening
+    // a grammar changes this literal; the limit itself is proven on canonical below.
+    const MAX_ENVELOPE: usize = 954;
+    const _: () = assert!(MAX_ENVELOPE <= 16_384);
+    let (mut command, snapshot, _) = fixture();
+    let widest = |prefix: &str| format!("{prefix}{}", "x".repeat(128 - prefix.len()));
+    let registration = EvidenceVerifierRegistration::approve(
+        EvidenceVerifierId::parse(widest("r")).unwrap(),
+        EvidenceVerifierVersion::parse(widest("v")).unwrap(),
+        EvidenceProviderId::parse(widest("p")).unwrap(),
+        &snapshot.action.request().contract,
+        &snapshot.action.request().target,
+    )
+    .unwrap();
+    let reference = EvidenceRecordReference::parse(widest("e")).unwrap();
+    command.input = EvidenceInput::VerifiedReference {
+        registration: registration.id().clone(),
+        reference: reference.clone(),
+    };
+    let overhead = serialized_bytes(&json!({"padding": ""}));
+    let invalid_result = json!({"padding": "x".repeat(65_537 - overhead)});
+    let mut attested = attestation(
+        &snapshot,
+        VerifiedDisposition::Applied {
+            recovered_result: Some(invalid_result),
+            request: AppliedEvidenceRequest::Unattributed,
+        },
+    );
+    let verified_at = snapshot.database_now + chrono::Duration::nanoseconds(123_456_789);
+    attested.authoritative_reference = reference;
+    attested.observed_at = snapshot.database_now - chrono::Duration::nanoseconds(987_654_321);
+    attested.valid_until = verified_at + chrono::Duration::hours(1);
+    attested.diagnostic =
+        AttestationDiagnostic::new(EvidenceProviderId::parse(widest("l")).unwrap());
+    let token =
+        VerifiedEvidence::issue(&command, &snapshot, &registration, attested, verified_at).unwrap();
+    assert_eq!(
+        token.diagnostic()["result"],
+        json!(ReconciliationBlockedReason::InvalidRecoveredResult)
+    );
+    assert_eq!(serialized_bytes(token.diagnostic()), MAX_ENVELOPE);
+}
+
+#[test]
+fn workflow_action_reconciliation_boundary_canonical_exact_bytes() {
     // Literal boundaries make a later limit increase fail this regression.
     assert_eq!(MAX_EVIDENCE_ENVELOPE_BYTES, 16_384);
-    let padding = 16_384 - serialized_bytes(empty.diagnostic());
-    let exact = issuance.final_evidence(padding).unwrap();
-    assert_eq!(serialized_bytes(exact.diagnostic()), 16_384);
-    assert_eq!(
-        exact.disposition(),
-        EffectiveEvidenceDisposition::FinalNotApplied
-    );
-    assert!(exact.recovered_result().is_none());
-
-    let mut oversized = exact.diagnostic().clone();
-    oversized["attestation"]["diagnostic"]["padding"] = json!("x".repeat(padding + 1));
-    assert_eq!(serialized_bytes(&oversized), 16_385);
-    assert!(
-        serialized_bytes(&oversized["attestation"]) <= 16_384,
-        "inner canonical bound must not mask the outer envelope bound"
-    );
+    let overhead = serialized_bytes(&json!({"padding": ""}));
+    let padded = |size: usize| json!({"padding": "x".repeat(size - overhead)});
+    let canonical = |value: &serde_json::Value| {
+        super::super::super::freeze::canonical(value, MAX_EVIDENCE_ENVELOPE_BYTES)
+    };
+    let exact = canonical(&padded(16_384)).unwrap();
+    assert_eq!(serialized_bytes(&exact), 16_384);
     assert!(matches!(
-        issuance.final_evidence(padding + 1),
+        canonical(&padded(16_385)),
         Err(AppError::BadRequest(_))
     ));
 }

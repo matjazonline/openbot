@@ -108,3 +108,10 @@ jobs:
       # thread gets by default, so growth is a red build rather than a crash months later.
       - name: Stack budget
         run: scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
+      # The workflow persistence bounds (LeasePolicy::attempt_bound) were raised past the old
+      # fixed second, which removed the signal that they were being approached. Re-run the
+      # lease, action and budget suites uncontended and fail when an operation's code-owned
+      # work (its statements after the leading locks) nears its bound; lock waits, acquire,
+      # commit and unknown outcomes are reported, not gated (contention and host IO).
+      - name: Lease budget
+        run: scripts/test-network-isolation.sh scripts/lease-budget.sh --offline

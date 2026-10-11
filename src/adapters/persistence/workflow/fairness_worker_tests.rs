@@ -273,8 +273,13 @@ async fn workflow_fairness_worker_stops_full_page_at_first_denied_demand() {
     p.configure_capacity(WorkflowCapacityPolicy::new(2, 1).unwrap())
         .await
         .unwrap();
-    p.claim_io(a, worker(), lease()).await.unwrap().unwrap();
-    p.claim_io(admit(&b, "owner").await, worker(), lease())
+    p.settled()
+        .claim_io(a, worker(), lease())
+        .await
+        .unwrap()
+        .unwrap();
+    p.settled()
+        .claim_io(admit(&b, "owner").await, worker(), lease())
         .await
         .unwrap()
         .unwrap();

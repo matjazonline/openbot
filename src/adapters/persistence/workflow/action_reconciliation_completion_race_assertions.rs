@@ -244,26 +244,35 @@ pub(super) fn completed(h: &HeldTruth, before: &Value, after: &Value) {
 
 pub(super) async fn inert(h: &HeldTruth, saved: &Value, first: Winner) {
     assert!(!retry_safe(&h.fixture, &h.request).await);
-    let (a, b) = tokio::join!(
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-        h.fixture
-            .persistence()
-            .claim_io(h.request.fence.scope, worker(), policy()),
-    );
+    let [a, b] = h
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.claim_io(h.request.fence.scope, worker(), policy()),
+            Option::is_some,
+        )
+        .await;
     assert!(a.unwrap().is_none() && b.unwrap().is_none());
     let provider = LedgerProvider::new(&h.fixture, Delivery::Pending);
+    let refused = Box::pin(invoke(&h.fixture, &h.request, &provider))
+        .await
+        .err()
+        .expect("a refusal, not a dispatch");
     assert!(
-        Box::pin(invoke(&h.fixture, &h.request, &provider))
-            .await
-            .is_err()
+        matches!(&refused, AppError::Conflict(message) if message == "Workflow lifecycle revision or command conflict"),
+        "expected refusal: {refused:?}"
     );
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     let repeated = h
         .fixture
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: h.request.fence,
             output: h.result.clone(),
         })

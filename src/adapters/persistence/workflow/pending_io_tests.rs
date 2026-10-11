@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::workflow::{batch::WorkflowBatch, completion::*, polling::*, waits::*};
+use crate::application::workflow::{batch::WorkflowBatch, polling::*, waits::*};
 
 #[tokio::test]
 async fn workflow_poison_io_activation_and_wrong_kind_park() {
@@ -14,6 +14,7 @@ async fn workflow_poison_io_activation_and_wrong_kind_park() {
         .unwrap();
     assert!(
         f.persistence()
+            .settled()
             .claim_io(scope, worker(), policy())
             .await
             .unwrap()
@@ -47,6 +48,7 @@ async fn workflow_poison_effect_output_and_spent_pending_reconcile() {
                 .unwrap();
             assert!(
                 f.persistence()
+                    .settled()
                     .retire_exhausted_work(scope, policy())
                     .await
                     .unwrap()
@@ -54,13 +56,19 @@ async fn workflow_poison_effect_output_and_spent_pending_reconcile() {
         } else {
             let owned = f
                 .persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()
                 .unwrap();
             assert!(
                 f.persistence()
+                    .settled()
                     .complete_io(FencedWorkflowResult {
+                        policy: crate::application::workflow::lease::LeasePolicy::new(
+                            std::time::Duration::from_secs(3)
+                        )
+                        .unwrap(),
                         fence: owned.fence,
                         output: Value::Null
                     })
@@ -83,6 +91,7 @@ async fn workflow_poison_effect_output_and_spent_pending_reconcile() {
         );
         assert!(
             f.persistence()
+                .settled()
                 .claim_io(scope, worker(), policy())
                 .await
                 .unwrap()

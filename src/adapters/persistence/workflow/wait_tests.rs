@@ -52,7 +52,8 @@ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
         a.wait.as_uuid().to_string()
     );
     assert!(
-        p.claim_io(scope, worker(), policy())
+        p.settled()
+            .claim_io(scope, worker(), policy())
             .await
             .unwrap()
             .is_none()

@@ -220,6 +220,7 @@ pub(super) async fn normal_control() {
     let claim = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(s.request.fence.scope, worker(), policy())
         .await
         .unwrap()
@@ -228,6 +229,7 @@ pub(super) async fn normal_control() {
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .validate_io(claim.fence, policy())
             .await
             .unwrap()

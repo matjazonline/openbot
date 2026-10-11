@@ -114,12 +114,40 @@ async fn held_ancestor_claims(s: &Descendant) -> Vec<WorkflowFence> {
     })
     .await
     .expect("descendant ordinary first claim commits with root and parent locked");
-    let claims = [first.unwrap(), second.unwrap()]
+    // The winner's commit while every ancestor lock is held is the proof. Beside it, a
+    // claimant that waited out its own bound behind the winner reports a definite NotApplied
+    // and lost; that it wrote nothing is asserted below. Without a winner a NotApplied still
+    // fails here: it is what a hidden ancestor lock would produce.
+    let winner = [&first, &second]
+        .iter()
+        .any(|claim| matches!(claim, Ok(Some(_))));
+    let mut losers = Vec::new();
+    let claims = [(first, first_worker), (second, second_worker)]
         .into_iter()
-        .flatten()
+        .filter_map(|(claim, worker)| match claim {
+            Err(AppError::DatabaseTimeout(error)) if winner => {
+                uncaptured(&format!(
+                    "SETTLE loser op=claim_io scenario=held_ancestor_claims not_applied={error}"
+                ));
+                losers.push(worker);
+                None
+            }
+            claim => claim.unwrap(),
+        })
         .map(|claim| claim.fence)
         .collect();
     held.rollback().await.unwrap();
+    for loser in losers {
+        let attempts: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM task_attempts WHERE task_id=$1 AND worker_id=$2",
+        )
+        .bind(s.descendant.job.0)
+        .bind(loser.0)
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        assert_eq!(attempts, 0, "the NotApplied claimant wrote no attempt");
+    }
     claims
 }
 
@@ -280,6 +308,7 @@ async fn workflow_action_reconciliation_claim_fairness_descendant_first_claim_wi
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .validate_io(claims[0], policy())
             .await
             .unwrap()

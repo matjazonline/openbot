@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::workflow::completion::WorkflowCompletion;
 
 struct LostReceiptAck(Dispatch);
 #[async_trait]
@@ -148,7 +147,12 @@ async fn workflow_action_receipt_actual_result_precedes_shared_completion_writer
     assert!(unadvanced);
     let committed = f
         .persistence()
+        .settled()
         .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: request.fence,
             output: receipt.result.clone(),
         })
@@ -275,6 +279,11 @@ async fn workflow_action_receipt_return_authority_errors_propagate_after_commit(
         AuthorityFailure::Policy,
         AuthorityFailure::Timeout,
     ] {
+        // The timeout variant stalls the return check past its bound on purpose: excluded
+        // from the lease budget's work gate like every deliberate stall.
+        let _injected = matches!(failure, AuthorityFailure::Timeout).then(
+            crate::adapters::persistence::workflow::persistence_bound::recorder::Injected::mark,
+        );
         let (f, request, contract) = receipt_fixture(ActionRecovery::Reconcile, false).await;
         let provider = dedup(&f, contract, false);
         let writer = PostgresActionDispatch::new(
@@ -295,8 +304,11 @@ async fn workflow_action_receipt_return_authority_errors_propagate_after_commit(
             (AuthorityFailure::Policy, Err(AppError::BadRequest(message))) => {
                 assert_eq!(message, "return policy malformed")
             }
-            (AuthorityFailure::Timeout, Err(AppError::Conflict(message))) => {
-                assert_eq!(message, "Workflow lease transaction timed out")
+            (AuthorityFailure::Timeout, Err(AppError::DatabaseTimeout(message))) => {
+                assert_eq!(
+                    message,
+                    "Workflow action.return_authorized not applied: persistence bound elapsed before commit"
+                )
             }
             _ => panic!("operational failure must remain visible"),
         }

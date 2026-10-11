@@ -65,6 +65,7 @@ async fn exhaust_sibling(s: &Scheduled) {
     let fence = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -74,6 +75,7 @@ async fn exhaust_sibling(s: &Scheduled) {
     assert_eq!(
         s.fixture
             .persistence()
+            .settled()
             .reserve_budget(
                 BudgetReservation::new(
                     fence,
@@ -104,10 +106,18 @@ async fn exhaust_sibling(s: &Scheduled) {
 
 async fn finish_accepted(s: &Scheduled, receipt: ActionReceipt) {
     let before = all_tables(&s.fixture).await;
+    // A definite NotApplied wrote nothing and the fence is still live, so `before` still
+    // holds and re-polling is sound. (The production worker does not retry complete_io
+    // itself; worker.rs propagates the error.)
     let committed = s
         .fixture
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: s.request.fence,
             output: receipt.result.clone(),
         })
@@ -161,6 +171,7 @@ async fn workflow_action_reconciliation_claim_recovery_lost_response_automatic_s
     assert!(
         s.fixture
             .persistence()
+            .settled()
             .claim_io(s.request.fence.scope, lost_worker, policy())
             .await
             .unwrap()
@@ -181,6 +192,7 @@ async fn workflow_action_reconciliation_claim_recovery_lost_response_automatic_s
     let sibling = s
         .fixture
         .persistence()
+        .settled()
         .claim_io(descendant, worker(), policy())
         .await
         .unwrap()
@@ -193,14 +205,18 @@ async fn workflow_action_reconciliation_claim_recovery_lost_response_automatic_s
 
 async fn recover_discarded(s: &mut Scheduled, charged: Value, lost: Value) {
     Box::pin(wait_for_clock(s, ClockBoundary::Lease)).await;
-    let (a, b) = tokio::join!(
-        s.fixture
-            .persistence()
-            .retire_expired_io(s.request.fence.scope, policy()),
-        s.fixture
-            .persistence()
-            .retire_expired_io(s.request.fence.scope, policy()),
-    );
+    // Exactly one competing sweep retires the expired attempt. A sweep that waits out its
+    // bound reports a definite NotApplied: beside the winner it lost, and with no winner the
+    // pair wrote nothing and re-polls (see `competing`).
+    let [a, b] = s
+        .fixture
+        .persistence()
+        .settled()
+        .competing(
+            |p, _| p.retire_expired_io(s.request.fence.scope, policy()),
+            |retired: &bool| *retired,
+        )
+        .await;
     assert_eq!(usize::from(a.unwrap()) + usize::from(b.unwrap()), 1);
     let retired = all_tables(&s.fixture).await;
     unchanged(&charged, &retired, CLAIM_SAVED_FACTS);
@@ -241,6 +257,7 @@ async fn recover_discarded(s: &mut Scheduled, charged: Value, lost: Value) {
     assert_eq!(
         s.fixture
             .persistence()
+            .settled()
             .reserve_budget(
                 BudgetReservation::new(
                     s.request.fence,
@@ -302,6 +319,7 @@ async fn late_receipt(timing: ReceiptTiming) {
         assert!(
             s.fixture
                 .persistence()
+                .settled()
                 .retire_expired_io(s.request.fence.scope, policy())
                 .await
                 .unwrap()
@@ -350,7 +368,12 @@ async fn accepted_observation(
             assert!(
                 s.fixture
                     .persistence()
+                    .settled()
                     .complete_io(FencedWorkflowResult {
+                        policy: crate::application::workflow::lease::LeasePolicy::new(
+                            std::time::Duration::from_secs(3)
+                        )
+                        .unwrap(),
                         fence: s.request.fence,
                         output: good(),
                     })

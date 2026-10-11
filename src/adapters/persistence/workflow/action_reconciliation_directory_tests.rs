@@ -118,6 +118,7 @@ async fn workflow_action_reconciliation_directory_settlement_error_cannot_commit
     assert_eq!(all_tables(&f).await, unavailable);
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()

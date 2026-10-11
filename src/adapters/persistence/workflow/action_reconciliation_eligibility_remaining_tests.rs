@@ -18,7 +18,23 @@ async fn pending_action() -> PendingAction {
     let (fixture, request) = Box::pin(limited()).await;
     let verifier = ledger(&fixture, &request).await;
     let provider = LedgerProvider::new(&fixture, Delivery::Pending);
-    assert!(invoke(&fixture, &request, &provider).await.is_err());
+    // The provider's own pending timeout is the expected error. A bounded persistence step
+    // before it may instead report a definite NotApplied, which wrote nothing and is
+    // retry-safe: retry it as the worker does. Anything else is a real failure.
+    let started = std::time::Instant::now();
+    loop {
+        match invoke(&fixture, &request, &provider).await {
+            Err(AppError::Timeout(_)) => break,
+            Err(AppError::DatabaseTimeout(error)) if provider.calls.load(Ordering::SeqCst) == 0 => {
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "persistence never applied before the provider: {error}"
+                );
+            }
+            Err(error) => panic!("dispatch failed before the provider: {error:?}"),
+            Ok(_) => panic!("a pending provider produced no result"),
+        }
+    }
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     PendingAction {
         fixture,
@@ -137,6 +153,7 @@ async fn blocked(pending: &PendingAction, key: &str) {
     assert_eq!(effects(f).await, 0);
     assert!(
         f.persistence()
+            .settled()
             .claim_io(pending.request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -324,6 +341,7 @@ async fn reserve(
     pending
         .fixture
         .persistence()
+        .settled()
         .reserve_budget(request, policy())
         .await
         .unwrap()
@@ -421,11 +439,27 @@ async fn budget_control(resource: BudgetResource) {
         BudgetResource::Repetition => 2,
         BudgetResource::Activation => unreachable!(),
     };
-    assert_eq!(
-        reserve(&pending, resource, "allowed-reservation", quantity).await,
-        BudgetReservationResult::Recorded(BudgetDisposition::Granted)
-    );
+    let reserved = reserve(&pending, resource, "allowed-reservation", quantity).await;
     let state = all_tables(&pending.fixture).await;
+    match reserved {
+        BudgetReservationResult::Recorded(BudgetDisposition::Granted) => {}
+        // This key was never reserved before, so `Replayed` can only be the read-only
+        // resolution of an ambiguous COMMIT that found its own receipt (the conservative
+        // B1 answer). Assert that it applied exactly once: one granted receipt for the key
+        // (the usage below is charged exactly `quantity`).
+        BudgetReservationResult::Replayed(BudgetDisposition::Granted) => {
+            let receipts: Vec<_> = state["workflow_budget_receipts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|row| row["reservation_key"] == "allowed-reservation")
+                .collect();
+            assert_eq!(receipts.len(), 1, "the resolved reservation applied once");
+            assert_eq!(receipts[0]["disposition"], "granted");
+            assert_eq!(receipts[0]["quantity"], quantity);
+        }
+        other => panic!("first reservation of the key: {other:?}"),
+    }
     let counter = match resource {
         BudgetResource::ModelCall => "model_calls",
         BudgetResource::Repetition => "repetitions",

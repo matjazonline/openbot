@@ -374,3 +374,5 @@ async fn workflow_action_reconciliation_native_diagnostic_scalar_and_controls() 
         Box::pin(exercise(probe)).await;
     }
 }
+#[path = "action_reconciliation_native_object_tests.rs"]
+mod native_object_tests;

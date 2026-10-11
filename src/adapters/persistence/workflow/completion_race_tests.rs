@@ -49,6 +49,7 @@ async fn workflow_completion_cancel_competes_without_stale_progression() {
         if let Some(saved) = saved {
             assert!(
                 f.persistence()
+                    .settled()
                     .claim_io(saved.successor.unwrap(), worker(), policy())
                     .await
                     .unwrap()
@@ -83,6 +84,7 @@ async fn workflow_completion_reclaim_competes_without_stale_progression() {
     due(&f, claim.fence.scope).await;
     let replacement = f
         .persistence()
+        .settled()
         .claim_io(claim.fence.scope, worker(), policy())
         .await
         .unwrap()
@@ -126,6 +128,7 @@ async fn workflow_completion_inactive_run_and_lock_contention_refuse() {
         let before = state(&f).await;
         assert!(
             f.persistence()
+                .settled()
                 .complete_io(result(claim.fence))
                 .await
                 .unwrap()
@@ -165,13 +168,16 @@ async fn workflow_completion_deferred_expiry_and_deadline_commit_guard() {
         } else {
             claim.fence.scope.run.as_uuid()
         };
-        sqlx::query(statement)
-            .bind(id)
-            .execute(f.persistence().pool())
-            .await
-            .unwrap();
+        // The short window is opened inside the completion's own transaction, right before
+        // complete_on, so a slow snapshot or BEGIN under load cannot close it first. The
+        // failed commit rolls the window back too, so `before` is the state without it.
         let before = state(&f).await;
         let mut tx = f.persistence().pool().begin().await.unwrap();
+        sqlx::query(statement)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
         complete_on(&mut tx, result(claim.fence))
             .await
             .unwrap()

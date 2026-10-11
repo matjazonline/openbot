@@ -1,6 +1,5 @@
 //! Genuine completion histories and an adversarial mutable max_steps projection.
 use super::*;
-use crate::application::workflow::completion::WorkflowCompletion;
 use crate::application::workflow::lease::FencedWorkflowResult;
 
 #[path = "action_reconciliation_terminal_revision_tests.rs"]
@@ -53,7 +52,12 @@ async fn completed_action(source: Value) -> CompletedAction {
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     let completed = f
         .persistence()
+        .settled()
         .complete_io(FencedWorkflowResult {
+            policy: crate::application::workflow::lease::LeasePolicy::new(
+                std::time::Duration::from_secs(3),
+            )
+            .unwrap(),
             fence: request.fence,
             output: receipt.result,
         })
@@ -80,6 +84,7 @@ async fn successor_action(completed: &CompletedAction) -> SuccessorAction {
     let scope = completed.successor.unwrap();
     let claim = f
         .persistence()
+        .settled()
         .claim_io(scope, worker(), policy())
         .await
         .unwrap()
@@ -278,6 +283,7 @@ async fn completed_refusal(source: Value) {
     assert_eq!(all_tables(f).await, after);
     assert!(
         f.persistence()
+            .settled()
             .claim_io(pending.request.fence.scope, worker(), policy())
             .await
             .unwrap()
@@ -333,6 +339,7 @@ async fn restore_bound_control(
     tx.rollback().await.unwrap();
     assert!(
         f.persistence()
+            .settled()
             .claim_io(request.fence.scope, worker(), policy())
             .await
             .unwrap()
