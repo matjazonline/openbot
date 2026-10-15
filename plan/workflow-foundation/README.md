@@ -77,10 +77,12 @@ root-accepted for the current user-authorized scope: final stock2MiB full librar
 2532passed/0failed/22unchangedignored, lease-budget87passed, all required static,
 SQLx, fresh53migration/schema and graft gates passed, with independent final review.
 [Final04.7 handoff](HANDOFF-04.7-COMPLETE-20261012.md) preserves the earlier unexplained
-failure and established scope/future-phase limits. Work stops here as requested;
-04.8 and migration squash have not started.
+failure and established scope/future-phase limits. 04.8 is now in progress: group A is implemented and independently code-reviewed,
+but required verification and root acceptance remain pending. See the
+[current handoff](HANDOFF-20261014-04.8.md). Migration squash has not started.
 [RESUME.md](RESUME.md) records the current state and first next action.
-[PROGRESS.md](PROGRESS.md) records accepted scope and handoffs.
+Superseded progress logs are available in Git history; retained briefs, contracts
+and the final 04.7 handoff preserve the foundation needed for later tasks.
 No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
 inventories current owners and removal gates.
 

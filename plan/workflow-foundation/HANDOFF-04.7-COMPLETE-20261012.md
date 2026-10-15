@@ -26,8 +26,9 @@ This continuation finished deferred coverage D1–D3 (8cells/6rollback witnesses
 2ordinary commits,65affected tests and scoped gates), corrected two documentation
 nits, and completed final integration. Independent code review corrected diagnostic
 line attribution and row/witness comparison assertions without weakening criteria.
-Earlier accepted row3d/row3e and native-owner evidence remains linked in the
-[prior handoff](HANDOFF-20261012-cont.md) and [continuation](CONTINUATION-20261012-root69.md).
+Earlier accepted row3d/row3e and native-owner checkpoint details are retained in
+Git history for `HANDOFF-20261012-cont.md` and `CONTINUATION-20261012-root69.md`;
+these superseded logs were removed during the 2026-10-15 planning cleanup.
 
 ## Retained limitations and history
 
