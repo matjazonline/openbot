@@ -225,26 +225,67 @@ pub(super) async fn reject_historical(source: &HighSource, attack: Attack) {
     tx.rollback().await.unwrap();
 }
 
+/// A reserve or entry refusal is never the required success. The lease is observed only to
+/// label the failure; an expiry seen afterwards does not excuse it.
+async fn refused(source: &HighSource, operation: &str, error: AppError) -> ! {
+    let state = lease_phase(
+        &source.fixture,
+        source.request.fence,
+        "high_bounds",
+        &format!("supported_{operation}_refused"),
+        source.claimed,
+    )
+    .await;
+    let kind = if state.owner && state.lease_ms > 0.0 && state.run_ms > 0.0 {
+        "LIVE-OWNER REFUSAL"
+    } else {
+        "LEASE LAPSE"
+    };
+    panic!(
+        "{kind} scenario=high_bounds supported {operation}: {error:?}; lease after refusal {state:?}"
+    )
+}
+
 pub(super) async fn supported_positive(source: &HighSource) {
+    super::renew(source, "supported_positive", &mut []).await;
     clean_current(source).await;
     let f = &source.fixture;
     assert_eq!(available(f, &source.request, None).await, None);
-    let before = all_tables(f).await;
+    super::phase(source, "supported_clean").await;
+    let mut before = all_tables(f).await;
+    super::phase(source, "supported_before_snapshot").await;
+    // Reservation freezes its own window from the live lease, which a later renewal cannot
+    // extend: renew immediately before it and keep heavy observations out of reserve-to-entry.
+    super::renew(source, "supported_reserve", &mut [&mut before]).await;
     let writer = adapter(f, 0);
-    let RemoteReservationResult::Reserved(reservation) = writer
+    let reservation = match writer
         .reserve_remote(&source.request, Some(&source.provider.contract))
         .await
-        .unwrap()
-    else {
-        panic!("genuine supported replay remains available above the proof bound");
+    {
+        Ok(RemoteReservationResult::Reserved(reservation)) => reservation,
+        Ok(_) => panic!("genuine supported replay remains available above the proof bound"),
+        Err(error) => refused(source, "reserve", error).await,
     };
-    let committed = all_tables(f).await;
+    let entry = reservation.entry;
+    // Every public relation as reservation left it, compactly enough for the frozen window.
+    let reserved = fingerprint(f).await;
+    super::phase(source, "supported_reserved").await;
+    let entered = match writer.enter_remote(*reservation).await {
+        Ok(entered) => entered,
+        Err(error) => refused(source, "entry", error).await,
+    };
+    assert_eq!(entered.entry, entry);
+    super::phase(source, "supported_entered").await;
+    // Full rows and fingerprint from one snapshot. Entry wrote nothing in any relation, so these
+    // rows are exactly the post-reservation state, which differs from `before` by entry 130.
+    let (committed, entered) = tables_and_fingerprint(f).await;
+    assert_eq!(entered, reserved, "entry writes nothing in any relation");
     reservation_delta(&before, &committed);
     let request = &source.request;
     let provenance: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry JOIN workflow_action_dispatches AS marker ON (marker.company_id,marker.run_id,marker.execution_id,marker.invocation_id,marker.argument_digest,marker.id)=(entry.company_id,entry.run_id,entry.execution_id,entry.invocation_id,entry.argument_digest,entry.dispatch_id) JOIN workflow_action_remote_entries AS historical ON historical.company_id=entry.company_id AND historical.id=$8 WHERE entry.company_id=$1 AND entry.run_id=$2 AND entry.execution_id=$3 AND entry.invocation_id=$4 AND entry.id=$5 AND entry.attempt_number=130 AND entry.execution_generation=$6 AND entry.worker_id=$7 AND entry.reservation_xid IS NOT NULL AND entry.reservation_xid<>historical.reservation_xid)")
         .bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
         .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())
-        .bind(reservation.entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
+        .bind(entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
         .bind(source.historical).fetch_one(f.persistence().pool()).await.unwrap();
     assert!(
         provenance,
@@ -258,8 +299,6 @@ pub(super) async fn supported_positive(source: &HighSource) {
             requests: 128
         }
     );
-    writer.enter_remote(*reservation).await.unwrap();
-    assert_eq!(all_tables(f).await, committed);
     assert_eq!(source.provider.inner.calls.load(Ordering::SeqCst), 128);
     assert_eq!(effects(f).await, 0);
     eprintln!(

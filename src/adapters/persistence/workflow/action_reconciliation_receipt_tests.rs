@@ -206,6 +206,107 @@ async fn park(f: &AdmissionFixture, request: &ActionDispatchRequest) {
             .unwrap()
     );
 }
+/// The exact owner's DB-clock windows at one labelled phase boundary of a lease-sensitive
+/// scenario. Read-only diagnostics: logged past libtest capture, never a result by itself.
+#[derive(Debug)]
+struct LeasePhase {
+    owner: bool,
+    lease_ms: f64,
+    run_ms: f64,
+}
+async fn lease_phase(
+    f: &AdmissionFixture,
+    fence: WorkflowFence,
+    scenario: &str,
+    phase: &str,
+    started: std::time::Instant,
+) -> LeasePhase {
+    let elapsed = started.elapsed();
+    let (owner, lease_ms, run_ms, now): (bool, f64, f64, String) = sqlx::query_as("SELECT job.status='processing' AND job.worker_id=$2 AND job.execution_generation=$3 AND job.retry_count+1=$4, COALESCE(extract(epoch FROM job.lock_expires_at-clock_timestamp())*1000,0)::float8, (extract(epoch FROM run.deadline-clock_timestamp())*1000)::float8, clock_timestamp()::text FROM background_tasks AS job JOIN workflow_runs AS run ON run.company_id=job.company_id AND run.id=$5 WHERE job.id=$1")
+        .bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0)
+        .bind(fence.attempt.0).bind(fence.scope.run.as_uuid())
+        .fetch_one(f.persistence().pool()).await.unwrap();
+    uncaptured(&format!(
+        "PHASE scenario={scenario} phase={phase} elapsed_ms={} owner={owner} attempt={} lease_remaining_ms={lease_ms:.0} run_remaining_ms={run_ms:.0} db_now={now}",
+        elapsed.as_millis(),
+        fence.attempt.0
+    ));
+    LeasePhase {
+        owner,
+        lease_ms,
+        run_ms,
+    }
+}
+/// A worker's genuine heartbeat at a quiescent phase boundary of a lease-sensitive scenario
+/// (DEC-010): the production `renew_io`, with the common three-second policy, before the old
+/// window ends. A lost lease fails here as a `LEASE LAPSE` naming its phase; a refusal while
+/// the exact owner is still live is a different, hard failure. Snapshots taken under the old
+/// window are rebased by exactly the one field a renewal writes, this job's
+/// `lock_expires_at`, read back as committed; every other row and column must still match
+/// wherever they are compared.
+async fn renew_phase(
+    f: &AdmissionFixture,
+    fence: WorkflowFence,
+    scenario: &str,
+    phase: &str,
+    started: std::time::Instant,
+    snapshots: &mut [&mut Value],
+) {
+    let lapse = |state: &LeasePhase| !state.owner || state.lease_ms <= 0.0 || state.run_ms <= 0.0;
+    let label = format!("{phase}:renew");
+    let current = lease_phase(f, fence, scenario, &label, started).await;
+    assert!(
+        !lapse(&current),
+        "LEASE LAPSE scenario={scenario} phase={phase} before renewal: {current:?}"
+    );
+    let revision = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT revision FROM workflow_runs WHERE company_id=$1 AND id=$2",
+        )
+        .bind(fence.scope.company.as_uuid())
+        .bind(fence.scope.run.as_uuid())
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap()
+    };
+    let before = revision().await;
+    let renewed = f.persistence().renew_io(fence, policy()).await;
+    let after = lease_phase(f, fence, scenario, &format!("{phase}:renewed"), started).await;
+    match renewed {
+        Ok(Some(_)) => {}
+        // A definite NotApplied keeps the old window, which must still be live.
+        Err(AppError::DatabaseTimeout(_)) if !lapse(&after) => {}
+        Ok(None) | Err(AppError::DatabaseTimeout(_)) if lapse(&after) => {
+            panic!("LEASE LAPSE scenario={scenario} phase={phase} at renewal: {after:?}")
+        }
+        other => panic!(
+            "renewal refused while the exact owner is live, scenario={scenario} phase={phase}: {other:?} {after:?}"
+        ),
+    }
+    assert_eq!(
+        revision().await,
+        before,
+        "a heartbeat moved the run revision"
+    );
+    let expiry: Value = sqlx::query_scalar(
+        "SELECT to_jsonb(job)->'lock_expires_at' FROM background_tasks AS job WHERE id=$1",
+    )
+    .bind(fence.scope.job.0)
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    let job = json!(fence.scope.job.0);
+    for snapshot in snapshots.iter_mut() {
+        let mut rows = snapshot["background_tasks"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .filter(|row| row["id"] == job);
+        let row = rows.next().expect("the renewed job is in the snapshot");
+        assert!(rows.next().is_none());
+        row["lock_expires_at"] = expiry.clone();
+    }
+}
 /// What a real worker does while it owns the step: renew the fixture lease through the
 /// production renew path, at points that no before/after snapshot pair straddles (the
 /// pattern approved for the retained-truth scenarios). A renewal moves only

@@ -1,0 +1,17 @@
+[
+  {
+    "filter": "prior_bounds_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "prior_bounds_"
+    ],
+    "exit_code": 0,
+    "expected": 9,
+    "summary": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 2548 filtered out",
+    "elapsed_s": 168.13,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-prior-bounds.D004-prior-controls.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "72cca654c30c76bea9c63216da8672c7e914145a8949ca943727c2d1ff852984"
+  }
+]

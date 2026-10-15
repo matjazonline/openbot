@@ -1,0 +1,1077 @@
+diff --git c/src/adapters/harness/rig/budget.rs w/src/adapters/harness/rig/budget.rs
+index 931215c..efec301 100644
+--- c/src/adapters/harness/rig/budget.rs
++++ w/src/adapters/harness/rig/budget.rs
+@@ -21,7 +21,7 @@ impl RunBudget {
+ 
+     pub fn charge(&self, tokens: usize) -> AppResult<()> {
+         self.remaining
+-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++            .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                 remaining.checked_sub(tokens)
+             })
+             .map(|_| ())
+diff --git c/src/adapters/http/routes/ui_dashboard.rs w/src/adapters/http/routes/ui_dashboard.rs
+index 4eeb382..4037f40 100644
+--- c/src/adapters/http/routes/ui_dashboard.rs
++++ w/src/adapters/http/routes/ui_dashboard.rs
+@@ -444,7 +444,7 @@ impl Drop for DashboardSseConnection {
+     fn drop(&mut self) {
+         let previous = self
+             .active
+-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
++            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                 Some(value.saturating_sub(1))
+             })
+             .unwrap_or(0);
+diff --git c/src/adapters/mcp/http.rs w/src/adapters/mcp/http.rs
+index 9a8b8d0..8840188 100644
+--- c/src/adapters/mcp/http.rs
++++ w/src/adapters/mcp/http.rs
+@@ -62,7 +62,7 @@ fn bounded(
+     async_stream::try_stream! {
+         while let Some(chunk) = source.next().await {
+             let chunk = chunk.map_err(|_| io::Error::other("MCP stream failed"))?;
+-            remaining.fetch_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
++            remaining.try_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
+             yield chunk;
+         }
+     }.boxed()
+diff --git c/src/adapters/persistence/workflow/action_cancellation_order_tests.rs w/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
+index dbb41fb..355a95d 100644
+--- c/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
++++ w/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
+@@ -93,7 +93,7 @@ impl Prepared {
+     }
+ }
+ 
+-async fn blocked<T: std::fmt::Debug>(
++pub(super) async fn blocked<T: std::fmt::Debug>(
+     observer: &mut sqlx::PgConnection,
+     blocker: i32,
+     statement: &str,
+@@ -124,12 +124,12 @@ async fn blocked<T: std::fmt::Debug>(
+ }
+ 
+ #[derive(Debug)]
+-enum RunLock {
++pub(super) enum RunLock {
+     Free,
+     Held,
+ }
+ 
+-async fn probe_run(
++pub(super) async fn probe_run(
+     observer: &mut sqlx::PgConnection,
+     request: &ActionDispatchRequest,
+     expected: RunLock,
+@@ -247,7 +247,11 @@ async fn race(boundary: Boundary, first: First) {
+     assert_drained(&mut observer, first_pid, second_pid).await;
+ }
+ 
+-async fn assert_drained(observer: &mut sqlx::PgConnection, first_pid: i32, second_pid: i32) {
++pub(super) async fn assert_drained(
++    observer: &mut sqlx::PgConnection,
++    first_pid: i32,
++    second_pid: i32,
++) {
+     sqlx::query("SELECT pg_stat_clear_snapshot()")
+         .execute(&mut *observer)
+         .await
+diff --git c/src/adapters/persistence/workflow/action_dispatch_tests.rs w/src/adapters/persistence/workflow/action_dispatch_tests.rs
+index 65c43aa..2772f25 100644
+--- c/src/adapters/persistence/workflow/action_dispatch_tests.rs
++++ w/src/adapters/persistence/workflow/action_dispatch_tests.rs
+@@ -61,6 +61,10 @@ impl SqlLocalAction for Effect {
+         }
+     }
+ }
++#[path = "action_snapshot_support.rs"]
++mod snapshot_support;
++use snapshot_support::*;
++
+ type Dispatch = PostgresActionDispatch<Authority, Effect>;
+ fn adapter(f: &AdmissionFixture, mode: u8) -> Dispatch {
+     PostgresActionDispatch::new(f.persistence().clone(), Authority, Effect(mode))
+diff --git c/src/adapters/persistence/workflow/action_receipt_tests.rs w/src/adapters/persistence/workflow/action_receipt_tests.rs
+index c7badb9..c695a1d 100644
+--- c/src/adapters/persistence/workflow/action_receipt_tests.rs
++++ w/src/adapters/persistence/workflow/action_receipt_tests.rs
+@@ -421,3 +421,6 @@ mod resolution_tests;
+ 
+ #[path = "action_uncertainty_tests.rs"]
+ mod uncertainty_tests;
++
++#[path = "action_cancellation_boundary_tests.rs"]
++mod cancellation_boundary_tests;
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
+index c18dc73..4f18ffb 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
+@@ -455,3 +455,6 @@ async fn workflow_action_reconciliation_control_serialization_expire_before_comm
+         Box::pin(case(truth, Terminal::Expire, First::Terminal)).await;
+     }
+ }
++
++#[path = "action_cancellation_hung_reconciliation_tests.rs"]
++mod hung_reconciliation_tests;
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
+index 420b3f6..5812018 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
+@@ -225,26 +225,67 @@ pub(super) async fn reject_historical(source: &HighSource, attack: Attack) {
+     tx.rollback().await.unwrap();
+ }
+ 
++/// A reserve or entry refusal is never the required success. The lease is observed only to
++/// label the failure; an expiry seen afterwards does not excuse it.
++async fn refused(source: &HighSource, operation: &str, error: AppError) -> ! {
++    let state = lease_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        &format!("supported_{operation}_refused"),
++        source.claimed,
++    )
++    .await;
++    let kind = if state.owner && state.lease_ms > 0.0 && state.run_ms > 0.0 {
++        "LIVE-OWNER REFUSAL"
++    } else {
++        "LEASE LAPSE"
++    };
++    panic!(
++        "{kind} scenario=high_bounds supported {operation}: {error:?}; lease after refusal {state:?}"
++    )
++}
++
+ pub(super) async fn supported_positive(source: &HighSource) {
++    super::renew(source, "supported_positive", &mut []).await;
+     clean_current(source).await;
+     let f = &source.fixture;
+     assert_eq!(available(f, &source.request, None).await, None);
+-    let before = all_tables(f).await;
++    super::phase(source, "supported_clean").await;
++    let mut before = all_tables(f).await;
++    super::phase(source, "supported_before_snapshot").await;
++    // Reservation freezes its own window from the live lease, which a later renewal cannot
++    // extend: renew immediately before it and keep heavy observations out of reserve-to-entry.
++    super::renew(source, "supported_reserve", &mut [&mut before]).await;
+     let writer = adapter(f, 0);
+-    let RemoteReservationResult::Reserved(reservation) = writer
++    let reservation = match writer
+         .reserve_remote(&source.request, Some(&source.provider.contract))
+         .await
+-        .unwrap()
+-    else {
+-        panic!("genuine supported replay remains available above the proof bound");
++    {
++        Ok(RemoteReservationResult::Reserved(reservation)) => reservation,
++        Ok(_) => panic!("genuine supported replay remains available above the proof bound"),
++        Err(error) => refused(source, "reserve", error).await,
+     };
+-    let committed = all_tables(f).await;
++    let entry = reservation.entry;
++    // Every public relation as reservation left it, compactly enough for the frozen window.
++    let reserved = fingerprint(f).await;
++    super::phase(source, "supported_reserved").await;
++    let entered = match writer.enter_remote(*reservation).await {
++        Ok(entered) => entered,
++        Err(error) => refused(source, "entry", error).await,
++    };
++    assert_eq!(entered.entry, entry);
++    super::phase(source, "supported_entered").await;
++    // Full rows and fingerprint from one snapshot. Entry wrote nothing in any relation, so these
++    // rows are exactly the post-reservation state, which differs from `before` by entry 130.
++    let (committed, entered) = tables_and_fingerprint(f).await;
++    assert_eq!(entered, reserved, "entry writes nothing in any relation");
+     reservation_delta(&before, &committed);
+     let request = &source.request;
+     let provenance: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry JOIN workflow_action_dispatches AS marker ON (marker.company_id,marker.run_id,marker.execution_id,marker.invocation_id,marker.argument_digest,marker.id)=(entry.company_id,entry.run_id,entry.execution_id,entry.invocation_id,entry.argument_digest,entry.dispatch_id) JOIN workflow_action_remote_entries AS historical ON historical.company_id=entry.company_id AND historical.id=$8 WHERE entry.company_id=$1 AND entry.run_id=$2 AND entry.execution_id=$3 AND entry.invocation_id=$4 AND entry.id=$5 AND entry.attempt_number=130 AND entry.execution_generation=$6 AND entry.worker_id=$7 AND entry.reservation_xid IS NOT NULL AND entry.reservation_xid<>historical.reservation_xid)")
+         .bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
+         .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())
+-        .bind(reservation.entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
++        .bind(entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
+         .bind(source.historical).fetch_one(f.persistence().pool()).await.unwrap();
+     assert!(
+         provenance,
+@@ -258,8 +299,6 @@ pub(super) async fn supported_positive(source: &HighSource) {
+             requests: 128
+         }
+     );
+-    writer.enter_remote(*reservation).await.unwrap();
+-    assert_eq!(all_tables(f).await, committed);
+     assert_eq!(source.provider.inner.calls.load(Ordering::SeqCst), 128);
+     assert_eq!(effects(f).await, 0);
+     eprintln!(
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
+index 18f209f..a9d69df 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
+@@ -396,6 +396,7 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
+     assert_ne!(sibling.subject.invocation, request.subject.invocation);
+     Box::pin(retire_retry(&f, &request, 129)).await;
+     Box::pin(new_claim(&f, &mut request)).await;
++    let claimed = std::time::Instant::now();
+     assert_subject(&f, &request, 130, "processing").await;
+     eprintln!(
+         "high_bounds committed_source attempts=129 retired_entries=129 current_attempt=130 max_retries=132"
+@@ -408,5 +409,6 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
+         historical,
+         other_invocation,
+         other_company,
++        claimed,
+     })
+ }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
+index 606f137..4ecd19c 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
+@@ -21,24 +21,66 @@ struct HighSource {
+     historical: Uuid,
+     other_invocation: Uuid,
+     other_company: Uuid,
++    /// When attempt 130's lease was claimed; phase diagnostics measure from here.
++    claimed: std::time::Instant,
++}
++
++/// Every phase after the claim needs attempt 130 live, so a probe that finds it lost fails
++/// as a labelled lease lapse rather than as whichever assertion meets it next.
++async fn phase(source: &HighSource, label: &str) -> LeasePhase {
++    let state = lease_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        label,
++        source.claimed,
++    )
++    .await;
++    assert!(
++        state.owner && state.lease_ms > 0.0 && state.run_ms > 0.0,
++        "LEASE LAPSE scenario=high_bounds phase={label}: {state:?}"
++    );
++    state
++}
++
++/// Renew attempt 130 at a quiescent boundary before its window can end (DEC-010).
++async fn renew(source: &HighSource, label: &str, snapshots: &mut [&mut Value]) {
++    renew_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        label,
++        source.claimed,
++        snapshots,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+ async fn workflow_action_reconciliation_high_bounds_native_owners_and_supported_entry() {
+     // Box fixture and native phases to retain the stock 2 MiB libtest stack.
+     let source = Box::pin(high_source()).await;
++    phase(&source, "source_ready").await;
+     let catalog = native_catalog(&source.fixture).await;
+-    let before = all_tables(&source.fixture).await;
++    phase(&source, "catalog").await;
++    let mut before = all_tables(&source.fixture).await;
++    phase(&source, "before_snapshot").await;
++    renew(&source, "invalid_exclusions", &mut [&mut before]).await;
+     Box::pin(native::invalid_exclusions(&source)).await;
++    phase(&source, "invalid_exclusions").await;
+     for attack in [native::Attack::Entry, native::Attack::Consumption] {
++        renew(&source, "reject_candidate", &mut [&mut before]).await;
+         Box::pin(native::reject_candidate(&source, attack)).await;
++        phase(&source, "reject_candidate").await;
+         unchanged(&source, &before, &catalog).await;
+     }
+     for attack in [
+         native::Attack::HistoricalSpoof,
+         native::Attack::HistoricalRetrofit,
+     ] {
++        renew(&source, "reject_historical", &mut [&mut before]).await;
+         Box::pin(native::reject_historical(&source, attack)).await;
++        phase(&source, "reject_historical").await;
+         unchanged(&source, &before, &catalog).await;
+     }
+     Box::pin(native::supported_positive(&source)).await;
+@@ -55,5 +97,6 @@ async fn unchanged(source: &HighSource, before: &Value, catalog: &Value) {
+     assert_eq!(&native_catalog(&source.fixture).await, catalog);
+     assert_eq!(source.provider.inner.calls.load(Ordering::SeqCst), 128);
+     assert_eq!(effects(&source.fixture).await, 0);
++    phase(source, "unchanged").await;
+     assert_subject(&source.fixture, &source.request, 130, "processing").await;
+ }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
+index 8353cf1..a7291ec 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
+@@ -427,10 +427,22 @@ async fn workflow_action_reconciliation_live_return_without_conflict_commits() {
+ #[tokio::test]
+ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_result() {
+     let mut h = Box::pin(live_retry()).await;
++    let started = std::time::Instant::now();
++    let fence = h.request.fence;
+     let (entry, result) = Box::pin(entered_result(&h)).await;
++    lease_phase(&h.fixture, fence, "live_conflict", "entered", started).await;
+     let entry_id = entry.entry;
+     let before = live_snapshot(&h).await;
++    lease_phase(
++        &h.fixture,
++        fence,
++        "live_conflict",
++        "before_snapshot",
++        started,
++    )
++    .await;
+     let conflicted = Box::pin(conflicting_old_receipt(&mut h, &before)).await;
++    lease_phase(&h.fixture, fence, "live_conflict", "conflicted", started).await;
+     assert!(matches!(
+         adapter(&h.fixture, 0)
+             .finish_remote(entry, result.clone())
+@@ -438,7 +450,16 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
+             .unwrap(),
+         RemoteDispatchObservation::Interrupted
+     ));
++    lease_phase(&h.fixture, fence, "live_conflict", "finished", started).await;
+     let returned = live_snapshot(&h).await;
++    lease_phase(
++        &h.fixture,
++        fence,
++        "live_conflict",
++        "returned_snapshot",
++        started,
++    )
++    .await;
+     unchanged_tables(
+         &conflicted,
+         &returned,
+@@ -467,6 +488,7 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
+         .unwrap();
+     assert_eq!(new["result"], result);
+     assert_eq!(new["remote_entry_id"], json!(entry_id));
++    lease_phase(&h.fixture, fence, "live_conflict", "before_retire", started).await;
+     Box::pin(retire_live(&h, &returned, 2)).await;
+ }
+ 
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
+index 0fcf571..0396ef3 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
+@@ -106,7 +106,16 @@ pub(super) async fn park_observed(
+     f: &AdmissionFixture,
+     request: &ActionDispatchRequest,
+ ) -> Option<()> {
+-    let before = all_tables(f).await;
++    Box::pin(park_observed_as(f, request, &[])).await
++}
++
++/// `park_observed`, its refused-release backstop over a `digested_tables` snapshot.
++pub(super) async fn park_observed_as(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    digested: &[&str],
++) -> Option<()> {
++    let before = digested_tables(f, None, digested).await;
+     let released = f
+         .persistence()
+         .settled()
+@@ -124,12 +133,22 @@ pub(super) async fn park_observed(
+         lapsed(f, request).await,
+         "release refusal without exact-owner expiry"
+     );
+-    assert_eq!(all_tables(f).await, before, "refused release wrote nothing");
++    assert_eq!(
++        digested_tables(f, None, digested).await,
++        before,
++        "refused release wrote nothing"
++    );
+     no_result(f, request).await;
+     uncaptured("BACKSTOP prior_bounds release=false lapsed_exact_fence; no durable delta");
+     None
+ }
+ 
++type Stamp = std::sync::Mutex<Option<std::time::Instant>>;
++
++fn stamp(at: &Stamp) {
++    *at.lock().unwrap() = Some(std::time::Instant::now());
++}
++
+ pub(super) struct PausedVerifier {
+     ledger: Arc<LedgerVerifier>,
+     pub(super) calls: AtomicUsize,
+@@ -137,19 +156,98 @@ pub(super) struct PausedVerifier {
+     pub(super) release: Notify,
+     pub(super) finished: CancellationToken,
+     pub(super) returned: std::sync::atomic::AtomicBool,
+-    pub(super) released_at: std::sync::Mutex<Option<std::time::Instant>>,
++    pub(super) released_at: Stamp,
++    /// One monotonic timeline for the paused command (DEC-011): verifier entered and ready,
++    /// release above, verifier returned, settlement entered and returned, command ended.
++    entered_at: Stamp,
++    ready_at: Stamp,
++    returned_at: Stamp,
++    settle: Arc<SettleTimes>,
++    ended_at: Stamp,
+ }
++
++#[derive(Default)]
++struct SettleTimes {
++    entered: Stamp,
++    returned: Stamp,
++}
++
++/// The real adapter, timestamping only the settlement call the service makes after its
++/// verifier returns. Delegates everything; adds no behaviour and no production port.
++struct TimedSettlement {
++    inner: PostgresActionReconciliation<Resources>,
++    times: Arc<SettleTimes>,
++}
++#[async_trait]
++impl ActionReconciliation for TimedSettlement {
++    async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation> {
++        self.inner.association(command).await
++    }
++    async fn snapshot(
++        &self,
++        command: &ReconcileActionCommand,
++    ) -> AppResult<ReconciliationPreparation> {
++        self.inner.snapshot(command).await
++    }
++    async fn settle(
++        &self,
++        command: &ReconcileActionCommand,
++        snapshot: &ReconciliationSnapshot,
++        evidence: VerifiedEvidence,
++    ) -> AppResult<ReconciliationResult> {
++        stamp(&self.times.entered);
++        let result = self.inner.settle(command, snapshot, evidence).await;
++        stamp(&self.times.returned);
++        result
++    }
++}
++
+ impl PausedVerifier {
++    /// `run_command` with the settlement timestamped; same service, budget and ports.
+     pub(super) async fn run(
+         self: &Arc<Self>,
+         f: &AdmissionFixture,
+         command: &ReconcileActionCommand,
+     ) -> AppResult<ReconciliationResult> {
+-        let result = run_command(f, command, self.clone()).await;
++        let persistence = f.persistence().clone();
++        let result = ActionReconciliationService::new(
++            TimedSettlement {
++                inner: PostgresActionReconciliation::new(persistence.clone(), Resources),
++                times: self.settle.clone(),
++            },
++            LifecycleAuthorizer::new(
++                persistence.clone(),
++                persistence.clone(),
++                persistence.clone(),
++            ),
++            Directory(persistence),
++            Some(self.clone() as Arc<dyn ActionEvidenceVerifier>),
++        )
++        .reconcile(command, &CancellationToken::new(), Duration::from_secs(5))
++        .await;
++        stamp(&self.ended_at);
+         self.finished.cancel();
+         result
+     }
+ 
++    pub(super) fn timeline(&self, command_started: std::time::Instant, result: &str) {
++        let at = |stamp: &Stamp| {
++            stamp.lock().unwrap().map_or("none".to_string(), |time| {
++                time.duration_since(command_started).as_millis().to_string()
++            })
++        };
++        uncaptured(&format!(
++            "TIMELINE prior_bounds verifier_entered_ms={} verifier_ready_ms={} release_ms={} verifier_returned_ms={} settle_entered_ms={} settle_returned_ms={} command_ended_ms={} result={result}",
++            at(&self.entered_at),
++            at(&self.ready_at),
++            at(&self.released_at),
++            at(&self.returned_at),
++            at(&self.settle.entered),
++            at(&self.settle.returned),
++            at(&self.ended_at),
++        ));
++    }
++
+     pub(super) async fn wait_started(&self) -> bool {
+         tokio::select! {
+             biased;
+@@ -166,7 +264,12 @@ impl PausedVerifier {
+             release: Notify::new(),
+             finished: CancellationToken::new(),
+             returned: std::sync::atomic::AtomicBool::new(false),
+-            released_at: std::sync::Mutex::new(None),
++            released_at: Stamp::default(),
++            entered_at: Stamp::default(),
++            ready_at: Stamp::default(),
++            returned_at: Stamp::default(),
++            settle: Arc::default(),
++            ended_at: Stamp::default(),
+         }
+     }
+ }
+@@ -182,15 +285,18 @@ impl ActionEvidenceVerifier for PausedVerifier {
+         cancellation: &CancellationToken,
+     ) -> AppResult<EvidenceAttestation> {
+         self.calls.fetch_add(1, Ordering::SeqCst);
++        stamp(&self.entered_at);
+         let evidence = self
+             .ledger
+             .verify(snapshot, reference, cancellation)
+             .await?;
++        stamp(&self.ready_at);
+         self.started.notify_one();
+         tokio::select! {
+             _ = cancellation.cancelled() => return Err(AppError::Conflict("fixture cancelled".into())),
+             _ = self.release.notified() => {},
+         }
++        stamp(&self.returned_at);
+         self.returned.store(true, Ordering::SeqCst);
+         Ok(evidence)
+     }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
+index c00bd9c..ba3cce0 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
+@@ -125,11 +125,23 @@ async fn available(
+         .unwrap()
+ }
+ 
+-async fn consume_128(
+-    f: &AdmissionFixture,
+-    request: &mut ActionDispatchRequest,
+-    proof: Uuid,
+-) -> Option<()> {
++/// While verification is paused, the 8,256-row proof coverage history is compared by digest
++/// (`digested_tables`): the same rows decide equality, without decoding them inside the budget.
++const PAUSE_DIGESTED: [&str; 1] = ["workflow_action_evidence_coverage"];
++
++/// Tables the 129th provider entry must leave as the claim left them.
++const ENTRY_PRESERVES: [&str; 6] = [
++    "workflow_action_intents",
++    "workflow_action_dispatches",
++    "workflow_action_evidence",
++    "workflow_action_evidence_coverage",
++    "workflow_budget_receipts",
++    "workflow_root_budget_usage",
++];
++
++/// The scheduled 128-entry premise, settled before the paused command starts (DEC-011): the
++/// command only reads until settlement, so the competitor need not re-observe it while paused.
++async fn scheduled_128(f: &AdmissionFixture, request: &ActionDispatchRequest, proof: Uuid) {
+     let scheduled = all_tables(f).await;
+     assert_eq!(entry_consumptions(f).await, (128, 127));
+     assert_eq!(available(f, request, None).await, Some(proof));
+@@ -142,12 +154,32 @@ async fn consume_128(
+         assert_eq!(available(f, request, Some(excluded)).await, None);
+     }
+     assert_eq!(all_tables(f).await, scheduled);
++}
++
++/// The genuine competing 128-to-129 transition, and only that, while verification is paused:
++/// the claim and entry are observed through exactly the relations the assertions compare.
++async fn consume_128(
++    f: &AdmissionFixture,
++    request: &mut ActionDispatchRequest,
++    proof: Uuid,
++    started: std::time::Instant,
++) -> Option<()> {
++    let phase = |label: &'static str, fence: WorkflowFence| {
++        lease_phase(f, fence, "prior_bounds", label, started)
++    };
++    phase("competitor_started", request.fence).await;
++    assert_eq!(entry_consumptions(f).await, (128, 127));
+     new_claim(f, request).await;
++    phase("claimed_129", request.fence).await;
+     renew_fixture_lease(f, request.fence).await;
+-    let claimed = all_tables(f).await;
++    let mut observed = ENTRY_PRESERVES.to_vec();
++    observed.push("task_attempts");
++    let claimed = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
++    phase("claimed_snapshot", request.fence).await;
+     assert_eq!(claimed["task_attempts"].as_array().unwrap().len(), 129);
+     let pending = LedgerProvider::new(f, Delivery::Pending);
+     Box::pin(support::observe_pending(f, request, &pending)).await?;
++    phase("consumed_129", request.fence).await;
+     assert_eq!(pending.calls.load(Ordering::SeqCst), 1);
+     assert_eq!(entry_consumptions(f).await, (129, 128));
+     let consumed: Uuid = sqlx::query_scalar(
+@@ -160,15 +192,11 @@ async fn consume_128(
+     assert_eq!(available(f, request, Some(consumed)).await, Some(proof));
+     assert_eq!(available(f, request, None).await, None);
+     assert_eq!(effects(f).await, 0);
+-    let after = all_tables(f).await;
+-    for table in [
+-        "workflow_action_intents",
+-        "workflow_action_dispatches",
+-        "workflow_action_evidence",
+-        "workflow_action_evidence_coverage",
+-        "workflow_budget_receipts",
+-        "workflow_root_budget_usage",
+-    ] {
++    let mut observed = ENTRY_PRESERVES.to_vec();
++    observed.push("background_tasks");
++    let after = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
++    phase("consumed_snapshot", request.fence).await;
++    for table in ENTRY_PRESERVES {
+         assert_eq!(
+             after[table], claimed[table],
+             "provider entry preserves {table}"
+@@ -347,6 +375,8 @@ async fn prove_prior_bound() -> Option<()> {
+     let (f, mut request) = Box::pin(prior_fixture()).await;
+     let verifier = ledger(&f, &request).await;
+     let result = Box::pin(prior_history(&f, &mut request, &verifier)).await?;
++    let proof = result.evidence.unwrap().as_uuid();
++    Box::pin(scheduled_128(&f, &request, proof)).await;
+     let observed = Arc::new(PausedVerifier::new(verifier.clone()));
+     let stale = proof_command(&f, &request, &verifier, "128-paused-before-129").await;
+     let command_started = std::time::Instant::now();
+@@ -356,21 +386,26 @@ async fn prove_prior_bound() -> Option<()> {
+             observed.wait_started().await,
+             "reconciliation ended before verifier pause"
+         );
+-        let consumed = Box::pin(consume_128(
+-            &f,
+-            &mut request,
+-            result.evidence.unwrap().as_uuid(),
+-        ))
+-        .await;
++        let consumed = Box::pin(consume_128(&f, &mut request, proof, command_started)).await;
+         let parked = if consumed.is_some() {
+-            Box::pin(park_live(&f, &request)).await
++            renew_fixture_lease(&f, request.fence).await;
++            Box::pin(support::park_observed_as(&f, &request, &PAUSE_DIGESTED)).await
+         } else {
+             None
+         };
++        lease_phase(&f, request.fence, "prior_bounds", "parked", command_started).await;
+         if parked.is_some() {
+             barrier(&f, &request).await;
+         }
+-        let before = all_tables(&f).await;
++        let before = digested_tables(&f, None, &PAUSE_DIGESTED).await;
++        lease_phase(
++            &f,
++            request.fence,
++            "prior_bounds",
++            "pre_settlement_snapshot",
++            command_started,
++        )
++        .await;
+         if parked.is_some() {
+             *observed.released_at.lock().unwrap() = Some(std::time::Instant::now());
+             observed.release.notify_one();
+@@ -378,7 +413,11 @@ async fn prove_prior_bound() -> Option<()> {
+         (before, parked)
+     };
+     let (settled, (before, parked)) = tokio::join!(reconcile, competitor);
+-    let after = all_tables(&f).await;
++    observed.timeline(
++        command_started,
++        &format!("{:?}", settled.as_ref().map(|result| &result.outcome)),
++    );
++    let after = digested_tables(&f, None, &PAUSE_DIGESTED).await;
+     if !observed.returned.load(Ordering::SeqCst) {
+         support::withheld_timeout(
+             &settled,
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
+index cf676f8..5a45863 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
+@@ -1,6 +1,8 @@
+ //! Genuine provider finality races and one-use proof lifetime.
+ use super::*;
+ use tokio::sync::Barrier;
++// Shared snapshots now live in `action_snapshot_support.rs`; sibling suites name them here.
++pub(super) use super::all_tables;
+ 
+ #[path = "action_reconciliation_attribution_tests.rs"]
+ mod attribution_tests;
+@@ -26,29 +28,69 @@ mod append_only_tests;
+ #[path = "action_reconciliation_validation_tests.rs"]
+ mod validation_tests;
+ 
+-// Catalog-owned identifiers only; one repeatable-read snapshot covers every fact,
+-// including reconciliation joins, witnesses and provider effects omitted by old helpers.
+-pub(super) async fn all_tables(f: &AdmissionFixture) -> Value {
+-    let mut tx = f.persistence().pool().begin().await.unwrap();
+-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+-        .execute(&mut *tx)
+-        .await
+-        .unwrap();
+-    let tables: Vec<String> = sqlx::query_scalar(
+-        "SELECT tablename::text FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
+-    )
+-    .fetch_all(&mut *tx)
+-    .await
+-    .unwrap();
+-    let mut state = serde_json::Map::new();
+-    for table in tables {
+-        let quoted = table.replace('"', "\"\"");
+-        let rows: Value = sqlx::query_scalar(&format!("SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) FROM public.\"{quoted}\" AS record"))
+-            .fetch_one(&mut *tx).await.unwrap();
+-        state.insert(table, rows);
++#[tokio::test]
++async fn workflow_action_reconciliation_all_tables_matches_per_relation_reads() {
++    let (f, request) = setup().await;
++    let _verifier = ledger(&f, &request).await;
++    let provider = LedgerProvider::new(&f, Delivery::Pending);
++    let _ = Box::pin(invoke(&f, &request, &provider)).await;
++    let single = all_tables(&f).await;
++    let populated = single
++        .as_object()
++        .unwrap()
++        .values()
++        .filter(|rows| !rows.as_array().unwrap().is_empty())
++        .count();
++    assert!(populated >= 10, "a populated action fixture: {populated}");
++    assert_eq!(single, per_relation_tables(&f).await);
++    let some = some_tables(&f, &["workflow_action_remote_entries", "background_tasks"]).await;
++    assert_eq!(some.as_object().unwrap().len(), 2);
++    for table in ["workflow_action_remote_entries", "background_tasks"] {
++        assert_eq!(some[table], single[table]);
++        assert_eq!(relation(&f, table).await, single[table]);
+     }
+-    tx.commit().await.unwrap();
+-    Value::Object(state)
++    // A digest stands for exactly its relation's rows; everything else stays in full.
++    let digests = ["workflow_action_remote_entries", "task_attempts"];
++    let digested = digested_tables(&f, None, &digests).await;
++    for (table, rows) in single.as_object().unwrap() {
++        if digests.contains(&table.as_str()) {
++            assert_eq!(
++                digested[table]["rows"],
++                json!(rows.as_array().unwrap().len())
++            );
++            assert_eq!(digested[table]["sha256"].as_str().unwrap().len(), 64);
++        } else {
++            assert_eq!(&digested[table], rows);
++        }
++    }
++    assert_ne!(
++        digested["workflow_action_remote_entries"]["sha256"],
++        digested["task_attempts"]["sha256"]
++    );
++    assert_eq!(digested_tables(&f, None, &digests).await, digested);
++    let (rows, whole) = tables_and_fingerprint(&f).await;
++    assert_eq!(rows, single);
++    assert_eq!(fingerprint(&f).await, whole);
++    let names: Vec<&str> = single
++        .as_object()
++        .unwrap()
++        .keys()
++        .map(String::as_str)
++        .collect();
++    assert_eq!(digested_tables(&f, None, &names).await, whole);
++    for (table, rows) in single.as_object().unwrap() {
++        assert_eq!(whole[table]["rows"], json!(rows.as_array().unwrap().len()));
++    }
++    // A digest changes exactly when its relation's rows change.
++    barrier(&f, &request).await;
++    let (changed, after) = tables_and_fingerprint(&f).await;
++    let mut differing = 0;
++    for (table, rows) in single.as_object().unwrap() {
++        let same_rows = &changed[table] == rows;
++        assert_eq!(after[table] == whole[table], same_rows, "{table}");
++        differing += usize::from(!same_rows);
++    }
++    assert!(differing > 0, "the barrier writes fixture relations");
+ }
+ 
+ async fn proof_command(
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
+index a876a9b..1db7426 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
+@@ -206,6 +206,107 @@ async fn park(f: &AdmissionFixture, request: &ActionDispatchRequest) {
+             .unwrap()
+     );
+ }
++/// The exact owner's DB-clock windows at one labelled phase boundary of a lease-sensitive
++/// scenario. Read-only diagnostics: logged past libtest capture, never a result by itself.
++#[derive(Debug)]
++struct LeasePhase {
++    owner: bool,
++    lease_ms: f64,
++    run_ms: f64,
++}
++async fn lease_phase(
++    f: &AdmissionFixture,
++    fence: WorkflowFence,
++    scenario: &str,
++    phase: &str,
++    started: std::time::Instant,
++) -> LeasePhase {
++    let elapsed = started.elapsed();
++    let (owner, lease_ms, run_ms, now): (bool, f64, f64, String) = sqlx::query_as("SELECT job.status='processing' AND job.worker_id=$2 AND job.execution_generation=$3 AND job.retry_count+1=$4, COALESCE(extract(epoch FROM job.lock_expires_at-clock_timestamp())*1000,0)::float8, (extract(epoch FROM run.deadline-clock_timestamp())*1000)::float8, clock_timestamp()::text FROM background_tasks AS job JOIN workflow_runs AS run ON run.company_id=job.company_id AND run.id=$5 WHERE job.id=$1")
++        .bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0)
++        .bind(fence.attempt.0).bind(fence.scope.run.as_uuid())
++        .fetch_one(f.persistence().pool()).await.unwrap();
++    uncaptured(&format!(
++        "PHASE scenario={scenario} phase={phase} elapsed_ms={} owner={owner} attempt={} lease_remaining_ms={lease_ms:.0} run_remaining_ms={run_ms:.0} db_now={now}",
++        elapsed.as_millis(),
++        fence.attempt.0
++    ));
++    LeasePhase {
++        owner,
++        lease_ms,
++        run_ms,
++    }
++}
++/// A worker's genuine heartbeat at a quiescent phase boundary of a lease-sensitive scenario
++/// (DEC-010): the production `renew_io`, with the common three-second policy, before the old
++/// window ends. A lost lease fails here as a `LEASE LAPSE` naming its phase; a refusal while
++/// the exact owner is still live is a different, hard failure. Snapshots taken under the old
++/// window are rebased by exactly the one field a renewal writes, this job's
++/// `lock_expires_at`, read back as committed; every other row and column must still match
++/// wherever they are compared.
++async fn renew_phase(
++    f: &AdmissionFixture,
++    fence: WorkflowFence,
++    scenario: &str,
++    phase: &str,
++    started: std::time::Instant,
++    snapshots: &mut [&mut Value],
++) {
++    let lapse = |state: &LeasePhase| !state.owner || state.lease_ms <= 0.0 || state.run_ms <= 0.0;
++    let label = format!("{phase}:renew");
++    let current = lease_phase(f, fence, scenario, &label, started).await;
++    assert!(
++        !lapse(&current),
++        "LEASE LAPSE scenario={scenario} phase={phase} before renewal: {current:?}"
++    );
++    let revision = || async {
++        sqlx::query_scalar::<_, i64>(
++            "SELECT revision FROM workflow_runs WHERE company_id=$1 AND id=$2",
++        )
++        .bind(fence.scope.company.as_uuid())
++        .bind(fence.scope.run.as_uuid())
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap()
++    };
++    let before = revision().await;
++    let renewed = f.persistence().renew_io(fence, policy()).await;
++    let after = lease_phase(f, fence, scenario, &format!("{phase}:renewed"), started).await;
++    match renewed {
++        Ok(Some(_)) => {}
++        // A definite NotApplied keeps the old window, which must still be live.
++        Err(AppError::DatabaseTimeout(_)) if !lapse(&after) => {}
++        Ok(None) | Err(AppError::DatabaseTimeout(_)) if lapse(&after) => {
++            panic!("LEASE LAPSE scenario={scenario} phase={phase} at renewal: {after:?}")
++        }
++        other => panic!(
++            "renewal refused while the exact owner is live, scenario={scenario} phase={phase}: {other:?} {after:?}"
++        ),
++    }
++    assert_eq!(
++        revision().await,
++        before,
++        "a heartbeat moved the run revision"
++    );
++    let expiry: Value = sqlx::query_scalar(
++        "SELECT to_jsonb(job)->'lock_expires_at' FROM background_tasks AS job WHERE id=$1",
++    )
++    .bind(fence.scope.job.0)
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    let job = json!(fence.scope.job.0);
++    for snapshot in snapshots.iter_mut() {
++        let mut rows = snapshot["background_tasks"]
++            .as_array_mut()
++            .unwrap()
++            .iter_mut()
++            .filter(|row| row["id"] == job);
++        let row = rows.next().expect("the renewed job is in the snapshot");
++        assert!(rows.next().is_none());
++        row["lock_expires_at"] = expiry.clone();
++    }
++}
+ /// What a real worker does while it owns the step: renew the fixture lease through the
+ /// production renew path, at points that no before/after snapshot pair straddles (the
+ /// pattern approved for the retained-truth scenarios). A renewal moves only
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
+index ee60749..3594e42 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
+@@ -360,6 +360,7 @@ async fn continue_genuine(h: &mut MixedTruth) {
+     let before = all_tables(&h.fixture).await;
+     let retired = h.requests[0].fence;
+     new_claim(&h.fixture, &mut h.requests[0]).await;
++    let started = std::time::Instant::now();
+     let fence = h.requests[0].fence;
+     assert_eq!(fence.scope, retired.scope);
+     assert_eq!(fence.attempt.0, retired.attempt.0 + 1);
+@@ -367,14 +368,31 @@ async fn continue_genuine(h: &mut MixedTruth) {
+     for request in &mut h.requests[1..] {
+         request.fence = fence;
+     }
+-    let claimed = all_tables(&h.fixture).await;
++    let mut claimed = all_tables(&h.fixture).await;
++    lease_phase(&h.fixture, fence, "mixed", "claimed_snapshot", started).await;
+     claim_boundary(&before, &claimed, fence);
+     Box::pin(live_recovery(h, true)).await;
+-    let applied = Box::pin(dispatch_genuine(h, &claimed)).await;
+-    Box::pin(complete_genuine(h, &applied, fence)).await;
++    lease_phase(&h.fixture, fence, "mixed", "live_recovery", started).await;
++    // DEC-010: the worker's genuine heartbeat at quiescent boundaries before its window ends.
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "receipt_only_dispatches",
++        started,
++        &mut [&mut claimed],
++    )
++    .await;
++    let applied = Box::pin(dispatch_genuine(h, &mut claimed, started)).await;
++    Box::pin(complete_genuine(h, &applied, fence, started)).await;
+ }
+ 
+-async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
++async fn dispatch_genuine(
++    h: &MixedTruth,
++    claimed: &mut Value,
++    started: std::time::Instant,
++) -> Value {
++    let fence = h.requests[0].fence;
+     let service = ActionService::new(mixed_writer(&h.fixture));
+     let saved = LedgerProvider::new(&h.fixture, Delivery::Pending);
+     for request in &h.requests[..2] {
+@@ -387,12 +405,30 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+         };
+         assert_eq!(receipt.result, good());
+     }
++    lease_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "receipt_only_dispatches",
++        started,
++    )
++    .await;
+     assert_eq!(saved.calls.load(Ordering::SeqCst), 0);
+     assert_eq!(
+         all_tables(&h.fixture).await,
+         *claimed,
+         "receipt-only siblings append no entry and poll no provider"
+     );
++    lease_phase(&h.fixture, fence, "mixed", "receipt_only_snapshot", started).await;
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "supported_dispatch",
++        started,
++        &mut [claimed],
++    )
++    .await;
+     let supported = RegisteredLedger::new(
+         &h.fixture,
+         &h.requests[2],
+@@ -410,11 +446,12 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+     else {
+         panic!("supported sibling genuine completion");
+     };
++    lease_phase(&h.fixture, fence, "mixed", "supported_dispatch", started).await;
+     assert_eq!(receipt.result, good());
+     assert_eq!(supported.inner.calls.load(Ordering::SeqCst), 1);
+     assert_eq!(effects(&h.fixture).await, 3);
+     assert_eq!(entry_consumptions(&h.fixture).await, (4, 0));
+-    let applied = all_tables(&h.fixture).await;
++    let mut applied = all_tables(&h.fixture).await;
+     supported_boundary(claimed, &applied, &h.requests[2]);
+     let digest_matches: bool = sqlx::query_scalar("SELECT result_digest=encode(sha256(jsonb_send($2::jsonb)),'hex') FROM workflow_action_actual_receipt_observations WHERE invocation_id=$1")
+         .bind(h.requests[2].subject.invocation.as_uuid()).bind(good())
+@@ -423,11 +460,27 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+         digest_matches,
+         "actual observation digest binds the authentic good result"
+     );
++    lease_phase(&h.fixture, fence, "mixed", "applied_snapshot", started).await;
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "completion",
++        started,
++        &mut [&mut applied],
++    )
++    .await;
+     applied
+ }
+ 
+-async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence) {
+-    let committed = h
++async fn complete_genuine(
++    h: &MixedTruth,
++    applied: &Value,
++    fence: WorkflowFence,
++    started: std::time::Instant,
++) {
++    lease_phase(&h.fixture, fence, "mixed", "before_completion", started).await;
++    let completed = h
+         .fixture
+         .persistence()
+         .settled()
+@@ -440,8 +493,17 @@ async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence)
+             output: good(),
+         })
+         .await
+-        .unwrap()
+         .unwrap();
++    let state = lease_phase(&h.fixture, fence, "mixed", "completed", started).await;
++    // A refusal is never the required genuine completion; the lease only labels it.
++    let Some(committed) = completed else {
++        let kind = if state.lease_ms > 0.0 && state.run_ms > 0.0 {
++            "LIVE-OWNER REFUSAL"
++        } else {
++            "LEASE LAPSE"
++        };
++        panic!("{kind} scenario=mixed phase=completion: shared completion refused; {state:?}");
++    };
+     assert!(committed.successor.is_none());
+     let done = all_tables(&h.fixture).await;
+     completed_boundary(applied, &done, fence);
+diff --git c/src/application/services/runtime_metrics.rs w/src/application/services/runtime_metrics.rs
+index a93498c..3bb3493 100644
+--- c/src/application/services/runtime_metrics.rs
++++ w/src/application/services/runtime_metrics.rs
+@@ -291,7 +291,7 @@ mod tests {
+             };
+             if self
+                 .failures_remaining
+-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++                .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                     (remaining > 0).then(|| remaining - 1)
+                 })
+                 .is_ok()
+diff --git c/src/application/services/task_worker.rs w/src/application/services/task_worker.rs
+index 9ae8dce..4374411 100644
+--- c/src/application/services/task_worker.rs
++++ w/src/application/services/task_worker.rs
+@@ -2011,7 +2011,7 @@ mod tests {
+             move |available| {
+                 observed_claim_sizes.lock().unwrap().push(available);
+                 let count = claim_remaining
+-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++                    .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                         Some(remaining.saturating_sub(available))
+                     })
+                     .unwrap()
+diff --git c/src/lib.rs w/src/lib.rs
+index f987194..620cef2 100644
+--- c/src/lib.rs
++++ w/src/lib.rs
+@@ -1,3 +1,7 @@
++// Clippy 1.99's `double_must_use` fires on every `#[async_trait]` expansion, not on code written
++// here. Remove this once async-trait stops triggering it.
++#![allow(clippy::double_must_use)]
++
+ pub mod adapters;
+ pub mod application;
+ pub mod domain;

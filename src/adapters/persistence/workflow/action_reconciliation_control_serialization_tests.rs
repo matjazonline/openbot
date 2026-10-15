@@ -455,3 +455,6 @@ async fn workflow_action_reconciliation_control_serialization_expire_before_comm
         Box::pin(case(truth, Terminal::Expire, First::Terminal)).await;
     }
 }
+
+#[path = "action_cancellation_hung_reconciliation_tests.rs"]
+mod hung_reconciliation_tests;

@@ -1,0 +1,34 @@
+[
+  {
+    "filter": "workflow_action_dispatch_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_dispatch_"
+    ],
+    "exit_code": 0,
+    "expected": 20,
+    "ignored_listed": 0,
+    "summary": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 2559 filtered out",
+    "elapsed_s": 45.23,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupC/runtime-workflow-action-dispatch.C-rerun.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "18d7c86ab7d56031d38450f7a7748d1198ff5f7a8a49ed978b780dc440584bb4"
+  },
+  {
+    "filter": "workflow_wait_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_wait_"
+    ],
+    "exit_code": 101,
+    "expected": 16,
+    "ignored_listed": 0,
+    "summary": "test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 2563 filtered out",
+    "elapsed_s": 41.01,
+    "success": false,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupC/runtime-workflow-wait.C-rerun.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "18d7c86ab7d56031d38450f7a7748d1198ff5f7a8a49ed978b780dc440584bb4"
+  }
+]

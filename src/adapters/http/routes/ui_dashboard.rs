@@ -444,7 +444,7 @@ impl Drop for DashboardSseConnection {
     fn drop(&mut self) {
         let previous = self
             .active
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
                 Some(value.saturating_sub(1))
             })
             .unwrap_or(0);

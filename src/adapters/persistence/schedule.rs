@@ -671,6 +671,7 @@ mod tests {
         thread::ThreadPersistence,
         user::UserPersistence,
     };
+    use chrono::SubsecRound;
 
     /// The claim steps from the slot that was due, so a run cannot drift later than its slot and
     /// a backlog after downtime collapses into the next slot instead of replaying.
@@ -772,8 +773,10 @@ mod tests {
         .await
         .unwrap();
 
-        // Backdate the slot by three and a half hours: three runs were missed.
-        let missed_slot = Utc::now() - chrono::Duration::minutes(210);
+        // Backdate the slot by three and a half hours: three runs were missed. Microsecond-exact,
+        // as timestamptz stores it (SQLx binds integer microseconds), so the rhythm below is
+        // measured from the very slot that was persisted.
+        let missed_slot = (Utc::now() - chrono::Duration::minutes(210)).trunc_subsecs(6);
         sqlx::query("UPDATE channel_schedules SET next_run_at = $1 WHERE id = $2")
             .bind(missed_slot)
             .bind(hourly.id)
@@ -789,7 +792,14 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(claimed.iter().any(|run| run.schedule.id == hourly.id));
+        let run = claimed
+            .iter()
+            .find(|run| run.schedule.id == hourly.id)
+            .expect("the missed slot is claimed");
+        assert_eq!(
+            run.scheduled_for, missed_slot,
+            "the run records the slot that was due"
+        );
 
         let advanced = SchedulePersistence::get_by_id(&persistence, hourly.id)
             .await
@@ -810,10 +820,12 @@ mod tests {
             lead < chrono::Duration::minutes(35),
             "expected the next slot in about 30 minutes, got {lead}"
         );
+        let advance = next - missed_slot;
+        assert!(advance > chrono::Duration::zero());
         assert_eq!(
-            (next - missed_slot).num_seconds() % 3600,
+            advance.num_microseconds().unwrap() % 3_600_000_000,
             0,
-            "the next run must stay on the original slot's rhythm"
+            "the next run must stay on the original slot's rhythm, to the microsecond: {advance}"
         );
 
         let _ = SchedulePersistence::delete(&persistence, hourly.id).await;

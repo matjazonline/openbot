@@ -1,0 +1,4455 @@
+diff --git c/src/adapters/harness/rig/budget.rs w/src/adapters/harness/rig/budget.rs
+index 931215c..efec301 100644
+--- c/src/adapters/harness/rig/budget.rs
++++ w/src/adapters/harness/rig/budget.rs
+@@ -21,7 +21,7 @@ impl RunBudget {
+ 
+     pub fn charge(&self, tokens: usize) -> AppResult<()> {
+         self.remaining
+-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++            .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                 remaining.checked_sub(tokens)
+             })
+             .map(|_| ())
+diff --git c/src/adapters/http/routes/ui_dashboard.rs w/src/adapters/http/routes/ui_dashboard.rs
+index 4eeb382..4037f40 100644
+--- c/src/adapters/http/routes/ui_dashboard.rs
++++ w/src/adapters/http/routes/ui_dashboard.rs
+@@ -444,7 +444,7 @@ impl Drop for DashboardSseConnection {
+     fn drop(&mut self) {
+         let previous = self
+             .active
+-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
++            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                 Some(value.saturating_sub(1))
+             })
+             .unwrap_or(0);
+diff --git c/src/adapters/mcp/http.rs w/src/adapters/mcp/http.rs
+index 9a8b8d0..8840188 100644
+--- c/src/adapters/mcp/http.rs
++++ w/src/adapters/mcp/http.rs
+@@ -62,7 +62,7 @@ fn bounded(
+     async_stream::try_stream! {
+         while let Some(chunk) = source.next().await {
+             let chunk = chunk.map_err(|_| io::Error::other("MCP stream failed"))?;
+-            remaining.fetch_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
++            remaining.try_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
+             yield chunk;
+         }
+     }.boxed()
+diff --git c/src/adapters/persistence/attention_tests.rs w/src/adapters/persistence/attention_tests.rs
+index 8f9ff93..cd1c21d 100644
+--- c/src/adapters/persistence/attention_tests.rs
++++ w/src/adapters/persistence/attention_tests.rs
+@@ -19,6 +19,7 @@ use crate::{
+         user::UserPersistence,
+     },
+ };
++use chrono::SubsecRound;
+ 
+ async fn fixture(persistence: &PostgresPersistence) -> (Uuid, Uuid, PrincipalId) {
+     let suffix = Uuid::new_v4().simple().to_string();
+@@ -760,7 +761,9 @@ async fn agent_work_stays_out_until_a_human_decision_is_required() {
+         .await
+         .unwrap();
+     let outreach_id = Uuid::new_v4();
+-    let expiry = Utc::now() + chrono::Duration::hours(2);
++    // Exactly representable as the stored timestamptz (SQLx binds integer microseconds), so the
++    // projected expiry can be compared for equality with the instant the fixture wrote.
++    let expiry = (Utc::now() + chrono::Duration::hours(2)).trunc_subsecs(6);
+     sqlx::query(
+         r#"INSERT INTO task_outreaches (
+                id, company_id, task_id, status, required_threshold_percent, expires_at,
+@@ -1757,8 +1760,9 @@ async fn the_queue_ages_the_generation_rather_than_the_row() {
+ 
+     // An old row whose current generation opened a minute ago, and a younger row that has been
+     // waiting an hour. On the row's own `created_at` the order would be the other way around.
+-    let opened_recently = Utc::now() - chrono::Duration::minutes(1);
+-    let opened_earlier = Utc::now() - chrono::Duration::hours(1);
++    // Microsecond-exact, as stored, so the projected age compares equal to what was written.
++    let opened_recently = (Utc::now() - chrono::Duration::minutes(1)).trunc_subsecs(6);
++    let opened_earlier = (Utc::now() - chrono::Duration::hours(1)).trunc_subsecs(6);
+     sqlx::query(
+         r#"UPDATE thread_handoffs
+            SET created_at = CURRENT_TIMESTAMP - interval '30 days', generation_opened_at = $2
+diff --git c/src/adapters/persistence/schedule.rs w/src/adapters/persistence/schedule.rs
+index 8c23f94..cc1e078 100644
+--- c/src/adapters/persistence/schedule.rs
++++ w/src/adapters/persistence/schedule.rs
+@@ -671,6 +671,7 @@ mod tests {
+         thread::ThreadPersistence,
+         user::UserPersistence,
+     };
++    use chrono::SubsecRound;
+ 
+     /// The claim steps from the slot that was due, so a run cannot drift later than its slot and
+     /// a backlog after downtime collapses into the next slot instead of replaying.
+@@ -772,8 +773,10 @@ mod tests {
+         .await
+         .unwrap();
+ 
+-        // Backdate the slot by three and a half hours: three runs were missed.
+-        let missed_slot = Utc::now() - chrono::Duration::minutes(210);
++        // Backdate the slot by three and a half hours: three runs were missed. Microsecond-exact,
++        // as timestamptz stores it (SQLx binds integer microseconds), so the rhythm below is
++        // measured from the very slot that was persisted.
++        let missed_slot = (Utc::now() - chrono::Duration::minutes(210)).trunc_subsecs(6);
+         sqlx::query("UPDATE channel_schedules SET next_run_at = $1 WHERE id = $2")
+             .bind(missed_slot)
+             .bind(hourly.id)
+@@ -789,7 +792,14 @@ mod tests {
+         )
+         .await
+         .unwrap();
+-        assert!(claimed.iter().any(|run| run.schedule.id == hourly.id));
++        let run = claimed
++            .iter()
++            .find(|run| run.schedule.id == hourly.id)
++            .expect("the missed slot is claimed");
++        assert_eq!(
++            run.scheduled_for, missed_slot,
++            "the run records the slot that was due"
++        );
+ 
+         let advanced = SchedulePersistence::get_by_id(&persistence, hourly.id)
+             .await
+@@ -810,10 +820,12 @@ mod tests {
+             lead < chrono::Duration::minutes(35),
+             "expected the next slot in about 30 minutes, got {lead}"
+         );
++        let advance = next - missed_slot;
++        assert!(advance > chrono::Duration::zero());
+         assert_eq!(
+-            (next - missed_slot).num_seconds() % 3600,
++            advance.num_microseconds().unwrap() % 3_600_000_000,
+             0,
+-            "the next run must stay on the original slot's rhythm"
++            "the next run must stay on the original slot's rhythm, to the microsecond: {advance}"
+         );
+ 
+         let _ = SchedulePersistence::delete(&persistence, hourly.id).await;
+diff --git c/src/adapters/persistence/task/tests.rs w/src/adapters/persistence/task/tests.rs
+index f80d3bf..3b1ccdf 100644
+--- c/src/adapters/persistence/task/tests.rs
++++ w/src/adapters/persistence/task/tests.rs
+@@ -6,7 +6,7 @@ mod child_source_tests;
+ 
+ use super::*;
+ use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
+-use chrono::{DateTime, Utc};
++use chrono::{DateTime, SubsecRound, Utc};
+ use sqlx::postgres::types::PgInterval;
+ use std::str::FromStr;
+ use std::time::Duration;
+@@ -6773,7 +6773,8 @@ async fn extending_an_expired_outreach_serializes_with_the_timeout_sweep() {
+     .execute(&pool)
+     .await
+     .unwrap();
+-    let new_expiry = Utc::now() + chrono::Duration::hours(48);
++    // Microsecond-exact, as timestamptz stores it, so the saved expiry compares equal.
++    let new_expiry = (Utc::now() + chrono::Duration::hours(48)).trunc_subsecs(6);
+     let request = delegation_command(
+         &fixture,
+         Uuid::new_v4(),
+diff --git c/src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs w/src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs
+new file mode 100644
+index 0000000..578b0b9
+--- /dev/null
++++ w/src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs
+@@ -0,0 +1,966 @@
++//! 04.8 group B1: an actual CancelCommand at each undispatched and in-flight action boundary,
++//! token-only interruption beside it, and action-bearing cancellation rollback (DEC-001/003/006).
++//! Every case uses the real control transition, the real dispatch service/writer and
++//! whole-database snapshots; refusals are asserted to write nothing at all.
++use super::*;
++use crate::application::workflow::lease::FencedWorkflowResult;
++use tokio::sync::Notify;
++
++/// A result valid both for the frozen action contract and as the step's committed output.
++fn step_output() -> Value {
++    json!({"items":[],"token_count":0})
++}
++
++fn provider(f: &AdmissionFixture) -> DeduplicatingProvider<'_> {
++    let mut provider = dedup(f, None, false);
++    provider.result = step_output();
++    provider
++}
++
++async fn cancel_command(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    key: &str,
++) -> CancelCommand {
++    CancelCommand {
++        company_id: request.scope().company,
++        run_id: request.scope().run,
++        actor: f.binding.target.actor,
++        command_key: IdempotencyKey::parse(key).unwrap(),
++        expected_revision: f
++            .persistence()
++            .head(request.scope().company, request.scope().run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    }
++}
++
++/// The durable control transition, committed.
++async fn cancel(f: &AdmissionFixture, request: &ActionDispatchRequest, key: &str) {
++    let result = f
++        .persistence()
++        .cancel(cancel_command(f, request, key).await)
++        .await
++        .unwrap();
++    assert!(matches!(result, CancelResult::Applied { .. }), "{result:?}");
++}
++
++/// A worker's genuine heartbeat before a baseline, so a short fixture lease cannot lapse
++/// inside the interval a case depends on.
++async fn heartbeat(f: &AdmissionFixture, request: &ActionDispatchRequest) {
++    assert!(
++        f.persistence()
++            .renew_io(request.fence, policy())
++            .await
++            .unwrap()
++            .is_some(),
++        "the claimed fence is live"
++    );
++}
++
++fn rows<'a>(state: &'a Value, table: &str) -> &'a Vec<Value> {
++    state[table].as_array().unwrap()
++}
++
++/// `before` -> `after` is exactly one durable cancellation of this fence: the run, its job and
++/// current attempt retired once, one control event and command receipt, and the uncertainty
++/// record for any marker. Nothing else changes; prepared intent and every action fact remain.
++fn retired_once(before: &Value, after: &Value, request: &ActionDispatchRequest) {
++    let allowed = [
++        "workflow_runs",
++        "background_tasks",
++        "task_attempts",
++        "workflow_run_events",
++        "workflow_control_commands",
++        "workflow_action_reconciliations",
++        "workflow_action_state_witnesses",
++    ];
++    for (table, rows) in before.as_object().unwrap() {
++        if !allowed.contains(&table.as_str()) {
++            assert_eq!(&after[table], rows, "cancellation preserves {table}");
++        }
++    }
++    let run = &rows(after, "workflow_runs")[0];
++    assert_eq!(run["state"], "cancelled");
++    // The transition's own state witness: append-only, one row, recording the prior state.
++    let (old, new) = (
++        rows(before, "workflow_action_state_witnesses"),
++        rows(after, "workflow_action_state_witnesses"),
++    );
++    assert_eq!(new.len(), old.len() + 1);
++    assert!(old.iter().all(|row| new.contains(row)));
++    let witness = new.iter().find(|row| !old.contains(row)).unwrap();
++    assert_eq!(witness["run_id"], json!(request.scope().run.as_uuid()));
++    assert_eq!(
++        witness["initial_state"],
++        rows(before, "workflow_runs")[0]["state"]
++    );
++    assert_eq!(
++        rows(after, "task_attempts").len(),
++        rows(before, "task_attempts").len()
++    );
++    let attempt = rows(after, "task_attempts")
++        .iter()
++        .find(|row| row["attempt_number"] == json!(request.fence.attempt.0))
++        .unwrap();
++    assert_eq!(attempt["status"], "failed");
++    assert_eq!(attempt["workflow_retirement"], "cancel");
++    assert_eq!(attempt["workflow_failure_code"], "workflow.cancelled");
++    assert_eq!(attempt["worker_id"], json!(request.fence.worker.0));
++    let job = &rows(after, "background_tasks")[0];
++    assert_eq!(job["status"], "failed");
++    assert!(job["worker_id"].is_null() && job["lock_expires_at"].is_null());
++    assert_eq!(
++        rows(after, "workflow_control_commands").len(),
++        rows(before, "workflow_control_commands").len() + 1
++    );
++    let events = |state: &Value| {
++        rows(state, "workflow_run_events")
++            .iter()
++            .filter(|row| row["event_kind"] == "control_cancel")
++            .count()
++    };
++    assert_eq!(events(after), events(before) + 1);
++    let execution = &rows(after, "workflow_executions")[0];
++    for field in ["completed_at", "committed_output", "successor_execution_id"] {
++        assert!(execution[field].is_null(), "no completion: {field}");
++    }
++}
++
++/// After cancellation the same fence and a fresh claimant are both inert: no completion, no
++/// new attempt, and no write anywhere.
++async fn inert(f: &AdmissionFixture, request: &ActionDispatchRequest, cancelled: &Value) {
++    let completion = f
++        .persistence()
++        .settled()
++        .complete_io(FencedWorkflowResult {
++            policy: policy(),
++            fence: request.fence,
++            output: step_output(),
++        })
++        .await
++        .unwrap();
++    assert!(completion.is_none(), "a cancelled fence cannot complete");
++    assert!(
++        f.persistence()
++            .settled()
++            .claim_io(request.fence.scope, worker(), policy())
++            .await
++            .unwrap()
++            .is_none()
++    );
++    assert_eq!(&all_tables(f).await, cancelled, "inert after cancellation");
++}
++
++fn refused(result: AppResult<impl std::fmt::Debug>) {
++    assert!(
++        matches!(&result, Err(AppError::Conflict(message)) if message == "Workflow lifecycle revision or command conflict"),
++        "expected the cancelled-fence refusal: {result:?}"
++    );
++}
++
++#[derive(Clone, Copy, Debug)]
++enum Prepared {
++    Local,
++    Remote,
++    ProtectedLocal,
++    ProtectedRemote,
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_prepared_and_protected_refuse_after_command() {
++    for case in [
++        Prepared::Local,
++        Prepared::Remote,
++        Prepared::ProtectedLocal,
++        Prepared::ProtectedRemote,
++    ] {
++        let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++        let provider = provider(&f);
++        if matches!(case, Prepared::ProtectedLocal | Prepared::ProtectedRemote) {
++            sqlx::query("UPDATE fixture_action_policies SET approval=true")
++                .execute(f.persistence().pool())
++                .await
++                .unwrap();
++        }
++        heartbeat(&f, &request).await;
++        let before = all_tables(&f).await;
++        assert_eq!(rows(&before, "workflow_action_intents").len(), 1);
++        cancel(&f, &request, "b1-prepared").await;
++        let cancelled = all_tables(&f).await;
++        retired_once(&before, &cancelled, &request);
++        // Every public service path, twice: the original service and a fresh one.
++        for _ in 0..2 {
++            let service = ActionService::new(adapter(&f, 0));
++            match case {
++                Prepared::Local | Prepared::ProtectedLocal => {
++                    refused(service.dispatch_local(&request).await.map(|_| ()))
++                }
++                Prepared::Remote | Prepared::ProtectedRemote => refused(
++                    service
++                        .dispatch_remote(&request, &provider, &CancellationToken::new())
++                        .await
++                        .map(|_| ()),
++                ),
++            }
++            assert_eq!(&all_tables(&f).await, &cancelled, "{case:?} writes nothing");
++        }
++        assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++        assert_eq!(effect_count(&f).await, 0);
++        assert_eq!(facts(&f).await, (0, 0, 0));
++        inert(&f, &request, &cancelled).await;
++    }
++}
++
++/// Real reservation commits, then the actual cancellation commits before the service performs
++/// its final entry authorization; nothing else is intercepted.
++/// What the gate observed: reserved marker and entry, and the snapshot after cancellation.
++type Reserved = std::sync::Mutex<Option<(Uuid, Uuid, Value)>>;
++struct CancelAfterReservation<'a> {
++    f: &'a AdmissionFixture,
++    inner: Dispatch,
++    reserved: &'a Reserved,
++}
++#[async_trait]
++impl ActionDispatch for CancelAfterReservation<'_> {
++    async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult> {
++        self.inner.local(request).await
++    }
++    async fn remote(
++        &self,
++        request: &ActionDispatchRequest,
++        provider: &dyn RemoteAction,
++        cancel: &CancellationToken,
++    ) -> AppResult<RemoteDispatchObservation> {
++        supervise_remote(self, request, provider, cancel).await
++    }
++}
++#[async_trait]
++impl RemoteDispatch for CancelAfterReservation<'_> {
++    async fn reserve_remote(
++        &self,
++        request: &ActionDispatchRequest,
++        contract: Option<&ProviderReplayContract>,
++    ) -> AppResult<RemoteReservationResult> {
++        let reserved = self.inner.reserve_remote(request, contract).await?;
++        let RemoteReservationResult::Reserved(reservation) = &reserved else {
++            panic!("a genuine first reservation")
++        };
++        let before = all_tables(self.f).await;
++        cancel(self.f, request, "b1-after-reservation").await;
++        let cancelled = all_tables(self.f).await;
++        retired_once(&before, &cancelled, request);
++        *self.reserved.lock().unwrap() = Some((reservation.marker, reservation.entry, cancelled));
++        Ok(reserved)
++    }
++    async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
++        self.inner.enter_remote(reservation).await
++    }
++    async fn finish_remote(
++        &self,
++        entry: RemoteEntry,
++        result: Value,
++    ) -> AppResult<RemoteDispatchObservation> {
++        self.inner.finish_remote(entry, result).await
++    }
++    async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool> {
++        self.inner.owns_remote(request).await
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_after_reservation_refuses_entry_zero_polls() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    heartbeat(&f, &request).await;
++    let reserved = Reserved::default();
++    let writer = CancelAfterReservation {
++        f: &f,
++        inner: adapter(&f, 0),
++        reserved: &reserved,
++    };
++    refused(
++        ActionService::new(writer)
++            .dispatch_remote(&request, &provider, &CancellationToken::new())
++            .await
++            .map(|_| ()),
++    );
++    let (marker, entry, cancelled) = reserved.lock().unwrap().take().expect("gate reached");
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++    assert_eq!(effect_count(&f).await, 0);
++    let after = all_tables(&f).await;
++    assert_eq!(after, cancelled, "refused entry writes nothing");
++    let ids = |table: &str| -> Vec<Value> {
++        rows(&after, table)
++            .iter()
++            .map(|row| row["id"].clone())
++            .collect()
++    };
++    assert_eq!(ids("workflow_action_dispatches"), vec![json!(marker)]);
++    assert_eq!(ids("workflow_action_remote_entries"), vec![json!(entry)]);
++    assert!(rows(&after, "workflow_action_receipts").is_empty());
++    // The retained marker is unresolved; cancellation records it for reconciliation.
++    assert_eq!(rows(&after, "workflow_action_reconciliations").len(), 1);
++    refused(
++        ActionService::new(adapter(&f, 0))
++            .dispatch_remote(&request, &provider, &CancellationToken::new())
++            .await
++            .map(|_| ()),
++    );
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++    inert(&f, &request, &cancelled).await;
++}
++
++/// A genuine first poll that never resolves. `applied` records the real external effect before
++/// pending (accepted, response never arrives); otherwise the provider never applies it.
++struct Pending<'a> {
++    f: &'a AdmissionFixture,
++    applied: bool,
++    started: Notify,
++    polls: AtomicUsize,
++    dropped: AtomicUsize,
++}
++struct DropGuard<'a>(&'a AtomicUsize);
++impl Drop for DropGuard<'_> {
++    fn drop(&mut self) {
++        self.0.fetch_add(1, Ordering::SeqCst);
++    }
++}
++impl<'a> Pending<'a> {
++    fn new(f: &'a AdmissionFixture, applied: bool) -> Self {
++        Self {
++            f,
++            applied,
++            started: Notify::new(),
++            polls: AtomicUsize::new(0),
++            dropped: AtomicUsize::new(0),
++        }
++    }
++}
++#[async_trait]
++impl RemoteAction for Pending<'_> {
++    fn replay_contract(&self) -> Option<&ProviderReplayContract> {
++        None
++    }
++    async fn invoke(&self, action: &FrozenAction, _: &ProviderInvocation) -> AppResult<Value> {
++        self.polls.fetch_add(1, Ordering::SeqCst);
++        let _guard = DropGuard(&self.dropped);
++        if self.applied {
++            sqlx::query("INSERT INTO fixture_remote_effects VALUES ($1)")
++                .bind(action.idempotency_key().as_str())
++                .execute(self.f.persistence().pool())
++                .await?;
++        }
++        self.started.notify_one();
++        std::future::pending().await
++    }
++}
++
++/// Dispatch, recording how many provider futures were dropped at the moment it returned.
++async fn dispatch_observed(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    provider: &Pending<'_>,
++    token: &CancellationToken,
++) -> (AppResult<RemoteDispatchObservation>, usize) {
++    let result = ActionService::new(adapter(f, 0))
++        .dispatch_remote(request, provider, token)
++        .await;
++    (result, provider.dropped.load(Ordering::SeqCst))
++}
++
++fn interrupted(result: AppResult<RemoteDispatchObservation>) {
++    assert!(
++        matches!(result, Ok(RemoteDispatchObservation::Interrupted)),
++        "expected Interrupted"
++    );
++}
++
++/// What the delegating supervision seam saw: the deadline the real `enter_remote` froze, and
++/// each ownership probe's start time and real result (`None` for an error).
++#[derive(Default)]
++struct Supervision {
++    deadline: std::sync::Mutex<Option<tokio::time::Instant>>,
++    probes: std::sync::Mutex<Vec<(tokio::time::Instant, Option<bool>)>>,
++}
++
++/// The real writer, observed. `always_owned` is the negative control: ownership supervision
++/// disabled, every heartbeat affirming ownership without asking the database.
++struct Supervised<'a> {
++    inner: Dispatch,
++    always_owned: bool,
++    seen: &'a Supervision,
++}
++#[async_trait]
++impl ActionDispatch for Supervised<'_> {
++    async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult> {
++        self.inner.local(request).await
++    }
++    async fn remote(
++        &self,
++        request: &ActionDispatchRequest,
++        provider: &dyn RemoteAction,
++        cancel: &CancellationToken,
++    ) -> AppResult<RemoteDispatchObservation> {
++        supervise_remote(self, request, provider, cancel).await
++    }
++}
++#[async_trait]
++impl RemoteDispatch for Supervised<'_> {
++    async fn reserve_remote(
++        &self,
++        request: &ActionDispatchRequest,
++        contract: Option<&ProviderReplayContract>,
++    ) -> AppResult<RemoteReservationResult> {
++        self.inner.reserve_remote(request, contract).await
++    }
++    async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
++        let entered = self.inner.enter_remote(reservation).await?;
++        *self.seen.deadline.lock().unwrap() = Some(entered.deadline);
++        Ok(entered)
++    }
++    async fn finish_remote(
++        &self,
++        entry: RemoteEntry,
++        result: Value,
++    ) -> AppResult<RemoteDispatchObservation> {
++        self.inner.finish_remote(entry, result).await
++    }
++    async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool> {
++        let started = tokio::time::Instant::now();
++        let owned = if self.always_owned {
++            Ok(true)
++        } else {
++            self.inner.owns_remote(request).await
++        };
++        let seen = owned.as_ref().ok().copied();
++        self.seen.probes.lock().unwrap().push((started, seen));
++        owned
++    }
++}
++
++/// F-004's causal oracle. The invocation ended because a real ownership probe, started after
++/// the cancellation committed, was refused, and it ended before the frozen entry deadline, so
++/// neither that deadline nor a supervision-guard timeout (which records no result) can pass.
++fn ownership_interrupted(
++    seen: &Supervision,
++    cancelled_at: tokio::time::Instant,
++    returned_at: tokio::time::Instant,
++) -> Result<(), String> {
++    let deadline = seen
++        .deadline
++        .lock()
++        .unwrap()
++        .ok_or("no frozen entry deadline")?;
++    let probes = seen.probes.lock().unwrap();
++    let after: Vec<_> = probes
++        .iter()
++        .filter(|(started, _)| *started >= cancelled_at)
++        .collect();
++    if after.iter().any(|(_, owned)| *owned != Some(false)) {
++        return Err(format!(
++            "a post-cancel probe did not refuse ownership: {probes:?}"
++        ));
++    }
++    let Some((refused_at, _)) = after.last() else {
++        return Err(format!("no ownership probe after cancellation: {probes:?}"));
++    };
++    if *refused_at > returned_at {
++        return Err("the refusal followed the return".into());
++    }
++    if returned_at >= deadline {
++        return Err(format!(
++            "returned {:?} at or after the frozen deadline",
++            returned_at - deadline
++        ));
++    }
++    Ok(())
++}
++
++struct PendingRun {
++    result: AppResult<RemoteDispatchObservation>,
++    dropped: usize,
++    cancelled_at: tokio::time::Instant,
++    returned_at: tokio::time::Instant,
++    cancelled: Value,
++}
++
++/// DEC-003 durable case: the token stays live; the real CancelCommand commits only after the
++/// live pending premise holds, and the service is observed through `Supervised`.
++async fn run_pending(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    provider: &Pending<'_>,
++    seen: &Supervision,
++    always_owned: bool,
++) -> PendingRun {
++    let token = CancellationToken::new();
++    let service = ActionService::new(Supervised {
++        inner: adapter(f, 0),
++        always_owned,
++        seen,
++    });
++    let dispatch = async {
++        let result = service.dispatch_remote(request, provider, &token).await;
++        (
++            result,
++            provider.dropped.load(Ordering::SeqCst),
++            tokio::time::Instant::now(),
++        )
++    };
++    let durable = async {
++        provider.started.notified().await;
++        // The required premise, before cancellation: genuinely polled, still pending, owned.
++        assert_eq!(provider.polls.load(Ordering::SeqCst), 1);
++        assert_eq!(provider.dropped.load(Ordering::SeqCst), 0, "pending");
++        let deadline = seen.deadline.lock().unwrap().expect("entered");
++        assert!(tokio::time::Instant::now() < deadline, "inside the window");
++        assert!(
++            adapter(f, 0).owns_remote(request).await.unwrap(),
++            "live ownership"
++        );
++        let entered = all_tables(f).await;
++        cancel(f, request, "b1-pending").await;
++        let cancelled_at = tokio::time::Instant::now();
++        let cancelled = all_tables(f).await;
++        retired_once(&entered, &cancelled, request);
++        (cancelled_at, cancelled)
++    };
++    let ((result, dropped, returned_at), (cancelled_at, cancelled)) =
++        tokio::time::timeout(Duration::from_secs(10), async {
++            tokio::join!(dispatch, durable)
++        })
++        .await
++        .expect("bounded pending invocation");
++    assert!(!token.is_cancelled(), "durable, not token, interruption");
++    PendingRun {
++        result,
++        dropped,
++        cancelled_at,
++        returned_at,
++        cancelled,
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_pending_provider_dropped_by_ownership_supervision() {
++    for applied in [false, true] {
++        let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++        heartbeat(&f, &request).await;
++        let provider = Pending::new(&f, applied);
++        let seen = Supervision::default();
++        let run = run_pending(&f, &request, &provider, &seen, false).await;
++        interrupted(run.result);
++        ownership_interrupted(&seen, run.cancelled_at, run.returned_at).unwrap();
++        assert_eq!(provider.polls.load(Ordering::SeqCst), 1);
++        assert_eq!(
++            run.dropped, 1,
++            "the actual future is dropped before dispatch returns"
++        );
++        let after = all_tables(&f).await;
++        assert_eq!(after, run.cancelled, "interruption fabricates nothing");
++        assert_eq!(rows(&after, "workflow_action_dispatches").len(), 1);
++        assert_eq!(rows(&after, "workflow_action_remote_entries").len(), 1);
++        assert!(rows(&after, "workflow_action_receipts").is_empty());
++        assert_eq!(rows(&after, "workflow_action_reconciliations").len(), 1);
++        assert_eq!(
++            effect_count(&f).await,
++            i64::from(applied),
++            "actual ledger truth"
++        );
++        refused(
++            ActionService::new(adapter(&f, 0))
++                .dispatch_remote(&request, &provider, &CancellationToken::new())
++                .await
++                .map(|_| ()),
++        );
++        assert_eq!(provider.polls.load(Ordering::SeqCst), 1);
++        inert(&f, &request, &run.cancelled).await;
++    }
++}
++
++/// Negative control: with ownership supervision disabled the frozen deadline still ends the
++/// invocation, and that must fail the causal oracle rather than pass.
++#[tokio::test]
++async fn workflow_action_cancellation_pending_oracle_rejects_deadline_only_interruption() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    heartbeat(&f, &request).await;
++    let provider = Pending::new(&f, false);
++    let seen = Supervision::default();
++    let run = run_pending(&f, &request, &provider, &seen, true).await;
++    interrupted(run.result);
++    assert_eq!(run.dropped, 1);
++    let deadline = seen.deadline.lock().unwrap().unwrap();
++    assert!(
++        run.returned_at >= deadline,
++        "only the frozen deadline ended it"
++    );
++    let verdict = ownership_interrupted(&seen, run.cancelled_at, run.returned_at);
++    assert!(
++        verdict.is_err(),
++        "deadline-only interruption must fail the oracle"
++    );
++    eprintln!("negative control rejected: {}", verdict.unwrap_err());
++}
++
++/// The oracle alone, over constructed observations: only a refusal probe started after the
++/// cancellation and returning before the deadline passes.
++#[test]
++fn workflow_action_cancellation_pending_oracle_discriminates_interruption_causes() {
++    let start = tokio::time::Instant::now();
++    let at = |millis: u64| start + Duration::from_millis(millis);
++    let seen = |probes: Vec<(u64, Option<bool>)>| {
++        let seen = Supervision::default();
++        *seen.deadline.lock().unwrap() = Some(at(3000));
++        *seen.probes.lock().unwrap() = probes
++            .into_iter()
++            .map(|(t, owned)| (at(t), owned))
++            .collect();
++        seen
++    };
++    let (cancelled, returned) = (at(100), at(1010));
++    // Refused by a post-cancel probe; an earlier pre-cancel affirmation is irrelevant.
++    assert!(
++        ownership_interrupted(
++            &seen(vec![(50, Some(true)), (1000, Some(false))]),
++            cancelled,
++            returned
++        )
++        .is_ok()
++    );
++    for (case, probes, returned) in [
++        (
++            "guard timeout records no result",
++            vec![(50, Some(true))],
++            returned,
++        ),
++        ("probe error", vec![(1000, None)], returned),
++        (
++            "still affirmed",
++            vec![(1000, Some(true)), (2000, Some(false))],
++            at(2010),
++        ),
++        (
++            "deadline-only",
++            vec![(1000, Some(true)), (2000, Some(true))],
++            at(3000),
++        ),
++        ("refusal after return", vec![(1000, Some(false))], at(900)),
++        (
++            "refused but returned at deadline",
++            vec![(2990, Some(false))],
++            at(3000),
++        ),
++    ] {
++        assert!(
++            ownership_interrupted(&seen(probes), cancelled, returned).is_err(),
++            "{case}"
++        );
++    }
++}
++
++/// Control facts a token-only interruption must leave as they were.
++const OWNERSHIP: [&str; 7] = [
++    "workflow_runs",
++    "workflow_executions",
++    "background_tasks",
++    "task_attempts",
++    "workflow_run_events",
++    "workflow_control_commands",
++    "workflow_action_reconciliations",
++];
++
++fn still_owned(before: &Value, after: &Value, request: &ActionDispatchRequest) {
++    for table in OWNERSHIP {
++        assert_eq!(
++            after[table], before[table],
++            "token interruption preserves {table}"
++        );
++    }
++    assert_eq!(rows(after, "workflow_runs")[0]["state"], "running");
++    let job = &rows(after, "background_tasks")[0];
++    assert_eq!(job["status"], "processing");
++    assert_eq!(job["worker_id"], json!(request.fence.worker.0));
++}
++
++/// The original Reconcile contract after an unresolved marker: no replay permission.
++async fn retry_needs_reconciliation(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    provider: &dyn RemoteAction,
++) {
++    let before = all_tables(f).await;
++    let retry = ActionService::new(adapter(f, 0))
++        .dispatch_remote(request, &Forward(provider), &CancellationToken::new())
++        .await
++        .unwrap();
++    assert!(matches!(
++        retry,
++        RemoteDispatchObservation::PossibleDispatchExists
++    ));
++    assert_eq!(
++        all_tables(f).await,
++        before,
++        "a refused retry writes nothing"
++    );
++}
++struct Forward<'a>(&'a dyn RemoteAction);
++#[async_trait]
++impl RemoteAction for Forward<'_> {
++    fn replay_contract(&self) -> Option<&ProviderReplayContract> {
++        self.0.replay_contract()
++    }
++    async fn invoke(
++        &self,
++        action: &FrozenAction,
++        invocation: &ProviderInvocation,
++    ) -> AppResult<Value> {
++        self.0.invoke(action, invocation).await
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_token_precancelled_never_reserves() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    heartbeat(&f, &request).await;
++    let before = all_tables(&f).await;
++    let token = CancellationToken::new();
++    token.cancel();
++    interrupted(
++        ActionService::new(adapter(&f, 0))
++            .dispatch_remote(&request, &provider, &token)
++            .await,
++    );
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++    assert_eq!(
++        all_tables(&f).await,
++        before,
++        "no reservation, marker or entry"
++    );
++}
++
++/// The real final entry authorization succeeds, then the token is cancelled before the
++/// service's monotonic/token check that precedes the first poll.
++struct CancelAfterEntry<'a> {
++    inner: Dispatch,
++    token: &'a CancellationToken,
++}
++#[async_trait]
++impl ActionDispatch for CancelAfterEntry<'_> {
++    async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult> {
++        self.inner.local(request).await
++    }
++    async fn remote(
++        &self,
++        request: &ActionDispatchRequest,
++        provider: &dyn RemoteAction,
++        cancel: &CancellationToken,
++    ) -> AppResult<RemoteDispatchObservation> {
++        supervise_remote(self, request, provider, cancel).await
++    }
++}
++#[async_trait]
++impl RemoteDispatch for CancelAfterEntry<'_> {
++    async fn reserve_remote(
++        &self,
++        request: &ActionDispatchRequest,
++        contract: Option<&ProviderReplayContract>,
++    ) -> AppResult<RemoteReservationResult> {
++        self.inner.reserve_remote(request, contract).await
++    }
++    async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
++        let entered = self.inner.enter_remote(reservation).await?;
++        self.token.cancel();
++        Ok(entered)
++    }
++    async fn finish_remote(
++        &self,
++        entry: RemoteEntry,
++        result: Value,
++    ) -> AppResult<RemoteDispatchObservation> {
++        self.inner.finish_remote(entry, result).await
++    }
++    async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool> {
++        self.inner.owns_remote(request).await
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_token_after_entry_suppresses_first_poll() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    heartbeat(&f, &request).await;
++    let before = all_tables(&f).await;
++    let token = CancellationToken::new();
++    let writer = CancelAfterEntry {
++        inner: adapter(&f, 0),
++        token: &token,
++    };
++    interrupted(
++        ActionService::new(writer)
++            .dispatch_remote(&request, &provider, &token)
++            .await,
++    );
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 0, "no first poll");
++    assert_eq!(effect_count(&f).await, 0);
++    let after = all_tables(&f).await;
++    still_owned(&before, &after, &request);
++    assert_eq!(rows(&after, "workflow_action_dispatches").len(), 1);
++    assert_eq!(rows(&after, "workflow_action_remote_entries").len(), 1);
++    assert!(rows(&after, "workflow_action_receipts").is_empty());
++    retry_needs_reconciliation(&f, &request, &provider).await;
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_token_pending_drop_keeps_ownership() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    heartbeat(&f, &request).await;
++    let before = all_tables(&f).await;
++    let provider = Pending::new(&f, false);
++    let token = CancellationToken::new();
++    let interrupt = async {
++        provider.started.notified().await;
++        let entered = all_tables(&f).await;
++        token.cancel();
++        entered
++    };
++    let ((result, dropped), entered) = tokio::time::timeout(Duration::from_secs(8), async {
++        tokio::join!(
++            dispatch_observed(&f, &request, &provider, &token),
++            interrupt
++        )
++    })
++    .await
++    .expect("token interruption ends the pending invocation");
++    interrupted(result);
++    assert_eq!(provider.polls.load(Ordering::SeqCst), 1);
++    assert_eq!(
++        dropped, 1,
++        "the actual future is dropped before dispatch returns"
++    );
++    let after = all_tables(&f).await;
++    assert_eq!(after, entered, "token interruption writes nothing");
++    still_owned(&before, &after, &request);
++    assert_eq!(rows(&after, "workflow_action_dispatches").len(), 1);
++    assert_eq!(rows(&after, "workflow_action_remote_entries").len(), 1);
++    assert!(rows(&after, "workflow_action_receipts").is_empty());
++    assert_eq!(effect_count(&f).await, 0);
++    retry_needs_reconciliation(&f, &request, &provider).await;
++    assert_eq!(
++        provider.polls.load(Ordering::SeqCst),
++        1,
++        "no replay permission"
++    );
++}
++
++/// DEC-006: a fault deferred to COMMIT, after every cancellation write has executed.
++async fn install_commit_fault(f: &AdmissionFixture) {
++    sqlx::raw_sql("CREATE FUNCTION b1_cancel_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'b1 cancellation commit fault'; END $$; CREATE CONSTRAINT TRIGGER b1_cancel_fault AFTER INSERT ON workflow_control_commands DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION b1_cancel_fault();")
++        .execute(f.persistence().pool()).await.unwrap();
++}
++async fn remove_commit_fault(f: &AdmissionFixture) {
++    sqlx::raw_sql("DROP TRIGGER b1_cancel_fault ON workflow_control_commands; DROP FUNCTION b1_cancel_fault();")
++        .execute(f.persistence().pool()).await.unwrap();
++}
++async fn faulted_cancel_rolls_back(f: &AdmissionFixture, request: &ActionDispatchRequest) {
++    install_commit_fault(f).await;
++    heartbeat(f, request).await;
++    let baseline = all_tables(f).await;
++    let error = f
++        .persistence()
++        .cancel(cancel_command(f, request, "b1-faulted").await)
++        .await
++        .unwrap_err();
++    assert!(
++        error.to_string().contains("b1 cancellation commit fault"),
++        "{error}"
++    );
++    assert_eq!(all_tables(f).await, baseline, "complete rollback");
++    remove_commit_fault(f).await;
++}
++
++async fn completes_once(f: &AdmissionFixture, request: &ActionDispatchRequest, output: &Value) {
++    let committed = f
++        .persistence()
++        .settled()
++        .complete_io(FencedWorkflowResult {
++            policy: policy(),
++            fence: request.fence,
++            output: output.clone(),
++        })
++        .await
++        .unwrap()
++        .expect("the original fence completes");
++    assert_eq!(&committed.output, output);
++    let state = all_tables(f).await;
++    assert_eq!(
++        rows(&state, "task_attempts").len(),
++        1,
++        "no reclaim or new attempt"
++    );
++    assert_eq!(rows(&state, "workflow_runs")[0]["state"], "succeeded");
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_rollback_keeps_prepared_work_usable() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    faulted_cancel_rolls_back(&f, &request).await;
++    let service = ActionService::new(adapter(&f, 0));
++    for _ in 0..2 {
++        let RemoteDispatchObservation::Committed(receipt) = service
++            .dispatch_remote(&request, &provider, &CancellationToken::new())
++            .await
++            .unwrap()
++        else {
++            panic!("the same fence dispatches the prepared action")
++        };
++        assert_eq!(receipt.result, step_output());
++    }
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1, "dispatched once");
++    assert_eq!(effect_count(&f).await, 1);
++    completes_once(&f, &request, &step_output()).await;
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_rollback_keeps_accepted_effect_settleable() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    let writer = adapter(&f, 0);
++    let RemoteReservationResult::Reserved(reservation) =
++        writer.reserve_remote(&request, None).await.unwrap()
++    else {
++        panic!("a genuine reservation")
++    };
++    let entry = writer.enter_remote(*reservation).await.unwrap();
++    let result = provider
++        .invoke(&entry.action, &entry.provider)
++        .await
++        .unwrap();
++    assert_eq!(effect_count(&f).await, 1, "accepted external effect");
++    faulted_cancel_rolls_back(&f, &request).await;
++    let RemoteDispatchObservation::Committed(receipt) =
++        writer.finish_remote(entry, result.clone()).await.unwrap()
++    else {
++        panic!("the same fence settles the accepted effect")
++    };
++    assert_eq!(receipt.result, result);
++    assert_eq!(facts(&f).await, (1, 1, 0));
++    completes_once(&f, &request, &result).await;
++    assert_eq!(
++        provider.calls.load(Ordering::SeqCst),
++        1,
++        "no further provider call"
++    );
++    assert_eq!(effect_count(&f).await, 1);
++}
++
++#[path = "action_cancellation_receipt_tests.rs"]
++mod receipt_tests;
++
++#[path = "action_cancellation_completion_tests.rs"]
++mod completion_tests;
+diff --git c/src/adapters/persistence/workflow/action_cancellation_completion_tests.rs w/src/adapters/persistence/workflow/action_cancellation_completion_tests.rs
+new file mode 100644
+index 0000000..40c3c5c
+--- /dev/null
++++ w/src/adapters/persistence/workflow/action_cancellation_completion_tests.rs
+@@ -0,0 +1,749 @@
++//! 04.8 group B3: an actual action receipt, then actual shared completion against an actual
++//! CancelCommand in both orders with the exact run blockers observed (DEC-002/005); the ordinary
++//! completion attempt told apart from ambiguous-COMMIT recovery (R-008/DEC-012); and cancelled
++//! SafeRepeat/ProviderIdempotency history refused at the terminal fence (DEC-001).
++use super::*;
++use crate::adapters::persistence::workflow::persistence_bound::recorder::{Injected, Observed};
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::{
++    RunLock, assert_drained, blocked, probe_run,
++};
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{
++    Gate, HANG_GUARD, Stall, connect, gated_policy, resolution_behind,
++};
++use crate::application::workflow::RunRevision;
++use crate::application::workflow::completion::{
++    CommitDisposition, CommittedWorkflowStep, WorkflowCompletion,
++};
++use crate::domain::workflow::{RouteSelection, StepId, TransitionTarget};
++use std::sync::atomic::AtomicBool;
++
++#[derive(Clone, Copy, Debug)]
++enum Route {
++    /// The step routes to `$end`: a committed completion makes the run terminal.
++    End,
++    /// The step routes to `second`: a committed completion schedules a successor.
++    Successor,
++}
++
++/// The same single step, routed `success -> second` (as the claim-SQL two-step fixture does).
++fn successor_source() -> Value {
++    let mut source: Value =
++        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
++    source["limits"]["root_budget"] = json!({"activations":10,"model_calls":2,"repetitions":2});
++    source["steps"]["second"] = source["steps"]["start"].clone();
++    source["steps"]["start"]["routes"]["success"] = json!("second");
++    source
++}
++
++async fn route_fixture(route: Route) -> (AdmissionFixture, ActionDispatchRequest) {
++    match route {
++        Route::End => {
++            let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++            (f, request)
++        }
++        Route::Successor => {
++            let (f, scope) = Box::pin(fixture_source(successor_source())).await;
++            let (f, request) = Box::pin(setup_action_on_fixture(
++                f,
++                scope,
++                ActionRecovery::Reconcile,
++                json!({"value":1}),
++            ))
++            .await;
++            sqlx::raw_sql("CREATE TABLE fixture_remote_effects (provider_key text PRIMARY KEY)")
++                .execute(f.persistence().pool())
++                .await
++                .unwrap();
++            (f, request)
++        }
++    }
++}
++
++/// The one canonical receipt and actual observation, bound to the exact invocation and result.
++fn receipt_kept(state: &Value, request: &ActionDispatchRequest) {
++    for table in [
++        "workflow_action_receipts",
++        "workflow_action_actual_receipt_observations",
++    ] {
++        let rows = rows(state, table);
++        assert_eq!(rows.len(), 1, "{table}");
++        assert_eq!(rows[0]["result"], step_output(), "{table}");
++        assert_eq!(
++            rows[0]["invocation_id"],
++            json!(request.subject.invocation.as_uuid()),
++            "{table}"
++        );
++    }
++}
++
++/// DEC-005 premise: the actual service commits the receipt for a result valid as the step's
++/// output, and that alone has not completed the step. The fence is then freshly renewed.
++async fn receipted<'a>(
++    f: &'a AdmissionFixture,
++    request: &ActionDispatchRequest,
++) -> DeduplicatingProvider<'a> {
++    let provider = provider(f);
++    heartbeat(f, request).await;
++    let RemoteDispatchObservation::Committed(receipt) = ActionService::new(adapter(f, 0))
++        .dispatch_remote(request, &provider, &CancellationToken::new())
++        .await
++        .unwrap()
++    else {
++        panic!("a live owner commits its receipt")
++    };
++    assert_eq!(receipt.result, step_output());
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    assert_eq!(effect_count(f).await, 1);
++    let state = all_tables(f).await;
++    receipt_kept(&state, request);
++    assert!(
++        rows(&state, "workflow_executions")[0]["completed_at"].is_null(),
++        "receipt commitment alone has not completed the step"
++    );
++    heartbeat(f, request).await;
++    provider
++}
++
++fn row_with<'a>(state: &'a Value, table: &str, column: &str, id: Uuid) -> &'a Value {
++    rows(state, table)
++        .iter()
++        .find(|row| row[column] == json!(id))
++        .unwrap_or_else(|| panic!("{table}.{column}={id}"))
++}
++
++fn events_of(state: &Value, kind: &str) -> usize {
++    rows(state, "workflow_run_events")
++        .iter()
++        .filter(|row| row["event_kind"] == kind)
++        .count()
++}
++
++#[derive(Clone, Copy, Debug)]
++enum First {
++    Cancel,
++    Completion,
++}
++
++struct Race {
++    completion: Option<CommittedWorkflowStep>,
++    cancel: CancelResult,
++    /// The revision the competing command was built from (after the receipt).
++    expected: RunRevision,
++    /// Every bounded operation the race finished, from the test-only recorder.
++    events: Vec<Observed>,
++}
++
++/// DEC-002 for the run-first completion owner. A gate holds only the exact execution row.
++/// Cancel-first: the actual cancellation stops at its execution lock owning company and run,
++/// and the actual completion waits on that exact run behind it. Completion-first: the actual
++/// completion stops at its execution lock owning the run, and the actual cancellation (company
++/// already authorized) waits at its head/run query behind it.
++async fn race(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    first: First,
++    injected: &Injected,
++) -> Race {
++    let command = cancel_command(f, request, "b3-completion-race").await;
++    let expected = command.expected_revision;
++    let mut gate = f.persistence().pool().begin().await.unwrap();
++    let gate_pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *gate)
++        .await
++        .unwrap();
++    sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND id=$2 FOR UPDATE")
++        .bind(request.scope().company.as_uuid())
++        .bind(request.scope().execution.as_uuid())
++        .execute(&mut *gate)
++        .await
++        .unwrap();
++    let mut observer = f.persistence().pool().acquire().await.unwrap();
++    probe_run(&mut observer, request, RunLock::Free).await;
++    let recorded = injected.outcomes().len();
++    let started = tokio::time::Instant::now();
++    let completion = f.persistence().complete_io(FencedWorkflowResult {
++        policy: policy(),
++        fence: request.fence,
++        output: step_output(),
++    });
++    let cancel = f.persistence().cancel(command);
++    tokio::pin!(completion, cancel);
++    let (first_pid, second_pid) = match first {
++        First::Cancel => {
++            let cancel_pid = blocked(
++                &mut observer,
++                gate_pid,
++                "SELECT id FROM workflow_executions",
++                cancel.as_mut(),
++            )
++            .await;
++            probe_run(&mut observer, request, RunLock::Held).await;
++            let completion_pid = tokio::select! {
++                result = cancel.as_mut() => panic!("cancel escaped its execution gate: {result:?}"),
++                pid = blocked(&mut observer, cancel_pid, "SELECT binding_id,max_steps FROM workflow_runs", completion.as_mut()) => pid,
++            };
++            (cancel_pid, completion_pid)
++        }
++        First::Completion => {
++            let completion_pid = blocked(
++                &mut observer,
++                gate_pid,
++                "SELECT completed_at,committed_output",
++                completion.as_mut(),
++            )
++            .await;
++            probe_run(&mut observer, request, RunLock::Held).await;
++            let cancel_pid = tokio::select! {
++                result = completion.as_mut() => panic!("completion escaped its execution gate: {result:?}"),
++                pid = blocked(&mut observer, completion_pid, "FROM workflow_runs AS run", cancel.as_mut()) => pid,
++            };
++            (completion_pid, cancel_pid)
++        }
++    };
++    assert_ne!(first_pid, second_pid);
++    gate.rollback().await.unwrap();
++    let released_ms = started.elapsed().as_millis();
++    let (completion, cancel) =
++        tokio::time::timeout(HANG_GUARD, async { tokio::join!(completion, cancel) })
++            .await
++            .expect("both real operations drain");
++    probe_run(&mut observer, request, RunLock::Free).await;
++    assert_drained(&mut observer, first_pid, second_pid).await;
++    let race = Race {
++        completion: completion.unwrap(),
++        cancel: cancel.unwrap(),
++        expected,
++        events: injected.outcomes()[recorded..].to_vec(),
++    };
++    eprintln!(
++        "completion race first={first:?} gate_released_ms={released_ms} drained_ms={} cancel={:?} events={:?}",
++        started.elapsed().as_millis(),
++        race.cancel,
++        race.events
++    );
++    race
++}
++
++/// R-008/DEC-012: the race's completion was the ordinary primary attempt, exactly one
++/// `completion` operation that `completed`. A resolved ambiguous COMMIT (`resolved_applied`,
++/// whose winner replays the saved step as `Replayed`), an unknown, or a not-applied attempt
++/// followed by a retry belongs to the separate ambiguity contract and cannot pass.
++fn ordinary_completion(
++    events: &[Observed],
++    winner: Option<&CommittedWorkflowStep>,
++) -> Result<(), String> {
++    let attempts: Vec<&Observed> = events
++        .iter()
++        .filter(|seen| seen.op == "completion")
++        .collect();
++    if attempts.len() != 1 || attempts[0].outcome != "completed" {
++        return Err(format!(
++            "not one completed primary completion attempt: {attempts:?}"
++        ));
++    }
++    match winner {
++        Some(step) if step.disposition != CommitDisposition::Committed => Err(format!(
++            "the winning step was {:?}, not committed by the primary attempt",
++            step.disposition
++        )),
++        _ => Ok(()),
++    }
++}
++
++/// Cancel commits first: the receipt, observation and effect stay; nothing advances the step,
++/// and no successor is scheduled even where the route has one.
++fn cancel_won(state: &Value, request: &ActionDispatchRequest) {
++    receipt_kept(state, request);
++    assert_eq!(rows(state, "workflow_runs")[0]["state"], "cancelled");
++    for table in ["workflow_executions", "background_tasks", "task_attempts"] {
++        assert_eq!(
++            rows(state, table).len(),
++            1,
++            "no successor or new attempt: {table}"
++        );
++    }
++    let execution = &rows(state, "workflow_executions")[0];
++    for field in [
++        "completed_at",
++        "committed_output",
++        "committed_route",
++        "route_target",
++        "successor_execution_id",
++    ] {
++        assert!(
++            execution[field].is_null(),
++            "no cancelled advancement: {field}"
++        );
++    }
++    assert_eq!(
++        rows(state, "task_attempts")[0]["workflow_retirement"],
++        "cancel"
++    );
++    assert_eq!(events_of(state, "io_step_completed"), 0);
++    let commands = rows(state, "workflow_control_commands");
++    assert_eq!(commands.len(), 1);
++    assert_eq!(commands[0]["operation"], "cancel");
++    assert_eq!(commands[0]["result"], "applied");
++}
++
++/// Completion commits first: its committed result stands, and the command built from the
++/// earlier revision is exactly a revision conflict whose only write is its own receipt.
++fn completion_won(
++    state: &Value,
++    request: &ActionDispatchRequest,
++    step: &CommittedWorkflowStep,
++    route: Route,
++    race: &Race,
++) {
++    assert_eq!(step.disposition, CommitDisposition::Committed);
++    assert_eq!(step.output, step_output());
++    assert_eq!(step.route, RouteSelection::Success);
++    receipt_kept(state, request);
++    let CancelResult::RevisionConflict { current_revision } = race.cancel else {
++        panic!(
++            "the stale command reports a revision conflict: {:?}",
++            race.cancel
++        )
++    };
++    assert!(current_revision.0 > race.expected.0);
++    let run = &rows(state, "workflow_runs")[0];
++    assert_eq!(run["revision"], json!(current_revision.0));
++    let predecessor = row_with(
++        state,
++        "workflow_executions",
++        "id",
++        request.scope().execution.as_uuid(),
++    );
++    assert!(!predecessor["completed_at"].is_null());
++    assert_eq!(predecessor["committed_output"], step_output());
++    assert_eq!(predecessor["committed_route"], "success");
++    match route {
++        Route::End => {
++            assert_eq!(step.target, TransitionTarget::End);
++            assert!(step.successor.is_none());
++            assert_eq!(run["state"], "succeeded");
++            assert_eq!(predecessor["route_target"], "$end");
++            assert!(predecessor["successor_execution_id"].is_null());
++            assert_eq!(rows(state, "workflow_executions").len(), 1);
++        }
++        Route::Successor => {
++            assert_eq!(
++                step.target,
++                TransitionTarget::Step(StepId::parse("second").unwrap())
++            );
++            let successor = step.successor.expect("a scheduled successor");
++            assert_ne!(successor.execution, request.scope().execution);
++            assert_eq!(run["state"], "running");
++            assert_eq!(predecessor["route_target"], "second");
++            assert_eq!(
++                predecessor["successor_execution_id"],
++                json!(successor.execution.as_uuid())
++            );
++            assert_eq!(rows(state, "workflow_executions").len(), 2);
++            let job = row_with(state, "background_tasks", "id", successor.job.0);
++            assert_eq!(job["status"], "pending");
++        }
++    }
++    let attempt = row_with(state, "task_attempts", "task_id", request.fence.scope.job.0);
++    assert_eq!(attempt["status"], "completed");
++    assert_eq!(events_of(state, "io_step_completed"), 1);
++    assert_eq!(events_of(state, "control_cancel"), 0);
++    let commands = rows(state, "workflow_control_commands");
++    assert_eq!(commands.len(), 1);
++    assert_eq!(commands[0]["operation"], "cancel");
++    assert_eq!(commands[0]["result"], "conflict");
++    assert_eq!(commands[0]["expected_revision"], json!(race.expected.0));
++    assert_eq!(commands[0]["result_revision"], json!(current_revision.0));
++}
++
++/// The identical completion replays its committed result and duplicates nothing.
++async fn replays_without_duplicate(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    step: &CommittedWorkflowStep,
++) {
++    let before = all_tables(f).await;
++    let replayed = f
++        .persistence()
++        .settled()
++        .complete_io(FencedWorkflowResult {
++            policy: policy(),
++            fence: request.fence,
++            output: step_output(),
++        })
++        .await
++        .unwrap()
++        .expect("the committed step replays");
++    assert_eq!(replayed.disposition, CommitDisposition::Replayed);
++    assert_eq!(
++        (
++            &replayed.output,
++            &replayed.route,
++            &replayed.target,
++            &replayed.successor
++        ),
++        (&step.output, &step.route, &step.target, &step.successor)
++    );
++    assert_eq!(all_tables(f).await, before, "replay writes nothing");
++}
++
++/// End route: a command at the current revision finds the run terminal and adds only its own
++/// receipt; the committed result is not rewritten.
++async fn terminal_command_keeps_result(f: &AdmissionFixture, request: &ActionDispatchRequest) {
++    let before = all_tables(f).await;
++    let command = cancel_command(f, request, "b3-terminal").await;
++    let current = command.expected_revision;
++    assert_eq!(
++        f.persistence().cancel(command).await.unwrap(),
++        CancelResult::AlreadyTerminalOrApplied { revision: current }
++    );
++    let after = all_tables(f).await;
++    for (table, rows) in before.as_object().unwrap() {
++        if table != "workflow_control_commands" {
++            assert_eq!(
++                &after[table], rows,
++                "a terminal command rewrites nothing: {table}"
++            );
++        }
++    }
++    let (old, new) = (
++        rows(&before, "workflow_control_commands"),
++        rows(&after, "workflow_control_commands"),
++    );
++    assert_eq!(new.len(), old.len() + 1);
++    let added = new.iter().find(|row| !old.contains(row)).unwrap();
++    assert_eq!(added["result"], "terminal");
++}
++
++/// Successor route: a fresh, correctly revisioned cancel retires the remaining work but cannot
++/// erase the predecessor's committed result or completed attempt.
++async fn fresh_cancel_keeps_predecessor(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    step: &CommittedWorkflowStep,
++) {
++    let successor = step.successor.expect("a scheduled successor");
++    let before = all_tables(f).await;
++    cancel(f, request, "b3-fresh-cancel").await;
++    let after = all_tables(f).await;
++    for (table, column, id) in [
++        (
++            "workflow_executions",
++            "id",
++            request.scope().execution.as_uuid(),
++        ),
++        ("background_tasks", "id", request.fence.scope.job.0),
++        ("task_attempts", "task_id", request.fence.scope.job.0),
++    ] {
++        assert_eq!(
++            row_with(&after, table, column, id),
++            row_with(&before, table, column, id),
++            "the predecessor's committed truth stays: {table}"
++        );
++    }
++    assert_eq!(rows(&after, "workflow_runs")[0]["state"], "cancelled");
++    assert!(
++        row_with(
++            &after,
++            "workflow_executions",
++            "id",
++            successor.execution.as_uuid()
++        )["completed_at"]
++            .is_null()
++    );
++    assert_eq!(
++        row_with(&after, "background_tasks", "id", successor.job.0)["status"],
++        "failed"
++    );
++    assert!(
++        f.persistence()
++            .settled()
++            .claim_io(successor, worker(), policy())
++            .await
++            .unwrap()
++            .is_none(),
++        "the retired successor cannot be claimed"
++    );
++    assert_eq!(all_tables(f).await, after);
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_completion_race_cancel_first() {
++    let injected = Injected::mark();
++    for route in [Route::End, Route::Successor] {
++        let (f, request) = route_fixture(route).await;
++        let provider = receipted(&f, &request).await;
++        let race = race(&f, &request, First::Cancel, &injected).await;
++        assert!(
++            matches!(race.cancel, CancelResult::Applied { .. }),
++            "{:?}",
++            race.cancel
++        );
++        assert!(
++            race.completion.is_none(),
++            "{route:?}: shared completion under the cancelled fence"
++        );
++        ordinary_completion(&race.events, None).unwrap();
++        let state = all_tables(&f).await;
++        cancel_won(&state, &request);
++        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++        assert_eq!(effect_count(&f).await, 1);
++        inert(&f, &request, &state).await;
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_completion_race_completion_first() {
++    let injected = Injected::mark();
++    for route in [Route::End, Route::Successor] {
++        let (f, request) = route_fixture(route).await;
++        let provider = receipted(&f, &request).await;
++        let race = race(&f, &request, First::Completion, &injected).await;
++        let step = race
++            .completion
++            .clone()
++            .unwrap_or_else(|| panic!("{route:?}: the completion committed first"));
++        ordinary_completion(&race.events, Some(&step)).unwrap();
++        completion_won(&all_tables(&f).await, &request, &step, route, &race);
++        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++        assert_eq!(effect_count(&f).await, 1);
++        replays_without_duplicate(&f, &request, &step).await;
++        match route {
++            Route::End => terminal_command_keeps_result(&f, &request).await,
++            Route::Successor => fresh_cancel_keeps_predecessor(&f, &request, &step).await,
++        }
++    }
++}
++
++/// Calibrated negative control: completion-first where the completion's COMMIT is held until
++/// its primary attempt elapsed and its ambiguous-COMMIT resolution queued on the run; the
++/// actual cancellation then waits behind that resolution. The business outcome matches the
++/// ordinary race, and the ordinary oracle must reject it.
++#[tokio::test]
++async fn workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle() {
++    let injected = Injected::mark();
++    let (f, request) = route_fixture(Route::End).await;
++    let _provider = receipted(&f, &request).await;
++    // DEC-012: the gate policy's 2 s attempt, through genuine renewal, for this control only.
++    let policy = gated_policy();
++    assert!(
++        f.persistence()
++            .renew_io(request.fence, policy)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    let command = cancel_command(&f, &request, "b3-resolved-commit").await;
++    let (mut observer, _) = connect(&f).await;
++    probe_run(&mut observer, &request, RunLock::Free).await;
++    let mut gate = Gate::arm(
++        &f,
++        "task_attempts",
++        "UPDATE",
++        "OLD.status='processing' AND NEW.status='completed'",
++        Stall::Commit,
++    )
++    .await;
++    let recorded = injected.outcomes().len();
++    let done = AtomicBool::new(false);
++    let completion = async {
++        let result = f
++            .persistence()
++            .complete_io(FencedWorkflowResult {
++                policy,
++                fence: request.fence,
++                output: step_output(),
++            })
++            .await;
++        done.store(true, Ordering::SeqCst);
++        result
++    };
++    let cancel = f.persistence().cancel(command);
++    tokio::pin!(completion, cancel);
++    let running = || !done.load(Ordering::SeqCst);
++    let waiting: [&dyn Fn() -> bool; 1] = [&running];
++    let completing = tokio::select! {
++        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
++        pid = gate.stalled(&mut observer, &waiting) => pid,
++    };
++    probe_run(&mut observer, &request, RunLock::Held).await;
++    let resolution = tokio::select! {
++        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
++        pid = resolution_behind(&mut observer, completing, policy, &waiting) => pid,
++    };
++    let cancel_pid = tokio::select! {
++        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
++        pid = blocked(&mut observer, resolution, "FROM workflow_runs AS run", cancel.as_mut()) => pid,
++    };
++    eprintln!(
++        "resolved-commit control: completing={completing} resolution={resolution} cancel={cancel_pid}"
++    );
++    gate.release().await;
++    let (completion, cancel) =
++        tokio::time::timeout(HANG_GUARD, async { tokio::join!(completion, cancel) })
++            .await
++            .expect("both real operations drain");
++    probe_run(&mut observer, &request, RunLock::Free).await;
++    assert_drained(&mut observer, completing, cancel_pid).await;
++    assert_drained(&mut observer, resolution, resolution).await;
++    let step = completion.unwrap().expect("the stalled COMMIT applied");
++    assert_eq!(step.output, step_output());
++    assert!(
++        matches!(cancel.unwrap(), CancelResult::RevisionConflict { .. }),
++        "the same business outcome as the ordinary completion-first race"
++    );
++    let state = all_tables(&f).await;
++    assert_eq!(rows(&state, "workflow_runs")[0]["state"], "succeeded");
++    assert_eq!(
++        rows(&state, "workflow_executions")[0]["committed_output"],
++        step_output()
++    );
++    let events = injected.outcomes()[recorded..].to_vec();
++    assert!(
++        events
++            .iter()
++            .any(|seen| seen.op == "completion" && seen.outcome == "resolved_applied"),
++        "the control exercised resolution: {events:?}"
++    );
++    assert_eq!(step.disposition, CommitDisposition::Replayed);
++    let verdict = ordinary_completion(&events, Some(&step));
++    assert!(
++        verdict.is_err(),
++        "a resolution path is not the ordinary race"
++    );
++    eprintln!("resolved-commit control rejected: {}", verdict.unwrap_err());
++}
++
++/// The oracle alone over constructed recorder events and winners.
++#[test]
++fn workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt_paths() {
++    let attempt = |outcome: &'static str| Observed {
++        op: "completion",
++        outcome,
++        cause: None,
++    };
++    let other = Observed {
++        op: "action.commit_remote",
++        outcome: "completed",
++        cause: None,
++    };
++    let step = |disposition| CommittedWorkflowStep {
++        disposition,
++        output: step_output(),
++        route: RouteSelection::Success,
++        target: TransitionTarget::End,
++        successor: None,
++    };
++    let (committed, replayed) = (
++        step(CommitDisposition::Committed),
++        step(CommitDisposition::Replayed),
++    );
++    assert!(ordinary_completion(&[other, attempt("completed")], None).is_ok());
++    assert!(ordinary_completion(&[attempt("completed")], Some(&committed)).is_ok());
++    for (case, events, winner) in [
++        ("resolved applied", vec![attempt("resolved_applied")], None),
++        (
++            "resolved applied winner",
++            vec![attempt("resolved_applied")],
++            Some(&replayed),
++        ),
++        ("unknown", vec![attempt("unknown")], None),
++        (
++            "not applied then retried",
++            vec![attempt("not_applied"), attempt("completed")],
++            Some(&committed),
++        ),
++        ("no attempt recorded", vec![other], None),
++        (
++            "completed attempt but replayed winner",
++            vec![attempt("completed")],
++            Some(&replayed),
++        ),
++    ] {
++        assert!(ordinary_completion(&events, winner).is_err(), "{case}");
++    }
++}
++
++async fn retry_safe(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Option<bool> {
++    sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
++        .bind(request.scope().company.as_uuid())
++        .bind(request.scope().execution.as_uuid())
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap()
++}
++
++#[derive(Clone, Copy, Debug)]
++enum Cancelled {
++    /// The lost-response history is still on the original attempt.
++    BeforeReclaim,
++    /// A genuine reclaim granted the live replay permission on attempt 2.
++    AfterReclaim,
++}
++
++/// The live replay contract stays valid for this history but cannot override the durable
++/// terminal state: no call, entry, attempt or claim follows the cancellation.
++async fn replay_contract_refused(recovery: ActionRecovery, point: Cancelled) {
++    let (f, mut request, contract) = receipt_fixture(recovery, true).await;
++    let mut provider = dedup(&f, contract, true);
++    provider.result = step_output();
++    let service = ActionService::new(adapter(&f, 0));
++    assert!(
++        service
++            .dispatch_remote(&request, &provider, &CancellationToken::new())
++            .await
++            .is_err(),
++        "the response is lost after the applied effect"
++    );
++    assert_eq!(effect_count(&f).await, 1);
++    assert!(matches!(
++        service
++            .dispatch_remote(&request, &provider, &CancellationToken::new())
++            .await
++            .unwrap(),
++        RemoteDispatchObservation::PossibleDispatchExists
++    ));
++    assert_eq!(retry_safe(&f, &request).await, Some(true), "live premise");
++    if matches!(point, Cancelled::AfterReclaim) {
++        reclaim(&f, &mut request).await;
++    }
++    heartbeat(&f, &request).await;
++    let before = all_tables(&f).await;
++    cancel(&f, &request, "b3-replay-contract").await;
++    let cancelled = all_tables(&f).await;
++    retired_once(&before, &cancelled, &request);
++    assert_eq!(
++        retry_safe(&f, &request).await,
++        Some(true),
++        "{recovery:?}/{point:?}: the contract itself is unchanged"
++    );
++    for service in [service, ActionService::new(adapter(&f, 0))] {
++        refused(
++            service
++                .dispatch_remote(&request, &provider, &CancellationToken::new())
++                .await
++                .map(|_| ()),
++        );
++    }
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1, "no replay call");
++    assert_eq!(effect_count(&f).await, 1);
++    assert_eq!(rows(&cancelled, "workflow_action_remote_entries").len(), 1);
++    assert_eq!(
++        all_tables(&f).await,
++        cancelled,
++        "{recovery:?}/{point:?}: refused replay writes nothing"
++    );
++    inert(&f, &request, &cancelled).await;
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_replay_contract_cannot_override_terminal() {
++    for recovery in [
++        ActionRecovery::SafeRepeat,
++        ActionRecovery::ProviderIdempotency,
++    ] {
++        for point in [Cancelled::BeforeReclaim, Cancelled::AfterReclaim] {
++            replay_contract_refused(recovery, point).await;
++        }
++    }
++}
+diff --git c/src/adapters/persistence/workflow/action_cancellation_hung_reconciliation_tests.rs w/src/adapters/persistence/workflow/action_cancellation_hung_reconciliation_tests.rs
+new file mode 100644
+index 0000000..9e4be22
+--- /dev/null
++++ w/src/adapters/persistence/workflow/action_cancellation_hung_reconciliation_tests.rs
+@@ -0,0 +1,179 @@
++//! 04.8 group B3 (R-006 Q3): the history B1 leaves when an actual CancelCommand interrupts a
++//! provider that applied its effect and then hung, recovered through the real reconciliation
++//! verifier. Unlike the parked 04.7 histories here, this run was never released for
++//! reconciliation: its uncertainty row comes from the cancellation itself.
++use super::*;
++
++struct Dropped<'a>(&'a AtomicUsize);
++impl Drop for Dropped<'_> {
++    fn drop(&mut self) {
++        self.0.fetch_add(1, Ordering::SeqCst);
++    }
++}
++
++/// The ledger provider applies the effect durably, and then the response never arrives.
++struct Hung {
++    inner: LedgerProvider,
++    started: Notify,
++    dropped: AtomicUsize,
++}
++#[async_trait]
++impl RemoteAction for Hung {
++    fn replay_contract(&self) -> Option<&ProviderReplayContract> {
++        None
++    }
++    async fn invoke(
++        &self,
++        action: &FrozenAction,
++        invocation: &ProviderInvocation,
++    ) -> AppResult<Value> {
++        let _guard = Dropped(&self.dropped);
++        let withheld = self.inner.invoke(action, invocation).await;
++        assert!(withheld.is_err(), "applied, with the response withheld");
++        self.started.notify_one();
++        std::future::pending().await
++    }
++}
++
++/// B1's durable shape after cancel-while-hung: run cancelled, attempt retired by the cancel,
++/// marker and entry kept, no receipt, one cancellation uncertainty row, the effect applied.
++async fn cancelled_hung_history(f: &AdmissionFixture) -> Value {
++    let state = all_tables(f).await;
++    assert_eq!(state["workflow_runs"][0]["state"], "cancelled");
++    assert_eq!(
++        state["task_attempts"][0]["workflow_retirement"], "cancel",
++        "retired by the cancellation, never parked"
++    );
++    for (table, count) in [
++        ("workflow_action_dispatches", 1),
++        ("workflow_action_remote_entries", 1),
++        ("workflow_action_receipts", 0),
++        ("workflow_action_reconciliations", 1),
++        ("workflow_action_evidence", 0),
++    ] {
++        assert_eq!(state[table].as_array().unwrap().len(), count, "{table}");
++    }
++    assert_eq!(
++        state["workflow_action_reconciliations"][0]["failure_code"],
++        "workflow.cancelled"
++    );
++    assert_eq!(effects(f).await, 1, "the hung provider applied its effect");
++    state
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_applied_then_hung_history_reconciles_after_cancel() {
++    let (f, request) = Box::pin(setup()).await;
++    resources(&f).await;
++    let ledger = ledger(&f, &request).await;
++    let provider = Hung {
++        inner: LedgerProvider::new(
++            &f,
++            Delivery::Apply {
++                result: good(),
++                recover: true,
++                lose: true,
++            },
++        ),
++        started: Notify::new(),
++        dropped: AtomicUsize::new(0),
++    };
++    let token = CancellationToken::new();
++    let service = ActionService::new(adapter(&f, 0));
++    let dispatch = async {
++        let result = service.dispatch_remote(&request, &provider, &token).await;
++        (
++            result.map(|observation| matches!(observation, RemoteDispatchObservation::Interrupted)),
++            provider.dropped.load(Ordering::SeqCst),
++        )
++    };
++    let durable = async {
++        provider.started.notified().await;
++        assert_eq!(provider.dropped.load(Ordering::SeqCst), 0, "still pending");
++        let head = f
++            .persistence()
++            .head(request.scope().company, request.scope().run)
++            .await
++            .unwrap()
++            .unwrap();
++        let cancelled = f
++            .persistence()
++            .cancel(CancelCommand {
++                company_id: request.scope().company,
++                run_id: request.scope().run,
++                actor: f.binding.target.actor,
++                command_key: IdempotencyKey::parse("b3-hung-cancel").unwrap(),
++                expected_revision: head.revision,
++            })
++            .await
++            .unwrap();
++        assert!(
++            matches!(cancelled, CancelResult::Applied { .. }),
++            "{cancelled:?}"
++        );
++    };
++    let ((interrupted, dropped), ()) = tokio::time::timeout(Duration::from_secs(10), async {
++        tokio::join!(dispatch, durable)
++    })
++    .await
++    .expect("bounded hung invocation");
++    assert!(interrupted.unwrap(), "the hung invocation ends Interrupted");
++    assert_eq!(
++        dropped, 1,
++        "the actual future is dropped before dispatch returns"
++    );
++    assert!(!token.is_cancelled(), "durable, not token, interruption");
++    assert_eq!(provider.inner.calls.load(Ordering::SeqCst), 1);
++    let before = cancelled_hung_history(&f).await;
++
++    let verifier = ObservedVerifier::new(ledger);
++    let command = verified_command(&f, &request, &verifier, "b3-hung-applied-truth").await;
++    let result = Box::pin(execute(&f, &command, Arc::new(verifier)))
++        .await
++        .unwrap();
++    assert_eq!(
++        result.outcome,
++        ReconciliationOutcome::AppliedRecorded { receipt: true }
++    );
++    let after = all_tables(&f).await;
++    linked_result(&after, &command, &result);
++    for table in [
++        "background_tasks",
++        "workflow_executions",
++        "task_attempts",
++        "workflow_budget_receipts",
++        "workflow_root_budget_usage",
++        "workflow_action_dispatches",
++        "workflow_action_remote_entries",
++        "fixture_provider_effects",
++    ] {
++        assert_eq!(
++            before[table], after[table],
++            "recovery is audit-only: {table}"
++        );
++    }
++    let run = &after["workflow_runs"][0];
++    assert_eq!(
++        run["state"], "cancelled",
++        "recovered truth does not reopen the run"
++    );
++    assert_eq!(run["revision"], result.revision.0);
++    let evidence = &after["workflow_action_evidence"][0];
++    assert_eq!(evidence["disposition"], "applied");
++    let receipts = after["workflow_action_receipts"].as_array().unwrap();
++    assert_eq!(receipts.len(), 1);
++    assert_eq!(receipts[0]["result"], good());
++    assert_eq!(receipts[0]["reconciliation_evidence_id"], evidence["id"]);
++    assert!(receipts[0]["remote_entry_id"].is_null());
++    assert_eq!(effects(&f).await, 1);
++    assert!(
++        f.persistence()
++            .settled()
++            .claim_io(request.fence.scope, worker(), policy())
++            .await
++            .unwrap()
++            .is_none()
++    );
++    assert_eq!(all_tables(&f).await, after, "terminal claim is inert");
++    Box::pin(terminal_dispatch_inert(&f, &request, &after)).await;
++}
+diff --git c/src/adapters/persistence/workflow/action_cancellation_order_tests.rs w/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
+index dbb41fb..355a95d 100644
+--- c/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
++++ w/src/adapters/persistence/workflow/action_cancellation_order_tests.rs
+@@ -93,7 +93,7 @@ impl Prepared {
+     }
+ }
+ 
+-async fn blocked<T: std::fmt::Debug>(
++pub(super) async fn blocked<T: std::fmt::Debug>(
+     observer: &mut sqlx::PgConnection,
+     blocker: i32,
+     statement: &str,
+@@ -124,12 +124,12 @@ async fn blocked<T: std::fmt::Debug>(
+ }
+ 
+ #[derive(Debug)]
+-enum RunLock {
++pub(super) enum RunLock {
+     Free,
+     Held,
+ }
+ 
+-async fn probe_run(
++pub(super) async fn probe_run(
+     observer: &mut sqlx::PgConnection,
+     request: &ActionDispatchRequest,
+     expected: RunLock,
+@@ -247,7 +247,11 @@ async fn race(boundary: Boundary, first: First) {
+     assert_drained(&mut observer, first_pid, second_pid).await;
+ }
+ 
+-async fn assert_drained(observer: &mut sqlx::PgConnection, first_pid: i32, second_pid: i32) {
++pub(super) async fn assert_drained(
++    observer: &mut sqlx::PgConnection,
++    first_pid: i32,
++    second_pid: i32,
++) {
+     sqlx::query("SELECT pg_stat_clear_snapshot()")
+         .execute(&mut *observer)
+         .await
+diff --git c/src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs w/src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs
+new file mode 100644
+index 0000000..4813247
+--- /dev/null
++++ w/src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs
+@@ -0,0 +1,596 @@
++//! 04.8 group B2: actual receipt settlement against an actual CancelCommand in both orders, with
++//! the exact run blockers observed (DEC-002/004); the observed-result token case; and the
++//! ordinary cancelled late receipt redelivered and retried from a fresh service.
++use super::*;
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::{
++    RunLock, assert_drained, blocked, probe_run,
++};
++use crate::adapters::persistence::workflow::persistence_bound::recorder::{Injected, Observed};
++use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{
++    Gate, HANG_GUARD, Stall, connect, gated_policy, resolution_behind,
++};
++use std::sync::atomic::AtomicBool;
++
++/// A real reservation, real final entry and the provider's real accepted effect, with the
++/// observation not yet settled. `spare` is the same frozen action, read while the run was live,
++/// for redelivering this exact entry later.
++struct Accepted<'a> {
++    request: ActionDispatchRequest,
++    writer: Dispatch,
++    marker: (Uuid, Uuid),
++    result: Value,
++    spare: FrozenAction,
++    provider: DeduplicatingProvider<'a>,
++}
++
++async fn accepted(
++    f: &AdmissionFixture,
++    mut request: ActionDispatchRequest,
++    lease: LeasePolicy,
++) -> (Accepted<'_>, RemoteEntry) {
++    assert!(
++        f.persistence()
++            .renew_io(request.fence, lease)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    request.lease = lease;
++    let provider = provider(f);
++    let writer = adapter(f, 0);
++    let RemoteReservationResult::Reserved(reservation) =
++        writer.reserve_remote(&request, None).await.unwrap()
++    else {
++        panic!("a genuine reservation")
++    };
++    let entry = writer.enter_remote(*reservation).await.unwrap();
++    let result = provider
++        .invoke(&entry.action, &entry.provider)
++        .await
++        .unwrap();
++    assert_eq!(effect_count(f).await, 1, "the provider accepted the effect");
++    let spare = f
++        .persistence()
++        .action_authority(request.scope(), &request.subject)
++        .await
++        .unwrap()
++        .action;
++    let accepted = Accepted {
++        request,
++        writer,
++        marker: (entry.marker, entry.entry),
++        result,
++        spare,
++        provider,
++    };
++    (accepted, entry)
++}
++
++/// The identical accepted observation delivered again for the exact same entry: same marker,
++/// entry, request, frozen action and (Reconcile, unregistered) provider invocation. The real
++/// receipt writer re-verifies every identity against durable facts before settling it.
++fn redelivery(
++    entry: (Uuid, Uuid),
++    request: &ActionDispatchRequest,
++    action: FrozenAction,
++) -> RemoteEntry {
++    let provider = prepare_provider(&action, None, Duration::from_secs(60)).unwrap();
++    RemoteEntry {
++        marker: entry.0,
++        entry: entry.1,
++        request: request.clone(),
++        action,
++        provider,
++        deadline: tokio::time::Instant::now() + Duration::from_secs(1),
++    }
++}
++
++/// A debuggable name for a settlement outcome (the production type has no `Debug`).
++fn outcome(result: AppResult<RemoteDispatchObservation>) -> AppResult<&'static str> {
++    result.map(|observation| match observation {
++        RemoteDispatchObservation::Interrupted => "interrupted",
++        RemoteDispatchObservation::Committed(_) => "committed",
++        RemoteDispatchObservation::ApprovalRequired => "approval_required",
++        RemoteDispatchObservation::PossibleDispatchExists => "possible_dispatch_exists",
++    })
++}
++
++#[derive(Clone, Copy, Debug)]
++enum First {
++    Cancel,
++    Receipt,
++}
++
++/// The settled outcome is the same in both orders except the order witness: cancellation
++/// records reconciliation uncertainty only for a marker that had no receipt when it committed.
++fn settled_truth(
++    state: &Value,
++    request: &ActionDispatchRequest,
++    entry: Uuid,
++    result: &Value,
++    first: First,
++) {
++    let one = |table: &str| {
++        let rows = rows(state, table);
++        assert_eq!(rows.len(), 1, "{table}");
++        rows[0].clone()
++    };
++    for table in [
++        "workflow_action_receipts",
++        "workflow_action_actual_receipt_observations",
++    ] {
++        let row = one(table);
++        assert_eq!(row["remote_entry_id"], json!(entry), "{table}");
++        assert_eq!(&row["result"], result, "{table}");
++        assert_eq!(
++            row["invocation_id"],
++            json!(request.subject.invocation.as_uuid())
++        );
++        assert_eq!(
++            row["argument_digest"],
++            json!(request.subject.argument_digest.as_str())
++        );
++    }
++    assert_eq!(rows(state, "workflow_action_remote_entries").len(), 1);
++    assert_eq!(rows(state, "workflow_action_dispatches").len(), 1);
++    assert!(rows(state, "workflow_action_evidence_conflicts").is_empty());
++    assert_eq!(one("workflow_runs")["state"], "cancelled");
++    let attempt = one("task_attempts");
++    assert_eq!(attempt["status"], "failed");
++    assert_eq!(attempt["workflow_retirement"], "cancel");
++    let execution = one("workflow_executions");
++    for field in [
++        "completed_at",
++        "committed_output",
++        "committed_route",
++        "successor_execution_id",
++    ] {
++        assert!(
++            execution[field].is_null(),
++            "no cancelled advancement: {field}"
++        );
++    }
++    let command = one("workflow_control_commands");
++    assert_eq!(command["operation"], "cancel");
++    assert_eq!(command["result"], "applied");
++    let reconciliations = rows(state, "workflow_action_reconciliations").len();
++    match first {
++        First::Cancel => assert_eq!(reconciliations, 1, "marker was unresolved when cancelled"),
++        First::Receipt => assert_eq!(reconciliations, 0, "receipt preceded cancellation"),
++    }
++}
++
++/// After durable cancellation and late settlement: the identical observation redelivered and a
++/// fresh service retry add no effect, entry, receipt, observation or conflict, poll nothing,
++/// and advance nothing.
++async fn late_truth_is_final(f: &AdmissionFixture, accepted: Accepted<'_>) {
++    let settled = all_tables(f).await;
++    let duplicate = redelivery(accepted.marker, &accepted.request, accepted.spare);
++    assert!(matches!(
++        accepted
++            .writer
++            .finish_remote(duplicate, accepted.result.clone())
++            .await
++            .unwrap(),
++        RemoteDispatchObservation::Interrupted
++    ));
++    assert_eq!(
++        all_tables(f).await,
++        settled,
++        "identical redelivery is idempotent"
++    );
++    refused(
++        ActionService::new(adapter(f, 0))
++            .dispatch_remote(
++                &accepted.request,
++                &accepted.provider,
++                &CancellationToken::new(),
++            )
++            .await
++            .map(|_| ()),
++    );
++    assert_eq!(accepted.provider.calls.load(Ordering::SeqCst), 1);
++    assert_eq!(effect_count(f).await, 1);
++    inert(f, &accepted.request, &settled).await;
++}
++
++/// DEC-002 cancel-first: actual cancellation stops at its execution gate owning company and
++/// run; the actual receipt settlement then waits on that exact run behind the cancel backend.
++#[tokio::test]
++async fn workflow_action_cancellation_receipt_race_cancel_first() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let (accepted, entry) = accepted(&f, request, policy()).await;
++    let request = accepted.request.clone();
++    let command = cancel_command(&f, &request, "b2-cancel-first").await;
++    {
++        let mut gate = f.persistence().pool().begin().await.unwrap();
++        let gate_pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++            .fetch_one(&mut *gate)
++            .await
++            .unwrap();
++        sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND id=$2 FOR UPDATE")
++            .bind(request.scope().company.as_uuid())
++            .bind(request.scope().execution.as_uuid())
++            .execute(&mut *gate)
++            .await
++            .unwrap();
++        let mut observer = f.persistence().pool().acquire().await.unwrap();
++        probe_run(&mut observer, &request, RunLock::Free).await;
++        let cancel = f.persistence().cancel(command);
++        let receipt = async {
++            outcome(
++                accepted
++                    .writer
++                    .finish_remote(entry, accepted.result.clone())
++                    .await,
++            )
++        };
++        tokio::pin!(cancel, receipt);
++        let cancel_pid = blocked(
++            &mut observer,
++            gate_pid,
++            "SELECT id FROM workflow_executions",
++            cancel.as_mut(),
++        )
++        .await;
++        probe_run(&mut observer, &request, RunLock::Held).await;
++        let receipt_pid = tokio::select! {
++            result = cancel.as_mut() => panic!("cancel escaped its execution gate: {result:?}"),
++            pid = blocked(&mut observer, cancel_pid, "SELECT id FROM workflow_runs WHERE company_id", receipt.as_mut()) => pid,
++        };
++        assert_ne!(cancel_pid, receipt_pid);
++        gate.rollback().await.unwrap();
++        let (cancelled, settled) =
++            tokio::time::timeout(HANG_GUARD, async { tokio::join!(cancel, receipt) })
++                .await
++                .expect("both real operations drain");
++        assert!(matches!(cancelled.unwrap(), CancelResult::Applied { .. }));
++        assert!(
++            settled.unwrap() == "interrupted",
++            "late truth, no caller success"
++        );
++        probe_run(&mut observer, &request, RunLock::Free).await;
++        assert_drained(&mut observer, cancel_pid, receipt_pid).await;
++    }
++    settled_truth(
++        &all_tables(&f).await,
++        &request,
++        accepted.marker.1,
++        &accepted.result,
++        First::Cancel,
++    );
++    late_truth_is_final(&f, accepted).await;
++}
++
++/// F-005 / DEC-012: what decides that receipt-first was the ordinary race, not a recovery.
++struct ReceiptFirst {
++    /// Every bounded operation the race finished, from the test-only recorder.
++    events: Vec<Observed>,
++    /// When the COMMIT gate was released (read after the release returned).
++    released: tokio::time::Instant,
++    /// A conservative primary-attempt deadline: the attempt bound from an instant read before
++    /// the settlement future existed, so never later than the real attempt's own deadline.
++    deadline: tokio::time::Instant,
++}
++
++/// The ordinary receipt-first oracle: exactly one `action.commit_remote` attempt, and it
++/// completed (no resolved, adopted, unknown, not-applied or retried attempt), with the gate
++/// released before the primary attempt's deadline.
++fn ordinary_receipt(race: &ReceiptFirst) -> Result<(), String> {
++    let commits: Vec<&Observed> = race
++        .events
++        .iter()
++        .filter(|seen| seen.op == "action.commit_remote")
++        .collect();
++    if commits.len() != 1 || commits[0].outcome != "completed" {
++        return Err(format!(
++            "not one completed primary receipt attempt: {commits:?}"
++        ));
++    }
++    if race.released >= race.deadline {
++        return Err(format!(
++            "gate released {:?} after the primary attempt deadline",
++            race.released - race.deadline
++        ));
++    }
++    Ok(())
++}
++
++/// DEC-002 receipt-first: the actual receipt transaction stalls inside its COMMIT (the
++/// established resolution gate) after writing the observation and receipt while it owns the
++/// run; actual cancellation, already holding company, then waits on that exact run.
++/// `late` holds the gate until the primary attempt has elapsed and its ambiguous-COMMIT
++/// resolution is observed queued on the run: the calibrated negative control.
++async fn receipt_first<'a>(
++    f: &'a AdmissionFixture,
++    request: ActionDispatchRequest,
++    injected: &Injected,
++    late: bool,
++) -> (Accepted<'a>, ReceiptFirst) {
++    // DEC-012: the gate policy's 2 s attempt bound, through genuine renewal, for this fixture.
++    let policy = gated_policy();
++    let (accepted, entry) = accepted(f, request, policy).await;
++    let request = accepted.request.clone();
++    let command = cancel_command(f, &request, "b2-receipt-first").await;
++    let race = {
++        let (mut observer, _) = connect(f).await;
++        probe_run(&mut observer, &request, RunLock::Free).await;
++        let mut gate = Gate::arm(
++            f,
++            "workflow_action_receipts",
++            "INSERT",
++            "true",
++            Stall::Commit,
++        )
++        .await;
++        let recorded = injected.outcomes().len();
++        let done = AtomicBool::new(false);
++        let deadline = tokio::time::Instant::now() + policy.attempt_bound();
++        let receipt = async {
++            let result = outcome(
++                accepted
++                    .writer
++                    .finish_remote(entry, accepted.result.clone())
++                    .await,
++            );
++            done.store(true, Ordering::SeqCst);
++            result
++        };
++        let cancel = f.persistence().cancel(command);
++        tokio::pin!(receipt, cancel);
++        let running = || !done.load(Ordering::SeqCst);
++        let waiting: [&dyn Fn() -> bool; 1] = [&running];
++        let receipt_pid = tokio::select! {
++            result = receipt.as_mut() => panic!("receipt escaped its COMMIT gate: {result:?}"),
++            pid = gate.stalled(&mut observer, &waiting) => pid,
++        };
++        probe_run(&mut observer, &request, RunLock::Held).await;
++        // The cancel's direct run blocker: the stalled receipt, or in the late control the
++        // primary attempt's resolution, which queued first on that row and holds its tuple lock.
++        let mut run_blocker = receipt_pid;
++        if late {
++            // The primary attempt has elapsed: its resolution now waits on the stalled run.
++            run_blocker = tokio::select! {
++                result = receipt.as_mut() => panic!("receipt escaped its COMMIT gate: {result:?}"),
++                pid = resolution_behind(&mut observer, receipt_pid, policy, &waiting) => pid,
++            };
++            eprintln!(
++                "late-release control: resolution={run_blocker} behind stalled receipt={receipt_pid}"
++            );
++        }
++        let cancel_pid = tokio::select! {
++            result = receipt.as_mut() => panic!("receipt escaped its COMMIT gate: {result:?}"),
++            pid = blocked(&mut observer, run_blocker, "FROM workflow_runs AS run", cancel.as_mut()) => pid,
++        };
++        assert_ne!(cancel_pid, receipt_pid);
++        gate.release().await;
++        let released = tokio::time::Instant::now();
++        let (settled, cancelled) =
++            tokio::time::timeout(HANG_GUARD, async { tokio::join!(receipt, cancel) })
++                .await
++                .expect("both real operations drain");
++        assert!(matches!(cancelled.unwrap(), CancelResult::Applied { .. }));
++        // Late truth persisted; the caller gets no success once cancellation retired the fence.
++        assert_eq!(settled.unwrap(), "interrupted");
++        probe_run(&mut observer, &request, RunLock::Free).await;
++        assert_drained(&mut observer, receipt_pid, cancel_pid).await;
++        ReceiptFirst {
++            events: injected.outcomes()[recorded..].to_vec(),
++            released,
++            deadline,
++        }
++    };
++    eprintln!(
++        "receipt-first late={late} released_before_deadline_ms={} events={:?}",
++        race.deadline
++            .checked_duration_since(race.released)
++            .map_or(-1, |margin| margin.as_millis() as i64),
++        race.events
++    );
++    settled_truth(
++        &all_tables(f).await,
++        &request,
++        accepted.marker.1,
++        &accepted.result,
++        First::Receipt,
++    );
++    (accepted, race)
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_receipt_race_receipt_first() {
++    let injected = Injected::mark();
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let (accepted, race) = receipt_first(&f, request, &injected, false).await;
++    ordinary_receipt(&race).unwrap();
++    late_truth_is_final(&f, accepted).await;
++}
++
++/// Calibrated negative control: release only after the primary attempt elapsed and its
++/// ambiguous-COMMIT resolution queued. Every business outcome still matches the ordinary race,
++/// and the ordinary oracle must reject it.
++#[tokio::test]
++async fn workflow_action_cancellation_receipt_race_late_release_fails_ordinary_oracle() {
++    let injected = Injected::mark();
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let (accepted, race) = receipt_first(&f, request, &injected, true).await;
++    let verdict = ordinary_receipt(&race);
++    assert!(
++        verdict.is_err(),
++        "a resolution path is not the ordinary race"
++    );
++    assert!(
++        race.events
++            .iter()
++            .any(|seen| seen.op == "action.commit_remote" && seen.outcome == "resolved_applied"),
++        "the control exercised resolution: {:?}",
++        race.events
++    );
++    eprintln!("late-release control rejected: {}", verdict.unwrap_err());
++    late_truth_is_final(&f, accepted).await;
++}
++
++/// The oracle alone over constructed recorder events.
++#[test]
++fn workflow_action_cancellation_receipt_ordinary_oracle_discriminates_attempt_paths() {
++    let now = tokio::time::Instant::now();
++    let commit = |outcome: &'static str| Observed {
++        op: "action.commit_remote",
++        outcome,
++        cause: None,
++    };
++    let other = Observed {
++        op: "action.return_authorized",
++        outcome: "completed",
++        cause: None,
++    };
++    let race = |events: Vec<Observed>, released_ms: u64| ReceiptFirst {
++        events,
++        released: now + Duration::from_millis(released_ms),
++        deadline: now + Duration::from_millis(2000),
++    };
++    assert!(ordinary_receipt(&race(vec![commit("completed"), other], 100)).is_ok());
++    for (case, events, released_ms) in [
++        ("resolved applied", vec![commit("resolved_applied")], 100),
++        ("resolved adopted", vec![commit("resolved_adopted")], 100),
++        ("unknown", vec![commit("unknown")], 100),
++        (
++            "not applied then retried",
++            vec![commit("not_applied"), commit("completed")],
++            100,
++        ),
++        ("no attempt recorded", vec![other], 100),
++        ("late release", vec![commit("completed")], 2000),
++    ] {
++        assert!(
++            ordinary_receipt(&race(events, released_ms)).is_err(),
++            "{case}"
++        );
++    }
++}
++
++/// The ungated live positive for both races: with no cancellation the same settlement returns
++/// the committed receipt, so neither race oracle can be met by a refusal-only implementation.
++#[tokio::test]
++async fn workflow_action_cancellation_receipt_without_cancel_commits() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let (accepted, entry) = accepted(&f, request, policy()).await;
++    let RemoteDispatchObservation::Committed(receipt) = accepted
++        .writer
++        .finish_remote(entry, accepted.result.clone())
++        .await
++        .unwrap()
++    else {
++        panic!("a live owner receives its receipt")
++    };
++    assert_eq!(receipt.result, accepted.result);
++    let state = all_tables(&f).await;
++    assert_eq!(rows(&state, "workflow_runs")[0]["state"], "running");
++    assert!(rows(&state, "workflow_control_commands").is_empty());
++}
++
++/// DEC-004: the token is cancelled at `finish_remote` entry, after the service selected and
++/// validated the provider result. Settlement still finishes; only caller success is suppressed.
++struct CancelAtSettlement<'a> {
++    inner: Dispatch,
++    token: &'a CancellationToken,
++    observed: &'a std::sync::Mutex<Option<Value>>,
++}
++#[async_trait]
++impl ActionDispatch for CancelAtSettlement<'_> {
++    async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult> {
++        self.inner.local(request).await
++    }
++    async fn remote(
++        &self,
++        request: &ActionDispatchRequest,
++        provider: &dyn RemoteAction,
++        cancel: &CancellationToken,
++    ) -> AppResult<RemoteDispatchObservation> {
++        supervise_remote(self, request, provider, cancel).await
++    }
++}
++#[async_trait]
++impl RemoteDispatch for CancelAtSettlement<'_> {
++    async fn reserve_remote(
++        &self,
++        request: &ActionDispatchRequest,
++        contract: Option<&ProviderReplayContract>,
++    ) -> AppResult<RemoteReservationResult> {
++        self.inner.reserve_remote(request, contract).await
++    }
++    async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
++        self.inner.enter_remote(reservation).await
++    }
++    async fn finish_remote(
++        &self,
++        entry: RemoteEntry,
++        result: Value,
++    ) -> AppResult<RemoteDispatchObservation> {
++        assert!(
++            !self.token.is_cancelled(),
++            "the service observed the result first"
++        );
++        *self.observed.lock().unwrap() = Some(result.clone());
++        self.token.cancel();
++        let settled = self.inner.finish_remote(entry, result).await?;
++        assert!(
++            matches!(settled, RemoteDispatchObservation::Committed(_)),
++            "settlement finished despite the cancelled token"
++        );
++        Ok(settled)
++    }
++    async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool> {
++        self.inner.owns_remote(request).await
++    }
++}
++
++#[tokio::test]
++async fn workflow_action_cancellation_observed_result_token_settles_then_interrupts() {
++    let (f, request, _) = receipt_fixture(ActionRecovery::Reconcile, false).await;
++    let provider = provider(&f);
++    heartbeat(&f, &request).await;
++    let before = all_tables(&f).await;
++    let token = CancellationToken::new();
++    let observed = std::sync::Mutex::new(None);
++    let writer = CancelAtSettlement {
++        inner: adapter(&f, 0),
++        token: &token,
++        observed: &observed,
++    };
++    interrupted(
++        ActionService::new(writer)
++            .dispatch_remote(&request, &provider, &token)
++            .await,
++    );
++    assert_eq!(observed.lock().unwrap().take(), Some(step_output()));
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    assert_eq!(effect_count(&f).await, 1);
++    let after = all_tables(&f).await;
++    still_owned(&before, &after, &request);
++    let entry = rows(&after, "workflow_action_remote_entries")[0]["id"].clone();
++    for table in [
++        "workflow_action_receipts",
++        "workflow_action_actual_receipt_observations",
++    ] {
++        let settled = rows(&after, table);
++        assert_eq!(settled.len(), 1, "{table}");
++        assert_eq!(settled[0]["remote_entry_id"], entry, "{table}");
++        assert_eq!(settled[0]["result"], step_output(), "{table}");
++        assert_eq!(
++            settled[0]["argument_digest"],
++            json!(request.subject.argument_digest.as_str())
++        );
++    }
++    // The live owner keeps the canonical receipt: a fresh service returns it without a call.
++    let RemoteDispatchObservation::Committed(receipt) = ActionService::new(adapter(&f, 0))
++        .dispatch_remote(&request, &provider, &CancellationToken::new())
++        .await
++        .unwrap()
++    else {
++        panic!("the settled receipt is returned to the live owner")
++    };
++    assert_eq!(receipt.result, step_output());
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    assert_eq!(all_tables(&f).await, after);
++}
+diff --git c/src/adapters/persistence/workflow/action_dispatch_remote_tests.rs w/src/adapters/persistence/workflow/action_dispatch_remote_tests.rs
+index fcdbb15..abf99f5 100644
+--- c/src/adapters/persistence/workflow/action_dispatch_remote_tests.rs
++++ w/src/adapters/persistence/workflow/action_dispatch_remote_tests.rs
+@@ -9,7 +9,6 @@ struct Intercept<'a> {
+     pool: &'a PgPool,
+     after_marker: Option<&'a str>,
+     ambiguous_ack: bool,
+-    entry_delay: Duration,
+ }
+ #[async_trait]
+ impl ActionDispatch for Intercept<'_> {
+@@ -49,9 +48,7 @@ impl RemoteDispatch for Intercept<'_> {
+         Ok(reserved)
+     }
+     async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
+-        let entered = self.inner.enter_remote(reservation).await?;
+-        tokio::time::sleep(self.entry_delay).await;
+-        Ok(entered)
++        self.inner.enter_remote(reservation).await
+     }
+     async fn finish_remote(
+         &self,
+@@ -84,7 +81,6 @@ async fn workflow_action_dispatch_service_post_marker_revoke_cancel_zero_provide
+             pool: f.persistence().pool(),
+             after_marker: Some(sql),
+             ambiguous_ack: false,
+-            entry_delay: Duration::ZERO,
+         };
+         assert!(
+             ActionService::new(writer)
+@@ -97,38 +93,238 @@ async fn workflow_action_dispatch_service_post_marker_revoke_cancel_zero_provide
+     }
+ }
+ 
++/// A worker's genuine heartbeat at a quiescent setup boundary, so each case starts from a full
++/// common-policy window rather than whatever the setup left.
++async fn renew(f: &AdmissionFixture, request: &ActionDispatchRequest) {
++    assert!(
++        f.persistence()
++            .renew_io(request.fence, policy())
++            .await
++            .unwrap()
++            .is_some(),
++        "the claimed fence is live"
++    );
++}
++
++/// What a test-only seam returns at entry: the genuine entry at once, or the same entry only
++/// after its own captured deadline has passed.
++#[derive(Clone, Copy)]
++enum AtEntry {
++    Return,
++    AwaitDeadline,
++}
++
++/// What the observed writer saw: the real entry (when it returned, its frozen deadline, and when
++/// the seam handed it to the service), and each real ownership probe's start and result (`None`
++/// for an error).
++#[derive(Default)]
++struct Seen {
++    entry: std::sync::Mutex<Option<Entered>>,
++    probes: std::sync::Mutex<Vec<(Instant, Option<bool>)>>,
++}
++#[derive(Clone, Copy, Debug)]
++struct Entered {
++    at: Instant,
++    deadline: Instant,
++    handed_back: Instant,
++}
++impl Seen {
++    fn entered(&self) -> Option<Entered> {
++        *self.entry.lock().unwrap()
++    }
++    fn probes(&self) -> Vec<(Instant, Option<bool>)> {
++        self.probes.lock().unwrap().clone()
++    }
++    /// Phase offsets from `origin`, for a labelled failure.
++    fn timeline(&self, origin: Instant) -> String {
++        let ms = |at: Instant| at.saturating_duration_since(origin).as_millis();
++        let entry = self.entered().map_or("entry=none".to_string(), |entry| {
++            format!(
++                "entry={}ms deadline={}ms handed_back={}ms",
++                ms(entry.at),
++                ms(entry.deadline),
++                ms(entry.handed_back)
++            )
++        });
++        let probes: Vec<String> = self
++            .probes()
++            .iter()
++            .map(|(at, owned)| format!("{}ms:{owned:?}", ms(*at)))
++            .collect();
++        format!("{entry} probes=[{}]", probes.join(", "))
++    }
++}
++
++/// The real writer, observed; only the hand-back time of the entry is chosen by the test.
++struct Recorded<'a> {
++    inner: Dispatch,
++    seen: &'a Seen,
++    at_entry: AtEntry,
++}
++#[async_trait]
++impl ActionDispatch for Recorded<'_> {
++    async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult> {
++        self.inner.local(request).await
++    }
++    async fn remote(
++        &self,
++        request: &ActionDispatchRequest,
++        provider: &dyn RemoteAction,
++        cancel: &CancellationToken,
++    ) -> AppResult<RemoteDispatchObservation> {
++        supervise_remote(self, request, provider, cancel).await
++    }
++}
++#[async_trait]
++impl RemoteDispatch for Recorded<'_> {
++    async fn reserve_remote(
++        &self,
++        request: &ActionDispatchRequest,
++        contract: Option<&ProviderReplayContract>,
++    ) -> AppResult<RemoteReservationResult> {
++        self.inner.reserve_remote(request, contract).await
++    }
++    async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry> {
++        let entered = self.inner.enter_remote(reservation).await?;
++        let at = Instant::now();
++        if matches!(self.at_entry, AtEntry::AwaitDeadline) {
++            tokio::time::sleep_until(entered.deadline).await;
++        }
++        *self.seen.entry.lock().unwrap() = Some(Entered {
++            at,
++            deadline: entered.deadline,
++            handed_back: Instant::now(),
++        });
++        Ok(entered)
++    }
++    async fn finish_remote(
++        &self,
++        entry: RemoteEntry,
++        result: Value,
++    ) -> AppResult<RemoteDispatchObservation> {
++        self.inner.finish_remote(entry, result).await
++    }
++    async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool> {
++        let started = Instant::now();
++        let owned = self.inner.owns_remote(request).await;
++        let seen = owned.as_ref().ok().copied();
++        self.seen.probes.lock().unwrap().push((started, seen));
++        owned
++    }
++}
++
++/// A debuggable name for a dispatch outcome (the production type has no `Debug`).
++fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
++    match result {
++        Ok(RemoteDispatchObservation::Interrupted) => "Interrupted".into(),
++        Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
++        Ok(RemoteDispatchObservation::ApprovalRequired) => "ApprovalRequired".into(),
++        Ok(RemoteDispatchObservation::PossibleDispatchExists) => "PossibleDispatchExists".into(),
++        Err(error) => format!("Err({error:?})"),
++    }
++}
++
++/// DEC-014's first-poll guard oracle: the genuine entry was reached and handed back only once
++/// its own captured deadline had passed, the invocation token stayed live, and the service
++/// returned Interrupted without polling the provider.
++struct ExpiredEntry {
++    entered: Option<Entered>,
++    polls: usize,
++    outcome: String,
++    token_live: bool,
++}
++fn expired_entry_never_polled(seen: &ExpiredEntry) -> Result<(), String> {
++    let entry = seen.entered.ok_or("the genuine entry was never reached")?;
++    if entry.handed_back < entry.deadline {
++        return Err(format!("handed back before its deadline: {entry:?}"));
++    }
++    if !seen.token_live {
++        return Err("the token, not the expired window, interrupted".into());
++    }
++    if seen.polls != 0 {
++        return Err(format!("the provider was polled {} times", seen.polls));
++    }
++    if seen.outcome != "Interrupted" {
++        return Err(format!("expected Interrupted, got {}", seen.outcome));
++    }
++    Ok(())
++}
++
++/// DEC-014: the genuine authorized entry is held until its own captured monotonic deadline has
++/// passed and then handed to the service unchanged; the final pre-poll guard must not poll.
++/// No compressed lease or guessed sleep: a refusal before entry is a failed premise.
+ #[tokio::test]
+ async fn workflow_action_dispatch_delayed_first_poll_checks_monotonic_window() {
+     let (f, request) = setup().await;
+-    sqlx::query(
+-        "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '0.3 seconds'",
+-    )
+-    .execute(f.persistence().pool())
+-    .await
+-    .unwrap();
++    renew(&f, &request).await;
+     let provider = Provider {
+         f: &f,
+         calls: AtomicUsize::new(0),
+         lost: false,
+     };
+-    let writer = Intercept {
++    let seen = Seen::default();
++    let token = CancellationToken::new();
++    let writer = Recorded {
+         inner: adapter(&f, 0),
+-        pool: f.persistence().pool(),
+-        after_marker: None,
+-        ambiguous_ack: false,
+-        entry_delay: Duration::from_millis(400),
++        seen: &seen,
++        at_entry: AtEntry::AwaitDeadline,
+     };
+-    assert!(matches!(
+-        ActionService::new(writer)
+-            .dispatch_remote(&request, &provider, &CancellationToken::new())
+-            .await
+-            .unwrap(),
+-        RemoteDispatchObservation::Interrupted
+-    ));
+-    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
++    let origin = Instant::now();
++    let result = ActionService::new(writer)
++        .dispatch_remote(&request, &provider, &token)
++        .await;
++    let observed = ExpiredEntry {
++        entered: seen.entered(),
++        polls: provider.calls.load(Ordering::SeqCst),
++        outcome: describe(&result),
++        token_live: !token.is_cancelled(),
++    };
++    expired_entry_never_polled(&observed)
++        .unwrap_or_else(|error| panic!("{error}; {}", seen.timeline(origin)));
+     assert_eq!(facts(&f).await, (1, 0, 0));
+ }
+ 
++/// The oracle alone: only an expired, genuinely reached entry with no poll, a live token and
++/// Interrupted passes; a polled provider is rejected.
++#[test]
++fn workflow_action_dispatch_expired_entry_oracle_rejects_polled_provider() {
++    let at = Instant::now();
++    let entry = |handed_back_ms: u64| Entered {
++        at,
++        deadline: at + Duration::from_millis(1000),
++        handed_back: at + Duration::from_millis(handed_back_ms),
++    };
++    let case = |entered, polls, outcome: &str, token_live| ExpiredEntry {
++        entered,
++        polls,
++        outcome: outcome.into(),
++        token_live,
++    };
++    assert!(expired_entry_never_polled(&case(Some(entry(1000)), 0, "Interrupted", true)).is_ok());
++    for (name, seen) in [
++        (
++            "polled provider",
++            case(Some(entry(1001)), 1, "Interrupted", true),
++        ),
++        ("never entered", case(None, 0, "Interrupted", true)),
++        (
++            "not yet expired",
++            case(Some(entry(999)), 0, "Interrupted", true),
++        ),
++        (
++            "token interruption",
++            case(Some(entry(1001)), 0, "Interrupted", false),
++        ),
++        (
++            "refused before entry",
++            case(None, 0, "Err(Conflict(\"lifecycle\"))", true),
++        ),
++        ("committed", case(Some(entry(1001)), 1, "Committed", true)),
++    ] {
++        assert!(expired_entry_never_polled(&seen).is_err(), "{name}");
++    }
++}
++
+ #[tokio::test]
+ async fn workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send()
+ {
+@@ -143,7 +339,6 @@ async fn workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_r
+         pool: f.persistence().pool(),
+         after_marker: None,
+         ambiguous_ack: true,
+-        entry_delay: Duration::ZERO,
+     };
+     let service = ActionService::new(writer);
+     assert!(
+@@ -221,62 +416,182 @@ impl RemoteAction for PendingProvider {
+         std::future::pending().await
+     }
+ }
+-#[tokio::test]
+-async fn workflow_action_dispatch_pending_actual_provider_dropped_on_loss_cancel_deadline() {
+-    for mode in 0..4 {
+-        let (f, request) = setup().await;
+-        let provider = PendingProvider {
+-            started: Notify::new(),
+-            polls: AtomicUsize::new(0),
+-            dropped: AtomicUsize::new(0),
+-        };
+-        let cancel = CancellationToken::new();
+-        if mode == 2 {
+-            sqlx::query(
+-                "UPDATE workflow_runs SET deadline=clock_timestamp()+interval '0.4 seconds'",
+-            )
++/// How the pending invocation loses its permission, named in every failure.
++#[derive(Clone, Copy, Debug)]
++enum Loss {
++    /// Another worker now owns the job.
++    OwnershipTaken,
++    /// The run is no longer live.
++    RunCancelled,
++    /// The run's own deadline, shorter than the lease, bounds the entry.
++    RunDeadline,
++    /// The invocation token, with ownership intact.
++    Token,
++}
++
++/// The run-deadline mode's window, set after a fresh renewal so the run deadline (not the
++/// three-second lease) is what the entry freezes. Wide enough for reserve and entry to finish.
++const RUN_WINDOW: Duration = Duration::from_millis(1500);
++
++/// When each phase of one pending case happened.
++struct PendingRun {
++    origin: Instant,
++    run_deadline_set: Option<Instant>,
++    polled: Instant,
++    interrupted: Instant,
++    returned: Instant,
++    outcome: String,
++    dropped_at_return: usize,
++}
++
++/// The causal witness for each mode, over the real entry and ownership probes.
++fn interrupted_by(loss: Loss, seen: &Seen, run: &PendingRun) -> Result<(), String> {
++    let entry = seen.entered().ok_or("no entry was recorded")?;
++    if run.polled >= entry.deadline {
++        return Err("the first poll was not inside the entry window".into());
++    }
++    let probes = seen.probes();
++    let after: Vec<_> = probes
++        .iter()
++        .filter(|(started, _)| *started >= run.interrupted)
++        .collect();
++    match loss {
++        Loss::OwnershipTaken | Loss::RunCancelled => {
++            if after.iter().any(|(_, owned)| *owned != Some(false)) {
++                return Err("a probe after the interruption did not refuse ownership".into());
++            }
++            let Some((refused, _)) = after.last() else {
++                return Err("no ownership probe after the interruption".into());
++            };
++            if *refused > run.returned || run.returned >= entry.deadline {
++                return Err("not ended by the ownership refusal before the deadline".into());
++            }
++        }
++        Loss::RunDeadline => {
++            let set = run.run_deadline_set.ok_or("the run deadline was not set")?;
++            if entry.deadline > set + RUN_WINDOW {
++                return Err("the entry was not bounded by the run deadline".into());
++            }
++            if probes.iter().any(|(_, owned)| *owned != Some(true)) {
++                return Err("ownership was refused before the deadline".into());
++            }
++            if run.returned < entry.deadline {
++                return Err("returned before the run deadline".into());
++            }
++        }
++        Loss::Token => {
++            if probes.iter().any(|(_, owned)| *owned != Some(true)) {
++                return Err("ownership was refused, so the token is not the cause".into());
++            }
++            if run.returned >= entry.deadline {
++                return Err("the deadline, not the token, ended it".into());
++            }
++        }
++    }
++    Ok(())
++}
++
++async fn pending_case(loss: Loss) {
++    let (f, request) = setup().await;
++    renew(&f, &request).await;
++    let mut run_deadline_set = None;
++    if matches!(loss, Loss::RunDeadline) {
++        sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+$1")
++            .bind(RUN_WINDOW)
+             .execute(f.persistence().pool())
+             .await
+             .unwrap();
+-        }
+-        let service = ActionService::new(adapter(&f, 0));
+-        let interrupt = async {
+-            provider.started.notified().await;
+-            match mode {
+-                0 => {
+-                    sqlx::query("UPDATE background_tasks SET worker_id=$1")
+-                        .bind(worker().0)
+-                        .execute(f.persistence().pool())
+-                        .await
+-                        .unwrap();
+-                }
+-                1 => {
+-                    sqlx::query("UPDATE workflow_runs SET state='cancelled'")
+-                        .execute(f.persistence().pool())
+-                        .await
+-                        .unwrap();
+-                }
+-                2 => (),
+-                _ => cancel.cancel(),
+-            }
++        run_deadline_set = Some(Instant::now());
++    }
++    let provider = PendingProvider {
++        started: Notify::new(),
++        polls: AtomicUsize::new(0),
++        dropped: AtomicUsize::new(0),
++    };
++    let seen = Seen::default();
++    let token = CancellationToken::new();
++    let service = ActionService::new(Recorded {
++        inner: adapter(&f, 0),
++        seen: &seen,
++        at_entry: AtEntry::Return,
++    });
++    let origin = Instant::now();
++    let run = tokio::time::timeout(Duration::from_secs(4), async {
++        let dispatch = service.dispatch_remote(&request, &provider, &token);
++        tokio::pin!(dispatch);
++        // A refused entry ends dispatch before any poll: fail at once, named, not at the watchdog.
++        let polled = tokio::select! {
++            result = &mut dispatch => panic!(
++                "{loss:?}: dispatch returned {} before the first provider poll; {}",
++                describe(&result),
++                seen.timeline(origin)
++            ),
++            _ = provider.started.notified() => Instant::now(),
+         };
+-        let result = tokio::time::timeout(Duration::from_secs(4), async {
+-            tokio::join!(
+-                service.dispatch_remote(&request, &provider, &cancel),
+-                interrupt
+-            )
+-            .0
+-        })
+-        .await
+-        .unwrap()
+-        .unwrap();
+-        assert!(matches!(result, RemoteDispatchObservation::Interrupted));
+-        assert_eq!(provider.polls.load(Ordering::SeqCst), 1);
+-        assert_eq!(
+-            provider.dropped.load(Ordering::SeqCst),
+-            1,
+-            "the actual future must be dropped before dispatch returns"
+-        );
+-        assert_eq!(facts(&f).await, (1, 0, 0));
++        match loss {
++            Loss::OwnershipTaken => {
++                sqlx::query("UPDATE background_tasks SET worker_id=$1")
++                    .bind(worker().0)
++                    .execute(f.persistence().pool())
++                    .await
++                    .unwrap();
++            }
++            Loss::RunCancelled => {
++                sqlx::query("UPDATE workflow_runs SET state='cancelled'")
++                    .execute(f.persistence().pool())
++                    .await
++                    .unwrap();
++            }
++            Loss::RunDeadline => (),
++            Loss::Token => token.cancel(),
++        }
++        let interrupted = Instant::now();
++        let result = dispatch.await;
++        PendingRun {
++            origin,
++            run_deadline_set,
++            polled,
++            interrupted,
++            returned: Instant::now(),
++            outcome: describe(&result),
++            dropped_at_return: provider.dropped.load(Ordering::SeqCst),
++        }
++    })
++    .await
++    .unwrap_or_else(|_| {
++        panic!(
++            "{loss:?}: not settled within 4 s; polls={} {}",
++            provider.polls.load(Ordering::SeqCst),
++            seen.timeline(origin)
++        )
++    });
++    let ms = |at: Instant| at.saturating_duration_since(run.origin).as_millis();
++    let phases = format!(
++        "{loss:?}: polled={}ms interrupted={}ms returned={}ms {}",
++        ms(run.polled),
++        ms(run.interrupted),
++        ms(run.returned),
++        seen.timeline(run.origin)
++    );
++    eprintln!("pending case {phases}");
++    assert_eq!(run.outcome, "Interrupted", "{phases}");
++    assert_eq!(provider.polls.load(Ordering::SeqCst), 1, "{phases}");
++    assert_eq!(
++        run.dropped_at_return, 1,
++        "the actual future must be dropped before dispatch returns; {phases}"
++    );
++    interrupted_by(loss, &seen, &run).unwrap_or_else(|error| panic!("{error}; {phases}"));
++    assert_eq!(facts(&f).await, (1, 0, 0), "{phases}");
++}
++
++#[tokio::test]
++async fn workflow_action_dispatch_pending_actual_provider_dropped_on_loss_cancel_deadline() {
++    for loss in [
++        Loss::OwnershipTaken,
++        Loss::RunCancelled,
++        Loss::RunDeadline,
++        Loss::Token,
++    ] {
++        pending_case(loss).await;
+     }
+ }
+diff --git c/src/adapters/persistence/workflow/action_dispatch_tests.rs w/src/adapters/persistence/workflow/action_dispatch_tests.rs
+index 65c43aa..2772f25 100644
+--- c/src/adapters/persistence/workflow/action_dispatch_tests.rs
++++ w/src/adapters/persistence/workflow/action_dispatch_tests.rs
+@@ -61,6 +61,10 @@ impl SqlLocalAction for Effect {
+         }
+     }
+ }
++#[path = "action_snapshot_support.rs"]
++mod snapshot_support;
++use snapshot_support::*;
++
+ type Dispatch = PostgresActionDispatch<Authority, Effect>;
+ fn adapter(f: &AdmissionFixture, mode: u8) -> Dispatch {
+     PostgresActionDispatch::new(f.persistence().clone(), Authority, Effect(mode))
+diff --git c/src/adapters/persistence/workflow/action_receipt_tests.rs w/src/adapters/persistence/workflow/action_receipt_tests.rs
+index c7badb9..c695a1d 100644
+--- c/src/adapters/persistence/workflow/action_receipt_tests.rs
++++ w/src/adapters/persistence/workflow/action_receipt_tests.rs
+@@ -421,3 +421,6 @@ mod resolution_tests;
+ 
+ #[path = "action_uncertainty_tests.rs"]
+ mod uncertainty_tests;
++
++#[path = "action_cancellation_boundary_tests.rs"]
++mod cancellation_boundary_tests;
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
+index c18dc73..4f18ffb 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs
+@@ -455,3 +455,6 @@ async fn workflow_action_reconciliation_control_serialization_expire_before_comm
+         Box::pin(case(truth, Terminal::Expire, First::Terminal)).await;
+     }
+ }
++
++#[path = "action_cancellation_hung_reconciliation_tests.rs"]
++mod hung_reconciliation_tests;
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
+index 420b3f6..5812018 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs
+@@ -225,26 +225,67 @@ pub(super) async fn reject_historical(source: &HighSource, attack: Attack) {
+     tx.rollback().await.unwrap();
+ }
+ 
++/// A reserve or entry refusal is never the required success. The lease is observed only to
++/// label the failure; an expiry seen afterwards does not excuse it.
++async fn refused(source: &HighSource, operation: &str, error: AppError) -> ! {
++    let state = lease_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        &format!("supported_{operation}_refused"),
++        source.claimed,
++    )
++    .await;
++    let kind = if state.owner && state.lease_ms > 0.0 && state.run_ms > 0.0 {
++        "LIVE-OWNER REFUSAL"
++    } else {
++        "LEASE LAPSE"
++    };
++    panic!(
++        "{kind} scenario=high_bounds supported {operation}: {error:?}; lease after refusal {state:?}"
++    )
++}
++
+ pub(super) async fn supported_positive(source: &HighSource) {
++    super::renew(source, "supported_positive", &mut []).await;
+     clean_current(source).await;
+     let f = &source.fixture;
+     assert_eq!(available(f, &source.request, None).await, None);
+-    let before = all_tables(f).await;
++    super::phase(source, "supported_clean").await;
++    let mut before = all_tables(f).await;
++    super::phase(source, "supported_before_snapshot").await;
++    // Reservation freezes its own window from the live lease, which a later renewal cannot
++    // extend: renew immediately before it and keep heavy observations out of reserve-to-entry.
++    super::renew(source, "supported_reserve", &mut [&mut before]).await;
+     let writer = adapter(f, 0);
+-    let RemoteReservationResult::Reserved(reservation) = writer
++    let reservation = match writer
+         .reserve_remote(&source.request, Some(&source.provider.contract))
+         .await
+-        .unwrap()
+-    else {
+-        panic!("genuine supported replay remains available above the proof bound");
++    {
++        Ok(RemoteReservationResult::Reserved(reservation)) => reservation,
++        Ok(_) => panic!("genuine supported replay remains available above the proof bound"),
++        Err(error) => refused(source, "reserve", error).await,
+     };
+-    let committed = all_tables(f).await;
++    let entry = reservation.entry;
++    // Every public relation as reservation left it, compactly enough for the frozen window.
++    let reserved = fingerprint(f).await;
++    super::phase(source, "supported_reserved").await;
++    let entered = match writer.enter_remote(*reservation).await {
++        Ok(entered) => entered,
++        Err(error) => refused(source, "entry", error).await,
++    };
++    assert_eq!(entered.entry, entry);
++    super::phase(source, "supported_entered").await;
++    // Full rows and fingerprint from one snapshot. Entry wrote nothing in any relation, so these
++    // rows are exactly the post-reservation state, which differs from `before` by entry 130.
++    let (committed, entered) = tables_and_fingerprint(f).await;
++    assert_eq!(entered, reserved, "entry writes nothing in any relation");
+     reservation_delta(&before, &committed);
+     let request = &source.request;
+     let provenance: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry JOIN workflow_action_dispatches AS marker ON (marker.company_id,marker.run_id,marker.execution_id,marker.invocation_id,marker.argument_digest,marker.id)=(entry.company_id,entry.run_id,entry.execution_id,entry.invocation_id,entry.argument_digest,entry.dispatch_id) JOIN workflow_action_remote_entries AS historical ON historical.company_id=entry.company_id AND historical.id=$8 WHERE entry.company_id=$1 AND entry.run_id=$2 AND entry.execution_id=$3 AND entry.invocation_id=$4 AND entry.id=$5 AND entry.attempt_number=130 AND entry.execution_generation=$6 AND entry.worker_id=$7 AND entry.reservation_xid IS NOT NULL AND entry.reservation_xid<>historical.reservation_xid)")
+         .bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
+         .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())
+-        .bind(reservation.entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
++        .bind(entry).bind(request.fence.generation.0).bind(request.fence.worker.0)
+         .bind(source.historical).fetch_one(f.persistence().pool()).await.unwrap();
+     assert!(
+         provenance,
+@@ -258,8 +299,6 @@ pub(super) async fn supported_positive(source: &HighSource) {
+             requests: 128
+         }
+     );
+-    writer.enter_remote(*reservation).await.unwrap();
+-    assert_eq!(all_tables(f).await, committed);
+     assert_eq!(source.provider.inner.calls.load(Ordering::SeqCst), 128);
+     assert_eq!(effects(f).await, 0);
+     eprintln!(
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
+index 18f209f..a9d69df 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs
+@@ -396,6 +396,7 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
+     assert_ne!(sibling.subject.invocation, request.subject.invocation);
+     Box::pin(retire_retry(&f, &request, 129)).await;
+     Box::pin(new_claim(&f, &mut request)).await;
++    let claimed = std::time::Instant::now();
+     assert_subject(&f, &request, 130, "processing").await;
+     eprintln!(
+         "high_bounds committed_source attempts=129 retired_entries=129 current_attempt=130 max_retries=132"
+@@ -408,5 +409,6 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
+         historical,
+         other_invocation,
+         other_company,
++        claimed,
+     })
+ }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
+index 606f137..4ecd19c 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs
+@@ -21,24 +21,66 @@ struct HighSource {
+     historical: Uuid,
+     other_invocation: Uuid,
+     other_company: Uuid,
++    /// When attempt 130's lease was claimed; phase diagnostics measure from here.
++    claimed: std::time::Instant,
++}
++
++/// Every phase after the claim needs attempt 130 live, so a probe that finds it lost fails
++/// as a labelled lease lapse rather than as whichever assertion meets it next.
++async fn phase(source: &HighSource, label: &str) -> LeasePhase {
++    let state = lease_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        label,
++        source.claimed,
++    )
++    .await;
++    assert!(
++        state.owner && state.lease_ms > 0.0 && state.run_ms > 0.0,
++        "LEASE LAPSE scenario=high_bounds phase={label}: {state:?}"
++    );
++    state
++}
++
++/// Renew attempt 130 at a quiescent boundary before its window can end (DEC-010).
++async fn renew(source: &HighSource, label: &str, snapshots: &mut [&mut Value]) {
++    renew_phase(
++        &source.fixture,
++        source.request.fence,
++        "high_bounds",
++        label,
++        source.claimed,
++        snapshots,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+ async fn workflow_action_reconciliation_high_bounds_native_owners_and_supported_entry() {
+     // Box fixture and native phases to retain the stock 2 MiB libtest stack.
+     let source = Box::pin(high_source()).await;
++    phase(&source, "source_ready").await;
+     let catalog = native_catalog(&source.fixture).await;
+-    let before = all_tables(&source.fixture).await;
++    phase(&source, "catalog").await;
++    let mut before = all_tables(&source.fixture).await;
++    phase(&source, "before_snapshot").await;
++    renew(&source, "invalid_exclusions", &mut [&mut before]).await;
+     Box::pin(native::invalid_exclusions(&source)).await;
++    phase(&source, "invalid_exclusions").await;
+     for attack in [native::Attack::Entry, native::Attack::Consumption] {
++        renew(&source, "reject_candidate", &mut [&mut before]).await;
+         Box::pin(native::reject_candidate(&source, attack)).await;
++        phase(&source, "reject_candidate").await;
+         unchanged(&source, &before, &catalog).await;
+     }
+     for attack in [
+         native::Attack::HistoricalSpoof,
+         native::Attack::HistoricalRetrofit,
+     ] {
++        renew(&source, "reject_historical", &mut [&mut before]).await;
+         Box::pin(native::reject_historical(&source, attack)).await;
++        phase(&source, "reject_historical").await;
+         unchanged(&source, &before, &catalog).await;
+     }
+     Box::pin(native::supported_positive(&source)).await;
+@@ -55,5 +97,6 @@ async fn unchanged(source: &HighSource, before: &Value, catalog: &Value) {
+     assert_eq!(&native_catalog(&source.fixture).await, catalog);
+     assert_eq!(source.provider.inner.calls.load(Ordering::SeqCst), 128);
+     assert_eq!(effects(&source.fixture).await, 0);
++    phase(source, "unchanged").await;
+     assert_subject(&source.fixture, &source.request, 130, "processing").await;
+ }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
+index 8353cf1..a7291ec 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
+@@ -427,10 +427,22 @@ async fn workflow_action_reconciliation_live_return_without_conflict_commits() {
+ #[tokio::test]
+ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_result() {
+     let mut h = Box::pin(live_retry()).await;
++    let started = std::time::Instant::now();
++    let fence = h.request.fence;
+     let (entry, result) = Box::pin(entered_result(&h)).await;
++    lease_phase(&h.fixture, fence, "live_conflict", "entered", started).await;
+     let entry_id = entry.entry;
+     let before = live_snapshot(&h).await;
++    lease_phase(
++        &h.fixture,
++        fence,
++        "live_conflict",
++        "before_snapshot",
++        started,
++    )
++    .await;
+     let conflicted = Box::pin(conflicting_old_receipt(&mut h, &before)).await;
++    lease_phase(&h.fixture, fence, "live_conflict", "conflicted", started).await;
+     assert!(matches!(
+         adapter(&h.fixture, 0)
+             .finish_remote(entry, result.clone())
+@@ -438,7 +450,16 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
+             .unwrap(),
+         RemoteDispatchObservation::Interrupted
+     ));
++    lease_phase(&h.fixture, fence, "live_conflict", "finished", started).await;
+     let returned = live_snapshot(&h).await;
++    lease_phase(
++        &h.fixture,
++        fence,
++        "live_conflict",
++        "returned_snapshot",
++        started,
++    )
++    .await;
+     unchanged_tables(
+         &conflicted,
+         &returned,
+@@ -467,6 +488,7 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
+         .unwrap();
+     assert_eq!(new["result"], result);
+     assert_eq!(new["remote_entry_id"], json!(entry_id));
++    lease_phase(&h.fixture, fence, "live_conflict", "before_retire", started).await;
+     Box::pin(retire_live(&h, &returned, 2)).await;
+ }
+ 
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
+index 0fcf571..0396ef3 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs
+@@ -106,7 +106,16 @@ pub(super) async fn park_observed(
+     f: &AdmissionFixture,
+     request: &ActionDispatchRequest,
+ ) -> Option<()> {
+-    let before = all_tables(f).await;
++    Box::pin(park_observed_as(f, request, &[])).await
++}
++
++/// `park_observed`, its refused-release backstop over a `digested_tables` snapshot.
++pub(super) async fn park_observed_as(
++    f: &AdmissionFixture,
++    request: &ActionDispatchRequest,
++    digested: &[&str],
++) -> Option<()> {
++    let before = digested_tables(f, None, digested).await;
+     let released = f
+         .persistence()
+         .settled()
+@@ -124,12 +133,22 @@ pub(super) async fn park_observed(
+         lapsed(f, request).await,
+         "release refusal without exact-owner expiry"
+     );
+-    assert_eq!(all_tables(f).await, before, "refused release wrote nothing");
++    assert_eq!(
++        digested_tables(f, None, digested).await,
++        before,
++        "refused release wrote nothing"
++    );
+     no_result(f, request).await;
+     uncaptured("BACKSTOP prior_bounds release=false lapsed_exact_fence; no durable delta");
+     None
+ }
+ 
++type Stamp = std::sync::Mutex<Option<std::time::Instant>>;
++
++fn stamp(at: &Stamp) {
++    *at.lock().unwrap() = Some(std::time::Instant::now());
++}
++
+ pub(super) struct PausedVerifier {
+     ledger: Arc<LedgerVerifier>,
+     pub(super) calls: AtomicUsize,
+@@ -137,19 +156,98 @@ pub(super) struct PausedVerifier {
+     pub(super) release: Notify,
+     pub(super) finished: CancellationToken,
+     pub(super) returned: std::sync::atomic::AtomicBool,
+-    pub(super) released_at: std::sync::Mutex<Option<std::time::Instant>>,
++    pub(super) released_at: Stamp,
++    /// One monotonic timeline for the paused command (DEC-011): verifier entered and ready,
++    /// release above, verifier returned, settlement entered and returned, command ended.
++    entered_at: Stamp,
++    ready_at: Stamp,
++    returned_at: Stamp,
++    settle: Arc<SettleTimes>,
++    ended_at: Stamp,
+ }
++
++#[derive(Default)]
++struct SettleTimes {
++    entered: Stamp,
++    returned: Stamp,
++}
++
++/// The real adapter, timestamping only the settlement call the service makes after its
++/// verifier returns. Delegates everything; adds no behaviour and no production port.
++struct TimedSettlement {
++    inner: PostgresActionReconciliation<Resources>,
++    times: Arc<SettleTimes>,
++}
++#[async_trait]
++impl ActionReconciliation for TimedSettlement {
++    async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation> {
++        self.inner.association(command).await
++    }
++    async fn snapshot(
++        &self,
++        command: &ReconcileActionCommand,
++    ) -> AppResult<ReconciliationPreparation> {
++        self.inner.snapshot(command).await
++    }
++    async fn settle(
++        &self,
++        command: &ReconcileActionCommand,
++        snapshot: &ReconciliationSnapshot,
++        evidence: VerifiedEvidence,
++    ) -> AppResult<ReconciliationResult> {
++        stamp(&self.times.entered);
++        let result = self.inner.settle(command, snapshot, evidence).await;
++        stamp(&self.times.returned);
++        result
++    }
++}
++
+ impl PausedVerifier {
++    /// `run_command` with the settlement timestamped; same service, budget and ports.
+     pub(super) async fn run(
+         self: &Arc<Self>,
+         f: &AdmissionFixture,
+         command: &ReconcileActionCommand,
+     ) -> AppResult<ReconciliationResult> {
+-        let result = run_command(f, command, self.clone()).await;
++        let persistence = f.persistence().clone();
++        let result = ActionReconciliationService::new(
++            TimedSettlement {
++                inner: PostgresActionReconciliation::new(persistence.clone(), Resources),
++                times: self.settle.clone(),
++            },
++            LifecycleAuthorizer::new(
++                persistence.clone(),
++                persistence.clone(),
++                persistence.clone(),
++            ),
++            Directory(persistence),
++            Some(self.clone() as Arc<dyn ActionEvidenceVerifier>),
++        )
++        .reconcile(command, &CancellationToken::new(), Duration::from_secs(5))
++        .await;
++        stamp(&self.ended_at);
+         self.finished.cancel();
+         result
+     }
+ 
++    pub(super) fn timeline(&self, command_started: std::time::Instant, result: &str) {
++        let at = |stamp: &Stamp| {
++            stamp.lock().unwrap().map_or("none".to_string(), |time| {
++                time.duration_since(command_started).as_millis().to_string()
++            })
++        };
++        uncaptured(&format!(
++            "TIMELINE prior_bounds verifier_entered_ms={} verifier_ready_ms={} release_ms={} verifier_returned_ms={} settle_entered_ms={} settle_returned_ms={} command_ended_ms={} result={result}",
++            at(&self.entered_at),
++            at(&self.ready_at),
++            at(&self.released_at),
++            at(&self.returned_at),
++            at(&self.settle.entered),
++            at(&self.settle.returned),
++            at(&self.ended_at),
++        ));
++    }
++
+     pub(super) async fn wait_started(&self) -> bool {
+         tokio::select! {
+             biased;
+@@ -166,7 +264,12 @@ impl PausedVerifier {
+             release: Notify::new(),
+             finished: CancellationToken::new(),
+             returned: std::sync::atomic::AtomicBool::new(false),
+-            released_at: std::sync::Mutex::new(None),
++            released_at: Stamp::default(),
++            entered_at: Stamp::default(),
++            ready_at: Stamp::default(),
++            returned_at: Stamp::default(),
++            settle: Arc::default(),
++            ended_at: Stamp::default(),
+         }
+     }
+ }
+@@ -182,15 +285,18 @@ impl ActionEvidenceVerifier for PausedVerifier {
+         cancellation: &CancellationToken,
+     ) -> AppResult<EvidenceAttestation> {
+         self.calls.fetch_add(1, Ordering::SeqCst);
++        stamp(&self.entered_at);
+         let evidence = self
+             .ledger
+             .verify(snapshot, reference, cancellation)
+             .await?;
++        stamp(&self.ready_at);
+         self.started.notify_one();
+         tokio::select! {
+             _ = cancellation.cancelled() => return Err(AppError::Conflict("fixture cancelled".into())),
+             _ = self.release.notified() => {},
+         }
++        stamp(&self.returned_at);
+         self.returned.store(true, Ordering::SeqCst);
+         Ok(evidence)
+     }
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
+index c00bd9c..ba3cce0 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs
+@@ -125,11 +125,23 @@ async fn available(
+         .unwrap()
+ }
+ 
+-async fn consume_128(
+-    f: &AdmissionFixture,
+-    request: &mut ActionDispatchRequest,
+-    proof: Uuid,
+-) -> Option<()> {
++/// While verification is paused, the 8,256-row proof coverage history is compared by digest
++/// (`digested_tables`): the same rows decide equality, without decoding them inside the budget.
++const PAUSE_DIGESTED: [&str; 1] = ["workflow_action_evidence_coverage"];
++
++/// Tables the 129th provider entry must leave as the claim left them.
++const ENTRY_PRESERVES: [&str; 6] = [
++    "workflow_action_intents",
++    "workflow_action_dispatches",
++    "workflow_action_evidence",
++    "workflow_action_evidence_coverage",
++    "workflow_budget_receipts",
++    "workflow_root_budget_usage",
++];
++
++/// The scheduled 128-entry premise, settled before the paused command starts (DEC-011): the
++/// command only reads until settlement, so the competitor need not re-observe it while paused.
++async fn scheduled_128(f: &AdmissionFixture, request: &ActionDispatchRequest, proof: Uuid) {
+     let scheduled = all_tables(f).await;
+     assert_eq!(entry_consumptions(f).await, (128, 127));
+     assert_eq!(available(f, request, None).await, Some(proof));
+@@ -142,12 +154,32 @@ async fn consume_128(
+         assert_eq!(available(f, request, Some(excluded)).await, None);
+     }
+     assert_eq!(all_tables(f).await, scheduled);
++}
++
++/// The genuine competing 128-to-129 transition, and only that, while verification is paused:
++/// the claim and entry are observed through exactly the relations the assertions compare.
++async fn consume_128(
++    f: &AdmissionFixture,
++    request: &mut ActionDispatchRequest,
++    proof: Uuid,
++    started: std::time::Instant,
++) -> Option<()> {
++    let phase = |label: &'static str, fence: WorkflowFence| {
++        lease_phase(f, fence, "prior_bounds", label, started)
++    };
++    phase("competitor_started", request.fence).await;
++    assert_eq!(entry_consumptions(f).await, (128, 127));
+     new_claim(f, request).await;
++    phase("claimed_129", request.fence).await;
+     renew_fixture_lease(f, request.fence).await;
+-    let claimed = all_tables(f).await;
++    let mut observed = ENTRY_PRESERVES.to_vec();
++    observed.push("task_attempts");
++    let claimed = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
++    phase("claimed_snapshot", request.fence).await;
+     assert_eq!(claimed["task_attempts"].as_array().unwrap().len(), 129);
+     let pending = LedgerProvider::new(f, Delivery::Pending);
+     Box::pin(support::observe_pending(f, request, &pending)).await?;
++    phase("consumed_129", request.fence).await;
+     assert_eq!(pending.calls.load(Ordering::SeqCst), 1);
+     assert_eq!(entry_consumptions(f).await, (129, 128));
+     let consumed: Uuid = sqlx::query_scalar(
+@@ -160,15 +192,11 @@ async fn consume_128(
+     assert_eq!(available(f, request, Some(consumed)).await, Some(proof));
+     assert_eq!(available(f, request, None).await, None);
+     assert_eq!(effects(f).await, 0);
+-    let after = all_tables(f).await;
+-    for table in [
+-        "workflow_action_intents",
+-        "workflow_action_dispatches",
+-        "workflow_action_evidence",
+-        "workflow_action_evidence_coverage",
+-        "workflow_budget_receipts",
+-        "workflow_root_budget_usage",
+-    ] {
++    let mut observed = ENTRY_PRESERVES.to_vec();
++    observed.push("background_tasks");
++    let after = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
++    phase("consumed_snapshot", request.fence).await;
++    for table in ENTRY_PRESERVES {
+         assert_eq!(
+             after[table], claimed[table],
+             "provider entry preserves {table}"
+@@ -347,6 +375,8 @@ async fn prove_prior_bound() -> Option<()> {
+     let (f, mut request) = Box::pin(prior_fixture()).await;
+     let verifier = ledger(&f, &request).await;
+     let result = Box::pin(prior_history(&f, &mut request, &verifier)).await?;
++    let proof = result.evidence.unwrap().as_uuid();
++    Box::pin(scheduled_128(&f, &request, proof)).await;
+     let observed = Arc::new(PausedVerifier::new(verifier.clone()));
+     let stale = proof_command(&f, &request, &verifier, "128-paused-before-129").await;
+     let command_started = std::time::Instant::now();
+@@ -356,21 +386,26 @@ async fn prove_prior_bound() -> Option<()> {
+             observed.wait_started().await,
+             "reconciliation ended before verifier pause"
+         );
+-        let consumed = Box::pin(consume_128(
+-            &f,
+-            &mut request,
+-            result.evidence.unwrap().as_uuid(),
+-        ))
+-        .await;
++        let consumed = Box::pin(consume_128(&f, &mut request, proof, command_started)).await;
+         let parked = if consumed.is_some() {
+-            Box::pin(park_live(&f, &request)).await
++            renew_fixture_lease(&f, request.fence).await;
++            Box::pin(support::park_observed_as(&f, &request, &PAUSE_DIGESTED)).await
+         } else {
+             None
+         };
++        lease_phase(&f, request.fence, "prior_bounds", "parked", command_started).await;
+         if parked.is_some() {
+             barrier(&f, &request).await;
+         }
+-        let before = all_tables(&f).await;
++        let before = digested_tables(&f, None, &PAUSE_DIGESTED).await;
++        lease_phase(
++            &f,
++            request.fence,
++            "prior_bounds",
++            "pre_settlement_snapshot",
++            command_started,
++        )
++        .await;
+         if parked.is_some() {
+             *observed.released_at.lock().unwrap() = Some(std::time::Instant::now());
+             observed.release.notify_one();
+@@ -378,7 +413,11 @@ async fn prove_prior_bound() -> Option<()> {
+         (before, parked)
+     };
+     let (settled, (before, parked)) = tokio::join!(reconcile, competitor);
+-    let after = all_tables(&f).await;
++    observed.timeline(
++        command_started,
++        &format!("{:?}", settled.as_ref().map(|result| &result.outcome)),
++    );
++    let after = digested_tables(&f, None, &PAUSE_DIGESTED).await;
+     if !observed.returned.load(Ordering::SeqCst) {
+         support::withheld_timeout(
+             &settled,
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
+index cf676f8..5a45863 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
+@@ -1,6 +1,8 @@
+ //! Genuine provider finality races and one-use proof lifetime.
+ use super::*;
+ use tokio::sync::Barrier;
++// Shared snapshots now live in `action_snapshot_support.rs`; sibling suites name them here.
++pub(super) use super::all_tables;
+ 
+ #[path = "action_reconciliation_attribution_tests.rs"]
+ mod attribution_tests;
+@@ -26,29 +28,69 @@ mod append_only_tests;
+ #[path = "action_reconciliation_validation_tests.rs"]
+ mod validation_tests;
+ 
+-// Catalog-owned identifiers only; one repeatable-read snapshot covers every fact,
+-// including reconciliation joins, witnesses and provider effects omitted by old helpers.
+-pub(super) async fn all_tables(f: &AdmissionFixture) -> Value {
+-    let mut tx = f.persistence().pool().begin().await.unwrap();
+-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+-        .execute(&mut *tx)
+-        .await
+-        .unwrap();
+-    let tables: Vec<String> = sqlx::query_scalar(
+-        "SELECT tablename::text FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
+-    )
+-    .fetch_all(&mut *tx)
+-    .await
+-    .unwrap();
+-    let mut state = serde_json::Map::new();
+-    for table in tables {
+-        let quoted = table.replace('"', "\"\"");
+-        let rows: Value = sqlx::query_scalar(&format!("SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) FROM public.\"{quoted}\" AS record"))
+-            .fetch_one(&mut *tx).await.unwrap();
+-        state.insert(table, rows);
++#[tokio::test]
++async fn workflow_action_reconciliation_all_tables_matches_per_relation_reads() {
++    let (f, request) = setup().await;
++    let _verifier = ledger(&f, &request).await;
++    let provider = LedgerProvider::new(&f, Delivery::Pending);
++    let _ = Box::pin(invoke(&f, &request, &provider)).await;
++    let single = all_tables(&f).await;
++    let populated = single
++        .as_object()
++        .unwrap()
++        .values()
++        .filter(|rows| !rows.as_array().unwrap().is_empty())
++        .count();
++    assert!(populated >= 10, "a populated action fixture: {populated}");
++    assert_eq!(single, per_relation_tables(&f).await);
++    let some = some_tables(&f, &["workflow_action_remote_entries", "background_tasks"]).await;
++    assert_eq!(some.as_object().unwrap().len(), 2);
++    for table in ["workflow_action_remote_entries", "background_tasks"] {
++        assert_eq!(some[table], single[table]);
++        assert_eq!(relation(&f, table).await, single[table]);
+     }
+-    tx.commit().await.unwrap();
+-    Value::Object(state)
++    // A digest stands for exactly its relation's rows; everything else stays in full.
++    let digests = ["workflow_action_remote_entries", "task_attempts"];
++    let digested = digested_tables(&f, None, &digests).await;
++    for (table, rows) in single.as_object().unwrap() {
++        if digests.contains(&table.as_str()) {
++            assert_eq!(
++                digested[table]["rows"],
++                json!(rows.as_array().unwrap().len())
++            );
++            assert_eq!(digested[table]["sha256"].as_str().unwrap().len(), 64);
++        } else {
++            assert_eq!(&digested[table], rows);
++        }
++    }
++    assert_ne!(
++        digested["workflow_action_remote_entries"]["sha256"],
++        digested["task_attempts"]["sha256"]
++    );
++    assert_eq!(digested_tables(&f, None, &digests).await, digested);
++    let (rows, whole) = tables_and_fingerprint(&f).await;
++    assert_eq!(rows, single);
++    assert_eq!(fingerprint(&f).await, whole);
++    let names: Vec<&str> = single
++        .as_object()
++        .unwrap()
++        .keys()
++        .map(String::as_str)
++        .collect();
++    assert_eq!(digested_tables(&f, None, &names).await, whole);
++    for (table, rows) in single.as_object().unwrap() {
++        assert_eq!(whole[table]["rows"], json!(rows.as_array().unwrap().len()));
++    }
++    // A digest changes exactly when its relation's rows change.
++    barrier(&f, &request).await;
++    let (changed, after) = tables_and_fingerprint(&f).await;
++    let mut differing = 0;
++    for (table, rows) in single.as_object().unwrap() {
++        let same_rows = &changed[table] == rows;
++        assert_eq!(after[table] == whole[table], same_rows, "{table}");
++        differing += usize::from(!same_rows);
++    }
++    assert!(differing > 0, "the barrier writes fixture relations");
+ }
+ 
+ async fn proof_command(
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
+index a876a9b..1db7426 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs
+@@ -206,6 +206,107 @@ async fn park(f: &AdmissionFixture, request: &ActionDispatchRequest) {
+             .unwrap()
+     );
+ }
++/// The exact owner's DB-clock windows at one labelled phase boundary of a lease-sensitive
++/// scenario. Read-only diagnostics: logged past libtest capture, never a result by itself.
++#[derive(Debug)]
++struct LeasePhase {
++    owner: bool,
++    lease_ms: f64,
++    run_ms: f64,
++}
++async fn lease_phase(
++    f: &AdmissionFixture,
++    fence: WorkflowFence,
++    scenario: &str,
++    phase: &str,
++    started: std::time::Instant,
++) -> LeasePhase {
++    let elapsed = started.elapsed();
++    let (owner, lease_ms, run_ms, now): (bool, f64, f64, String) = sqlx::query_as("SELECT job.status='processing' AND job.worker_id=$2 AND job.execution_generation=$3 AND job.retry_count+1=$4, COALESCE(extract(epoch FROM job.lock_expires_at-clock_timestamp())*1000,0)::float8, (extract(epoch FROM run.deadline-clock_timestamp())*1000)::float8, clock_timestamp()::text FROM background_tasks AS job JOIN workflow_runs AS run ON run.company_id=job.company_id AND run.id=$5 WHERE job.id=$1")
++        .bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0)
++        .bind(fence.attempt.0).bind(fence.scope.run.as_uuid())
++        .fetch_one(f.persistence().pool()).await.unwrap();
++    uncaptured(&format!(
++        "PHASE scenario={scenario} phase={phase} elapsed_ms={} owner={owner} attempt={} lease_remaining_ms={lease_ms:.0} run_remaining_ms={run_ms:.0} db_now={now}",
++        elapsed.as_millis(),
++        fence.attempt.0
++    ));
++    LeasePhase {
++        owner,
++        lease_ms,
++        run_ms,
++    }
++}
++/// A worker's genuine heartbeat at a quiescent phase boundary of a lease-sensitive scenario
++/// (DEC-010): the production `renew_io`, with the common three-second policy, before the old
++/// window ends. A lost lease fails here as a `LEASE LAPSE` naming its phase; a refusal while
++/// the exact owner is still live is a different, hard failure. Snapshots taken under the old
++/// window are rebased by exactly the one field a renewal writes, this job's
++/// `lock_expires_at`, read back as committed; every other row and column must still match
++/// wherever they are compared.
++async fn renew_phase(
++    f: &AdmissionFixture,
++    fence: WorkflowFence,
++    scenario: &str,
++    phase: &str,
++    started: std::time::Instant,
++    snapshots: &mut [&mut Value],
++) {
++    let lapse = |state: &LeasePhase| !state.owner || state.lease_ms <= 0.0 || state.run_ms <= 0.0;
++    let label = format!("{phase}:renew");
++    let current = lease_phase(f, fence, scenario, &label, started).await;
++    assert!(
++        !lapse(&current),
++        "LEASE LAPSE scenario={scenario} phase={phase} before renewal: {current:?}"
++    );
++    let revision = || async {
++        sqlx::query_scalar::<_, i64>(
++            "SELECT revision FROM workflow_runs WHERE company_id=$1 AND id=$2",
++        )
++        .bind(fence.scope.company.as_uuid())
++        .bind(fence.scope.run.as_uuid())
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap()
++    };
++    let before = revision().await;
++    let renewed = f.persistence().renew_io(fence, policy()).await;
++    let after = lease_phase(f, fence, scenario, &format!("{phase}:renewed"), started).await;
++    match renewed {
++        Ok(Some(_)) => {}
++        // A definite NotApplied keeps the old window, which must still be live.
++        Err(AppError::DatabaseTimeout(_)) if !lapse(&after) => {}
++        Ok(None) | Err(AppError::DatabaseTimeout(_)) if lapse(&after) => {
++            panic!("LEASE LAPSE scenario={scenario} phase={phase} at renewal: {after:?}")
++        }
++        other => panic!(
++            "renewal refused while the exact owner is live, scenario={scenario} phase={phase}: {other:?} {after:?}"
++        ),
++    }
++    assert_eq!(
++        revision().await,
++        before,
++        "a heartbeat moved the run revision"
++    );
++    let expiry: Value = sqlx::query_scalar(
++        "SELECT to_jsonb(job)->'lock_expires_at' FROM background_tasks AS job WHERE id=$1",
++    )
++    .bind(fence.scope.job.0)
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    let job = json!(fence.scope.job.0);
++    for snapshot in snapshots.iter_mut() {
++        let mut rows = snapshot["background_tasks"]
++            .as_array_mut()
++            .unwrap()
++            .iter_mut()
++            .filter(|row| row["id"] == job);
++        let row = rows.next().expect("the renewed job is in the snapshot");
++        assert!(rows.next().is_none());
++        row["lock_expires_at"] = expiry.clone();
++    }
++}
+ /// What a real worker does while it owns the step: renew the fixture lease through the
+ /// production renew path, at points that no before/after snapshot pair straddles (the
+ /// pattern approved for the retained-truth scenarios). A renewal moves only
+diff --git c/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs w/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
+index ee60749..3594e42 100644
+--- c/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
++++ w/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs
+@@ -360,6 +360,7 @@ async fn continue_genuine(h: &mut MixedTruth) {
+     let before = all_tables(&h.fixture).await;
+     let retired = h.requests[0].fence;
+     new_claim(&h.fixture, &mut h.requests[0]).await;
++    let started = std::time::Instant::now();
+     let fence = h.requests[0].fence;
+     assert_eq!(fence.scope, retired.scope);
+     assert_eq!(fence.attempt.0, retired.attempt.0 + 1);
+@@ -367,14 +368,31 @@ async fn continue_genuine(h: &mut MixedTruth) {
+     for request in &mut h.requests[1..] {
+         request.fence = fence;
+     }
+-    let claimed = all_tables(&h.fixture).await;
++    let mut claimed = all_tables(&h.fixture).await;
++    lease_phase(&h.fixture, fence, "mixed", "claimed_snapshot", started).await;
+     claim_boundary(&before, &claimed, fence);
+     Box::pin(live_recovery(h, true)).await;
+-    let applied = Box::pin(dispatch_genuine(h, &claimed)).await;
+-    Box::pin(complete_genuine(h, &applied, fence)).await;
++    lease_phase(&h.fixture, fence, "mixed", "live_recovery", started).await;
++    // DEC-010: the worker's genuine heartbeat at quiescent boundaries before its window ends.
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "receipt_only_dispatches",
++        started,
++        &mut [&mut claimed],
++    )
++    .await;
++    let applied = Box::pin(dispatch_genuine(h, &mut claimed, started)).await;
++    Box::pin(complete_genuine(h, &applied, fence, started)).await;
+ }
+ 
+-async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
++async fn dispatch_genuine(
++    h: &MixedTruth,
++    claimed: &mut Value,
++    started: std::time::Instant,
++) -> Value {
++    let fence = h.requests[0].fence;
+     let service = ActionService::new(mixed_writer(&h.fixture));
+     let saved = LedgerProvider::new(&h.fixture, Delivery::Pending);
+     for request in &h.requests[..2] {
+@@ -387,12 +405,30 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+         };
+         assert_eq!(receipt.result, good());
+     }
++    lease_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "receipt_only_dispatches",
++        started,
++    )
++    .await;
+     assert_eq!(saved.calls.load(Ordering::SeqCst), 0);
+     assert_eq!(
+         all_tables(&h.fixture).await,
+         *claimed,
+         "receipt-only siblings append no entry and poll no provider"
+     );
++    lease_phase(&h.fixture, fence, "mixed", "receipt_only_snapshot", started).await;
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "supported_dispatch",
++        started,
++        &mut [claimed],
++    )
++    .await;
+     let supported = RegisteredLedger::new(
+         &h.fixture,
+         &h.requests[2],
+@@ -410,11 +446,12 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+     else {
+         panic!("supported sibling genuine completion");
+     };
++    lease_phase(&h.fixture, fence, "mixed", "supported_dispatch", started).await;
+     assert_eq!(receipt.result, good());
+     assert_eq!(supported.inner.calls.load(Ordering::SeqCst), 1);
+     assert_eq!(effects(&h.fixture).await, 3);
+     assert_eq!(entry_consumptions(&h.fixture).await, (4, 0));
+-    let applied = all_tables(&h.fixture).await;
++    let mut applied = all_tables(&h.fixture).await;
+     supported_boundary(claimed, &applied, &h.requests[2]);
+     let digest_matches: bool = sqlx::query_scalar("SELECT result_digest=encode(sha256(jsonb_send($2::jsonb)),'hex') FROM workflow_action_actual_receipt_observations WHERE invocation_id=$1")
+         .bind(h.requests[2].subject.invocation.as_uuid()).bind(good())
+@@ -423,11 +460,27 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+         digest_matches,
+         "actual observation digest binds the authentic good result"
+     );
++    lease_phase(&h.fixture, fence, "mixed", "applied_snapshot", started).await;
++    renew_phase(
++        &h.fixture,
++        fence,
++        "mixed",
++        "completion",
++        started,
++        &mut [&mut applied],
++    )
++    .await;
+     applied
+ }
+ 
+-async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence) {
+-    let committed = h
++async fn complete_genuine(
++    h: &MixedTruth,
++    applied: &Value,
++    fence: WorkflowFence,
++    started: std::time::Instant,
++) {
++    lease_phase(&h.fixture, fence, "mixed", "before_completion", started).await;
++    let completed = h
+         .fixture
+         .persistence()
+         .settled()
+@@ -440,8 +493,17 @@ async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence)
+             output: good(),
+         })
+         .await
+-        .unwrap()
+         .unwrap();
++    let state = lease_phase(&h.fixture, fence, "mixed", "completed", started).await;
++    // A refusal is never the required genuine completion; the lease only labels it.
++    let Some(committed) = completed else {
++        let kind = if state.lease_ms > 0.0 && state.run_ms > 0.0 {
++            "LIVE-OWNER REFUSAL"
++        } else {
++            "LEASE LAPSE"
++        };
++        panic!("{kind} scenario=mixed phase=completion: shared completion refused; {state:?}");
++    };
+     assert!(committed.successor.is_none());
+     let done = all_tables(&h.fixture).await;
+     completed_boundary(applied, &done, fence);
+diff --git c/src/adapters/persistence/workflow/action_snapshot_support.rs w/src/adapters/persistence/workflow/action_snapshot_support.rs
+new file mode 100644
+index 0000000..75b4e2a
+--- /dev/null
++++ w/src/adapters/persistence/workflow/action_snapshot_support.rs
+@@ -0,0 +1,148 @@
++//! Whole-database snapshots for action tests: every public relation from one repeatable-read
++//! read, in a form exact enough to assert that an operation wrote nothing or exactly one fact.
++use super::*;
++
++// Catalog-owned identifiers only; one repeatable-read snapshot covers every fact,
++// including reconciliation joins, witnesses and provider effects omitted by old helpers.
++// One statement reads every relation: the same rows in the same order as reading them one by
++// one (`per_relation_tables`), without ~120 round trips that let a parallel suite outlive
++// the short fixture leases these snapshots sit between.
++pub(super) async fn all_tables(f: &AdmissionFixture) -> Value {
++    snapshot(f, None, &[]).await
++}
++
++/// Exactly these relations, in the form and from the one snapshot `all_tables` would report.
++pub(super) async fn some_tables(f: &AdmissionFixture, tables: &[&str]) -> Value {
++    snapshot(f, Some(tables), &[]).await
++}
++
++/// `all_tables` (or `some_tables`), except that each `digested` relation is reported as its row
++/// count and the SHA-256 of exactly the canonical text the full form sorts and compares. Two
++/// such snapshots are equal precisely when those relations hold the same rows, at a fraction of
++/// the cost for large append-only history. Compare only like with like.
++pub(super) async fn digested_tables(
++    f: &AdmissionFixture,
++    only: Option<&[&str]>,
++    digested: &[&str],
++) -> Value {
++    snapshot(f, only, digested).await
++}
++
++/// Every public relation as its `digested_tables` row count and SHA-256: a compact, faithful
++/// fingerprint of the whole database for intervals too short for full rows.
++pub(super) async fn fingerprint(f: &AdmissionFixture) -> Value {
++    let mut tx = read_snapshot(f).await;
++    let tables = public_tables(&mut tx).await;
++    let fingerprint = relations_on(&mut tx, &tables, |_| true).await;
++    tx.commit().await.unwrap();
++    fingerprint
++}
++
++/// `all_tables` and `fingerprint` from one repeatable-read snapshot, so the full rows are
++/// exactly the state the fingerprint identifies.
++pub(super) async fn tables_and_fingerprint(f: &AdmissionFixture) -> (Value, Value) {
++    let mut tx = read_snapshot(f).await;
++    let tables = public_tables(&mut tx).await;
++    let rows = relations_on(&mut tx, &tables, |_| false).await;
++    let fingerprint = relations_on(&mut tx, &tables, |_| true).await;
++    tx.commit().await.unwrap();
++    (rows, fingerprint)
++}
++
++async fn snapshot(f: &AdmissionFixture, only: Option<&[&str]>, digested: &[&str]) -> Value {
++    let mut tx = read_snapshot(f).await;
++    let tables = match only {
++        None => public_tables(&mut tx).await,
++        Some(tables) => tables.iter().map(ToString::to_string).collect(),
++    };
++    let state = relations_on(&mut tx, &tables, |table| digested.contains(&table)).await;
++    tx.commit().await.unwrap();
++    state
++}
++
++async fn read_snapshot(f: &AdmissionFixture) -> sqlx::Transaction<'static, sqlx::Postgres> {
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    tx
++}
++
++/// One statement reading every named relation, digested where `digest` says so.
++async fn relations_on(
++    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
++    tables: &[String],
++    digest: impl Fn(&str) -> bool,
++) -> Value {
++    let relations = tables
++        .iter()
++        .enumerate()
++        .map(|(ordinal, table)| {
++            let rows = if digest(table) {
++                relation_digest(table)
++            } else {
++                relation_rows(table)
++            };
++            format!("({ordinal},{rows})")
++        })
++        .collect::<Vec<_>>()
++        .join(",");
++    let rows = sqlx::query_scalar::<_, Value>(&format!("SELECT COALESCE(jsonb_agg(relation.rows ORDER BY relation.ordinal),'[]'::jsonb) FROM (VALUES {relations}) AS relation(ordinal,rows)"))
++        .fetch_one(&mut **tx).await.unwrap();
++    let Value::Array(rows) = rows else {
++        panic!("one array of relations")
++    };
++    assert_eq!(rows.len(), tables.len());
++    Value::Object(tables.iter().cloned().zip(rows).collect())
++}
++
++async fn public_tables(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Vec<String> {
++    sqlx::query_scalar(
++        "SELECT tablename::text FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
++    )
++    .fetch_all(&mut **tx)
++    .await
++    .unwrap()
++}
++
++fn relation_rows(table: &str) -> String {
++    let quoted = table.replace('"', "\"\"");
++    format!(
++        "(SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) FROM public.\"{quoted}\" AS record)"
++    )
++}
++
++fn relation_digest(table: &str) -> String {
++    let quoted = table.replace('"', "\"\"");
++    format!(
++        "(SELECT jsonb_build_object('rows',count(*),'sha256',encode(sha256(convert_to(COALESCE(string_agg(to_jsonb(record)::text,E'\\n' ORDER BY to_jsonb(record)::text COLLATE \"C\"),''),'UTF8')),'hex')) FROM public.\"{quoted}\" AS record)"
++    )
++}
++
++/// One relation in exactly the form `all_tables` reports it; a cheap read for short intervals.
++pub(super) async fn relation(f: &AdmissionFixture, table: &str) -> Value {
++    sqlx::query_scalar(&format!("SELECT {}", relation_rows(table)))
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap()
++}
++
++/// The one-relation-per-query read `all_tables` replaced, kept as its equivalence oracle.
++pub(super) async fn per_relation_tables(f: &AdmissionFixture) -> Value {
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    let mut state = serde_json::Map::new();
++    for table in public_tables(&mut tx).await {
++        let rows: Value = sqlx::query_scalar(&format!("SELECT {}", relation_rows(&table)))
++            .fetch_one(&mut *tx)
++            .await
++            .unwrap();
++        state.insert(table, rows);
++    }
++    tx.commit().await.unwrap();
++    Value::Object(state)
++}
+diff --git c/src/adapters/persistence/workflow/wait_tests.rs w/src/adapters/persistence/workflow/wait_tests.rs
+index 8e37246..ee57d45 100644
+--- c/src/adapters/persistence/workflow/wait_tests.rs
++++ w/src/adapters/persistence/workflow/wait_tests.rs
+@@ -1,5 +1,6 @@
+ use super::*;
+ use crate::application::workflow::{batch::*, completion::CommitDisposition, waits::*};
++use chrono::{DateTime, SubsecRound, Utc};
+ fn source(timer: bool) -> Value {
+     let name = if timer { "wait.timer" } else { "wait.event" };
+     let mut source: Value = serde_json::from_str(&registry::example(name).unwrap().source).unwrap();
+@@ -35,7 +36,13 @@ fn completed(
+ }
+ #[tokio::test]
+ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
+-    let (f, scope) = fixture_source(source(false)).await;
++    // F-006: a deadline finer than the stored microseconds on every platform, so the first park,
++    // the competing park and a replay must all answer with the persisted value.
++    let requested = (Utc::now() + chrono::Duration::minutes(30)).trunc_subsecs(6)
++        + chrono::Duration::nanoseconds(477);
++    let mut source = source(false);
++    source["steps"]["start"]["with"]["deadline"] = json!({"literal":requested.to_rfc3339()});
++    let (f, scope) = fixture_source(source).await;
+     let p = f.persistence();
+     let barrier = Barrier::new(2);
+     let park = || async {
+@@ -44,6 +51,19 @@ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
+     };
+     let (a, b) = tokio::join!(park(), park());
+     assert_eq!(a, b);
++    let (stored, run_deadline): (DateTime<Utc>, DateTime<Utc>) = sqlx::query_as("SELECT wait.deadline,run.deadline FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id WHERE wait.id=$1")
++        .bind(a.wait.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    assert_ne!(stored, requested, "the input keeps sub-microsecond digits");
++    assert_eq!(stored, requested.min(run_deadline).trunc_subsecs(6));
++    assert_eq!(
++        a.deadline, stored,
++        "the first park answers with the persisted deadline"
++    );
++    assert_eq!(
++        p.park_wait(scope).await.unwrap(),
++        Some(a.clone()),
++        "a replay answers exactly as the first park did"
++    );
+     let state = snapshot_all(&f).await;
+     assert_eq!(state["base"]["jobs"][0]["status"], "completed");
+     assert_eq!(state["base"]["runs"][0]["state"], "waiting");
+diff --git c/src/adapters/persistence/workflow/waits.rs w/src/adapters/persistence/workflow/waits.rs
+index 12745b1..05ad7d6 100644
+--- c/src/adapters/persistence/workflow/waits.rs
++++ w/src/adapters/persistence/workflow/waits.rs
+@@ -189,8 +189,10 @@ async fn park_on(
+     let reason = if spec.timer { "timer" } else { "event" };
+     // Registration facts only. Phase04/05 consume this identity for delivery, never a separate queue.
+     let intent = json!({"version":1,"kind":"wait_registered","wait_id":id,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()});
+-    sqlx::query("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,event_name,correlation,notification_intent) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),$7,$8,$9)")
+-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(id).bind(reason).bind(deadline).bind(spec.name).bind(spec.correlation).bind(intent).execute(&mut *db).await?;
++    // The response is the stored deadline, as a replay reads it: timestamptz keeps microseconds,
++    // so returning the capped Rust value would answer the first park differently from the next.
++    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,event_name,correlation,notification_intent) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),$7,$8,$9) RETURNING deadline")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(id).bind(reason).bind(deadline).bind(spec.name).bind(spec.correlation).bind(intent).fetch_one(&mut *db).await?;
+     completion_job::finish(db, scope, completion_job::CompletionOwner::Pure).await?;
+     sqlx::query(
+         "UPDATE workflow_runs SET state='waiting',waiting_reason=$3 WHERE company_id=$1 AND id=$2",
+diff --git c/src/application/services/runtime_metrics.rs w/src/application/services/runtime_metrics.rs
+index a93498c..3bb3493 100644
+--- c/src/application/services/runtime_metrics.rs
++++ w/src/application/services/runtime_metrics.rs
+@@ -291,7 +291,7 @@ mod tests {
+             };
+             if self
+                 .failures_remaining
+-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++                .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                     (remaining > 0).then(|| remaining - 1)
+                 })
+                 .is_ok()
+diff --git c/src/application/services/task_worker.rs w/src/application/services/task_worker.rs
+index 9ae8dce..4374411 100644
+--- c/src/application/services/task_worker.rs
++++ w/src/application/services/task_worker.rs
+@@ -2011,7 +2011,7 @@ mod tests {
+             move |available| {
+                 observed_claim_sizes.lock().unwrap().push(available);
+                 let count = claim_remaining
+-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
++                    .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                         Some(remaining.saturating_sub(available))
+                     })
+                     .unwrap()
+diff --git c/src/lib.rs w/src/lib.rs
+index f987194..620cef2 100644
+--- c/src/lib.rs
++++ w/src/lib.rs
+@@ -1,3 +1,7 @@
++// Clippy 1.99's `double_must_use` fires on every `#[async_trait]` expansion, not on code written
++// here. Remove this once async-trait stops triggering it.
++#![allow(clippy::double_must_use)]
++
+ pub mod adapters;
+ pub mod application;
+ pub mod domain;

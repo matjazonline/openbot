@@ -61,6 +61,10 @@ impl SqlLocalAction for Effect {
         }
     }
 }
+#[path = "action_snapshot_support.rs"]
+mod snapshot_support;
+use snapshot_support::*;
+
 type Dispatch = PostgresActionDispatch<Authority, Effect>;
 fn adapter(f: &AdmissionFixture, mode: u8) -> Dispatch {
     PostgresActionDispatch::new(f.persistence().clone(), Authority, Effect(mode))

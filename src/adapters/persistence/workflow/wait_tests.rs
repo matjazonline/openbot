@@ -1,5 +1,6 @@
 use super::*;
 use crate::application::workflow::{batch::*, completion::CommitDisposition, waits::*};
+use chrono::{DateTime, SubsecRound, Utc};
 fn source(timer: bool) -> Value {
     let name = if timer { "wait.timer" } else { "wait.event" };
     let mut source: Value = serde_json::from_str(&registry::example(name).unwrap().source).unwrap();
@@ -35,7 +36,13 @@ fn completed(
 }
 #[tokio::test]
 async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
-    let (f, scope) = fixture_source(source(false)).await;
+    // F-006: a deadline finer than the stored microseconds on every platform, so the first park,
+    // the competing park and a replay must all answer with the persisted value.
+    let requested = (Utc::now() + chrono::Duration::minutes(30)).trunc_subsecs(6)
+        + chrono::Duration::nanoseconds(477);
+    let mut source = source(false);
+    source["steps"]["start"]["with"]["deadline"] = json!({"literal":requested.to_rfc3339()});
+    let (f, scope) = fixture_source(source).await;
     let p = f.persistence();
     let barrier = Barrier::new(2);
     let park = || async {
@@ -44,6 +51,19 @@ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
     };
     let (a, b) = tokio::join!(park(), park());
     assert_eq!(a, b);
+    let (stored, run_deadline): (DateTime<Utc>, DateTime<Utc>) = sqlx::query_as("SELECT wait.deadline,run.deadline FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id WHERE wait.id=$1")
+        .bind(a.wait.as_uuid()).fetch_one(p.pool()).await.unwrap();
+    assert_ne!(stored, requested, "the input keeps sub-microsecond digits");
+    assert_eq!(stored, requested.min(run_deadline).trunc_subsecs(6));
+    assert_eq!(
+        a.deadline, stored,
+        "the first park answers with the persisted deadline"
+    );
+    assert_eq!(
+        p.park_wait(scope).await.unwrap(),
+        Some(a.clone()),
+        "a replay answers exactly as the first park did"
+    );
     let state = snapshot_all(&f).await;
     assert_eq!(state["base"]["jobs"][0]["status"], "completed");
     assert_eq!(state["base"]["runs"][0]["state"], "waiting");

@@ -1,6 +1,8 @@
 //! Genuine provider finality races and one-use proof lifetime.
 use super::*;
 use tokio::sync::Barrier;
+// Shared snapshots now live in `action_snapshot_support.rs`; sibling suites name them here.
+pub(super) use super::all_tables;
 
 #[path = "action_reconciliation_attribution_tests.rs"]
 mod attribution_tests;
@@ -26,29 +28,69 @@ mod append_only_tests;
 #[path = "action_reconciliation_validation_tests.rs"]
 mod validation_tests;
 
-// Catalog-owned identifiers only; one repeatable-read snapshot covers every fact,
-// including reconciliation joins, witnesses and provider effects omitted by old helpers.
-pub(super) async fn all_tables(f: &AdmissionFixture) -> Value {
-    let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    let tables: Vec<String> = sqlx::query_scalar(
-        "SELECT tablename::text FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
-    )
-    .fetch_all(&mut *tx)
-    .await
-    .unwrap();
-    let mut state = serde_json::Map::new();
-    for table in tables {
-        let quoted = table.replace('"', "\"\"");
-        let rows: Value = sqlx::query_scalar(&format!("SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) FROM public.\"{quoted}\" AS record"))
-            .fetch_one(&mut *tx).await.unwrap();
-        state.insert(table, rows);
+#[tokio::test]
+async fn workflow_action_reconciliation_all_tables_matches_per_relation_reads() {
+    let (f, request) = setup().await;
+    let _verifier = ledger(&f, &request).await;
+    let provider = LedgerProvider::new(&f, Delivery::Pending);
+    let _ = Box::pin(invoke(&f, &request, &provider)).await;
+    let single = all_tables(&f).await;
+    let populated = single
+        .as_object()
+        .unwrap()
+        .values()
+        .filter(|rows| !rows.as_array().unwrap().is_empty())
+        .count();
+    assert!(populated >= 10, "a populated action fixture: {populated}");
+    assert_eq!(single, per_relation_tables(&f).await);
+    let some = some_tables(&f, &["workflow_action_remote_entries", "background_tasks"]).await;
+    assert_eq!(some.as_object().unwrap().len(), 2);
+    for table in ["workflow_action_remote_entries", "background_tasks"] {
+        assert_eq!(some[table], single[table]);
+        assert_eq!(relation(&f, table).await, single[table]);
     }
-    tx.commit().await.unwrap();
-    Value::Object(state)
+    // A digest stands for exactly its relation's rows; everything else stays in full.
+    let digests = ["workflow_action_remote_entries", "task_attempts"];
+    let digested = digested_tables(&f, None, &digests).await;
+    for (table, rows) in single.as_object().unwrap() {
+        if digests.contains(&table.as_str()) {
+            assert_eq!(
+                digested[table]["rows"],
+                json!(rows.as_array().unwrap().len())
+            );
+            assert_eq!(digested[table]["sha256"].as_str().unwrap().len(), 64);
+        } else {
+            assert_eq!(&digested[table], rows);
+        }
+    }
+    assert_ne!(
+        digested["workflow_action_remote_entries"]["sha256"],
+        digested["task_attempts"]["sha256"]
+    );
+    assert_eq!(digested_tables(&f, None, &digests).await, digested);
+    let (rows, whole) = tables_and_fingerprint(&f).await;
+    assert_eq!(rows, single);
+    assert_eq!(fingerprint(&f).await, whole);
+    let names: Vec<&str> = single
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(digested_tables(&f, None, &names).await, whole);
+    for (table, rows) in single.as_object().unwrap() {
+        assert_eq!(whole[table]["rows"], json!(rows.as_array().unwrap().len()));
+    }
+    // A digest changes exactly when its relation's rows change.
+    barrier(&f, &request).await;
+    let (changed, after) = tables_and_fingerprint(&f).await;
+    let mut differing = 0;
+    for (table, rows) in single.as_object().unwrap() {
+        let same_rows = &changed[table] == rows;
+        assert_eq!(after[table] == whole[table], same_rows, "{table}");
+        differing += usize::from(!same_rows);
+    }
+    assert!(differing > 0, "the barrier writes fixture relations");
 }
 
 async fn proof_command(

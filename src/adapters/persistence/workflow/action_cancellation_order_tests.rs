@@ -93,7 +93,7 @@ impl Prepared {
     }
 }
 
-async fn blocked<T: std::fmt::Debug>(
+pub(super) async fn blocked<T: std::fmt::Debug>(
     observer: &mut sqlx::PgConnection,
     blocker: i32,
     statement: &str,
@@ -124,12 +124,12 @@ async fn blocked<T: std::fmt::Debug>(
 }
 
 #[derive(Debug)]
-enum RunLock {
+pub(super) enum RunLock {
     Free,
     Held,
 }
 
-async fn probe_run(
+pub(super) async fn probe_run(
     observer: &mut sqlx::PgConnection,
     request: &ActionDispatchRequest,
     expected: RunLock,
@@ -247,7 +247,11 @@ async fn race(boundary: Boundary, first: First) {
     assert_drained(&mut observer, first_pid, second_pid).await;
 }
 
-async fn assert_drained(observer: &mut sqlx::PgConnection, first_pid: i32, second_pid: i32) {
+pub(super) async fn assert_drained(
+    observer: &mut sqlx::PgConnection,
+    first_pid: i32,
+    second_pid: i32,
+) {
     sqlx::query("SELECT pg_stat_clear_snapshot()")
         .execute(&mut *observer)
         .await

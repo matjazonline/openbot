@@ -19,6 +19,7 @@ use crate::{
         user::UserPersistence,
     },
 };
+use chrono::SubsecRound;
 
 async fn fixture(persistence: &PostgresPersistence) -> (Uuid, Uuid, PrincipalId) {
     let suffix = Uuid::new_v4().simple().to_string();
@@ -760,7 +761,9 @@ async fn agent_work_stays_out_until_a_human_decision_is_required() {
         .await
         .unwrap();
     let outreach_id = Uuid::new_v4();
-    let expiry = Utc::now() + chrono::Duration::hours(2);
+    // Exactly representable as the stored timestamptz (SQLx binds integer microseconds), so the
+    // projected expiry can be compared for equality with the instant the fixture wrote.
+    let expiry = (Utc::now() + chrono::Duration::hours(2)).trunc_subsecs(6);
     sqlx::query(
         r#"INSERT INTO task_outreaches (
                id, company_id, task_id, status, required_threshold_percent, expires_at,
@@ -1757,8 +1760,9 @@ async fn the_queue_ages_the_generation_rather_than_the_row() {
 
     // An old row whose current generation opened a minute ago, and a younger row that has been
     // waiting an hour. On the row's own `created_at` the order would be the other way around.
-    let opened_recently = Utc::now() - chrono::Duration::minutes(1);
-    let opened_earlier = Utc::now() - chrono::Duration::hours(1);
+    // Microsecond-exact, as stored, so the projected age compares equal to what was written.
+    let opened_recently = (Utc::now() - chrono::Duration::minutes(1)).trunc_subsecs(6);
+    let opened_earlier = (Utc::now() - chrono::Duration::hours(1)).trunc_subsecs(6);
     sqlx::query(
         r#"UPDATE thread_handoffs
            SET created_at = CURRENT_TIMESTAMP - interval '30 days', generation_opened_at = $2

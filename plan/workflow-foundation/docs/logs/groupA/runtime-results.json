@@ -1,0 +1,137 @@
+[
+  {
+    "filter": "workflow_action_dispatch_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_dispatch_"
+    ],
+    "exit_code": 0,
+    "expected": 20,
+    "summary": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 2536 filtered out",
+    "elapsed_s": 37.57,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action-dispatch.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_action_receipt_return_authority_errors_propagate_after_commit",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_receipt_return_authority_errors_propagate_after_commit"
+    ],
+    "exit_code": 0,
+    "expected": 1,
+    "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2555 filtered out",
+    "elapsed_s": 6.83,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action-receipt-return-authority-errors-propagate-after-commit.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_action_receipt_refused_return_releases_run_before_returning",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_receipt_refused_return_releases_run_before_returning"
+    ],
+    "exit_code": 0,
+    "expected": 1,
+    "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2555 filtered out",
+    "elapsed_s": 1.81,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action-receipt-refused-return-releases-run-before-returning.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_action_receipt",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_receipt"
+    ],
+    "exit_code": 0,
+    "expected": 12,
+    "summary": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 2544 filtered out",
+    "elapsed_s": 15.78,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action-receipt.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_action_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_"
+    ],
+    "exit_code": 101,
+    "expected": 309,
+    "summary": "test result: FAILED. 308 passed; 1 failed; 0 ignored; 0 measured; 2247 filtered out",
+    "elapsed_s": 665.9,
+    "success": false,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_control_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_control_"
+    ],
+    "exit_code": 0,
+    "expected": 29,
+    "summary": "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 2527 filtered out",
+    "elapsed_s": 33.41,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-control.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "control_tests",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "control_tests"
+    ],
+    "exit_code": 0,
+    "expected": 37,
+    "summary": "test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 2519 filtered out",
+    "elapsed_s": 52.1,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-control-tests.log",
+    "residue_own_dbs_and_foreign_clients_after": "1|5",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "::controls::",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "::controls::"
+    ],
+    "exit_code": 0,
+    "expected": 7,
+    "summary": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2549 filtered out",
+    "elapsed_s": 11.15,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-controls.log",
+    "residue_own_dbs_and_foreign_clients_after": "1|5",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  },
+  {
+    "filter": "workflow_action_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_"
+    ],
+    "exit_code": 101,
+    "expected": 309,
+    "summary": "test result: FAILED. 307 passed; 2 failed; 0 ignored; 0 measured; 2247 filtered out",
+    "elapsed_s": 663.24,
+    "success": false,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "f14fb5cda77c66735354f34141597cdc9ef718038eed2901c121d9340168517e"
+  }
+]

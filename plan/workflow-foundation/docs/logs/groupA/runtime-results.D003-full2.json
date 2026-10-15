@@ -1,0 +1,17 @@
+[
+  {
+    "filter": "workflow_action_",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "workflow_action_"
+    ],
+    "exit_code": 0,
+    "expected": 310,
+    "summary": "test result: ok. 310 passed; 0 failed; 0 ignored; 0 measured; 2247 filtered out",
+    "elapsed_s": 507.42,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-workflow-action.D003-full2.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "c973c76d0cd5858ec03b3471b11b3b0ace0ca366db4d14c0dea156f8145b84a8"
+  }
+]

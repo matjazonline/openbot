@@ -360,6 +360,7 @@ async fn continue_genuine(h: &mut MixedTruth) {
     let before = all_tables(&h.fixture).await;
     let retired = h.requests[0].fence;
     new_claim(&h.fixture, &mut h.requests[0]).await;
+    let started = std::time::Instant::now();
     let fence = h.requests[0].fence;
     assert_eq!(fence.scope, retired.scope);
     assert_eq!(fence.attempt.0, retired.attempt.0 + 1);
@@ -367,14 +368,31 @@ async fn continue_genuine(h: &mut MixedTruth) {
     for request in &mut h.requests[1..] {
         request.fence = fence;
     }
-    let claimed = all_tables(&h.fixture).await;
+    let mut claimed = all_tables(&h.fixture).await;
+    lease_phase(&h.fixture, fence, "mixed", "claimed_snapshot", started).await;
     claim_boundary(&before, &claimed, fence);
     Box::pin(live_recovery(h, true)).await;
-    let applied = Box::pin(dispatch_genuine(h, &claimed)).await;
-    Box::pin(complete_genuine(h, &applied, fence)).await;
+    lease_phase(&h.fixture, fence, "mixed", "live_recovery", started).await;
+    // DEC-010: the worker's genuine heartbeat at quiescent boundaries before its window ends.
+    renew_phase(
+        &h.fixture,
+        fence,
+        "mixed",
+        "receipt_only_dispatches",
+        started,
+        &mut [&mut claimed],
+    )
+    .await;
+    let applied = Box::pin(dispatch_genuine(h, &mut claimed, started)).await;
+    Box::pin(complete_genuine(h, &applied, fence, started)).await;
 }
 
-async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
+async fn dispatch_genuine(
+    h: &MixedTruth,
+    claimed: &mut Value,
+    started: std::time::Instant,
+) -> Value {
+    let fence = h.requests[0].fence;
     let service = ActionService::new(mixed_writer(&h.fixture));
     let saved = LedgerProvider::new(&h.fixture, Delivery::Pending);
     for request in &h.requests[..2] {
@@ -387,12 +405,30 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
         };
         assert_eq!(receipt.result, good());
     }
+    lease_phase(
+        &h.fixture,
+        fence,
+        "mixed",
+        "receipt_only_dispatches",
+        started,
+    )
+    .await;
     assert_eq!(saved.calls.load(Ordering::SeqCst), 0);
     assert_eq!(
         all_tables(&h.fixture).await,
         *claimed,
         "receipt-only siblings append no entry and poll no provider"
     );
+    lease_phase(&h.fixture, fence, "mixed", "receipt_only_snapshot", started).await;
+    renew_phase(
+        &h.fixture,
+        fence,
+        "mixed",
+        "supported_dispatch",
+        started,
+        &mut [claimed],
+    )
+    .await;
     let supported = RegisteredLedger::new(
         &h.fixture,
         &h.requests[2],
@@ -410,11 +446,12 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
     else {
         panic!("supported sibling genuine completion");
     };
+    lease_phase(&h.fixture, fence, "mixed", "supported_dispatch", started).await;
     assert_eq!(receipt.result, good());
     assert_eq!(supported.inner.calls.load(Ordering::SeqCst), 1);
     assert_eq!(effects(&h.fixture).await, 3);
     assert_eq!(entry_consumptions(&h.fixture).await, (4, 0));
-    let applied = all_tables(&h.fixture).await;
+    let mut applied = all_tables(&h.fixture).await;
     supported_boundary(claimed, &applied, &h.requests[2]);
     let digest_matches: bool = sqlx::query_scalar("SELECT result_digest=encode(sha256(jsonb_send($2::jsonb)),'hex') FROM workflow_action_actual_receipt_observations WHERE invocation_id=$1")
         .bind(h.requests[2].subject.invocation.as_uuid()).bind(good())
@@ -423,11 +460,27 @@ async fn dispatch_genuine(h: &MixedTruth, claimed: &Value) -> Value {
         digest_matches,
         "actual observation digest binds the authentic good result"
     );
+    lease_phase(&h.fixture, fence, "mixed", "applied_snapshot", started).await;
+    renew_phase(
+        &h.fixture,
+        fence,
+        "mixed",
+        "completion",
+        started,
+        &mut [&mut applied],
+    )
+    .await;
     applied
 }
 
-async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence) {
-    let committed = h
+async fn complete_genuine(
+    h: &MixedTruth,
+    applied: &Value,
+    fence: WorkflowFence,
+    started: std::time::Instant,
+) {
+    lease_phase(&h.fixture, fence, "mixed", "before_completion", started).await;
+    let completed = h
         .fixture
         .persistence()
         .settled()
@@ -440,8 +493,17 @@ async fn complete_genuine(h: &MixedTruth, applied: &Value, fence: WorkflowFence)
             output: good(),
         })
         .await
-        .unwrap()
         .unwrap();
+    let state = lease_phase(&h.fixture, fence, "mixed", "completed", started).await;
+    // A refusal is never the required genuine completion; the lease only labels it.
+    let Some(committed) = completed else {
+        let kind = if state.lease_ms > 0.0 && state.run_ms > 0.0 {
+            "LIVE-OWNER REFUSAL"
+        } else {
+            "LEASE LAPSE"
+        };
+        panic!("{kind} scenario=mixed phase=completion: shared completion refused; {state:?}");
+    };
     assert!(committed.successor.is_none());
     let done = all_tables(&h.fixture).await;
     completed_boundary(applied, &done, fence);

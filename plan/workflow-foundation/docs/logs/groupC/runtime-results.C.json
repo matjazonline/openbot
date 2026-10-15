@@ -1,0 +1,18 @@
+[
+  {
+    "filter": "",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      ""
+    ],
+    "exit_code": 101,
+    "expected": 2579,
+    "ignored_listed": 22,
+    "summary": "test result: FAILED. 2550 passed; 7 failed; 22 ignored; 0 measured; 0 filtered out",
+    "elapsed_s": 1608.01,
+    "success": false,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupC/runtime-all-lib.C.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "18d7c86ab7d56031d38450f7a7748d1198ff5f7a8a49ed978b780dc440584bb4"
+  }
+]

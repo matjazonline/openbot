@@ -106,7 +106,16 @@ pub(super) async fn park_observed(
     f: &AdmissionFixture,
     request: &ActionDispatchRequest,
 ) -> Option<()> {
-    let before = all_tables(f).await;
+    Box::pin(park_observed_as(f, request, &[])).await
+}
+
+/// `park_observed`, its refused-release backstop over a `digested_tables` snapshot.
+pub(super) async fn park_observed_as(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    digested: &[&str],
+) -> Option<()> {
+    let before = digested_tables(f, None, digested).await;
     let released = f
         .persistence()
         .settled()
@@ -124,10 +133,20 @@ pub(super) async fn park_observed(
         lapsed(f, request).await,
         "release refusal without exact-owner expiry"
     );
-    assert_eq!(all_tables(f).await, before, "refused release wrote nothing");
+    assert_eq!(
+        digested_tables(f, None, digested).await,
+        before,
+        "refused release wrote nothing"
+    );
     no_result(f, request).await;
     uncaptured("BACKSTOP prior_bounds release=false lapsed_exact_fence; no durable delta");
     None
+}
+
+type Stamp = std::sync::Mutex<Option<std::time::Instant>>;
+
+fn stamp(at: &Stamp) {
+    *at.lock().unwrap() = Some(std::time::Instant::now());
 }
 
 pub(super) struct PausedVerifier {
@@ -137,17 +156,96 @@ pub(super) struct PausedVerifier {
     pub(super) release: Notify,
     pub(super) finished: CancellationToken,
     pub(super) returned: std::sync::atomic::AtomicBool,
-    pub(super) released_at: std::sync::Mutex<Option<std::time::Instant>>,
+    pub(super) released_at: Stamp,
+    /// One monotonic timeline for the paused command (DEC-011): verifier entered and ready,
+    /// release above, verifier returned, settlement entered and returned, command ended.
+    entered_at: Stamp,
+    ready_at: Stamp,
+    returned_at: Stamp,
+    settle: Arc<SettleTimes>,
+    ended_at: Stamp,
 }
+
+#[derive(Default)]
+struct SettleTimes {
+    entered: Stamp,
+    returned: Stamp,
+}
+
+/// The real adapter, timestamping only the settlement call the service makes after its
+/// verifier returns. Delegates everything; adds no behaviour and no production port.
+struct TimedSettlement {
+    inner: PostgresActionReconciliation<Resources>,
+    times: Arc<SettleTimes>,
+}
+#[async_trait]
+impl ActionReconciliation for TimedSettlement {
+    async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation> {
+        self.inner.association(command).await
+    }
+    async fn snapshot(
+        &self,
+        command: &ReconcileActionCommand,
+    ) -> AppResult<ReconciliationPreparation> {
+        self.inner.snapshot(command).await
+    }
+    async fn settle(
+        &self,
+        command: &ReconcileActionCommand,
+        snapshot: &ReconciliationSnapshot,
+        evidence: VerifiedEvidence,
+    ) -> AppResult<ReconciliationResult> {
+        stamp(&self.times.entered);
+        let result = self.inner.settle(command, snapshot, evidence).await;
+        stamp(&self.times.returned);
+        result
+    }
+}
+
 impl PausedVerifier {
+    /// `run_command` with the settlement timestamped; same service, budget and ports.
     pub(super) async fn run(
         self: &Arc<Self>,
         f: &AdmissionFixture,
         command: &ReconcileActionCommand,
     ) -> AppResult<ReconciliationResult> {
-        let result = run_command(f, command, self.clone()).await;
+        let persistence = f.persistence().clone();
+        let result = ActionReconciliationService::new(
+            TimedSettlement {
+                inner: PostgresActionReconciliation::new(persistence.clone(), Resources),
+                times: self.settle.clone(),
+            },
+            LifecycleAuthorizer::new(
+                persistence.clone(),
+                persistence.clone(),
+                persistence.clone(),
+            ),
+            Directory(persistence),
+            Some(self.clone() as Arc<dyn ActionEvidenceVerifier>),
+        )
+        .reconcile(command, &CancellationToken::new(), Duration::from_secs(5))
+        .await;
+        stamp(&self.ended_at);
         self.finished.cancel();
         result
+    }
+
+    pub(super) fn timeline(&self, command_started: std::time::Instant, result: &str) {
+        let at = |stamp: &Stamp| {
+            stamp.lock().unwrap().map_or("none".to_string(), |time| {
+                time.duration_since(command_started).as_millis().to_string()
+            })
+        };
+        uncaptured(&format!(
+            "TIMELINE prior_bounds verifier_entered_ms={} verifier_ready_ms={} release_ms={} verifier_returned_ms={} settle_entered_ms={} settle_returned_ms={} command_ended_ms={} result={result}",
+            at(&self.entered_at),
+            at(&self.ready_at),
+            at(&self.released_at),
+            at(&self.returned_at),
+            at(&self.settle.entered),
+            at(&self.settle.returned),
+            at(&self.ended_at),
+        ));
     }
 
     pub(super) async fn wait_started(&self) -> bool {
@@ -166,7 +264,12 @@ impl PausedVerifier {
             release: Notify::new(),
             finished: CancellationToken::new(),
             returned: std::sync::atomic::AtomicBool::new(false),
-            released_at: std::sync::Mutex::new(None),
+            released_at: Stamp::default(),
+            entered_at: Stamp::default(),
+            ready_at: Stamp::default(),
+            returned_at: Stamp::default(),
+            settle: Arc::default(),
+            ended_at: Stamp::default(),
         }
     }
 }
@@ -182,15 +285,18 @@ impl ActionEvidenceVerifier for PausedVerifier {
         cancellation: &CancellationToken,
     ) -> AppResult<EvidenceAttestation> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        stamp(&self.entered_at);
         let evidence = self
             .ledger
             .verify(snapshot, reference, cancellation)
             .await?;
+        stamp(&self.ready_at);
         self.started.notify_one();
         tokio::select! {
             _ = cancellation.cancelled() => return Err(AppError::Conflict("fixture cancelled".into())),
             _ = self.release.notified() => {},
         }
+        stamp(&self.returned_at);
         self.returned.store(true, Ordering::SeqCst);
         Ok(evidence)
     }

@@ -396,6 +396,7 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
     assert_ne!(sibling.subject.invocation, request.subject.invocation);
     Box::pin(retire_retry(&f, &request, 129)).await;
     Box::pin(new_claim(&f, &mut request)).await;
+    let claimed = std::time::Instant::now();
     assert_subject(&f, &request, 130, "processing").await;
     eprintln!(
         "high_bounds committed_source attempts=129 retired_entries=129 current_attempt=130 max_retries=132"
@@ -408,5 +409,6 @@ async fn try_high_source(attempt: usize) -> Option<HighSource> {
         historical,
         other_invocation,
         other_company,
+        claimed,
     })
 }

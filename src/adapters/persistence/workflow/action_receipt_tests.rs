@@ -421,3 +421,6 @@ mod resolution_tests;
 
 #[path = "action_uncertainty_tests.rs"]
 mod uncertainty_tests;
+
+#[path = "action_cancellation_boundary_tests.rs"]
+mod cancellation_boundary_tests;

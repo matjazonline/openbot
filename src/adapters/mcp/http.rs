@@ -62,7 +62,7 @@ fn bounded(
     async_stream::try_stream! {
         while let Some(chunk) = source.next().await {
             let chunk = chunk.map_err(|_| io::Error::other("MCP stream failed"))?;
-            remaining.fetch_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
+            remaining.try_update(std::sync::atomic::Ordering::SeqCst,std::sync::atomic::Ordering::SeqCst,|value|value.checked_sub(chunk.len())).map_err(|_|io::Error::other("MCP response exceeds limit"))?;
             yield chunk;
         }
     }.boxed()

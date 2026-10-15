@@ -2011,7 +2011,7 @@ mod tests {
             move |available| {
                 observed_claim_sizes.lock().unwrap().push(available);
                 let count = claim_remaining
-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
                         Some(remaining.saturating_sub(available))
                     })
                     .unwrap()

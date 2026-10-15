@@ -427,10 +427,22 @@ async fn workflow_action_reconciliation_live_return_without_conflict_commits() {
 #[tokio::test]
 async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_result() {
     let mut h = Box::pin(live_retry()).await;
+    let started = std::time::Instant::now();
+    let fence = h.request.fence;
     let (entry, result) = Box::pin(entered_result(&h)).await;
+    lease_phase(&h.fixture, fence, "live_conflict", "entered", started).await;
     let entry_id = entry.entry;
     let before = live_snapshot(&h).await;
+    lease_phase(
+        &h.fixture,
+        fence,
+        "live_conflict",
+        "before_snapshot",
+        started,
+    )
+    .await;
     let conflicted = Box::pin(conflicting_old_receipt(&mut h, &before)).await;
+    lease_phase(&h.fixture, fence, "live_conflict", "conflicted", started).await;
     assert!(matches!(
         adapter(&h.fixture, 0)
             .finish_remote(entry, result.clone())
@@ -438,7 +450,16 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
             .unwrap(),
         RemoteDispatchObservation::Interrupted
     ));
+    lease_phase(&h.fixture, fence, "live_conflict", "finished", started).await;
     let returned = live_snapshot(&h).await;
+    lease_phase(
+        &h.fixture,
+        fence,
+        "live_conflict",
+        "returned_snapshot",
+        started,
+    )
+    .await;
     unchanged_tables(
         &conflicted,
         &returned,
@@ -467,6 +488,7 @@ async fn workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_
         .unwrap();
     assert_eq!(new["result"], result);
     assert_eq!(new["remote_entry_id"], json!(entry_id));
+    lease_phase(&h.fixture, fence, "live_conflict", "before_retire", started).await;
     Box::pin(retire_live(&h, &returned, 2)).await;
 }
 

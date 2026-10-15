@@ -1,0 +1,77 @@
+[
+  {
+    "filter": "adapters::harness::rig::",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "adapters::harness::rig::"
+    ],
+    "exit_code": 0,
+    "expected": 52,
+    "summary": "test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 2504 filtered out",
+    "elapsed_s": 1.13,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-adapters-harness-rig.D002.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "d769bca7fdcde79d492e83ab775ee5f5e6170b0c64887b3613c80421db887972"
+  },
+  {
+    "filter": "adapters::http::routes::ui_dashboard::",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "adapters::http::routes::ui_dashboard::"
+    ],
+    "exit_code": 0,
+    "expected": 5,
+    "summary": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2551 filtered out",
+    "elapsed_s": 0.01,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-adapters-http-routes-ui-dashboard.D002.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "d769bca7fdcde79d492e83ab775ee5f5e6170b0c64887b3613c80421db887972"
+  },
+  {
+    "filter": "adapters::mcp::",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "adapters::mcp::"
+    ],
+    "exit_code": 0,
+    "expected": 7,
+    "summary": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2549 filtered out",
+    "elapsed_s": 0.38,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-adapters-mcp.D002.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "d769bca7fdcde79d492e83ab775ee5f5e6170b0c64887b3613c80421db887972"
+  },
+  {
+    "filter": "application::services::runtime_metrics::",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "application::services::runtime_metrics::"
+    ],
+    "exit_code": 0,
+    "expected": 6,
+    "summary": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 2550 filtered out",
+    "elapsed_s": 0.02,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-application-services-runtime-metrics.D002.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "d769bca7fdcde79d492e83ab775ee5f5e6170b0c64887b3613c80421db887972"
+  },
+  {
+    "filter": "bounded_task_loop_runs_up_to_its_limit_and_refills_finished_slots",
+    "command": [
+      "/home/mh/dev/openbot/target/debug/deps/mail_agents-43f563ba6b6c24ac",
+      "bounded_task_loop_runs_up_to_its_limit_and_refills_finished_slots"
+    ],
+    "exit_code": 0,
+    "expected": 1,
+    "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2555 filtered out",
+    "elapsed_s": 0.02,
+    "success": true,
+    "log": "/home/mh/dev/openbot/plan/workflow-foundation/docs/logs/groupA/runtime-bounded-task-loop-runs-up-to-its-limit-and-refills-finished-slots.D002.log",
+    "residue_own_dbs_and_foreign_clients_after": "0|0",
+    "binary_sha256": "d769bca7fdcde79d492e83ab775ee5f5e6170b0c64887b3613c80421db887972"
+  }
+]

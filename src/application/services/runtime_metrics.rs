@@ -291,7 +291,7 @@ mod tests {
             };
             if self
                 .failures_remaining
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
                     (remaining > 0).then(|| remaining - 1)
                 })
                 .is_ok()

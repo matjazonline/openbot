@@ -6,7 +6,7 @@ mod child_source_tests;
 
 use super::*;
 use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SubsecRound, Utc};
 use sqlx::postgres::types::PgInterval;
 use std::str::FromStr;
 use std::time::Duration;
@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::adapters::persistence::test_support::{
     DeliveryFixtureRequest, delivery_fixture, own_database, test_machine, test_pool,
+    wait_until_a_backend_is_blocked, wait_until_backends_are_blocked,
 };
 use crate::app_error::AppError;
 use crate::entities::message::{MessageDirection, MessageRole};
@@ -6773,7 +6774,8 @@ async fn extending_an_expired_outreach_serializes_with_the_timeout_sweep() {
     .execute(&pool)
     .await
     .unwrap();
-    let new_expiry = Utc::now() + chrono::Duration::hours(48);
+    // Microsecond-exact, as timestamptz stores it, so the saved expiry compares equal.
+    let new_expiry = (Utc::now() + chrono::Duration::hours(48)).trunc_subsecs(6);
     let request = delegation_command(
         &fixture,
         Uuid::new_v4(),
@@ -7444,11 +7446,23 @@ async fn redirecting_an_internal_target_at_a_person_is_refused() {
         .unwrap();
 }
 
-#[tokio::test]
-async fn stop_task_serializes_with_final_dispatch_without_duplicate_customer_reply() {
-    let Some(pool) = test_pool().await else {
+/// Which real operation takes the outreach row first once the test's gate releases it.
+#[derive(Clone, Copy, Debug)]
+enum StopRace {
+    StopFirst,
+    DispatchFirst,
+}
+
+/// StopTask and the final dispatch both lock the outreach row before the task row. A gate
+/// transaction holds that row, the first contender is lined up behind it and the second behind
+/// both, so releasing the gate decides the winner deterministically; each order then has one
+/// exact outcome. The final dispatch publishes but does not complete the task: worker closeout
+/// (`mark_task_completed`) is the separate fenced step, run here after a winning dispatch.
+async fn stop_race(order: StopRace) {
+    let Some(database) = own_database().await else {
         return;
     };
+    let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let fixture =
         delegation_fixture(&persistence, 1, Utc::now() + chrono::Duration::hours(96)).await;
@@ -7507,53 +7521,131 @@ async fn stop_task_serializes_with_final_dispatch_without_duplicate_customer_rep
             outreach_id: fixture.outreach_id,
         },
     );
-    let (stopped, dispatched) = tokio::join!(
-        persistence.execute_delegation_command(stop),
-        persistence.commit_agent_dispatch(AgentDispatchCommit {
-            lease,
-            reply: &reply,
-            deliveries: vec![delivery],
-            review_candidate: None,
-            payload: serde_json::json!({"final": true}),
-            complete_outreach: true,
-        }),
-    );
-    match (stopped, dispatched.unwrap()) {
-        (Ok(_), DispatchCommit::LeaseLost) => assert_eq!(
-            persistence
-                .get_task_by_id(fixture.task.id)
-                .await
-                .unwrap()
-                .unwrap()
-                .status,
-            TaskStatus::Stopped
-        ),
-        (Err(AppError::Conflict(_)), DispatchCommit::Committed { .. }) => assert_eq!(
-            persistence
-                .get_task_by_id(fixture.task.id)
-                .await
-                .unwrap()
-                .unwrap()
-                .status,
-            TaskStatus::Completed
-        ),
-        other => panic!("stop/final-dispatch race must have one winner, got {other:?}"),
-    }
-    let replies: i64 = sqlx::query_scalar(
-        r#"SELECT COUNT(*) FROM message_deliveries
-           WHERE task_id = $1 AND idempotency_key LIKE '%stop-final-race%'"#,
-    )
-    .bind(fixture.task.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert!(
-        replies <= 1,
-        "the recovery path cannot queue a second customer reply"
-    );
-    CompanyPersistence::delete(&persistence, fixture.company.id)
+
+    let mut gate = pool.begin().await.unwrap();
+    sqlx::query("SELECT id FROM task_outreaches WHERE id = $1 FOR UPDATE")
+        .bind(fixture.outreach_id)
+        .execute(&mut *gate)
         .await
         .unwrap();
+    let stopping = persistence.execute_delegation_command(stop);
+    let dispatching = persistence.commit_agent_dispatch(AgentDispatchCommit {
+        lease,
+        reply: &reply,
+        deliveries: vec![delivery],
+        review_candidate: None,
+        payload: serde_json::json!({"final": true}),
+        complete_outreach: true,
+    });
+    tokio::pin!(stopping, dispatching);
+    match order {
+        StopRace::StopFirst => {
+            tokio::select! {
+                result = &mut stopping => panic!("stop passed the held outreach row: {result:?}"),
+                () = wait_until_a_backend_is_blocked(&pool) => {}
+            }
+            tokio::select! {
+                result = &mut stopping => panic!("stop passed the held outreach row: {result:?}"),
+                result = &mut dispatching => panic!("dispatch passed the held outreach row: {result:?}"),
+                () = wait_until_backends_are_blocked(&pool, 2) => {}
+            }
+        }
+        StopRace::DispatchFirst => {
+            tokio::select! {
+                result = &mut dispatching => panic!("dispatch passed the held outreach row: {result:?}"),
+                () = wait_until_a_backend_is_blocked(&pool) => {}
+            }
+            tokio::select! {
+                result = &mut stopping => panic!("stop passed the held outreach row: {result:?}"),
+                result = &mut dispatching => panic!("dispatch passed the held outreach row: {result:?}"),
+                () = wait_until_backends_are_blocked(&pool, 2) => {}
+            }
+        }
+    }
+    gate.rollback().await.unwrap();
+    let (stopped, dispatched) = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::join!(stopping, dispatching)
+    })
+    .await
+    .expect("both real operations finish once the gate is released");
+    eprintln!("stop race {order:?}: stop={stopped:?} dispatch={dispatched:?}");
+
+    let fence = || async {
+        sqlx::query_as::<_, (String, Option<Uuid>, Option<Uuid>)>(
+            "SELECT status, worker_id, execution_generation FROM background_tasks WHERE id = $1",
+        )
+        .bind(fixture.task.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    let outreach = || async {
+        sqlx::query_scalar::<_, String>("SELECT status FROM task_outreaches WHERE id = $1")
+            .bind(fixture.outreach_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let replies = || async {
+        sqlx::query_scalar::<_, i64>(
+            r#"SELECT COUNT(*) FROM message_deliveries
+               WHERE task_id = $1 AND idempotency_key LIKE '%stop-final-race%'"#,
+        )
+        .bind(fixture.task.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    match order {
+        StopRace::StopFirst => {
+            assert!(stopped.is_ok(), "{order:?}: the stop wins: {stopped:?}");
+            assert!(
+                matches!(dispatched.unwrap(), DispatchCommit::LeaseLost),
+                "{order:?}: the stopped task refuses the final dispatch"
+            );
+            assert_eq!(fence().await.0, "stopped");
+            assert_eq!(replies().await, 0, "no customer reply after the stop");
+        }
+        StopRace::DispatchFirst => {
+            assert!(
+                matches!(dispatched.unwrap(), DispatchCommit::Committed { .. }),
+                "{order:?}: the final dispatch wins"
+            );
+            assert!(
+                matches!(&stopped, Err(AppError::Conflict(message)) if message.starts_with("Delegation changed from version 2")),
+                "{order:?}: the stop's outreach version is stale: {stopped:?}"
+            );
+            assert_eq!(
+                fence().await,
+                (
+                    "processing".to_string(),
+                    Some(lease.worker_id),
+                    Some(lease.execution_generation)
+                ),
+                "publication keeps the processing fence; closeout completes the task"
+            );
+            assert_eq!(outreach().await, "completed");
+            assert_eq!(replies().await, 1, "exactly one customer reply");
+            assert!(persistence.mark_task_completed(lease).await.unwrap());
+            assert_eq!(
+                persistence
+                    .get_task_by_id(fixture.task.id)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .status,
+                TaskStatus::Completed
+            );
+            assert_eq!(replies().await, 1, "closeout queues no second reply");
+        }
+    }
+}
+
+#[tokio::test]
+async fn stop_task_serializes_with_final_dispatch_without_duplicate_customer_reply() {
+    for order in [StopRace::StopFirst, StopRace::DispatchFirst] {
+        stop_race(order).await;
+    }
 }
 
 #[tokio::test]

@@ -1,6 +1,19 @@
 # Workflow foundation resume
 
-## 04.8 checkpoint — 2026-10-14, USER STOP
+## Accepted — 04.8 complete, 2026-10-16
+
+**04.8 VERIFIED and root-accepted** under bb-implement-astra-opus. Records:
+[docs/TASK.md](docs/TASK.md) (decisions, workers), [docs/REVIEW.md](docs/REVIEW.md)
+(acceptance per batch A, B1–B3, C), [docs/GUIDANCE.md](docs/GUIDANCE.md)
+(DEC-001..014), [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) (evidence),
+review notes R-001..R-017 and findings F-001..F-009 (all resolved).
+Final artifact manifest `docs/logs/groupC/source-manifest-C2.json`
+(`5f818107…`): HEAD `94c77e0` plus two uncommitted test edits (F-007, F-009).
+Gaps: CI network-isolation wrapper not run locally. Task PG fixture container
+`workflow-foundation-048-20261013` stopped, data retained. Next: 04.9 only under a
+new instruction; no migration squash or deployment authorized.
+
+## 04.8 checkpoint — 2026-10-14, USER STOP (superseded by the entry above)
 
 **04.8 incomplete; group A implemented and independently code-reviewed, required
 verification pending.** Read [current handoff](HANDOFF-20261014-04.8.md) and

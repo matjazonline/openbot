@@ -189,8 +189,10 @@ async fn park_on(
     let reason = if spec.timer { "timer" } else { "event" };
     // Registration facts only. Phase04/05 consume this identity for delivery, never a separate queue.
     let intent = json!({"version":1,"kind":"wait_registered","wait_id":id,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()});
-    sqlx::query("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,event_name,correlation,notification_intent) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),$7,$8,$9)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(id).bind(reason).bind(deadline).bind(spec.name).bind(spec.correlation).bind(intent).execute(&mut *db).await?;
+    // The response is the stored deadline, as a replay reads it: timestamptz keeps microseconds,
+    // so returning the capped Rust value would answer the first park differently from the next.
+    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,event_name,correlation,notification_intent) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),$7,$8,$9) RETURNING deadline")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(id).bind(reason).bind(deadline).bind(spec.name).bind(spec.correlation).bind(intent).fetch_one(&mut *db).await?;
     completion_job::finish(db, scope, completion_job::CompletionOwner::Pure).await?;
     sqlx::query(
         "UPDATE workflow_runs SET state='waiting',waiting_reason=$3 WHERE company_id=$1 AND id=$2",

@@ -21,7 +21,7 @@ impl RunBudget {
 
     pub fn charge(&self, tokens: usize) -> AppResult<()> {
         self.remaining
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
                 remaining.checked_sub(tokens)
             })
             .map(|_| ())

@@ -125,11 +125,23 @@ async fn available(
         .unwrap()
 }
 
-async fn consume_128(
-    f: &AdmissionFixture,
-    request: &mut ActionDispatchRequest,
-    proof: Uuid,
-) -> Option<()> {
+/// While verification is paused, the 8,256-row proof coverage history is compared by digest
+/// (`digested_tables`): the same rows decide equality, without decoding them inside the budget.
+const PAUSE_DIGESTED: [&str; 1] = ["workflow_action_evidence_coverage"];
+
+/// Tables the 129th provider entry must leave as the claim left them.
+const ENTRY_PRESERVES: [&str; 6] = [
+    "workflow_action_intents",
+    "workflow_action_dispatches",
+    "workflow_action_evidence",
+    "workflow_action_evidence_coverage",
+    "workflow_budget_receipts",
+    "workflow_root_budget_usage",
+];
+
+/// The scheduled 128-entry premise, settled before the paused command starts (DEC-011): the
+/// command only reads until settlement, so the competitor need not re-observe it while paused.
+async fn scheduled_128(f: &AdmissionFixture, request: &ActionDispatchRequest, proof: Uuid) {
     let scheduled = all_tables(f).await;
     assert_eq!(entry_consumptions(f).await, (128, 127));
     assert_eq!(available(f, request, None).await, Some(proof));
@@ -142,12 +154,32 @@ async fn consume_128(
         assert_eq!(available(f, request, Some(excluded)).await, None);
     }
     assert_eq!(all_tables(f).await, scheduled);
+}
+
+/// The genuine competing 128-to-129 transition, and only that, while verification is paused:
+/// the claim and entry are observed through exactly the relations the assertions compare.
+async fn consume_128(
+    f: &AdmissionFixture,
+    request: &mut ActionDispatchRequest,
+    proof: Uuid,
+    started: std::time::Instant,
+) -> Option<()> {
+    let phase = |label: &'static str, fence: WorkflowFence| {
+        lease_phase(f, fence, "prior_bounds", label, started)
+    };
+    phase("competitor_started", request.fence).await;
+    assert_eq!(entry_consumptions(f).await, (128, 127));
     new_claim(f, request).await;
+    phase("claimed_129", request.fence).await;
     renew_fixture_lease(f, request.fence).await;
-    let claimed = all_tables(f).await;
+    let mut observed = ENTRY_PRESERVES.to_vec();
+    observed.push("task_attempts");
+    let claimed = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
+    phase("claimed_snapshot", request.fence).await;
     assert_eq!(claimed["task_attempts"].as_array().unwrap().len(), 129);
     let pending = LedgerProvider::new(f, Delivery::Pending);
     Box::pin(support::observe_pending(f, request, &pending)).await?;
+    phase("consumed_129", request.fence).await;
     assert_eq!(pending.calls.load(Ordering::SeqCst), 1);
     assert_eq!(entry_consumptions(f).await, (129, 128));
     let consumed: Uuid = sqlx::query_scalar(
@@ -160,15 +192,11 @@ async fn consume_128(
     assert_eq!(available(f, request, Some(consumed)).await, Some(proof));
     assert_eq!(available(f, request, None).await, None);
     assert_eq!(effects(f).await, 0);
-    let after = all_tables(f).await;
-    for table in [
-        "workflow_action_intents",
-        "workflow_action_dispatches",
-        "workflow_action_evidence",
-        "workflow_action_evidence_coverage",
-        "workflow_budget_receipts",
-        "workflow_root_budget_usage",
-    ] {
+    let mut observed = ENTRY_PRESERVES.to_vec();
+    observed.push("background_tasks");
+    let after = digested_tables(f, Some(&observed), &PAUSE_DIGESTED).await;
+    phase("consumed_snapshot", request.fence).await;
+    for table in ENTRY_PRESERVES {
         assert_eq!(
             after[table], claimed[table],
             "provider entry preserves {table}"
@@ -347,6 +375,8 @@ async fn prove_prior_bound() -> Option<()> {
     let (f, mut request) = Box::pin(prior_fixture()).await;
     let verifier = ledger(&f, &request).await;
     let result = Box::pin(prior_history(&f, &mut request, &verifier)).await?;
+    let proof = result.evidence.unwrap().as_uuid();
+    Box::pin(scheduled_128(&f, &request, proof)).await;
     let observed = Arc::new(PausedVerifier::new(verifier.clone()));
     let stale = proof_command(&f, &request, &verifier, "128-paused-before-129").await;
     let command_started = std::time::Instant::now();
@@ -356,21 +386,26 @@ async fn prove_prior_bound() -> Option<()> {
             observed.wait_started().await,
             "reconciliation ended before verifier pause"
         );
-        let consumed = Box::pin(consume_128(
-            &f,
-            &mut request,
-            result.evidence.unwrap().as_uuid(),
-        ))
-        .await;
+        let consumed = Box::pin(consume_128(&f, &mut request, proof, command_started)).await;
         let parked = if consumed.is_some() {
-            Box::pin(park_live(&f, &request)).await
+            renew_fixture_lease(&f, request.fence).await;
+            Box::pin(support::park_observed_as(&f, &request, &PAUSE_DIGESTED)).await
         } else {
             None
         };
+        lease_phase(&f, request.fence, "prior_bounds", "parked", command_started).await;
         if parked.is_some() {
             barrier(&f, &request).await;
         }
-        let before = all_tables(&f).await;
+        let before = digested_tables(&f, None, &PAUSE_DIGESTED).await;
+        lease_phase(
+            &f,
+            request.fence,
+            "prior_bounds",
+            "pre_settlement_snapshot",
+            command_started,
+        )
+        .await;
         if parked.is_some() {
             *observed.released_at.lock().unwrap() = Some(std::time::Instant::now());
             observed.release.notify_one();
@@ -378,7 +413,11 @@ async fn prove_prior_bound() -> Option<()> {
         (before, parked)
     };
     let (settled, (before, parked)) = tokio::join!(reconcile, competitor);
-    let after = all_tables(&f).await;
+    observed.timeline(
+        command_started,
+        &format!("{:?}", settled.as_ref().map(|result| &result.outcome)),
+    );
+    let after = digested_tables(&f, None, &PAUSE_DIGESTED).await;
     if !observed.returned.load(Ordering::SeqCst) {
         support::withheld_timeout(
             &settled,
