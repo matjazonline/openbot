@@ -1,6 +1,6 @@
 //! Receipts retain effect truth independently of current execution ownership.
 use super::persistence_bound::{Attempt, End, Evidence, WriteBound};
-use super::{action_dispatch::*, *};
+use super::{action_dispatch::*, invalid, *};
 use crate::application::workflow::actions::*;
 use serde_json::Value;
 use std::time::Duration;
@@ -310,7 +310,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         Ok(receipt.map_or(Evidence::NotApplied, Evidence::Applied))
     }
 
-    async fn return_authorized(&self, entry: &RemoteEntry) -> AppResult<bool> {
+    pub(super) async fn return_authorized(&self, entry: &RemoteEntry) -> AppResult<bool> {
         let bound = WriteBound::read_only("action.return_authorized", entry.request.lease);
         bound
             .read(Box::pin(async {
@@ -318,6 +318,9 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
                 let mut conn = bound.acquire(self.persistence.pool()).await?;
                 let mut tx = bound.begin(&mut conn).await?;
                 let window = async {
+                    // Company/principal before run, including this ownership-only precheck.
+                    let actor =
+                        action_authority::prelock_on(&mut tx, entry.request.scope()).await?;
                     // Known ownership loss suppresses output; operational failures remain errors.
                     if !lease::lock_fence(&mut tx, entry.request.fence, bound.server_timeout())
                         .await?
@@ -328,7 +331,12 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
                         return Ok(None);
                     }
                     let authorized = self
-                        .authorize_on(&mut tx, &entry.request, bound.server_timeout())
+                        .authorize_prelocked_on(
+                            &mut tx,
+                            &entry.request,
+                            bound.server_timeout(),
+                            actor,
+                        )
                         .await?;
                     if authorized.approval_required
                         || action_uncertainty::conflicted_on(&mut tx, entry.request.scope()).await?

@@ -1,3 +1,4 @@
+use super::invalid;
 use super::*;
 use crate::application::workflow::actions::*;
 use serde_json::Value;
@@ -21,9 +22,32 @@ impl ActionAuthorities for PostgresPersistence {
     ) -> AppResult<ActionRunAuthority> {
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','5s',true), set_config('statement_timeout','5s',true)").execute(&mut *tx).await?;
-        let authority = load_on(&mut tx, scope, subject).await?;
+        let actor = prelock_on(&mut tx, scope).await?;
+        let authority = load_on(&mut tx, scope, subject, actor).await?;
         tx.commit().await?;
         Ok(authority)
+    }
+}
+
+/// The unlocked actor is only a lock-order hint. `load_on` verifies it again under
+/// the run lock. Keep a denied authority distinct from operational errors so receipt
+/// return can still report known lost ownership before reporting access denial.
+pub(super) async fn prelock_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: ActionScope,
+) -> AppResult<Option<WorkflowActor>> {
+    let actor: Option<Uuid> =
+        sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid())
+            .bind(scope.run.as_uuid())
+            .fetch_optional(&mut **tx)
+            .await?;
+    let Some(actor) = actor else { return Ok(None) };
+    let actor = WorkflowActor::authenticated(actor)?;
+    match authority::authorize_company(tx, scope.company, actor).await {
+        Ok(()) => Ok(Some(actor)),
+        Err(AppError::NotFound(_)) => Ok(None),
+        Err(error) => Err(error),
     }
 }
 
@@ -31,8 +55,9 @@ pub(super) async fn load_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: ActionScope,
     subject: &ApprovalSubject,
+    actor: Option<WorkflowActor>,
 ) -> AppResult<ActionRunAuthority> {
-    // Run first, then company/principal locks. No external lookup holds this transaction.
+    let actor = actor.ok_or_else(missing)?;
     let run = sqlx::query_as::<_, RunAuthorityRow>(
         "SELECT actor_id,version_id,workflow_id,bundle,resources FROM workflow_runs \
              WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') \
@@ -43,8 +68,9 @@ pub(super) async fn load_on(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
-    let actor = WorkflowActor::authenticated(run.actor_id)?;
-    authority::authorize_company(tx, scope.company, actor).await?;
+    if run.actor_id != actor.user_id() {
+        return Err(conflict());
+    }
     let operation: Value = sqlx::query_scalar(
         "SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 \
              AND execution_id=$3 AND id=$4 AND argument_digest=$5",

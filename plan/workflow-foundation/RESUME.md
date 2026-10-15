@@ -1,5 +1,16 @@
 # Workflow foundation resume
 
+## 04.8 checkpoint — 2026-10-14, USER STOP
+
+**04.8 incomplete; group A implemented and independently code-reviewed, required
+verification pending.** Read [current handoff](HANDOFF-20261014-04.8.md) and
+[continuation](CONTINUATION-20261013-04.8.md). Public cancellation/action lock-order
+correction and competing-operation tests are in uncommitted source. Independent
+architecture and corrected code PASS; no root acceptance of group A or full04.8.
+Resume first unverified group A checks before dependent boundary-matrix work.
+Preserve all WIP and the identified task-owned fixture. No04.9 or migration squash.
+The user requested handoff and stop; further work requires a new instruction.
+
 ## 04.7 COMPLETE — 2026-10-12, STOP
 
 **Current user-authorized04.7 VERIFIED and root-accepted.** Independent final

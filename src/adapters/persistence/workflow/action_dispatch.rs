@@ -77,6 +77,18 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         request: &ActionDispatchRequest,
         server: Duration,
     ) -> AppResult<AuthorizedAction> {
+        let actor = action_authority::prelock_on(tx, request.scope()).await?;
+        self.authorize_prelocked_on(tx, request, server, actor)
+            .await
+    }
+
+    pub(super) async fn authorize_prelocked_on(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        server: Duration,
+        actor: Option<WorkflowActor>,
+    ) -> AppResult<AuthorizedAction> {
         if !lease::lock_fence(tx, request.fence, server).await? {
             return Err(conflict());
         }
@@ -102,6 +114,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
             tx,
             request.scope(),
             &request.subject,
+            actor,
         ))
         .await?;
         validate_run_authority(request.scope(), &request.subject, &authority)?;

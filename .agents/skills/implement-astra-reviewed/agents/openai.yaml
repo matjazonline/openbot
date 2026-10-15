@@ -1,0 +1,3 @@
+interface:
+  display_name: "Implement Astra Reviewed"
+  short_description: "Astra implementation with independent Astra review"
