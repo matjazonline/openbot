@@ -12,4 +12,5 @@ pub mod smtp;
 pub mod storage;
 
 pub mod response_schema;
+pub mod workflow_http;
 pub mod workflow_source;

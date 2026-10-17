@@ -1,5 +1,29 @@
 # Workflow foundation resume
 
+## 04.9 RESUMED — 2026-10-17 (current)
+
+User authorized continuation under implement-astra-reviewed-2.1 and confirmed root
+as Astra/high author. Root restarted the identified retained fixture, resumed HTTP
+verification, added credential inventory/rotation/CAS and exact-resource
+binding/admission tests, and corrected scalar secret redaction.
+Read the latest 04.9 entries in [TASK](docs/TASK.md) and [REVIEW](docs/REVIEW.md)
+for the authoritative verification, review, artifact identity, acceptance and
+resource status. Earlier stop and partial-check entries below are historical.
+Preserve all WIP. Scope is 04.9 only; later phases require a new instruction.
+
+## 04.9 USER STOP — 2026-10-17 (superseded by continuation above)
+
+**04.9 incomplete; stopped at the user's next secure checkpoint request.** Read
+[stop handoff](HANDOFF-04.9-USER-STOP-20261017.md) before resuming. Architecture
+04.9-D2 passed independent review04.9-R002 and root accepted that gate only;
+implementation has not been code-reviewed or accepted. Earlier focused HTTP
+suite11PASS predates latest additions; expanded check was stopped during compile
+(status143), so latest source and full gates remain unverified. HTTP rotation-row
+coverage is still needed. Task fixture `workflow-foundation-049-20261017` is stopped
+with data retained; no author-owned checks remain running. Preserve all WIP.
+Snapshot/evidence are linked in handoff and TASK. New instruction required to resume;
+no later phases, commit, migration squash, deployment or host firewall mutation.
+
 ## Accepted — 04.8 complete, 2026-10-16
 
 **04.8 VERIFIED and root-accepted** under bb-implement-astra-opus. Records:
@@ -35,9 +59,8 @@ records are historical; the 04.8 handoff above owns the current resumption state
 
 ## Remaining work and retained documents
 
-Resume 04.8 group A verification, then its dependent boundary matrix and combined
-acceptance gates. Continue later phase 04 items and phases 05–10 only under the
-applicable implementation instruction. This cleanup does not resume implementation.
+04.8 is accepted. Current04.9 status is recorded in TASK/REVIEW as linked above.
+Later phase04 items and phases05–10 remain outside this continuation.
 
 - [README](README.md), numbered phase plans and [EXPANSION](EXPANSION.md) define
   the roadmap; [REPLACEMENT-MAP](REPLACEMENT-MAP.md) records replacement gates.

@@ -189,7 +189,7 @@ impl WorkflowDefinitions for PostgresPersistence {
         {
             return Err(conflict());
         }
-        supported_publication(&command.bundle)?;
+        supported_publication(&mut tx, &command.bundle).await?;
         verify_children(&mut tx, &command.bundle).await?;
         insert_version(&mut tx, command).await?;
         event(

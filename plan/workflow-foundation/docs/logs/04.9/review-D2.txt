@@ -1,0 +1,75 @@
+Architecture decision revision 04.9-D2 — proposed, awaiting B
+
+D1 retained at `logs/04.9/review-D1.txt`. D2 resolves04.9-F001..003;
+reviewer `/root/reviewer`, requested `gpt-6-astra` / medium, independent context.
+
+1. Additive company HTTP connection/credential/operation-policy schema. Connection
+   identity and origin immutable; origin replacement creates a new identity, so
+   an already frozen action cannot silently target another service. Enabled state,
+   current credentials and registered policies remain revocable. Tenant participates
+   in credential/policy FKs. Revisioned management is company-admin authorized;
+   dispatch retains existing current owner/admin plus frozen capability/resource
+   authorization. Ordinary membership is insufficient at management, publication,
+   binding, admission, action preparation, dispatch and replay boundaries.
+   Credential envelopes use a separate tenant+connection-bound context and join the
+   existing credential inventory/rotation path. No credentials enter frozen actions.
+2. Trusted operation registration supplies bounded `ToolSnapshot` contracts for a
+   connection. Registrations permit only remote/reconcile operations initially:
+   HTTP verbs and headers never establish replay safety. Policy changes cannot
+   broaden an old snapshot. Binding aliases are not grants: selected resource ID
+   must match the saved run binding; current contract comparisons retain all schema,
+   capability and recovery fields. Unknown registrations fail closed.
+3. Implement production `SqlActionAuthority` using the existing company/actor
+   locks before run/attempt locks (`action_authority::prelock_on` then
+   `authorize_prelocked_on`); lock the connection and its policy only after those
+   owners and before action intent. Never acquire company/actor locks beneath a
+   connection or run lock. Management locks company/actor then connection and
+   never a run; publication/binding/admission retain company/actor-first order.
+   Credential writes/deletes and provider credential reads lock their parent
+   connection first; envelope rotation retains its existing ciphertext-CAS update
+   and never acquires a connection/run lock beneath a credential row lock.
+   Recheck
+   current connection/credential/policy at provider use. Remote network I/O never
+   runs in the SQL authorization transaction. Revocation after entry cannot retract
+   an already started remote effect; ambiguous outcomes retain existing reconciliation.
+4. HTTP transport is private behind `RemoteAction`; new step and direct-tool
+   ingress use the same `ActionService`, including its durable model-call mapping.
+   Registered remote tools route only to a trusted registered adapter/operation;
+   arbitrary supplied provider metadata cannot register a tool or claim safe replay.
+   Existing legacy harness paths remain at their original06/08 replacement gates.
+5. Requests use fixed origin + absolute path only; reject alternate authorities,
+   schemes, fragments, userinfo, backslashes and credential/host/hop-by-hop header
+   overrides. HTTPS required by default; explicitly configured operator-only exact
+   IP-literal origins may permit local/private test or deployment destinations.
+   Resolve once per operation, reject any prohibited answer, pin vetted addresses
+   into a fresh proxy-free HTTP client, disable redirects and automatic retries.
+   Preserve TLS hostname validation. No pooled client can reuse stale DNS authority.
+6. Bound DNS/connect/total/read duration, input headers/body, response bytes and
+   retained envelope. No raw request/response/error logging. Retain only safe response
+   headers and redact active credentials from bounded body content before receipts
+   or context. Redirect/error/timeout/oversize failures never prove non-application.
+   Existing supervisor owns cancellation by dropping the actual provider future.
+7. Replace `authority::supported_publication`'s blanket tools denial with bounded
+   database-authoritative validation only for registered HTTP-owned operation
+   snapshots. Publication validates the company's live registration and immutable
+   schema/capability/recovery facts; no caller-supplied snapshot becomes a grant.
+   Resource-slot alias substitution may change only `contract.connection`, after
+   verifying a declared HTTP slot; all other contract/policy fields must match.
+   Binding/admission additionally check the exact bound connection's current
+   registration, rather than accepting another connection's matching tool name.
+   Dispatch repeats that exact resource+operation check under the existing locks.
+   Traverse child bundles with bounded existing publication depth/count limits;
+   each child's company and registrations must pass. Agents, skills, profiles,
+   MCP and other unimplemented resource/tool owners remain denied. Existing
+   publication idempotency replay remains its established immutable-result contract;
+   current use authorization remains mandatory on binding/admission/dispatch.
+   Exercise production publish → bind → admit → dispatch and negative forged,
+   changed, foreign, revoked, unsupported and ordinary-member paths without
+   fixture-only bundle replacement.
+
+Failure matrix: foreign tenant/actor, missing or revoked connection/credential/
+policy, changed contract, protected action, forged URL/header, unsafe DNS or rebinding,
+redirect, timeout, oversized/chunked body, secret echo, competing dispatchers,
+restart with receipt and unknown write. All require fail-closed behavior or retained
+effect truth as appropriate; no new queue or lease owner is introduced.
+

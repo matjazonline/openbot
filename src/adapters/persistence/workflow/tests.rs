@@ -9,6 +9,8 @@ mod binding_association_tests;
 mod binding_schema_tests;
 #[path = "binding_tests.rs"]
 mod binding_tests;
+#[path = "http_tests.rs"]
+mod http_tests;
 #[path = "run_schema_tests.rs"]
 mod run_schema_tests;
 use crate::adapters::persistence::test_support::{OwnDatabase, own_database};

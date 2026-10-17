@@ -34,6 +34,7 @@ mod completion_job;
 mod definitions;
 mod fair_polling;
 mod fairness;
+pub mod http;
 mod lease;
 mod lease_claim;
 mod persistence_bound;

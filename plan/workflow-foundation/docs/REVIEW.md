@@ -89,3 +89,19 @@
   tests excluded as in CI; f2 had intermittent foreign load (no failures).
 - Not done / not authorized: committing the two uncommitted test edits, 04.9,
   migration squash, deployment.
+
+
+## 04.9 — implement-astra-reviewed-2.1
+### 04.9-R001 — 2026-10-17 architecture revision 04.9-D1
+CHANGES REQUIRED. See agent-review-notes.md#04.9-R001 and findings 04.9-F001–F003 in agent-review-findings.md. Original decision retained in logs/04.9/review-D1.txt. Current code inspection establishes company-before-run locks, owner/admin workflow authority and a blanket tool-publication rejection that the gated integration contract must reconcile. No implementation acceptance; no tests/fixture mutations performed.
+
+
+### 04.9-R002 — 2026-10-17 architecture revision 04.9-D2
+**PASS — exact decision revision 04.9-D2**, retained in logs/04.9/review-D2.txt. F001–F003 resolved at decision level; see appended resolution history and round note. Reviewed correction delta and affected publication replay/callers; unchanged R001 evidence reused. Architecture may proceed to implementation; no code/test acceptance claimed.
+
+04.9 user-stop checkpoint (2026-10-17): D2/R002 architecture PASS remains the only
+04.9 independent acceptance. Implementation is NOT reviewed or accepted. Current
+expanded focused compilation was user-stopped status143; earlier11PASS does not
+cover latest source. See HANDOFF-04.9-USER-STOP-20261017.md and TASK; resume requires
+new instruction. Checkpoint digest:
+`e64f7016555ec87c656b2198e309ecb707ccc47e1915f6c093667500d3154cd9`.

@@ -377,3 +377,36 @@
   113/113 and the final full suite is 2559/0/22. Source and observed outcomes meet
   the correction criterion. Earlier a1's bad assertion remains recorded as a
   defect, not relabeled as host load. S inspected evidence without running tests.
+
+
+## 04.9-F001 — Preserve the accepted company-before-run lock order
+- Date/workflow: 2026-10-17, implement-astra-reviewed-2.1; architecture round 04.9-R001, decision 04.9-D1, base 2729f2caaf58830bea8291bdcc6f9882a3ad03ee. Reviewer B, requested gpt-6-astra/medium (host settings not independently exposed). Records: TASK.md / REVIEW.md.
+- Classification: actionable, medium, architecture; originates in decision D1 item 3.
+- Evidence: D1 describes the existing transaction as run/attempt-first. Actual `action_dispatch.rs:74-83` calls `action_authority::prelock_on` before `authorize_prelocked_on`; `action_authority.rs:35-52` locks company and membership through `authority::authorize_company` before `lease::lock_fence` at `action_dispatch.rs:92`. Public control and reconciliation share this order (graft callers authorize_company). A run-first implementation would restore the lock inversion corrected and accepted in 04.8.
+- Required correction: state the actual company/actor-before-run/attempt/resource/policy/intent order and retain it across new authority/provider-use paths; identify credential locking and management order without introducing inversions. Existing company-before-run race coverage plus new competing revocation tests must remain applicable.
+- Instruction lesson: resolve historical plan lock-order descriptions against the latest accepted code before gating a new collaborator; evidence is D1 versus current source, not an implementation defect.
+- Resolution: OPEN.
+
+## 04.9-F002 — Resolve company-member versus owner/admin authority mismatch
+- Date/workflow: 2026-10-17, implement-astra-reviewed-2.1; architecture round 04.9-R001, decision 04.9-D1, same base/reviewer/records as 04.9-F001.
+- Classification: actionable, medium, authorization architecture; originates in D1 item 1.
+- Evidence: D1 says dispatch is current company-member authority, but `authority.rs:9-36` additionally requires owner or admin, and both existing action authorization (`action_authority.rs:47`) and ResourceDirectory (`resources.rs:47`) use it. A newly implemented member-only path would diverge from existing action dispatch/return checks, while retaining the helper would contradict the promised access model.
+- Required correction: explicitly retain established owner/admin workflow authority or record and justify a coherent scoped change and its affected callers/tests. Do not weaken the shared helper implicitly. Cover member-without-admin, removed membership/principal and foreign actor in the actual admission/dispatch path.
+- Instruction lesson: verify existing authorization predicates rather than using a role shorthand in an architecture gate.
+- Resolution: OPEN.
+
+## 04.9-F003 — Identify authoritative publication gate replacement
+- Date/workflow: 2026-10-17, implement-astra-reviewed-2.1; architecture round 04.9-R001, decision 04.9-D1, same base/reviewer/records as 04.9-F001.
+- Classification: actionable, medium, integration/authorization architecture; missing decision detail.
+- Evidence: `authority.rs:41-56` rejects every tool-bearing published bundle recursively. D1 supplies trusted ToolSnapshots and readiness but does not identify how this existing production persistence authority gate is replaced. Merely enabling HTTP resource readiness leaves real publication unusable; deleting blanket rejection without current trusted validation permits caller-supplied frozen policy to become authority (the source comment explicitly explains this boundary).
+- Required correction: record scoped authoritative validation at publication for supported HTTP registrations, including recursive child behavior and continued denial of unsupported dependency owners. Verify production publish/bind/admit/dispatch composition and forged/unsupported snapshot denial, rather than only compiler mocks.
+- Instruction lesson: when opening a formerly fail-closed provider boundary, enumerate the owning publication and readiness checks together; root/author also independently flagged this seam during review.
+- Resolution: OPEN.
+
+
+### 2026-10-17 — 04.9-R002 resolution follow-up (implement-astra-reviewed-2.1)
+Reviewed 04.9-D2 (preserved logs/04.9/review-D2.txt), same base as R001.
+- **04.9-F001 FIXED at decision level:** D2 item3 states company/actor-before-run/attempt and connection/policy-before-intent order; management and credential access acquire parent connection first, rotation stays ciphertext CAS without inverse connection/run locking. Matches inspected accepted helpers; new implementation/race tests remain to review.
+- **04.9-F002 FIXED at decision level:** D2 item1 retains current owner/admin authorization across publication, binding, admission, preparation, dispatch and replay; ordinary membership is explicitly insufficient. No shared helper weakening proposed.
+- **04.9-F003 FIXED at decision level:** D2 item7 requires authoritative HTTP registration validation for publication, recursive children, exact bound resource at binding/admission/dispatch, narrow alias substitution and denial of unsupported dependency owners. Real production path and forged/revoked/member negative tests are required. Existing publication replay returns an equivalent saved immutable result after current actor authorization (`definitions.rs:170-183`); D2 correctly distinguishes that from future use authorization.
+No implementation acceptance is inferred from these decision-level closures.

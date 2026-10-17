@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Astra Reviewed 2.1"
+  short_description: "Large-batch Astra implementation and independent review"
+  default_prompt: "Use $implement-astra-reviewed-2.1 to implement this task with independent Astra review and persistent plan-local review evidence."

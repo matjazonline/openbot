@@ -85,7 +85,7 @@ async fn replay(
         run,
     )
     .await?;
-    authority::supported_publication(configuration.bundle())?;
+    authority::supported_publication(tx, configuration.bundle()).await?;
     resources::check_readiness(tx, &configuration).await?;
     Ok(AdmissionResult::Replayed(RunId::new(run)))
 }

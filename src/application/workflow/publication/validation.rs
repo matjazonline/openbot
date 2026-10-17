@@ -90,11 +90,11 @@ fn validate_tools(
                 .definition()
                 .resources
                 .iter()
-                .any(|r| &r.slot == slot && r.kind.as_str() == "mcp");
+                .any(|r| &r.slot == slot && matches!(r.kind.as_str(), "mcp" | "http"));
             if !valid {
                 return Err(fail(
                     "publication.resource",
-                    &format!("requires declared MCP resource slot {slot}"),
+                    &format!("requires declared HTTP or MCP resource slot {slot}"),
                 ));
             }
         }

@@ -14,6 +14,7 @@ pub mod compiler;
 pub mod completion;
 mod contracts;
 pub mod fixtures;
+pub mod http;
 pub mod lease;
 pub mod lifecycle;
 mod ports;

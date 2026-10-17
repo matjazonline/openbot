@@ -13,6 +13,9 @@ pub(super) async fn inspect_on(
     company: CompanyId,
     id: RuntimeResourceId,
 ) -> AppResult<Option<ResourceStatus>> {
+    if let Some(connection) = http::connection_on(tx, company, id.as_uuid()).await? {
+        return http::status_on(tx, &connection).await.map(Some);
+    }
     let Some(connection) =
         super::super::mcp::connection_on(&mut *tx, company.as_uuid(), id.as_uuid()).await?
     else {
@@ -55,6 +58,17 @@ pub(super) async fn check_readiness(
     tx: &mut Transaction<'_, Postgres>,
     configuration: &binding::ConfiguredBinding,
 ) -> AppResult<()> {
+    for tool in &configuration.bundle().snapshots().tools {
+        if let Some(slot) = &tool.contract.connection {
+            let id = configuration.resources().get(slot).ok_or_else(missing)?;
+            let connection = http::connection_on(tx, configuration.company_id(), id.as_uuid())
+                .await?
+                .ok_or_else(missing)?;
+            http::policy_on(tx, connection.company, connection.id, tool).await?;
+        } else {
+            http::registered_on(tx, configuration.company_id(), tool).await?;
+        }
+    }
     for requirement in &configuration
         .bundle()
         .compiled()

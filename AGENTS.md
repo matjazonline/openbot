@@ -15,6 +15,21 @@ CI must exercise formatting, offline compilation, migrations, and the database-b
 When adding or changing a concurrency protocol, include a test with competing claimants rather
 than relying only on sequential mocks.
 
+# Keep verification focused during implementation
+
+- During implementation, run the smallest meaningful set of tests covering each changed behavior
+  and its affected interfaces. Use focused unit tests and relevant database-backed tests for
+  individual plan steps or batches; do not rerun the full suite after every batch.
+- Run the full verification suite once the entire task is implemented, before declaring
+  completion, including formatting, offline compilation, migrations, and database-backed tests.
+  Documentation-only changes do not require the Rust or database-backed suites.
+- Run broader checks earlier when changes affect shared infrastructure or cross-cutting behavior.
+  After final-verification fixes, rerun affected checks; repeat the full suite when the impact
+  warrants it.
+- Implementation plans must specify per-batch focused checks and a final full-suite gate. Record
+  commands and results, explicitly report unavailable checks, and do not claim full verification
+  when required checks could not run.
+
 # A raised limit must leave something that fails when it is approached again
 
 Raising a bound to clear a failure also removes the signal that the bound was being approached, and

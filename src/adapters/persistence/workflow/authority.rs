@@ -38,19 +38,41 @@ pub(super) async fn authorize_company(
 /// These facts have no matching authoritative durable owners yet. Persisting
 /// caller-supplied policy/profile/skill facts would turn frozen content into a
 /// grant. Their phase04/06 adapters must replace this fail-closed boundary.
-pub(super) fn supported_publication(bundle: &PublishedBundle) -> AppResult<()> {
-    let snapshots = bundle.snapshots();
-    if !snapshots.agents.is_empty()
-        || !snapshots.skills.is_empty()
-        || !snapshots.profiles.is_empty()
-        || !snapshots.tools.is_empty()
-    {
-        return Err(AppError::BadRequest(
-            "Workflow dependency authority is not available".into(),
-        ));
-    }
-    for child in bundle.children().values() {
-        supported_publication(child)?;
+pub(super) async fn supported_publication(
+    tx: &mut Transaction<'_, Postgres>,
+    bundle: &PublishedBundle,
+) -> AppResult<()> {
+    let mut pending = vec![bundle];
+    let mut seen = 0;
+    while let Some(current) = pending.pop() {
+        seen += 1;
+        if seen > 256 || current.company_id() != bundle.company_id() {
+            return Err(missing());
+        }
+        let snapshots = current.snapshots();
+        if !snapshots.agents.is_empty()
+            || !snapshots.skills.is_empty()
+            || !snapshots.profiles.is_empty()
+        {
+            return Err(AppError::BadRequest(
+                "Workflow dependency authority is not available".into(),
+            ));
+        }
+        for tool in &snapshots.tools {
+            if let Some(slot) = &tool.contract.connection
+                && !current
+                    .compiled()
+                    .graph()
+                    .definition()
+                    .resources
+                    .iter()
+                    .any(|resource| &resource.slot == slot && resource.kind.as_str() == "http")
+            {
+                return Err(missing());
+            }
+            http::registered_on(tx, current.company_id(), tool).await?;
+        }
+        pending.extend(current.children().values().map(AsRef::as_ref));
     }
     Ok(())
 }
