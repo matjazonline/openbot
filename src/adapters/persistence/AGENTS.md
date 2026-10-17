@@ -7,6 +7,14 @@ not.
 A one-field change is never one edit. It lands in seven places, and the compiler only finds five of
 them. Work the list in order; the two it cannot find are steps 2 and 7.
 
+# No backward compatibility
+
+We don't need backward compatibility and will reset the database when needed (see the root
+`AGENTS.md`). Where the sections below call for backfills, legacy-row handling, staged or
+additive compatibility rollouts, legacy credential reads, or `#[serde(default)]` to keep old
+payloads decodable, skip that work and reset the database instead. Constraints, fallible decoding,
+lease fencing, and the database-backed tests still apply.
+
 # Preserve invariants at the database boundary
 
 Application checks are useful error messages, not substitutes for constraints. If a relationship

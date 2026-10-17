@@ -1,5 +1,9 @@
 # Transport-Neutral Messaging and Slack Integration
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 This directory turns `plan/slack-peer-transport-architecture-review.md` into an implementation
 sequence. Each numbered file is one independently reviewable step. Complete the files in order;
 do not begin the Slack phase until the abstraction gate in step 11 passes.

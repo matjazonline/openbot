@@ -1,5 +1,9 @@
 # Preserve Memory Scope Isolation
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Goal
 
 Make memory scope resolution monotonic: when a requested narrow identity is unavailable, the

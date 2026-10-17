@@ -1,5 +1,9 @@
 # Plan 1 — Durable Procedure Execution for Human–Agent Teams
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Outcome
 
 Add versioned standard operating procedures (SOPs) as a durable coordination layer above

@@ -1,5 +1,9 @@
 # Channel response trigger: Always / Mentioned / Mentioned-or-reply-to-agent
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Context
 Today, whether a channel's agent runs on an inbound message is hard-wired at
 `src/application/use_cases/thread/ingest/routing.rs:607`:

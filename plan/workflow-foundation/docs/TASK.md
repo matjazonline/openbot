@@ -1,5 +1,97 @@
 # 04.8 continuation under bb-implement-astra-opus — task record
 
+## 04.9 crash recovery — 2026-10-17 current status
+
+**04.9 VERIFIED AND ROOT-ACCEPTED — 2026-10-17.** R003 whole-batch code review
+and R004 final documentation/evidence review PASS; F001–F003 fixed, no new findings
+or required verification gaps. Root independently recomputed accepted digest
+`1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b` at base
+`e634a82837d50e7ed4aba4bb003f0a98ec294b10`, same five exact exclusions
+(`logs/04.9/crash-accepted-snapshot.txt`). All gate commands/results are retained.
+Task PG fixture stopped cleanly after checks; data retained at
+`/private/tmp/workflow049-crash-20261017`. No author-owned checks remain running.
+PostgreSQL18.6 remains installed; original external-volume database path preserved.
+Other sessions' edits preserved. No source correction was needed in this recovery.
+No commit, deployment, migration squash or later phase performed. Next phase
+requires a new instruction. Earlier in-progress entries below are historical.
+
+Original requirements: phase04 HTTP/registered-tool section, BRIEF-04.9 and
+accepted architecture D2/R002. Scope remains 04.9 only. User confirms root is
+Astra/high and author; independent Astra/medium B will be spawned at freeze.
+Host context telemetry/compaction controls remain unavailable; use durable records.
+Starting HEAD `e634a82837d50e7ed4aba4bb003f0a98ec294b10` contains all prior 04.9 WIP.
+Preserve unrelated `.claude/helpers/graft-hooks.cjs` and `graft-statusline.cjs`
+changes. Existing AGENTS/skill changes in HEAD are pre-existing, outside this batch.
+
+Old Linux fixture and detailed ignored logs are unavailable. User requested latest
+PostgreSQL18; refreshed Homebrew installed18.6 (formula18.6_1). Default data symlink
+to missing `/Volumes/ssd1/postgresql/data18` preserved. Isolated PG18.6 fixture
+`/private/tmp/workflow049-crash-20261017`, localhost55449, role `workflow049`,
+database `workflow049_test`, system identifier `7697645681053396076`; root owns it.
+No application database, host firewall, migration history or deployment changed.
+
+Current checks: offline all-target compilation PASS (`logs/04.9/crash-offline.log`);
+graph rebuilt. Focused HTTP and credential checks, fresh migration/schema, SQLx
+prepare/check, offline compilation, strict Clippy, formatting, transport regression,
+credential CLI, full all-target suite with macOS network isolation, stock-stack and
+lease-budget gates are serialized in `logs/04.9/crash-gates.sh`; outcomes in
+`crash-gate-status.log`. No limit raised. Then freeze using the five exact existing
+exclusions, independent whole-batch code/integration review, corrections and acceptance.
+No implementation acceptance yet. No new architecture decision proposed.
+
+Recovery update: fresh migrations/schema and focused HTTP20/20 PASS. During this
+run an unrelated session changed AGENTS.md, persistence/AGENTS.md, plan README
+guidance and `src/main.rs` (startup warning); preserve these concurrent edits.
+Observed path list: `logs/04.9/crash-concurrent-paths.txt`. New guidance removes
+backward-compatibility work but does not remove constraints, fail-closed decoding,
+lease fencing or DB tests; this continuation adds no compatibility rollout.
+Snapshot helper `logs/04.9/crash-snapshot.sh` calls the unchanged skill snapshot
+script with its five exact exclusions, providing a Python realpath/relpath wrapper
+because macOS BSD realpath lacks the script's GNU flags. No skill files changed.
+
+Review freeze: base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, digest
+`7b68a7fcdb1c96d8a1e683feae8bc0008b945573c6f846f72cd30b39aa31ab1a`, exact
+five exclusions unchanged. Manifest `logs/04.9/crash-review-snapshot.txt`.
+Review the complete implementation delta from `2729f2caaf58830bea8291bdcc6f9882a3ad03ee`
+to current source, including code already committed in the crash checkpoint;
+`crash-review-source-files.txt` identifies its source/migration files. Concurrent
+guidance/main warning edits are preserved outside 04.9 scope and covered by digest.
+Author audit traced the HTTP/action entrances, publication/binding/admission checks,
+provider revocation/secret reads, shared guarded client and credential inventory/CAS.
+No new design change. Focused HTTP20/20 and credential12/12, fresh migration/schema,
+SQLx prepare/check (cache unchanged), offline all-target check, strict Clippy,
+fmt/diff, transport/regression and credential CLI PASS. Full all-target suite is
+running under verified macOS egress isolation; stock-stack/lease checks follow.
+Code is frozen for B; root alone owns the running fixture checks. Independent
+review may inspect now; acceptance requires all outstanding check results.
+
+B handle `/root/reviewer049`, requested `gpt-6-astra`/medium with independent
+context, owns review notes/findings/REVIEW. Root remains author and owns fixture
+checks. No project writes during this review; review records/logs alone may change.
+
+R003 code/integration PASS received and persisted; no new findings. After B
+finished, root corrected delivery status in RESUME and BRIEF-04.9 to link current
+acceptance records. No source/migration change. Final artifact base unchanged,
+digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b`,
+manifest `logs/04.9/crash-final-snapshot.txt`, same five exclusions. Final B
+follow-up needs only this documentation delta and outstanding gate evidence.
+
+Full all-target gate PASS under macOS egress isolation: library2579PASS/0FAIL/
+22existingignored (555.28s), binary5PASS/0FAIL (`crash-full-tests.log`). Stock
+2048KiB full library suite started14:54:55Z; lease and final graph follow.
+
+Stock-stack gate PASS15:04:31Z:2579PASS/0FAIL/22existingignored at2048KiB,
+573.85s (`crash-stack.log`). Lease gate now running; no stack/lease limits raised.
+
+All recovery gates finished PASS15:06:54Z (`crash-gate-status.log` and exact
+commands in `crash-gates.sh`). Lease89/89PASS, highest measured work35.5% versus
+50% limit, all required operations observed (`crash-lease.log`, `crash-lease.jsonl`).
+Final graph rebuild PASS. Root rechecked final digest `1ad9356a…` unchanged and
+diff whitespace PASS. Gate process exited0. No unavailable required gate: macOS
+network-isolation wrapper ran successfully, replacing the historical Linux gap.
+22 pre-existing ignored tests remain excluded as in the baseline/CI. B final
+documentation-delta/evidence review pending; root acceptance not yet declared.
+
 Root: thread `thr_8m3bvxma9d` (claude-code, Opus 5.5; effort not authoritatively
 confirmed, so root is a thin coordinator and fills no role). Started 2026-10-15.
 

@@ -1,5 +1,9 @@
 # Orchestration for a tenant-owned execution backend
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 Status: implementation plan, 2026-09-07. The types, routes, tables, limits and UI below are
 proposed contracts, not implemented features or configuration keys the server currently reads.
 This document prepares the abstractions for implementation; it does not enable remote execution.

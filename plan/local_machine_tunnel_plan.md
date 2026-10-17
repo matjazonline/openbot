@@ -1,5 +1,9 @@
 # Pattern B: Persistent Reverse WebSocket Tunnel Architecture Plan for `openbots`
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 This document outlines the architectural design and implementation plan for executing OpenCode agent prompts on a user's **local machine** using a persistent reverse WebSocket tunnel (Pattern B).
 
 With this pattern, the user runs a local daemon (`opencode-tunnel` or `opencode serve`) on their machine. The daemon establishes a secure, outbound-only WebSocket connection back to `openbots`. No open incoming ports, static IPs, or public tunneling services (like Ngrok or Cloudflare Tunnels) are required.

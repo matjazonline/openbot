@@ -1,5 +1,9 @@
 # Improve Provider-Credential Security
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Goal
 
 Close the remaining credential-storage and launch gaps. Multi-instance key rotation is no longer one

@@ -410,3 +410,11 @@ Reviewed 04.9-D2 (preserved logs/04.9/review-D2.txt), same base as R001.
 - **04.9-F002 FIXED at decision level:** D2 item1 retains current owner/admin authorization across publication, binding, admission, preparation, dispatch and replay; ordinary membership is explicitly insufficient. No shared helper weakening proposed.
 - **04.9-F003 FIXED at decision level:** D2 item7 requires authoritative HTTP registration validation for publication, recursive children, exact bound resource at binding/admission/dispatch, narrow alias substitution and denial of unsupported dependency owners. Real production path and forged/revoked/member negative tests are required. Existing publication replay returns an equivalent saved immutable result after current actor authorization (`definitions.rs:170-183`); D2 correctly distinguishes that from future use authorization.
 No implementation acceptance is inferred from these decision-level closures.
+
+
+### 2026-10-17 — 04.9-R003 implementation follow-up (implement-astra-reviewed-2.1)
+At base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, digest `7b68a7fcdb1c96d8a1e683feae8bc0008b945573c6f846f72cd30b39aa31ab1a`, B verified implementation of the previously closed decision findings: F001 uses existing company-first dispatch/preparation/provider authority and parent-first credential mutation without an inverse rotation lock; F002 retains owner/admin authority and adds ordinary-member/foreign/revocation checks; F003 supplies authoritative HTTP publication validation with exact selected-resource binding/admission checks and real lifecycle tests. No new concrete finding. Whole-batch code review passes; mandatory final verification remains pending as recorded in R003. Earlier decision-only outcomes remain preserved.
+
+
+### 2026-10-17 — 04.9-R004 final disposition (implement-astra-reviewed-2.1)
+Final base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b`: unchanged implementation retains R003's verification that F001–F003 are fixed. Required final full/stock-stack/lease and other gates now pass; see R004 evidence note. No new finding, no deferred acceptance-blocking defect, no outstanding required verification gap. Final combined review PASS. Prior decision and implementation histories remain unchanged.

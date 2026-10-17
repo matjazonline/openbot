@@ -1,5 +1,9 @@
 # Deferred Until There Is Traffic
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Goal
 
 Record the performance concerns from `plan/db_improvements.md` that cannot be decided yet, with

@@ -1,5 +1,9 @@
 # Hindsight memory provider — remaining work
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Context
 
 Hindsight landed as a second memory provider alongside HydraDB: `src/adapters/memory/hindsight.rs`

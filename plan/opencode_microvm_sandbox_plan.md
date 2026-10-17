@@ -1,5 +1,9 @@
 # MicroVM Sandbox Isolation (Option 2) Architecture Plan for `openbots`
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 This document details the architectural design and implementation plan for executing OpenCode prompts inside isolated, hardware-virtualized MicroVM sandboxes (e.g., **E2B**, **Daytona**, or a custom Firecracker microservice) for `openbots`.
 
 Execution mode (`in_process` vs `microvm_sandbox`) is specified per **Workflow** in `workflow_config` (with system-level fallback credentials defined in `AppConfig`).

@@ -1,5 +1,9 @@
 # Company- and agent-scoped documents in long-term memory — shared instructions
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 Read this before any phase file. Each phase lives in `plan/memory_management/phase{n}.md` and
 assumes everything here.
 

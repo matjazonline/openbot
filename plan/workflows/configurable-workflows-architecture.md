@@ -1,5 +1,9 @@
 # Configurable Durable Workflows Architecture Plan
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Executive Summary
 
 This document specifies the architectural transition of the platform from a hardcoded message dispatch pipeline (`email_agent_dispatch`) to a **Workflow-Native Architecture** ("Everything is a Workflow").

@@ -1,5 +1,9 @@
 # Outreach Target Allowlist
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Status
 
 Implemented. External outreach now defaults to addresses the server knew before the model ran.

@@ -43,6 +43,7 @@ The existing action supervisor owns cancellation and lease loss by dropping the
 actual HTTP future. Receipts remain authoritative and unknown outcomes retain
 the existing reconciliation protocol.
 
-Architecture 04.9-D2 was independently approved in 04.9-R002. Implementation and
-verification acceptance are pending; no deployment, migration squash or commit
-is part of this continuation.
+Architecture 04.9-D2 was independently approved in 04.9-R002; whole-batch code
+review passed in 04.9-R003. Current verification and acceptance evidence is in
+[TASK](docs/TASK.md) and [REVIEW](docs/REVIEW.md). No deployment, migration squash
+or commit is part of this continuation.

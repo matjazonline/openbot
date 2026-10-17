@@ -1,5 +1,9 @@
 # Add Shodh as a third long-term memory provider
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 > **Revised after the Hindsight integration landed.** Most of what the original version of this
 > plan described is now done: the shared HTTP transport, the configured-provider set, the
 > provider-neutral routes and settings UI, the runtime-metric rename, and the widened `CHECK`

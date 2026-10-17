@@ -1,5 +1,9 @@
 # Workflow foundation
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Outcome
 
 Replace hardcoded message-to-agent dispatch with one durable workflow engine in Rust and

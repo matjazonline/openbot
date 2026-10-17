@@ -1,5 +1,9 @@
 # Outreach Target Allowlist
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Expected result
 
 `outreach_and_await_quorum` can only send to addresses that were already known to the system before

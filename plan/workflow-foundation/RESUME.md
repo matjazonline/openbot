@@ -1,6 +1,26 @@
 # Workflow foundation resume
 
-## 04.9 RESUMED — 2026-10-17 (current)
+## 04.9 crash recovery — 2026-10-17 (current)
+
+User authorized continuation and confirmed root as Astra/high author under
+implement-astra-reviewed-2.1. Starting HEAD is `e634a82837d50e7ed4aba4bb003f0a98ec294b10`,
+containing the previously uncommitted 04.9 implementation. Preserve pre-existing
+edits to `.claude/helpers/graft-hooks.cjs` and `graft-statusline.cjs`.
+Earlier Linux fixture and ignored check logs are unavailable on this Mac;
+old pass summaries are historical and verification is being rebuilt.
+
+PostgreSQL 18.6 installed at the user's request. Its default data symlink points
+to an unavailable external volume and is preserved. New task-only fixture:
+`/private/tmp/workflow049-crash-20261017`, localhost port55449, role `workflow049`,
+database `workflow049_test`, system identifier `7697645681053396076`.
+Root owns serialized tests; `docs/logs/04.9/crash-gates.sh` records commands and
+`crash-gate-status.log` records outcomes. Architecture D2/R002 is accepted, and
+independent whole-batch code review R003 passed with no new findings.
+The current verification, final acceptance, artifact and resource status are in
+the latest [TASK](docs/TASK.md) and [REVIEW](docs/REVIEW.md) entries; they supersede
+all pre-crash statuses below. Scope is 04.9 only; later phases need a new instruction.
+
+## 04.9 RESUMED — 2026-10-17 (historical, pre-crash)
 
 User authorized continuation under implement-astra-reviewed-2.1 and confirmed root
 as Astra/high author. Root restarted the identified retained fixture, resumed HTTP

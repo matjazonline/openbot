@@ -1,6 +1,15 @@
 These rules apply across the repository. More specific guides under `src/` add source-level and
 subsystem rules.
 
+# No backward compatibility
+
+We don't need backward compatibility and will reset the database when needed. Do not add data
+backfills, dual reads/writes, legacy decoders, compatibility shims, or staged rollouts for existing
+data; when a schema or payload change does not apply cleanly to existing rows, reset the database.
+Every plan under `plan/` carries this note, and new plans must too. `serve` logs it as a warning
+at startup, listing every file that carries it (`NO_BACKWARD_COMPATIBILITY_NOTES` in
+`src/main.rs`); add a new plan's path there as well.
+
 # Keep builds and deployment secure and reproducible
 
 Run the production image as a non-root user unless a narrowly documented capability is required

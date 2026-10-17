@@ -149,7 +149,41 @@ async fn run_credential_rotation() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Every file carrying the "No backward compatibility" note, logged at startup.
+const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+    "AGENTS.md",
+    "src/adapters/persistence/AGENTS.md",
+    "plan/agent-response-setting.md",
+    "plan/db_improve/05-deferred-until-traffic.md",
+    "plan/db_improve/improve-key-credentials.md",
+    "plan/db_improve/kanban_denormalized_rollup_table_optimization.md",
+    "plan/hindsight_remaining_work.md",
+    "plan/hydradb/01-preserve-memory-scope-isolation.md",
+    "plan/hydradb/06-make-memory-ingestion-durable.md",
+    "plan/local_machine_tunnel_plan.md",
+    "plan/memory_management/general_plan_instructions.md",
+    "plan/message-confirmation-ideas/outreach-target-allowlist.md",
+    "plan/opencode_microvm_sandbox_plan.md",
+    "plan/outreach_allowlist_plan.md",
+    "plan/shodh_memory_provider.md",
+    "plan/slack-integration/README.md",
+    "plan/sop/01-procedure-execution-foundation.md",
+    "plan/sop/02-operational-techniques.md",
+    "plan/tenant-owned-execution-backends.md",
+    "plan/workflow-foundation/README.md",
+    "plan/workflow-library/README.md",
+    "plan/workflows/configurable-workflows-architecture.md",
+    "plan/workflows/post-approval-workflow-execution.md",
+];
+
 async fn serve() -> anyhow::Result<()> {
+    // Logged before migrations run, so it is visible when one fails against existing data.
+    warn!(
+        notes = ?NO_BACKWARD_COMPATIBILITY_NOTES,
+        "No backward compatibility: schema and persisted data are not migrated across releases; \
+         reset the database when a migration does not apply cleanly. Remove this warning and the \
+         listed notes when compatibility is required."
+    );
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
     let memory_worker = app_state.memory_worker.clone();

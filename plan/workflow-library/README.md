@@ -1,5 +1,9 @@
 # Business Workflow Library
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Outcome
 
 Let a company select a business outcome, connect its tools, assign people and agents, review the

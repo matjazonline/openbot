@@ -1,5 +1,9 @@
 # Deferred — denormalized `task_chains` rollup table
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 **Status: deferred. Do not build until the trigger condition below is met and measured.**
 
 Prerequisite: **Stage 0** below. The window pushdown this document builds on has shipped; its

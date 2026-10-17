@@ -105,3 +105,15 @@ expanded focused compilation was user-stopped status143; earlier11PASS does not
 cover latest source. See HANDOFF-04.9-USER-STOP-20261017.md and TASK; resume requires
 new instruction. Checkpoint digest:
 `e64f7016555ec87c656b2198e309ecb707ccc47e1915f6c093667500d3154cd9`.
+
+
+### 04.9-R003 — 2026-10-17 whole-batch code/integration review
+**CODE REVIEW PASS** for base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, digest `7b68a7fcdb1c96d8a1e683feae8bc0008b945573c6f846f72cd30b39aa31ab1a`; full delta from `2729f2caaf58830bea8291bdcc6f9882a3ad03ee` reviewed. See [round note](agent-review-notes.md#049-r003--whole-batch-code-and-integration-review--code-review-pass-final-gates-pending). No new findings; F001–F003 decision corrections are implemented. Current HTTP20/20, credential12/12 and inspected schema/static/build logs pass. Full all-target suite, stock-stack and lease-budget gates remain pending; **no final acceptance**. Same reviewer handle retains context for final evidence follow-up on unchanged code.
+
+
+### 04.9-R004 — 2026-10-17 final verification/documentation follow-up
+**PASS — final combined 04.9 artifact**, base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b`, same exact exclusions. R003 unchanged code review reused; RESUME/BRIEF status delta reviewed. Final snapshot independently recomputed. Full all-target library2579/0/22 plus bin5/0 under network guard, stock2048KiB2579/0/22, lease89/0 with maximum work35.5% below50%, all schema/build/static gates and graph PASS. The22 existing optional/live/developer ignored tests are not counted as coverage. No new finding or outstanding required check; F001–F003 remain fixed. See R004 in agent-review-notes.md and final finding disposition. Root may accept and shut down its task fixture.
+
+
+### 04.9 root final acceptance — 2026-10-17
+**ACCEPTED.** Root verified R003/R004 PASS, persisted notes/findings and resolved F001–F003, all required gate results, and unchanged final digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b` (base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, five exact exclusions retained in TASK). Manifest: `logs/04.9/crash-accepted-snapshot.txt`. Full library2579/0/22existingignored, bin5/0, stock2048KiB2579/0/22, lease89/0/max35.5%<50%; all remaining gates PASS. No required verification gap. Task-only PostgreSQL18.6 fixture stopped cleanly, data retained at `/private/tmp/workflow049-crash-20261017`; no active author checks. Scope04.9 complete; later phases require a new instruction. Unrelated edits and the original unavailable external-volume database path preserved.
