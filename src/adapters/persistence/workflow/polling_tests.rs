@@ -13,10 +13,15 @@ impl WorkflowHandler for Scripted {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
         self.supported
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        Ok(json!({"items":[],"token_count":0}))
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerOutcome {
+        WorkflowHandlerOutcome::Completed(
+            async {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                Ok(json!({"items":[],"token_count":0}))
+            }
+            .await,
+        )
     }
 }
 fn scripted() -> Scripted {
@@ -287,10 +292,15 @@ impl WorkflowHandler for DroppingHandler {
     fn supports(&self, _: &WorkflowStepKind) -> bool {
         true
     }
-    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
-        let _witness = DropWitness(&self.dropped);
-        self.started.notify_one();
-        std::future::pending().await
+    async fn execute(&self, _: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerOutcome {
+        WorkflowHandlerOutcome::Completed(
+            async {
+                let _witness = DropWitness(&self.dropped);
+                self.started.notify_one();
+                std::future::pending().await
+            }
+            .await,
+        )
     }
 }
 #[tokio::test]

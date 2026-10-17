@@ -6,6 +6,7 @@ pub mod memory;
 pub mod monitoring;
 pub mod persistence;
 pub mod protocols;
+pub(crate) mod redaction;
 pub mod resend_api;
 pub mod sendgrid;
 pub mod smtp;
@@ -13,4 +14,5 @@ pub mod storage;
 
 pub mod response_schema;
 pub mod workflow_http;
+pub mod workflow_mcp;
 pub mod workflow_source;

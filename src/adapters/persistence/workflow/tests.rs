@@ -1,4 +1,6 @@
 use super::*;
+#[path = "action_outcome_support.rs"]
+mod action_outcome_support;
 #[path = "admission_binding_tests.rs"]
 mod admission_binding_tests;
 #[path = "admission_tests.rs"]
@@ -11,6 +13,8 @@ mod binding_schema_tests;
 mod binding_tests;
 #[path = "http_tests.rs"]
 mod http_tests;
+#[path = "mcp_tests.rs"]
+mod mcp_tests;
 #[path = "run_schema_tests.rs"]
 mod run_schema_tests;
 use crate::adapters::persistence::test_support::{OwnDatabase, own_database};

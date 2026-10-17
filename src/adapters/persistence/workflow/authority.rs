@@ -7,14 +7,14 @@ use super::*;
 /// Member/principal row locks
 /// prevent concurrent demotion/deletion until the workflow commit has finished.
 pub(super) async fn authorize_company(
-    tx: &mut Transaction<'_, Postgres>,
+    db: &mut PgConnection,
     company: CompanyId,
     actor: WorkflowActor,
 ) -> AppResult<()> {
     let owner: Uuid =
         sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
             .bind(company.as_uuid())
-            .fetch_optional(&mut **tx)
+            .fetch_optional(&mut *db)
             .await?
             .ok_or_else(missing)?;
     let role: String = sqlx::query_scalar(
@@ -26,7 +26,7 @@ pub(super) async fn authorize_company(
     )
     .bind(company.as_uuid())
     .bind(actor.user_id())
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *db)
     .await?
     .ok_or_else(missing)?;
     if owner != actor.user_id() && role != "admin" {
@@ -35,9 +35,9 @@ pub(super) async fn authorize_company(
     Ok(())
 }
 
-/// These facts have no matching authoritative durable owners yet. Persisting
-/// caller-supplied policy/profile/skill facts would turn frozen content into a
-/// grant. Their phase04/06 adapters must replace this fail-closed boundary.
+/// Tools must match a live HTTP registration or MCP approval for their slot kind.
+/// Agents, skills and profiles have no authoritative durable owner yet: persisting
+/// caller-supplied facts would turn frozen content into a grant (phase 06).
 pub(super) async fn supported_publication(
     tx: &mut Transaction<'_, Postgres>,
     bundle: &PublishedBundle,
@@ -58,19 +58,32 @@ pub(super) async fn supported_publication(
                 "Workflow dependency authority is not available".into(),
             ));
         }
+        let definition = current.compiled().graph().definition();
         for tool in &snapshots.tools {
-            if let Some(slot) = &tool.contract.connection
-                && !current
-                    .compiled()
-                    .graph()
-                    .definition()
-                    .resources
-                    .iter()
-                    .any(|resource| &resource.slot == slot && resource.kind.as_str() == "http")
-            {
-                return Err(missing());
+            // Built-in messaging has no registration: the snapshot must be exactly the trusted
+            // built-in, and its current authority is the company's (04.11-D2 §1.6).
+            use crate::application::workflow::message::{
+                is_builtin_message_tool, is_trusted_message_snapshot,
+            };
+            if is_builtin_message_tool(tool.contract.name.as_str()) {
+                if !is_trusted_message_snapshot(tool)? {
+                    return Err(missing());
+                }
+                continue;
             }
-            http::registered_on(tx, current.company_id(), tool).await?;
+            let kind = match &tool.contract.connection {
+                Some(slot) => resources::slot_kind(definition, slot),
+                None => Some("http"),
+            };
+            match kind {
+                Some("http") => {
+                    http::registered_on(tx, current.company_id(), tool).await?;
+                }
+                Some("mcp") => {
+                    mcp::registered_on(tx, current.company_id(), tool).await?;
+                }
+                _ => return Err(missing()),
+            }
         }
         pending.extend(current.children().values().map(AsRef::as_ref));
     }

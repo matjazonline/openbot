@@ -263,7 +263,9 @@ async fn stalled_remote(
     }
     let running: [&dyn Fn() -> bool; 1] = [&|| !first.is_finished()];
     resolution_behind(&mut observer, reserving, request.lease, &running).await;
-    gate.release().await;
+    // An elapsed resolution can return while the original COMMIT is still running.
+    // Drain that transaction before reading its durable rows or removing its abort rule.
+    gate.drain().await;
     let first = first.await.unwrap();
     gate.abort_on_release(Abort::Nothing).await;
     first

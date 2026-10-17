@@ -1,8 +1,8 @@
 use super::*;
+use crate::app_error::AppError;
 use crate::application::workflow::{
     actions::*, lease::*, polling::WorkflowStepKind, worker::WorkflowHandler,
 };
-use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
 use tokio_util::sync::CancellationToken;
 
 pub struct HttpToolCall {
@@ -73,16 +73,23 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
             )
             .await
     }
+    /// Preparation errors happen before `dispatch_remote` and can never follow a marker;
+    /// the 04.10-D3 mapping relies on keeping the two phases apart.
     async fn step(
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> AppResult<RemoteDispatchObservation> {
-        let request = self.persistence.http_step_request(claim, kind).await?;
-        HttpRequest::parse(&request.arguments)?;
+    ) -> Result<RemoteDispatchObservation, StepError> {
+        let request = self
+            .persistence
+            .http_step_request(claim, kind)
+            .await
+            .map_err(StepError::Preparation)?;
+        HttpRequest::parse(&request.arguments).map_err(StepError::Preparation)?;
         let intent = ActionService::new(self.persistence.clone())
             .prepare_step(request)
-            .await?;
+            .await
+            .map_err(StepError::Preparation)?;
         self.dispatch
             .dispatch_remote(
                 &ActionDispatchRequest {
@@ -94,7 +101,12 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
                 &CancellationToken::new(),
             )
             .await
+            .map_err(StepError::Dispatch)
     }
+}
+enum StepError {
+    Preparation(AppError),
+    Dispatch(AppError),
 }
 #[async_trait]
 impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: RemoteAction>
@@ -107,18 +119,40 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
+    ) -> WorkflowHandlerOutcome {
+        self.run(kind, claim).await.into()
+    }
+}
+impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: RemoteAction>
+    HttpActions<P, D, R>
+{
+    /// The step's completed result: HTTP steps never suspend.
+    pub async fn run(
+        &self,
+        kind: &WorkflowStepKind,
+        claim: &ClaimedWorkflow,
     ) -> WorkflowHandlerResult {
-        match self.step(kind, claim).await {
-            Ok(RemoteDispatchObservation::Committed(receipt)) => Ok(receipt.result),
-            _ => Err(WorkflowFailure {
-                failure: StepFailure::new(
-                    FailureClass::Terminal,
-                    FailureCode::parse("http.unresolved").expect("static failure code"),
-                    None,
-                )
-                .expect("bounded failure"),
-                safety: RetrySafety::EffectOutcomeUnknown,
-            }),
-        }
+        use ActionStepOutcome as Outcome;
+        let outcome = match self.step(kind, claim).await {
+            Ok(RemoteDispatchObservation::Committed(receipt)) => return Ok(receipt.result),
+            Ok(RemoteDispatchObservation::ApprovalRequired) => Outcome::ApprovalRequired,
+            Ok(RemoteDispatchObservation::PossibleDispatchExists) => {
+                Outcome::PossibleDispatchExists
+            }
+            Ok(RemoteDispatchObservation::Interrupted) => Outcome::Interrupted,
+            Err(StepError::Preparation(error)) => {
+                return Err(action_step_failure(
+                    ActionFamily::Http,
+                    Outcome::Preparation(&error),
+                ));
+            }
+            Err(StepError::Dispatch(error)) => {
+                return Err(action_step_failure(
+                    ActionFamily::Http,
+                    Outcome::Dispatch(&error),
+                ));
+            }
+        };
+        Err(action_step_failure(ActionFamily::Http, outcome))
     }
 }

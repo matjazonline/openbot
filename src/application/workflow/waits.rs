@@ -46,6 +46,8 @@ pub enum WaitProgress {
 pub enum WaitFailureReason {
     ActivationLimit,
     InvalidOutput,
+    /// A finality breach vetoed automatic continuation of a message step (04.11-D4 §M).
+    EvidenceConflict,
 }
 
 #[async_trait]
@@ -56,6 +58,13 @@ pub trait WorkflowWaits: Send + Sync {
     async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress>;
     /// Bounded database scan; transitions each selected run independently in run-first order.
     async fn sweep_waits(&self, limit: u16) -> AppResult<u16>;
+    /// Aggregate the execution's message deliveries into action states and receipts, one
+    /// action per transaction, at most `MESSAGE_RECEIPT_PAGE` actions per call.
+    async fn consume_message_receipts(
+        &self,
+        scope: crate::application::workflow::activation::ActivationRequest,
+        policy: crate::application::workflow::lease::LeasePolicy,
+    ) -> AppResult<u16>;
 }
 
 pub(crate) struct WaitSpecification {

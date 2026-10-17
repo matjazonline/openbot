@@ -91,6 +91,26 @@ pub struct WorkflowFailure {
 }
 pub type WorkflowHandlerResult = Result<Value, WorkflowFailure>;
 
+/// A handler that parked its step in the same commit as its effect (04.11 message steps).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SuspendedWorkflow {
+    pub wait: crate::domain::workflow::WaitId,
+}
+
+/// A handler either finishes its attempt (output or classified failure) or names the durable
+/// wait its own committed transaction parked it in. Suspension is not a failure, and the
+/// supervisor must confirm it rather than complete or release the attempt.
+#[derive(Debug)]
+pub enum WorkflowHandlerOutcome {
+    Completed(WorkflowHandlerResult),
+    Suspended(SuspendedWorkflow),
+}
+impl From<WorkflowHandlerResult> for WorkflowHandlerOutcome {
+    fn from(result: WorkflowHandlerResult) -> Self {
+        Self::Completed(result)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseReleaseCause {
     LocalInterruption,
@@ -122,6 +142,13 @@ pub trait WorkflowLeases: Send + Sync {
         fence: WorkflowFence,
         policy: LeasePolicy,
         cause: LeaseReleaseCause,
+    ) -> AppResult<bool>;
+    /// Read-only proof that this exact fence's attempt was closed by the effect park and that
+    /// `wait` belongs to the execution's message action. No default: every port states it.
+    async fn confirm_suspension(
+        &self,
+        fence: WorkflowFence,
+        wait: crate::domain::workflow::WaitId,
     ) -> AppResult<bool>;
 }
 

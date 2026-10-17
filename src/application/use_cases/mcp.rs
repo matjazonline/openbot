@@ -36,16 +36,18 @@ impl McpConnectionWrite {
             if !names.insert(&tool.name) {
                 return Err(invalid("Duplicate discovered MCP tool name"));
             }
-            crate::services::tool_schema::compile(&tool.input_schema)?;
-            if !tool.input_schema.is_object()
-                || serde_json::to_vec(&tool.input_schema)
-                    .map_err(|_| invalid("Invalid MCP schema"))?
-                    .len()
-                    > MAX_MCP_SCHEMA_BYTES
-            {
-                return Err(invalid(
-                    "MCP tool schema must be an object of at most 64 KiB",
-                ));
+            for schema in std::iter::once(&tool.input_schema).chain(&tool.output_schema) {
+                crate::services::tool_schema::compile(schema)?;
+                if !schema.is_object()
+                    || serde_json::to_vec(schema)
+                        .map_err(|_| invalid("Invalid MCP schema"))?
+                        .len()
+                        > MAX_MCP_SCHEMA_BYTES
+                {
+                    return Err(invalid(
+                        "MCP tool schema must be an object of at most 64 KiB",
+                    ));
+                }
             }
         }
         let mut grants = std::collections::HashSet::new();
@@ -61,6 +63,10 @@ impl McpConnectionWrite {
 }
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
+}
+/// A connection id names one endpoint for its lifetime; frozen workflow actions rely on it.
+pub fn endpoint_fixed() -> AppError {
+    invalid("An MCP connection's endpoint cannot change; create a new connection instead")
 }
 
 /// Tokens are write-only and use a distinct port from catalog projections.
@@ -171,6 +177,9 @@ impl McpUseCases {
     ) -> AppResult<CompanyMcpConnection> {
         super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
         write.validate()?;
+        if write.endpoint != current.endpoint {
+            return Err(endpoint_fixed());
+        }
         self.client.validate_endpoint(&write.endpoint)?;
         self.catalog
             .update_mcp_connection(current.company_id, current.id, current.revision, write)
@@ -263,7 +272,8 @@ impl McpUseCases {
             .filter(|name| {
                 let old = current.discovered_tools.iter().find(|t| &t.name == *name);
                 let new = tools.iter().find(|t| &t.name == *name);
-                matches!((old, new), (Some(a), Some(b)) if a.input_schema == b.input_schema)
+                matches!((old, new), (Some(a), Some(b)) if a.input_schema == b.input_schema
+                    && a.output_schema == b.output_schema)
             })
             .cloned()
             .collect();

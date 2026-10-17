@@ -3,6 +3,8 @@
 mod authorization;
 mod contracts;
 mod dispatch;
+mod effect;
+mod failure;
 mod freeze;
 mod reconciliation;
 mod replay;
@@ -17,6 +19,8 @@ pub(crate) use dispatch::{
     RemoteDispatch, RemoteEntry, RemoteReservation, RemoteReservationResult, supervise_remote,
     validate_action_result,
 };
+pub use effect::*;
+pub use failure::*;
 pub use reconciliation::*;
 pub use replay::{ProviderInvocation, ProviderReplayContract, ProviderReplayMode};
 pub(crate) use replay::{prepare_provider, replay_subject};

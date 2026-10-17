@@ -13,7 +13,7 @@
 
 use std::str::FromStr;
 
-use sqlx::{Postgres, Transaction};
+use sqlx::{PgConnection, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{claimable_statuses_sql, queue::own_row_fence_sql, sql_status_list};
@@ -45,6 +45,21 @@ pub(crate) const fn cancellation_detail(reason: DeliveryCancellationReason) -> &
         }
         DeliveryCancellationReason::TaskStopped => {
             "The task that produced this delivery was stopped"
+        }
+        DeliveryCancellationReason::WorkflowCancelled => {
+            "The workflow run that produced this delivery was cancelled"
+        }
+        DeliveryCancellationReason::WorkflowExpired => {
+            "The workflow run that produced this delivery ended before it went out"
+        }
+        DeliveryCancellationReason::WorkflowRevoked => {
+            "The workflow's messaging authority was revoked before this delivery went out"
+        }
+        DeliveryCancellationReason::RecipientRevoked => {
+            "The recipient is no longer a member with the frozen address"
+        }
+        DeliveryCancellationReason::EvidenceConflict => {
+            "A reconciliation finality breach stopped further sends for this message"
         }
     }
 }
@@ -97,6 +112,63 @@ pub(crate) async fn cancel_task_deliveries_on(
     .fetch_all(&mut **tx)
     .await
     .map_err(AppError::from)?;
+    cancel_locked_deliveries_on(tx, &locked, reason).await
+}
+
+/// Workflow-linked deliveries of a run (or of one invocation), cancelled with a workflow reason.
+///
+/// Callers hold the run lock (run before parent, the order workflow `begin_part`, the receipt
+/// consumer and evidence settlement also take). Unsent work is superseded; in-flight and
+/// ambiguous deliveries keep their lease and get only the intent, so late truth still lands.
+pub(crate) async fn cancel_workflow_deliveries_on(
+    db: &mut PgConnection,
+    company_id: Uuid,
+    run_id: Uuid,
+    invocation_id: Option<Uuid>,
+    reason: DeliveryCancellationReason,
+) -> AppResult<CancelledDeliveries> {
+    let claimable = claimable_statuses_sql();
+    let in_flight =
+        sql_status_list([DeliveryStatus::Sending, DeliveryStatus::OutcomeUnknown].iter());
+    let locked: Vec<Uuid> = sqlx::query_scalar(&format!(
+        r#"SELECT delivery.id FROM message_deliveries AS delivery
+             JOIN workflow_message_destinations AS target
+               ON target.company_id = delivery.company_id AND target.delivery_id = delivery.id
+            WHERE target.company_id = $1 AND target.run_id = $2
+              AND ($3::uuid IS NULL OR target.invocation_id = $3)
+              AND delivery.status IN ({claimable}, {in_flight})
+              AND delivery.cancellation_requested_at IS NULL
+            ORDER BY delivery.id
+              FOR UPDATE OF delivery"#
+    ))
+    .bind(company_id)
+    .bind(run_id)
+    .bind(invocation_id)
+    .fetch_all(&mut *db)
+    .await
+    .map_err(AppError::from)?;
+    cancel_locked_deliveries_on(db, &locked, reason).await
+}
+
+/// Record a workflow refusal's intent on the parent the calling worker holds and has locked;
+/// `settle_cancelled_on` then finishes it with what its parts prove (04.11-D2 §6).
+pub(crate) async fn cancel_held_delivery_on(
+    db: &mut PgConnection,
+    delivery_id: Uuid,
+    reason: DeliveryCancellationReason,
+) -> AppResult<CancelledDeliveries> {
+    cancel_locked_deliveries_on(db, &[delivery_id], reason).await
+}
+
+/// Settle the already-locked deliveries: unsent ones superseded, in-flight ones given the intent.
+async fn cancel_locked_deliveries_on(
+    db: &mut PgConnection,
+    locked: &[Uuid],
+    reason: DeliveryCancellationReason,
+) -> AppResult<CancelledDeliveries> {
+    let claimable = claimable_statuses_sql();
+    let in_flight =
+        sql_status_list([DeliveryStatus::Sending, DeliveryStatus::OutcomeUnknown].iter());
     if locked.is_empty() {
         return Ok(CancelledDeliveries::default());
     }
@@ -114,13 +186,13 @@ pub(crate) async fn cancel_task_deliveries_on(
         dead = DeliveryStatus::DeadLetter.as_str(),
         superseded = FailureClass::Superseded.as_str(),
     ))
-    .bind(&locked)
+    .bind(locked)
     .bind(reason.as_str())
     .bind(cancellation_detail(reason))
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut *db)
     .await
     .map_err(AppError::from)?;
-    bury_unsent_parts_on(tx, &superseded).await?;
+    bury_unsent_parts_on(db, &superseded).await?;
 
     // A worker holds these, or a provider may. Only the intent is written: the lease, the
     // execution id and every provider outcome stay exactly as the worker left them.
@@ -131,9 +203,9 @@ pub(crate) async fn cancel_task_deliveries_on(
             WHERE id = ANY($1) AND status IN ({in_flight})
         RETURNING id"#
     ))
-    .bind(&locked)
+    .bind(locked)
     .bind(reason.as_str())
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut *db)
     .await
     .map_err(AppError::from)?;
 
@@ -149,7 +221,7 @@ pub(crate) async fn cancel_task_deliveries_on(
 /// part whose request started is exactly the uncertainty a cancellation must not erase. Acts only
 /// on parents that already carry the intent, which is where the detail comes from.
 pub(crate) async fn bury_unsent_parts_on(
-    tx: &mut Transaction<'_, Postgres>,
+    db: &mut PgConnection,
     delivery_ids: &[Uuid],
 ) -> AppResult<()> {
     if delivery_ids.is_empty() {
@@ -176,7 +248,7 @@ pub(crate) async fn bury_unsent_parts_on(
         detail = cancellation_detail_sql("delivery.cancellation_reason"),
     ))
     .bind(delivery_ids)
-    .execute(&mut **tx)
+    .execute(&mut *db)
     .await
     .map_err(AppError::from)?;
     Ok(())

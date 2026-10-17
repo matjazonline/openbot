@@ -6,6 +6,7 @@ use serde::Serialize;
 pub(crate) enum InputCheck {
     Deadline,
     Http,
+    Message,
 }
 impl InputCheck {
     /// Called for known literals at compilation and again for all resolved inputs.
@@ -33,6 +34,7 @@ impl InputCheck {
                 }
             }
             Self::Http => check_http(inputs, root, span)?,
+            Self::Message => check_message(inputs, root, span)?,
         }
         Ok(())
     }
@@ -92,6 +94,62 @@ fn check_http(inputs: &Value, root: &str, span: SourceSpan) -> Result<(), Diagno
                 "Credentials, origin overrides and line breaks are forbidden in workflow headers",
                 &format!("{root}/headers"),
                 name,
+                span,
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Canonical byte bounds and destination identity, checked for literals at compilation and for
+/// every resolved input before the handler runs, so a violation never reaches a marker.
+fn check_message(inputs: &Value, root: &str, span: SourceSpan) -> Result<(), Diagnostic> {
+    use crate::application::transport::ingress::{MAX_BODY_BYTES, MAX_SUBJECT_BYTES};
+    if let Some(content) = inputs.get("content").and_then(Value::as_object) {
+        if content
+            .get("subject")
+            .and_then(Value::as_str)
+            .is_some_and(|subject| subject.len() > MAX_SUBJECT_BYTES)
+        {
+            return Err(error(
+                "registry.message_subject",
+                "A message subject is at most 998 UTF-8 bytes",
+                &format!("{root}/content"),
+                "subject",
+                span,
+            ));
+        }
+        if content
+            .get("body")
+            .and_then(Value::as_str)
+            .is_some_and(|body| body.len() > MAX_BODY_BYTES)
+        {
+            return Err(error(
+                "registry.message_body",
+                "A message body exceeds the canonical byte bound",
+                &format!("{root}/content"),
+                "body",
+                span,
+            ));
+        }
+    }
+    let Some(destinations) = inputs.get("destinations").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    let mut seen = BTreeSet::new();
+    for destination in destinations {
+        let kind = destination.get("kind").and_then(Value::as_str);
+        let id = destination
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|id| uuid::Uuid::parse_str(id).ok());
+        let valid = matches!(kind, Some("user" | "channel")) && id.is_some();
+        if !valid || !seen.insert((kind, id)) {
+            return Err(error(
+                "registry.message_destination",
+                "Destinations are distinct users or channels named by UUID",
+                root,
+                "destinations",
                 span,
             ));
         }

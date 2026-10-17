@@ -252,13 +252,27 @@ pub(super) async fn assert_drained(
     first_pid: i32,
     second_pid: i32,
 ) {
-    sqlx::query("SELECT pg_stat_clear_snapshot()")
-        .execute(&mut *observer)
+    // ReadyForQuery and the statistics observer are separate connections. Await
+    // observable idle state; a single immediate sample can still show the last
+    // completed statement. Exact run-lock probes and primary-attempt assertions
+    // remain the ownership/timing oracles, and a leaked transaction still fails.
+    let drained = async {
+        loop {
+            sqlx::query("SELECT pg_stat_clear_snapshot()")
+                .execute(&mut *observer)
+                .await
+                .unwrap();
+            let clean: bool = sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1) AND (activity.state='active' OR activity.xact_start IS NOT NULL))")
+                .bind(vec![first_pid, second_pid]).fetch_one(&mut *observer).await.unwrap();
+            if clean {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), drained)
         .await
-        .unwrap();
-    let clean: bool = sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1) AND (activity.state='active' OR activity.xact_start IS NOT NULL))")
-        .bind(vec![first_pid, second_pid]).fetch_one(&mut *observer).await.unwrap();
-    assert!(clean, "completed contenders released their transactions");
+        .expect("completed contenders released their transactions");
 }
 
 fn expected_facts(

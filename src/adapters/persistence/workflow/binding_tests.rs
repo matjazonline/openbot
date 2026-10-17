@@ -150,6 +150,7 @@ fn mcp_write() -> McpConnectionWrite {
             name: "lookup".to_owned().try_into().unwrap(),
             description: String::new(),
             input_schema: json!({"type":"object"}),
+            output_schema: None,
         }],
         tool_grants: vec!["lookup".to_owned().try_into().unwrap()],
     }

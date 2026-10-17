@@ -162,6 +162,14 @@ impl WorkflowLeases for PostgresPersistence {
             }
         }
     }
+
+    async fn confirm_suspension(
+        &self,
+        fence: WorkflowFence,
+        wait: crate::domain::workflow::WaitId,
+    ) -> AppResult<bool> {
+        message::receipts::confirm_suspension(self, fence, wait.as_uuid()).await
+    }
 }
 
 /// `Some(released)` once settled; `None` when an ambiguous release proved not applied.

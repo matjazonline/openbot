@@ -174,6 +174,15 @@ async fn cancel_on(db: &mut PgConnection, command: &CancelCommand) -> AppResult<
     .await?;
     sqlx::query("UPDATE workflow_waits SET state='cancelled',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
         .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
+    // Unsent message deliveries are superseded; in-flight ones keep only the intent (04.11-D2 §6).
+    message::receipts::cancel_message_deliveries_on(
+        db,
+        command.company_id,
+        command.run_id,
+        None,
+        crate::entities::transport::DeliveryCancellationReason::WorkflowCancelled,
+    )
+    .await?;
     sqlx::query("UPDATE workflow_runs SET state='cancelled',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
     let code =

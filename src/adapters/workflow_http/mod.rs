@@ -39,7 +39,8 @@ pub struct HttpRuntime {
         HttpProvider,
     >,
 }
-struct NoLocal;
+/// No same-database effect: remote providers only. Shared by the MCP composition.
+pub(crate) struct NoLocal;
 #[async_trait]
 impl crate::adapters::persistence::workflow::action_dispatch::SqlLocalAction for NoLocal {
     async fn apply(
@@ -79,6 +80,14 @@ impl HttpRuntime {
     ) -> AppResult<RemoteDispatchObservation> {
         self.inner.call_tool(fence, call, cancel).await
     }
+    /// The step's completed result; HTTP steps never suspend.
+    pub async fn run(
+        &self,
+        kind: &crate::application::workflow::polling::WorkflowStepKind,
+        claim: &crate::application::workflow::lease::ClaimedWorkflow,
+    ) -> crate::application::workflow::lease::WorkflowHandlerResult {
+        Box::pin(self.inner.run(kind, claim)).await
+    }
 }
 #[async_trait]
 impl crate::application::workflow::worker::WorkflowHandler for HttpRuntime {
@@ -89,7 +98,7 @@ impl crate::application::workflow::worker::WorkflowHandler for HttpRuntime {
         &self,
         kind: &crate::application::workflow::polling::WorkflowStepKind,
         claim: &crate::application::workflow::lease::ClaimedWorkflow,
-    ) -> crate::application::workflow::lease::WorkflowHandlerResult {
+    ) -> crate::application::workflow::lease::WorkflowHandlerOutcome {
         // Bound the external provider/SQL composition at the adapter seam.
         Box::pin(self.inner.execute(kind, claim)).await
     }
@@ -176,7 +185,10 @@ async fn bounded_response(
         if value.len() > 256 {
             return Err(failed());
         }
-        headers.insert("content-type", redact(value, secret));
+        headers.insert(
+            "content-type",
+            crate::adapters::redaction::redact_text(value, secret),
+        );
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(|_| failed())? {
@@ -187,7 +199,9 @@ async fn bounded_response(
     }
     let text = std::str::from_utf8(&bytes).map_err(|_| failed())?;
     let mut body = serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()));
-    redact_value(&mut body, secret, 0)?;
+    if !crate::adapters::redaction::redact_json(&mut body, secret) {
+        return Err(failed());
+    }
     let result = json!({"status":status,"headers":headers,"body":body});
     if serde_json::to_vec(&result).map_err(|_| failed())?.len() > 65_536 {
         return Err(failed());
@@ -195,52 +209,6 @@ async fn bounded_response(
     Ok(result)
 }
 
-fn redact(value: &str, secret: Option<&SecretString>) -> String {
-    match secret {
-        Some(secret) => value.replace(secret.expose_secret(), "[REDACTED]"),
-        None => value.to_owned(),
-    }
-}
-fn redact_value(value: &mut Value, secret: Option<&SecretString>, depth: usize) -> AppResult<()> {
-    if depth > 32 {
-        return Err(failed());
-    }
-    match value {
-        Value::String(value) => *value = redact(value, secret),
-        Value::Array(values) => {
-            for value in values {
-                redact_value(value, secret, depth + 1)?;
-            }
-        }
-        Value::Object(values) => {
-            let old = std::mem::take(values);
-            for (name, mut value) in old {
-                if matches!(
-                    name.to_ascii_lowercase().as_str(),
-                    "authorization"
-                        | "cookie"
-                        | "set-cookie"
-                        | "x-api-key"
-                        | "api-key"
-                        | "proxy-authorization"
-                ) {
-                    value = json!("[REDACTED]");
-                } else {
-                    redact_value(&mut value, secret, depth + 1)?;
-                }
-                values.insert(redact(&name, secret), value);
-            }
-        }
-        Value::Number(_) | Value::Bool(_) | Value::Null => {
-            // A bearer token can itself be a JSON scalar (for example a numeric PIN).
-            // Parsing a provider's echo must not make it escape string redaction.
-            if secret.is_some_and(|secret| value.to_string().contains(secret.expose_secret())) {
-                *value = json!("[REDACTED]");
-            }
-        }
-    }
-    Ok(())
-}
 fn failed() -> AppError {
     AppError::BadRequest("HTTP action did not produce an accepted result".into())
 }

@@ -117,3 +117,145 @@ new instruction. Checkpoint digest:
 
 ### 04.9 root final acceptance — 2026-10-17
 **ACCEPTED.** Root verified R003/R004 PASS, persisted notes/findings and resolved F001–F003, all required gate results, and unchanged final digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b` (base `e634a82837d50e7ed4aba4bb003f0a98ec294b10`, five exact exclusions retained in TASK). Manifest: `logs/04.9/crash-accepted-snapshot.txt`. Full library2579/0/22existingignored, bin5/0, stock2048KiB2579/0/22, lease89/0/max35.5%<50%; all remaining gates PASS. No required verification gap. Task-only PostgreSQL18.6 fixture stopped cleanly, data retained at `/private/tmp/workflow049-crash-20261017`; no active author checks. Scope04.9 complete; later phases require a new instruction. Unrelated edits and the original unavailable external-volume database path preserved.
+
+
+## 04.10 — implement-opus-reviewed-2.1
+
+### 04.10-R001 — 2026-10-17 architecture gate 04.10-D1
+**CHANGES REQUIRED** for decision 04.10-D1: `logs/04.10/decision-D1.md`, SHA256 `3f10553022b5d631876b8174d57d0ea270ff3c7d150b25d5812fd776e285035e` (verified), base `8ce1fd4`. Workflow implement-opus-reviewed-2.1; Reviewer B Opus 5.5. See the [round note](agent-review-notes.md#0410-r001--architecture-gate-0410-d1--changes-required) and [findings](agent-review-findings.md).
+
+Actionable findings:
+- 04.10-F001 (medium): outcome table for pre-marker and non-committed paths, so revocation, approval and crash do not become unreconcilable reconciliation waits.
+- 04.10-F002 (low): the `mcp.tool_error` safety label contradicts the shared DB retry-safety predicate.
+- 04.10-F003 (medium): the race/recovery matrix and the affected-suite/stock-stack gate are incomplete.
+
+Optional findings: 04.10-F004 to F007.
+
+The core architecture holds up: a single MCP owner, immutable endpoint, operations table with grant-FK cascade, routing through publication/binding/admission, company-first lock order, the eager/lazy possible-dispatch boundary, envelope validation and cleanup. The corrections are decision text and verification scope. This was inspection only: no tests run, no fixture/DB access, no project edits, and no implementation acceptance.
+
+### 04.10-R002 — 2026-10-17 correction recheck 04.10-D2
+**CHANGES REQUIRED** for decision 04.10-D2: `logs/04.10/decision-D2.md`, SHA256 `84d532eec3476569a878bca7188ed914ecde7f8ff9f09e4b462679e55330ded5` (verified), base `8ce1fd4`. D1 is unchanged at `3f105530…035e`. See the [round note](agent-review-notes.md#0410-r002--correction-recheck-0410-d2--changes-required) and [findings](agent-review-findings.md).
+
+Status of the R001 findings:
+- 04.10-F001, F002 and F003 are resolved at decision level.
+- F004's decline is accepted as a documented limitation.
+- F005 is resolved.
+- F006 and F007 were adopted, but each introduced a new defect.
+
+New actionable findings:
+- 04.10-F008 (medium): the accepted 04.9 HTTP handler parks pre-marker failures in a reconciliation wait that nothing can settle. D2's shared classifier makes http.request inconsistent: a crash before the marker retries, while the same refusal returned by the handler waits until the deadline. Recommended: align the HTTP handler in this batch, or root records it as a blocker for 04.11.
+- 04.10-F009 (low): order the permits endpoint-first so a waiter never holds a global permit.
+- 04.10-F010 (low): make the operation revision ABA-safe across revoke and cascade delete.
+
+Optional: 04.10-F011 (record the classifier's handler-composition invariant).
+
+The shared `marker_owned_effect_kind` change to `recovery::report` and `pending_recovery::unknown_effect` was reviewed for regressions and found sound. This was inspection only: no tests, no fixture/DB access, no project edits, and no implementation acceptance.
+
+### 04.10-R003 — 2026-10-17 correction recheck 04.10-D3
+**PASS (architecture gate) for decision 04.10-D3**: `logs/04.10/decision-D3.md`, SHA256 `f89b0a89afa11ec9b789ce8e25fc3370a9678bbb43ff1e60c7dcb3e050e7b32b` (verified). The effective gated decision is **D2 (`84d532ee…`, unchanged) as amended by D3**; D1 is unchanged. Base `8ce1fd4`. See the [round note](agent-review-notes.md#0410-r003--correction-recheck-0410-d3--pass-architecture-gate-f012-carried-to-implementation) and [findings](agent-review-findings.md).
+
+Findings:
+- 04.10-F008, F009 and F010 are resolved at decision level; F011 is adopted as documentation.
+- The D2 row-4 side effect (MCP pre-marker reservation refusal costs one extra attempt, after which eager preparation rejects without network) is acceptable.
+- The shared `action_step_failure` mapping changes accepted 04.9 HTTP behaviour only as intended; its effective decisions match.
+- **04.10-F012 (low, actionable)**: slotted `http.request` preparation does not check connection readiness, so a disabled connection or removed secret retries until attempts are exhausted instead of failing as `http.rejected`. It is carried to implementation and must be fixed and tested before batch acceptance.
+- Optional: 04.10-F013 (name the changed accepted assertion `http_tests.rs:100`; refine the I9 wording for evidence-conflict waits).
+
+Implementation may proceed. This was inspection only: no tests, no fixture/DB access, no project edits, and no implementation acceptance.
+
+04.10 user-stop checkpoint (2026-10-17): architecture gate D2+D3 accepted via R003 only;
+implementation unverified, not frozen, not code-reviewed; F012 open. Checkpoint digest
+`6d5b89b7a612505bf209e74b18a3483a5999d5920ecb905bca7f4a8979de0c30`. See
+HANDOFF-04.10-USER-STOP-20261017.md. Author proposes an application-level substitute for the
+lazy post-not-applied MCP matrix case (no MCP evidence verifier) — reviewer to judge on resume.
+
+
+### 04.10-R004 — 2026-10-17 whole-batch code/integration review
+**CHANGES REQUIRED (verification); code inspection PASS.** Workflow `implement-astra-reviewed-2.1`; independent Reviewer B (requested gpt-6-astra/medium). Base `8ce1fd49b5a961da705fddf0b92cac3182da427b`, digest `cb1b1dba9f6a803d7e35308917786c2863e89e73e7abddd4d2f722f2927a6210`; sole exclusion `plan/workflow-foundation/docs`, independently matched before/after review. See [R004 note](agent-review-notes.md#0410-r004--whole-batch-codeintegration-review) and [findings](agent-review-findings.md).
+
+Whole04.10 implementation and HTTP alignment were inspected against original requirements and D2+D3. No new code defect found. F012 is **FIXED** with real HTTP readiness/one-attempt retirement evidence; previous decision corrections are implemented. The lazy not-applied matrix uses the real DB reconciliation service plus a test-host verifier and real transport, satisfying the planned seam. F013's HTTP effective-state assertion and evidence-conflict wording are adopted.
+
+New blocking finding **04.10-F014 (medium, verification)**: required scoped2048KiB gate failed390/3; the three focused rechecks passed, but the full retry failed391/2 on different existing action-protocol tests. Cause remains unestablished; logs retained. Fresh migration/schema comparison and focused504/0/0 pass; stock and subsequent SQLx/build/static gates do not yet pass as a complete gate. No final batch acceptance. Root may investigate/correct and request a single affected-delta/evidence recheck; reviewer handle retained. No04.11 review performed.
+
+
+### 04.10-R005 — 2026-10-17 correction/evidence recheck — PASS
+**PASS for batch04.10**, base `8ce1fd49b5a961da705fddf0b92cac3182da427b`, digest `2be42e3e5d8b0651ad1d6bc523cf356dd6bb55ac254050b99914bede669ebc4c`; sole exclusion `plan/workflow-foundation/docs`, independently recomputed before/after checks. Same independent Reviewer B, workflow `implement-astra-reviewed-2.1`; R004 unaffected code coverage reused. [R005 note](agent-review-notes.md#0410-r005--f014-correction-and-evidence-recheck), [finding dispositions](agent-review-findings.md).
+
+F014 **RESOLVED**: test synchronization corrections preserve GUIDANCE ordinary-race oracles and negative controls; affected stock12/0/0 and corrected complete scoped/default-parallel stock2048KiB393/0/0 pass. All previously failing tests pass in the complete corrected run. SQLx prepare/check, offline all-target compilation, strict Clippy, fmt/diff, transport/regression, credential CLI and graph gates pass; fresh migration/schema equivalence and focused504/0/0 evidence retained. F012 stays fixed; no outstanding04.10 blocker or new finding. Previous failures are preserved as history.
+
+Root may accept04.10. This is not overall task completion: full combined all-target tests, full stock-stack and lease-budget gates remain the04.11 final gate. No04.11 architecture or implementation reviewed here; same reviewer handle retained.
+
+Root acceptance2026-10-17: independently matched2be42e3e…bc4c after R005 final PASS,
+verified persisted notes/dispositions and batch gates. **04.10 ACCEPTED**. Next04.11
+architecture gate, then one cohesive implementation review and combined final gates.
+
+
+### 04.11-R001 — 2026-10-17 user-stop architecture checkpoint — INCOMPLETE
+**NO PASS; architecture gate unfinished.** Reviewed portions of `logs/04.11/decision-D1.md`, SHA256 `ebb523dfdfcf5d7b937ddf48b47161bb79b70ad9bc2d890b511f63ef58b8ad83` (independently matched before review and checkpoint). User requested safe handoff and STOP before grouped findings/final verdict. No04.11 implementation exists;04.10 R005 acceptance remains valid.
+
+[Round note](agent-review-notes.md#0411-r001--architecture-review-interrupted-by-user-stop-incomplete) and [provisional findings](agent-review-findings.md) preserve F001 recovery/owner integration, F002 unestablished action bound, F003 subject byte limit and optional F004 cursor synchronization test. Author already identified F002/F003, but proposed corrections are not yet gated. Resume by completing this architecture review and obtaining a verdict before implementation. Inspection only; no DB/cargo checks or implementation edits. Reviewer stopped.
+
+
+### Final user-stop checkpoint — 2026-10-17
+
+**STOPPED at user request.** See [current handoff](HANDOFF-04.11-USER-STOP-20261017.md).
+04.10 R005/root acceptance remains valid; 04.11 R001 is incomplete, NO PASS,
+with provisional F001–F004 retained. No04.11 implementation. Reviewer returned
+stopped. Root verified fixture system identifier7697669855432439122, stopped only
+`/private/tmp/workflow0410-20261017` with pg_ctl fast stop, and confirmed no server
+running; data retained. No author checks remain active. Worktree/evidence preserved;
+no commit or deployment. Final handoff/RESUME edits are administrative documentation;
+full combined tests/stock/lease gates remain pending. Further work requires a new
+continuation instruction. Stop-checkpoint verification: `git diff --check`.
+
+### 04.11-R002 — 2026-10-17 architecture gate 04.11-D1 (completes R001) — CHANGES REQUIRED
+**No PASS** for `logs/04.11/decision-D1.md` SHA256 `ebb523dfdfcf5d7b937ddf48b47161bb79b70ad9bc2d890b511f63ef58b8ad83` (recomputed at review start; base `8ce1fd49b5a961da705fddf0b92cac3182da427b`). Reviewer B Opus 5.5, xhigh requested, fresh independent context. All D1 sections 1–6 reviewed by code/schema inspection; no checks run (assignment forbids builds/fixtures). No 04.11 implementation exists.
+
+[Round note](agent-review-notes.md#0411-r002--architecture-gate-0411-d1-completed--changes-required). Findings:
+- Actionable: [04.11-F001](agent-review-findings.md#0411-f001--r002-disposition-confirmed-revised-medium) medium — delivery-kind recovery/reconciliation outcomes across shared predicates (confirmed, expanded); [04.11-F002](agent-review-findings.md#0411-f002--r002-disposition-confirmed-medium) medium — no enforced action-count/consumption bound (confirmed); [04.11-F003](agent-review-findings.md#0411-f003--r002-disposition-confirmed-revised-low) low — subject 998-byte owner bound and destination count vs association bound (confirmed, revised); [04.11-F005](agent-review-findings.md#0411-f005--canonical-message-classification-and-per-recipient-provider-identity-are-unspecified) medium — message classification and per-recipient Message-ID/threading vs existing thread consumers (new); [04.11-F006](agent-review-findings.md#0411-f006--verification-plan-omits-ci-gates-and-the-tests-f001f005-require) low — final gate lacks network isolation/diff check and required tests (new); [04.11-F007](agent-review-findings.md#0411-f007--commit-time-and-receipt-proofs-are-not-database-derived) low — captured expiry and receipt result not DB-derived (new); [04.11-F008](agent-review-findings.md#0411-f008--effect-wait-deadline-and-resume-semantics-unspecified) low — effect-wait deadline/resume semantics (new).
+- Optional: [04.11-F004](agent-review-findings.md#0411-f004--r002-disposition-confirmed-optional) — cursor/event-production invariant and test (confirmed optional; no lost-event defect).
+- Author's unreviewed 16-page / 129-probe proposals remain unaccepted; F002 states the conditions a D2 bound must meet. Next: A revises D1 into D2 addressing all actionable findings in one revision; B rechecks by finding ID before implementation.
+
+### 04.11-R003 — 2026-10-17 correction recheck of 04.11-D2 — CHANGES REQUIRED
+**No PASS** for `logs/04.11/decision-D2.md` SHA256 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44` (recomputed at start). This is a recheck by finding ID, broadened to the contracts D2 changed, including the reaper and lease-budget changes. Inspection only; no checks run.
+
+[Round note](agent-review-notes.md#0411-r003--correction-recheck-of-0411-d2--changes-required); [dispositions](agent-review-findings.md#r003-dispositions-for-0411-f001-to-f008).
+- Resolved at decision level: F001 (except the evidence path, now F010), F002, F003, F004 (optional, adopted), F005, F006, F007, F008.
+- New, actionable:
+  - [04.11-F010](agent-review-findings.md#0411-f010--message-deliveries-with-unknown-outcome-have-no-authorized-reconciliation-path) **medium**: no verifier-attested reconciliation path for message invocations, which fails item 6 and the reconciliation Acceptance line.
+  - [04.11-F011](agent-review-findings.md#0411-f011--lease-budget-measurement-of-new-message-operations-undefined) **low**: the bound and leading-lock boundary for the new lease-budget operations are undefined.
+- New, optional: [04.11-F009](agent-review-findings.md#0411-f009--sql-backstops-admission-count-race-and-step-close-identity-optional) low, SQL backstop tightening.
+- D2 §5.3 judgement: **(b) fails the criteria.**
+  - Item 5 is met.
+  - Item 6 and the Acceptance line are not, under the accepted 04.7/04.10 reading. A test-host verifier through the real service is enough, and no production verifier is required (MCP precedent, BRIEF-04.10:60).
+  - Only an explicit user scope reduction could accept it; the R003 note states the exact choice. Root has not waived it.
+- Reaper change: sound. Lease-budget change: sound in direction (no threshold raised), but incomplete (F011).
+- Next: A corrects F010 and F011 (F009 optional) in one revision, then B rechecks those IDs and the F004/§5.1 premises that F010 touches.
+
+### 04.11-R004 — 2026-10-17 correction recheck of 04.11-D3 (delta over D2) — CHANGES REQUIRED
+**No PASS** for the effective decision D2 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44` + D3 `c462e4eb56cb76ac816fa107b7b01f7651706796b8723fed8f206c6315858a89` (both recomputed at start). This is a recheck of F009–F011 plus the premises F010 changes, broadened to the 04.7 schema D3 extends. Inspection only.
+
+[Round note](agent-review-notes.md#0411-r004--correction-recheck-of-0411-d3-delta-over-d2--changes-required); [dispositions](agent-review-findings.md#r004-dispositions-for-0411-f009-f010-f011).
+- Resolved at decision level: F009 (optional, adopted), F010, F011. The F004 premise and rows 11–13, 15–19 and 21 are consistent with the code. The remote 04.7/04.10 MCP branches are unchanged; the request-digest `target` field is a no-BC encoding change and is retested.
+- New, actionable:
+  - [04.11-F012](agent-review-findings.md#0411-f012--effect-wait-resume-bypasses-the-finality-breach-continuation-veto) **low**: the effect-wait resume bypasses the accepted finality-breach continuation veto (`completion.rs:106`).
+  - [04.11-F013](agent-review-findings.md#0411-f013--message-evidence-shape-and-projection-gaps-against-the-047-schema) **low**: message `applied_request` attribution, the reopen-guard conflict check, effect-state precedence for row 16, and conflict orientation.
+- D3 §L deferral (phase 06 reopens `model_tool`-origin agent executions): **acceptable** against phase 04 items 4–6 and Acceptance, under three conditions recorded in the note: BRIEF-04.11 carries the obligation and its trigger; message outcomes stay out of the shared `continue_on`; a port-seam test is added.
+- Next: A amends with a small delta for F012 and F013, then B rechecks those two IDs only.
+
+### 04.11-R005 — 2026-10-17 correction recheck of 04.11-D4 (delta over D2+D3) — PASS
+**PASS at the architecture gate** for the effective decision:
+- D2 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44`;
+- D3 `c462e4eb56cb76ac816fa107b7b01f7651706796b8723fed8f206c6315858a89`;
+- D4 `6bf5efcb3de54949df516b45725c8c9d4fe8cc1ff968a38671a367862e1fa276`.
+
+All three hashes were recomputed at start and at end. Inspection only.
+
+[Round note](agent-review-notes.md#0411-r005--correction-recheck-of-0411-d4-delta-over-d2d3--pass); [dispositions](agent-review-findings.md#r005-dispositions-for-0411-f012-f013).
+- Resolved at decision level:
+  - F012: the effect-resume conflict veto, giving the Reconcile park that `complete_io` would.
+  - F013 items 1–4.
+  - The three R004 §L conditions.
+- The renamed `DeliveryReopened` outcome (NULL `scheduled_job_id`) is required by the existing command CHECK and the claim-episode binding.
+- No open actionable 04.11 decision findings. Optional F014 (low): clarify the NULL shape alternative, and add conflict refusal at publication/`begin_part`.
+- This PASS does not cover implementation, tests, the combined phase 04 gate or the whole-batch review; all remain required. The lightly reviewed areas listed in R003–R005 are carried into the batch review.

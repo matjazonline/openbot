@@ -15,11 +15,14 @@ pub trait WorkflowHandler: Send + Sync {
     /// Pure, nonblocking capability decision. Missing support spends no attempt.
     fn supports(&self, kind: &WorkflowStepKind) -> bool;
     /// Effect permission, receipts and replay safety remain the handler's contract.
+    /// A handler for an action-owned kind (`actions::marker_owned_effect_kind`) must
+    /// perform effects only through ActionService's marker-first dispatch: retirement
+    /// treats "no marker" as "no effect" for those kinds.
     async fn execute(
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> WorkflowHandlerResult;
+    ) -> WorkflowHandlerOutcome;
 }
 
 pub struct WorkflowWorker<'a, P, H> {
@@ -113,6 +116,12 @@ where
             }
             PollWork::ExhaustedPending => {
                 self.port.retire_exhausted_work(scope, self.lease).await?;
+                return Ok(WorkDisposition::Done);
+            }
+            PollWork::MessageReceipt => {
+                self.port
+                    .consume_message_receipts(scope, self.lease)
+                    .await?;
                 return Ok(WorkDisposition::Done);
             }
             PollWork::Job => {}

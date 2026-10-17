@@ -31,6 +31,10 @@ stored_enum! {
         Outreach => "outreach",
         /// A platform notice: a bounce, an approval request, a stop notice, a schedule digest.
         Notification => "notification",
+        /// A workflow `message.send` opening a conversation with a company member.
+        WorkflowSend => "workflow_send",
+        /// A workflow `message.reply` answering the exact source message it names.
+        WorkflowReply => "workflow_reply",
     }
 }
 
@@ -41,8 +45,8 @@ impl DeliveryPurpose {
     /// and refuses the starting kind; that is the entire meaning of the policy, stated once.
     pub const fn initiates_conversation(self) -> bool {
         match self {
-            Self::Outreach => true,
-            Self::Reply | Self::Mirror | Self::Notification => false,
+            Self::Outreach | Self::WorkflowSend => true,
+            Self::Reply | Self::Mirror | Self::Notification | Self::WorkflowReply => false,
         }
     }
 
@@ -60,6 +64,8 @@ impl DeliveryPurpose {
             Self::Mirror => "Mirror",
             Self::Outreach => "Outreach",
             Self::Notification => "Notification",
+            Self::WorkflowSend => "Workflow message",
+            Self::WorkflowReply => "Workflow reply",
         }
     }
 }
@@ -217,6 +223,12 @@ stored_enum! {
         Superseded => "superseded",
         /// The lease lapsed without the run reporting anything.
         LeaseExpired => "lease_expired",
+        /// Verified evidence proved an earlier request was never applied; the delivery may retry.
+        ReconciledNotApplied => "reconciled_not_applied",
+        /// Verified evidence proved non-application, but no delivery attempt remains.
+        NotAppliedExhausted => "not_applied_exhausted",
+        /// The reopening proof expired before the retried request reached the provider.
+        ReconciliationProofExpired => "reconciliation_proof_expired",
     }
 }
 
@@ -231,6 +243,16 @@ stored_enum! {
         ChannelAgentRemoved => "channel_agent_removed",
         /// The task that produced the delivery was stopped.
         TaskStopped => "task_stopped",
+        /// The workflow run that produced the delivery was cancelled.
+        WorkflowCancelled => "workflow_cancelled",
+        /// The workflow run reached its deadline or ended before the delivery went out.
+        WorkflowExpired => "workflow_expired",
+        /// The run actor's current messaging authority was revoked before the send.
+        WorkflowRevoked => "workflow_revoked",
+        /// The frozen recipient is no longer a current member with the frozen address.
+        RecipientRevoked => "recipient_revoked",
+        /// A finality breach vetoed further provider entries for the invocation.
+        EvidenceConflict => "evidence_conflict",
     }
 }
 
@@ -288,7 +310,10 @@ impl FailureClass {
             | Self::Internal
             | Self::DependencyFailed
             | Self::Superseded
-            | Self::LeaseExpired => false,
+            | Self::LeaseExpired
+            | Self::ReconciledNotApplied
+            | Self::NotAppliedExhausted
+            | Self::ReconciliationProofExpired => false,
         }
     }
 }

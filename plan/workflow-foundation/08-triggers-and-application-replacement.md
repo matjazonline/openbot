@@ -78,3 +78,11 @@ Do not build a second SOP engine or install the older workflow-library architect
 - Existing ingress/access/threading protections remain exercised against the new routes.
 - No runtime or UI path depends on removed channel execution settings or alternate harness selection.
 - Exhaustive caller searches identify no remaining legacy execution entry points.
+
+## 04.10 handler composition obligation
+
+Every handler advertising `mcp.call`, `http.request` or `tool.call` must route
+effects exclusively through ActionService's marker-first local/remote protocol.
+The shared `marker_owned_effect_kind` recovery classifier relies on this invariant.
+A new tool bridge must preserve it or change the classifier before integration.
+See [BRIEF-04.10](BRIEF-04.10.md) and finding04.10-F011.

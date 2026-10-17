@@ -73,16 +73,36 @@ pub(super) fn candidate(row: CandidateRow) -> AppResult<PollCandidate> {
             "deadline" => PollWork::ExpiredRun,
             "exhausted" => PollWork::ExhaustedPending,
             "wait" => PollWork::Wait,
+            "message_receipt" => PollWork::MessageReceipt,
             _ => return Err(invalid()),
         },
     })
 }
 
+/// An action of this execution with delivery events beyond its cursor and no backoff pending.
+macro_rules! message_receipt_candidates {
+    () => {
+        r#"EXISTS (SELECT 1 FROM workflow_message_actions AS action
+                WHERE action.company_id = execution.company_id AND action.execution_id = execution.id
+                  AND action.state IN ('pending','uncertain') AND action.consume_after <= clock_timestamp()
+                  AND EXISTS (SELECT 1 FROM workflow_message_delivery_events AS event
+                      WHERE event.company_id = action.company_id AND event.invocation_id = action.invocation_id
+                        AND event.seq > action.consumed_through))"#
+    };
+}
+
 /// Shared eligibility for diagnostics and fair discovery. Neither grants ownership.
-pub(super) const CANDIDATES_SQL: &str = r#"
+///
+/// Message receipt work (04.11-D3 §E) is discovered on live, terminal and cancelled runs and
+/// whether or not the execution completed: an action with unconsumed delivery events.
+pub(super) const CANDIDATES_SQL: &str = concat!(
+    r#"
                 SELECT job.company_id, execution.run_id, execution.id AS execution_id,
                        job.id AS job_id,
-                       CASE WHEN run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp() THEN 'deadline'
+                       CASE WHEN execution.completed_at IS NULL AND run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp() THEN 'deadline'
+                            WHEN "#,
+    message_receipt_candidates!(),
+    r#" THEN 'message_receipt'
                             WHEN wait.id IS NOT NULL THEN 'wait'
                             WHEN job.status = 'processing' THEN 'expired'
                             WHEN job.retry_count >= job.max_retries THEN 'exhausted' ELSE 'job' END AS work
@@ -94,7 +114,7 @@ pub(super) const CANDIDATES_SQL: &str = r#"
                 LEFT JOIN workflow_waits AS wait
                   ON wait.company_id = execution.company_id AND wait.execution_id = execution.id
                  AND wait.run_id = run.id AND wait.state = 'waiting'
-                WHERE job.queue_kind = 'workflow' AND execution.completed_at IS NULL
+                WHERE job.queue_kind = 'workflow' AND ((execution.completed_at IS NULL
                   AND (
                     (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
                     OR (wait.id IS NULL AND run.state IN ('queued','running')
@@ -108,6 +128,18 @@ pub(super) const CANDIDATES_SQL: &str = r#"
                         OR EXISTS (SELECT 1 FROM workflow_wait_events AS event
                             WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
                               AND event.execution_id = wait.execution_id
-                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation)))
-                  )
-"#;
+                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation)
+                        -- An effect wait wakes on its action's receipt or on a finality breach
+                        -- (04.11-D2 §4.4, D4 §M); otherwise only at the run deadline.
+                        OR (wait.reason = 'effect' AND (
+                            EXISTS (SELECT 1 FROM workflow_message_actions AS action
+                                JOIN workflow_action_receipts AS receipt
+                                  ON receipt.company_id = action.company_id AND receipt.invocation_id = action.invocation_id
+                                WHERE action.company_id = wait.company_id AND action.execution_id = wait.execution_id
+                                  AND action.wait_id = wait.id)
+                            OR workflow_action_has_evidence_conflict(wait.company_id, wait.execution_id)))))
+                  )) OR "#,
+    message_receipt_candidates!(),
+    r#")
+"#
+);

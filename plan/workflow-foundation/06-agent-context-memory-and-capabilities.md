@@ -119,3 +119,11 @@ before model calls and retain uncertain provider usage reservations across recov
 - Structured-output repair, token limits, provider deadlines, and cancellation are enforced.
 - Agent outputs and internal feedback are not automatically sent or saved to memory.
 - Tests and configuration no longer require or expose the alternate runtime.
+
+## 04.10 handler composition obligation
+
+Every handler advertising `mcp.call`, `http.request` or `tool.call` must route
+effects exclusively through ActionService's marker-first local/remote protocol.
+The shared `marker_owned_effect_kind` recovery classifier relies on this invariant.
+A new tool bridge must preserve it or change the classifier before integration.
+See [BRIEF-04.10](BRIEF-04.10.md) and finding04.10-F011.

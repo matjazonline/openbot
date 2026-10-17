@@ -281,6 +281,8 @@ impl RunHost {
                 name: saved.identity.name.clone(),
                 description: saved.description.clone(),
                 input_schema: saved.input_schema.clone(),
+                // Agent declarations carry no output contract; only the input is compared.
+                output_schema: None,
             },
             &discovered,
         )?;
@@ -292,7 +294,7 @@ impl RunHost {
             McpClaim::Completed(value) => Ok(value),
             McpClaim::Execute => match session.call(&saved.identity.name, args).await {
                 Ok(value) => {
-                    let value = bounded_result(value);
+                    let value = bounded_result(value.envelope());
                     self.journal
                         .complete(&self.scope, invocation_id, &value)
                         .await?;

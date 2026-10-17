@@ -19,14 +19,20 @@ use uuid::Uuid;
 use super::{
     DeliveryDb, attempt_failed_set,
     cancellation::{
-        HeldDelivery, lock_held_delivery_on, settle_cancelled_on, settle_stranded_cancellations_on,
+        HeldDelivery, cancel_held_delivery_on, lock_held_delivery_on, settle_cancelled_on,
+        settle_stranded_cancellations_on,
     },
     claimable_statuses_sql,
     enqueue::{insert_standalone_delivery_on, load_parts_on},
     qualified_delivery_columns, retry_delay_sql, sql_status_list,
 };
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{
+        PostgresPersistence,
+        workflow::message::receipts::{
+            WorkflowDeliveryAdmission, reopen_proof_expired_on, workflow_delivery_admission_on,
+        },
+    },
     app_error::{AppError, AppResult},
     entities::transport::{
         DeliveryId, DeliveryPartId, DeliveryPartStatus, DeliveryStatus, FailureClass,
@@ -170,6 +176,9 @@ impl DeliveryQueue for PostgresPersistence {
         let claimable_part =
             sql_part_list(&[DeliveryPartStatus::Prepared, DeliveryPartStatus::Retryable]);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // A workflow-linked delivery rechecks the run, its actor's current authority and the
+        // recipient first, in the company -> run -> parent order the workflow side takes.
+        let admission = workflow_delivery_admission_on(&mut tx, fence.row.as_uuid()).await?;
         // The parent's row lock first. A cancellation that won it has already recorded its
         // intent, and no further provider request may start; one that has not yet won it waits
         // for this commit and then reports the part as potentially sent.
@@ -184,6 +193,23 @@ impl DeliveryQueue for PostgresPersistence {
                 return Ok(outcome);
             }
             HeldDelivery::Live => {}
+        }
+        match admission {
+            WorkflowDeliveryAdmission::NotWorkflow => {}
+            // Refused before any provider entry: the unsent work is cancelled and settled.
+            WorkflowDeliveryAdmission::Refuse(reason) => {
+                cancel_held_delivery_on(&mut tx, fence.row.as_uuid(), reason).await?;
+                let outcome = settle_cancelled_on(&mut tx, fence, reason, None).await?;
+                tx.commit().await.map_err(AppError::from)?;
+                return Ok(outcome);
+            }
+            WorkflowDeliveryAdmission::Proceed => {
+                if reopen_proof_expired_on(&mut tx, fence.row.as_uuid(), part_id.as_uuid()).await? {
+                    let outcome = expire_reopened_part_on(&mut tx, fence, part_id).await?;
+                    tx.commit().await.map_err(AppError::from)?;
+                    return Ok(outcome);
+                }
+            }
         }
         // Joined to the parent and fenced on its execution: the part has no lease of its own, so
         // "may I send this?" is answered entirely by whether this run still owns the delivery.
@@ -237,8 +263,10 @@ impl DeliveryQueue for PostgresPersistence {
                       updated_at = CURRENT_TIMESTAMP
                  FROM message_deliveries AS delivery
                 WHERE part.id = $1 AND part.delivery_id = delivery.id
+                  AND part.status = '{sending_part}'
                   AND {live_fence}"#,
             delivered_part = DeliveryPartStatus::Delivered.as_str(),
+            sending_part = DeliveryPartStatus::Sending.as_str(),
             live_fence = live_fence_sql(),
         ))
         .bind(result.part_id.as_uuid())
@@ -259,7 +287,8 @@ impl DeliveryQueue for PostgresPersistence {
         .map_err(AppError::from)?;
 
         if updated.rows_affected() != 1 {
-            // Either this run no longer owns the delivery, or the part is not one of its own.
+            // Either this run no longer owns the delivery, the part is not one of its own, or the
+            // part already took its first outcome: a duplicate callback changes nothing.
             // Rolled back rather than partially applied: the replacement execution owns the
             // outcome now, and this run's provider call is that execution's problem to reconcile.
             tx.rollback().await.map_err(AppError::from)?;
@@ -572,8 +601,10 @@ async fn reap_expired_leases_on(tx: &mut Transaction<'_, Postgres>) -> AppResult
         sending = DeliveryStatus::Sending.as_str(),
     );
 
+    // Parents first, in id order, the lock every other producer holds before a transition, so a
+    // workflow receipt consumer locking parents in the same order never deadlocks with the sweep.
     let stranded: Vec<Uuid> = sqlx::query_scalar(&format!(
-        "SELECT id FROM message_deliveries WHERE {expired}"
+        "SELECT id FROM message_deliveries WHERE {expired} ORDER BY id FOR UPDATE SKIP LOCKED"
     ))
     .fetch_all(&mut **tx)
     .await
@@ -644,6 +675,55 @@ async fn reap_expired_leases_on(tx: &mut Transaction<'_, Postgres>) -> AppResult
     .map_err(AppError::from)?;
 
     Ok(unknown.rows_affected() + cancelled + retried.rows_affected())
+}
+
+/// A reopened part whose consuming proof expired before provider entry goes back to
+/// `outcome_unknown` with no call (04.11-D3 §I); the parent's lease is released.
+async fn expire_reopened_part_on(
+    tx: &mut Transaction<'_, Postgres>,
+    fence: &ExecutionLease<DeliveryId>,
+    part_id: DeliveryPartId,
+) -> AppResult<DeliveryOutcome> {
+    let class = FailureClass::ReconciliationProofExpired.as_str();
+    let detail = "The reconciliation proof expired before the provider request started";
+    let part = sqlx::query(&format!(
+        r#"UPDATE message_delivery_parts
+              SET status = '{unknown_part}', last_error_class = '{class}',
+                  last_error_detail = $3, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1 AND delivery_id = $2 AND status = '{retryable_part}'"#,
+        unknown_part = DeliveryPartStatus::OutcomeUnknown.as_str(),
+        retryable_part = DeliveryPartStatus::Retryable.as_str(),
+    ))
+    .bind(part_id.as_uuid())
+    .bind(fence.row.as_uuid())
+    .bind(detail)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if part.rows_affected() != 1 {
+        return Ok(DeliveryOutcome::LeaseLost);
+    }
+    let parent = sqlx::query(&format!(
+        r#"UPDATE message_deliveries
+              SET status = '{unknown}', last_error_class = '{class}', last_error_detail = $4,
+                  execution_id = NULL, owner_worker_id = NULL,
+                  locked_at = NULL, lock_expires_at = NULL,
+                  updated_at = CURRENT_TIMESTAMP
+            WHERE {fence}"#,
+        unknown = DeliveryStatus::OutcomeUnknown.as_str(),
+        fence = own_row_fence_sql(),
+    ))
+    .bind(fence.row.as_uuid())
+    .bind(fence.execution.as_uuid())
+    .bind(fence.owner.as_uuid())
+    .bind(detail)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if parent.rows_affected() != 1 {
+        return Ok(DeliveryOutcome::LeaseLost);
+    }
+    Ok(DeliveryOutcome::Cancelled(DeliveryStatus::OutcomeUnknown))
 }
 
 /// Dead-letter the descendants of a dependency that can never be delivered.

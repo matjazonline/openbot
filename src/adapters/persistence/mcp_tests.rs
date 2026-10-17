@@ -1,5 +1,6 @@
 use super::{PostgresPersistence, credentials::CredentialCipher, test_support::test_pool};
 use crate::{
+    app_error::AppError,
     entities::{harness::HarnessKind, mcp::*},
     use_cases::{
         agent::{AgentPersistence, AgentWrite},
@@ -41,6 +42,7 @@ fn write(slug: &str) -> McpConnectionWrite {
             name: name.clone(),
             description: "Search".into(),
             input_schema: serde_json::json!({"type":"object"}),
+            output_schema: None,
         }],
         tool_grants: vec![name],
     }
@@ -134,10 +136,27 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
     .await
     .unwrap();
     assert_eq!(p.agent_mcp_selection(company, a).await.unwrap(), selected);
-    let mut changed = write("crm");
-    changed.endpoint = "https://example.org/mcp".to_string().try_into().unwrap();
+    // 04.10: an endpoint is fixed for the connection's lifetime (frozen workflow actions
+    // target the connection id). The writer refuses, and the trigger backs it up.
+    let mut moved = write("crm");
+    moved.endpoint = "https://example.org/mcp".to_string().try_into().unwrap();
+    assert!(matches!(
+        p.update_mcp_connection(company, first.id, rev, moved).await,
+        Err(AppError::BadRequest(_))
+    ));
+    assert!(
+        sqlx::query("UPDATE company_mcp_connections SET endpoint_url='https://example.org/mcp' WHERE company_id=$1 AND id=$2")
+            .bind(company)
+            .bind(first.id)
+            .execute(&pool)
+            .await
+            .is_err()
+    );
+    // Changing authentication still rebinds: the stored credential is discarded.
+    let mut rebound = write("crm");
+    rebound.auth = McpAuth::None;
     let changed = p
-        .update_mcp_connection(company, first.id, rev, changed)
+        .update_mcp_connection(company, first.id, rev, rebound)
         .await
         .unwrap();
     assert!(!changed.secret_set);
@@ -335,6 +354,7 @@ async fn mcp_selection_and_effective_grant_limits_reject_the_whole_edit() {
             name: format!("tool-{i}").try_into().unwrap(),
             description: String::new(),
             input_schema: serde_json::json!({"type":"object"}),
+            output_schema: None,
         })
         .collect();
     definition.tool_grants = definition
@@ -367,6 +387,7 @@ async fn mcp_selection_and_effective_grant_limits_reject_the_whole_edit() {
         name: "extra".to_string().try_into().unwrap(),
         description: String::new(),
         input_schema: serde_json::json!({}),
+        output_schema: None,
     });
     definition.tool_grants = definition
         .discovered_tools

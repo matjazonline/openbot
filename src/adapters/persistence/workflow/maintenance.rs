@@ -33,6 +33,14 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
     retire_jobs(db, scope.company, scope.run, RetirementCause::Deadline).await?;
     sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    message::receipts::cancel_message_deliveries_on(
+        db,
+        scope.company,
+        scope.run,
+        None,
+        crate::entities::transport::DeliveryCancellationReason::WorkflowExpired,
+    )
+    .await?;
     sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     waits::audit(db, scope, "run_deadline_expired").await?;

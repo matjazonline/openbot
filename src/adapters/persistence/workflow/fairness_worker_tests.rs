@@ -46,23 +46,28 @@ impl WorkflowHandler for Gated {
         &self,
         _: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> WorkflowHandlerResult {
-        let company = claim.fence.scope.company.as_uuid();
-        let live = self.live.fetch_add(1, Ordering::SeqCst) + 1;
-        self.maximum.fetch_max(live, Ordering::SeqCst);
-        {
-            let mut companies = self.companies.lock().unwrap();
-            let count = companies.entry(company).or_default();
-            *count += 1;
-            assert!(*count <= 1, "per-company actual concurrency exceeded");
-        }
-        let _guard = Invocation {
-            handler: self,
-            company,
-        };
-        self.started.send(company).await.unwrap();
-        self.gates[&company].acquire().await.unwrap().forget();
-        Ok(json!({"items":[],"token_count":0}))
+    ) -> WorkflowHandlerOutcome {
+        WorkflowHandlerOutcome::Completed(
+            async {
+                let company = claim.fence.scope.company.as_uuid();
+                let live = self.live.fetch_add(1, Ordering::SeqCst) + 1;
+                self.maximum.fetch_max(live, Ordering::SeqCst);
+                {
+                    let mut companies = self.companies.lock().unwrap();
+                    let count = companies.entry(company).or_default();
+                    *count += 1;
+                    assert!(*count <= 1, "per-company actual concurrency exceeded");
+                }
+                let _guard = Invocation {
+                    handler: self,
+                    company,
+                };
+                self.started.send(company).await.unwrap();
+                self.gates[&company].acquire().await.unwrap().forget();
+                Ok(json!({"items":[],"token_count":0}))
+            }
+            .await,
+        )
     }
 }
 fn runner<'a>(
@@ -198,14 +203,23 @@ impl WorkflowHandler for Selective {
     fn supports(&self, kind: &WorkflowStepKind) -> bool {
         kind == &self.kind
     }
-    async fn execute(&self, kind: &WorkflowStepKind, _: &ClaimedWorkflow) -> WorkflowHandlerResult {
-        assert_eq!(kind, &self.kind);
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        Ok(if kind.0 == "context.load" {
-            json!({"items":[],"token_count":0})
-        } else {
-            json!({"items":[]})
-        })
+    async fn execute(
+        &self,
+        kind: &WorkflowStepKind,
+        _: &ClaimedWorkflow,
+    ) -> WorkflowHandlerOutcome {
+        WorkflowHandlerOutcome::Completed(
+            async {
+                assert_eq!(kind, &self.kind);
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                Ok(if kind.0 == "context.load" {
+                    json!({"items":[],"token_count":0})
+                } else {
+                    json!({"items":[]})
+                })
+            }
+            .await,
+        )
     }
 }
 

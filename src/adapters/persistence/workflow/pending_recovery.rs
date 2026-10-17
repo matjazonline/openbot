@@ -135,10 +135,13 @@ async fn unknown_effect(db: &mut PgConnection, scope: ActivationRequest) -> AppR
         .steps
         .get(&step)
         .ok_or_else(invalid)?;
+    // Called only when the execution has no marker: an action-owned kind cannot then
+    // have sent anything (see `marker_owned_effect_kind`).
+    let kind = definition.step_type.as_str();
     Ok(!matches!(
-        definition.step_type.as_str(),
+        kind,
         "data.map" | "decision.rule" | "context.load" | "memory.load" | "wait.event" | "wait.timer"
-    ))
+    ) && !crate::application::workflow::actions::marker_owned_effect_kind(kind))
 }
 
 pub(super) async fn prepare_pure(

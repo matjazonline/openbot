@@ -17,6 +17,8 @@ pub mod fixtures;
 pub mod http;
 pub mod lease;
 pub mod lifecycle;
+pub mod mcp;
+pub mod message;
 mod ports;
 pub mod publication;
 pub mod registry;

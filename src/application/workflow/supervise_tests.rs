@@ -33,6 +33,9 @@ struct Port {
     calls: AtomicUsize,
     dropped: Arc<AtomicBool>,
     valid: bool,
+    /// What `confirm_suspension` proves; `None` is a persistence error.
+    suspension: Option<bool>,
+    released: AtomicUsize,
 }
 #[async_trait]
 impl WorkflowLeases for Port {
@@ -81,7 +84,16 @@ impl WorkflowLeases for Port {
             self.dropped.load(Ordering::SeqCst),
             "actual future must be gone BEFORE cleanup"
         );
+        self.released.fetch_add(1, Ordering::SeqCst);
         Ok(true)
+    }
+    async fn confirm_suspension(
+        &self,
+        _: WorkflowFence,
+        _: crate::domain::workflow::WaitId,
+    ) -> AppResult<bool> {
+        self.suspension
+            .ok_or_else(|| AppError::Database("injected".into()))
     }
 }
 struct Handler {
@@ -139,6 +151,8 @@ fn fixture(renewal: Renewal, duration: u64) -> (Port, ClaimedWorkflow, Handler) 
             calls: AtomicUsize::new(0),
             dropped: dropped.clone(),
             valid: true,
+            suspension: Some(true),
+            released: AtomicUsize::new(0),
         },
         claim,
         Handler {
@@ -340,4 +354,45 @@ async fn workflow_io_supervision_stops_renewing_a_deadline_capped_window() {
         "{renewals:?}"
     );
     assert_eq!(renewals.len(), 1, "{renewals:?}");
+}
+
+/// A handler whose own commit parked the step (04.11-D2 §3): the supervisor proves the exact
+/// close and never completes or releases the parked attempt.
+#[tokio::test(start_paused = true)]
+async fn workflow_message_wait_supervisor_confirms_suspension_and_never_releases() {
+    let wait = crate::domain::workflow::WaitId::new(Uuid::new_v4());
+    for (suspension, expected) in [
+        (Some(true), None),
+        (Some(false), Some(StopReason::LeaseLost)),
+        (None, Some(StopReason::Persistence)),
+    ] {
+        let (mut port, claim, _) = fixture(Renewal::Success, 1);
+        port.suspension = suspension;
+        port.dropped.store(true, Ordering::SeqCst);
+        let parked = async move {
+            WorkflowHandlerOutcome::Suspended(crate::application::workflow::lease::SuspendedWorkflow {
+                wait,
+            })
+        };
+        let result = supervise_io(
+            &port,
+            claim,
+            policy(),
+            Instant::now() + Duration::from_secs(20),
+            parked,
+            std::future::pending(),
+        )
+        .await;
+        match expected {
+            None => assert!(
+                matches!(result, SupervisedResult::Suspended(actual) if actual == wait),
+                "{result:?}"
+            ),
+            Some(reason) => assert!(
+                matches!(result, SupervisedResult::Stopped(actual) if actual == reason),
+                "{result:?}"
+            ),
+        }
+        assert_eq!(port.released.load(Ordering::SeqCst), 0);
+    }
 }

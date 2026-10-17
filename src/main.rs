@@ -171,6 +171,7 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/sop/02-operational-techniques.md",
     "plan/tenant-owned-execution-backends.md",
     "plan/workflow-foundation/README.md",
+    "plan/workflow-foundation/BRIEF-04.10.md",
     "plan/workflow-library/README.md",
     "plan/workflows/configurable-workflows-architecture.md",
     "plan/workflows/post-approval-workflow-execution.md",

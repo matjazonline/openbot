@@ -107,14 +107,13 @@ async fn replace_grants(
     id: Uuid,
     grants: &[McpToolName],
 ) -> AppResult<()> {
-    sqlx::query("DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2")
-        .bind(company)
-        .bind(id)
-        .execute(&mut **tx)
-        .await?;
+    // A set difference, not delete-and-reinsert: workflow MCP operations reference their grant
+    // with ON DELETE CASCADE, so only grants actually removed may revoke those approvals.
     let names: Vec<&str> = grants.iter().map(McpToolName::as_str).collect();
-    sqlx::query("INSERT INTO company_mcp_tool_grants (company_id, connection_id, tool_name) SELECT $1, $2, unnest($3::text[])")
-        .bind(company).bind(id).bind(names).execute(&mut **tx).await?;
+    sqlx::query("DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2 AND NOT (tool_name = ANY($3::text[]))")
+        .bind(company).bind(id).bind(&names).execute(&mut **tx).await?;
+    sqlx::query("INSERT INTO company_mcp_tool_grants (company_id, connection_id, tool_name) SELECT $1, $2, unnest($3::text[]) ON CONFLICT (company_id, connection_id, tool_name) DO NOTHING")
+        .bind(company).bind(id).bind(&names).execute(&mut **tx).await?;
     Ok(())
 }
 /// Called after tentative changes, before commit. Error rolls the whole operation back.
@@ -242,7 +241,10 @@ impl McpPersistence for PostgresPersistence {
         if old.revision != expected_revision {
             return Err(conflict());
         }
-        let rebind = old.endpoint != write.endpoint || old.auth != write.auth;
+        if old.endpoint != write.endpoint {
+            return Err(crate::use_cases::mcp::endpoint_fixed());
+        }
+        let rebind = old.auth != write.auth;
         if rebind {
             sqlx::query(
                 "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
@@ -276,6 +278,14 @@ impl McpPersistence for PostgresPersistence {
         }
         sqlx::query(
             "DELETE FROM company_mcp_credentials WHERE company_id = $1 AND connection_id = $2",
+        )
+        .bind(company_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        // The soft-deleted row stays for audit; its workflow approvals do not.
+        sqlx::query(
+            "DELETE FROM workflow_mcp_operations WHERE company_id = $1 AND connection_id = $2",
         )
         .bind(company_id)
         .bind(id)

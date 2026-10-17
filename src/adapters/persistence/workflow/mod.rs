@@ -37,6 +37,8 @@ mod fairness;
 pub mod http;
 mod lease;
 mod lease_claim;
+pub mod mcp;
+pub mod message;
 mod persistence_bound;
 // Exact historical owner is compiled only for pre-episode migration fixtures.
 mod resources;

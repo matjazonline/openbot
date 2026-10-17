@@ -1500,3 +1500,329 @@
 - **Ignored accounting and limits:** exact same 22 ignored names in full and stock-stack runs: 19 HydraDB optional/live adapter tests, two SMTP live-DNS smokes, one JavaScript dump developer aid. They are existing exclusions outside this HTTP batch, not credited as executed coverage. No task-required check remains unavailable. The macOS network guard pass is current local evidence; it does not claim a remote CI run or every platform's isolation implementation. Production deployment, later-phase harness/startup replacement, UI and MCP action work remain outside scope.
 - **Finding disposition/outcome:** no new findings; 04.9-F001–F003 remain fixed at decision and implementation level per R002/R003. **PASS — final combined 04.9 code, documentation and verification for digest `1ad9356a5a29195853d8a5be8e53e4e384465e3365db0ed456ea35f35c76f08b`.** R003's outstanding verification conditions are now satisfied. Root owns formal acceptance and task-fixture shutdown; no implementation edits or resource cleanup by B.
 - **Process feedback:** retaining the same reviewer and immutable code review while gates completed avoided redundant review and preserved gaps explicitly until evidence existed. No additional instruction change supported beyond R003's crash-recovery comparison-commit/evidence lesson. Original R003 pending outcome remains intact; this follow-up supplies final evidence.
+- **Follow-up 2026-10-17 (04.10-R002, implement-opus-reviewed-2.1, Reviewer B Opus 5.5):** later-discovered miss. The accepted HTTP handler (`application/workflow/http_runtime.rs:106-123`) labels every non-committed outcome, including pre-marker failures, as Terminal/EffectOutcomeUnknown. With no marker, `retire_on` keeps that label, parks the run in waiting/reconciliation and records no reconciliation fact, so the park is permanent until the run deadline. Logged as [04.10-F008](agent-review-findings.md#0410-f008--http-handler-parks-pre-marker-failures-with-nothing-to-reconcile-align-with-d2-in-this-batch). R003/R004 did not assert run/attempt outcomes for HTTP revocation; the test `http_tests.rs:114-190` checks only that no network call was made. The original PASS text above is preserved.
+
+## 04.10-R001 — Architecture gate 04.10-D1 — CHANGES REQUIRED
+- Identity: 2026-10-17; workflow implement-opus-reviewed-2.1; batch 04.10 MCP, stage architecture gate. Reviewer B: Opus 5.5 (claude-opus-5-5), xhigh requested per the TASK workers table; the effective effort and context occupancy are not visible to the reviewer. Independent context, no author transcript. Artifact: base `8ce1fd4` (HEAD), decision 04.10-D1 `logs/04.10/decision-D1.md`, SHA256 `3f10553022b5d631876b8174d57d0ea270ff3c7d150b25d5812fd776e285035e`, verified before review. The copy under TASK.md "Architecture decision 04.10-D1" is identical after trailing-whitespace normalization. No code digest, because this is a pre-implementation gate. Records: [TASK](TASK.md) §"04.10 + 04.11", [REVIEW](REVIEW.md) §04.10.
+- Requirements read independently: phase 04 "MCP tool calls over HTTP", "Action contract", "Execution and uncertainty" 1–7 and "Acceptance" (the MCP bullets plus direct/step parity and competing dispatchers); EXPANSION row 04.10 and its cross-point preservation paragraph; the deferred obligations in BRIEF-04.1 (direct MCP through the service), 04.2 (MCP contract authority), 04.4 (no replay from MCP metadata), 04.5 (`isError` classification), 04.6 (parking) and 04.9 (accepted HTTP owner/runtime pattern); root/src/application/persistence AGENTS.md.
+- Code inspected (inspection only):
+  - MCP catalog: DDL in init_schema (connections/credentials/grants and their FKs); `persistence/mcp.rs` (company FOR UPDATE lock order, endpoint/auth rebind, delete-all `replace_grants`, soft delete that keeps grants, `replace_mcp_token` bumping `credential_revision`); `use_cases/mcp.rs` (owner/admin `managed_company`, refresh grant retention); JSON/UI write builders, which reuse stored discovery only.
+  - Credentials: `credential_rotation.rs` (ciphertext CAS, no revision bump, MCP rows already in the inventory).
+  - Adapter: `adapters/mcp/{mod,http,worker,policy}.rs` (`EndpointPolicy` wrapped by 04.9 `HttpDestinationPolicy`, try-acquire 32 global/4 per endpoint, `reinit_on_expired_session=false`, `get_stream` disabled, 1 MiB per-operation budget, `notifications/cancelled` plus close on drop).
+  - Legacy agent runtime: `services/mcp_runtime.rs` (discover-then-claim, `definition_revision`).
+  - 04.9 HTTP owner: `persistence/workflow/{http,http_runtime}.rs` and `application/workflow/http_runtime.rs`.
+  - Action dispatch: `action_dispatch.rs` (prelock → fence → attempt → run → `lock_current` → intent); `supervise_remote` and every caller of `validate_action_result`; the `workflow_action_effect_states` view.
+  - Recovery: `workflow_action_retry_safe`; `recovery.rs` `retire_on`/`report`/`settle_run`; domain `RecoveryPolicy::decide`; `supervise_io` → `lease::retire`.
+  - Publication and binding: registry `mcp.call` contract and MCP content schema; `resources.rs` `inspect_on`/`check_readiness`; `authority.rs` `authorize_company`/`supported_publication`; ToolSnapshot/ApprovedActionPolicy; TypeName rules.
+- Assumptions challenged:
+  1. Reuse of 04.9 rather than duplication: confirmed. The guarded transport, encrypted credential envelopes and rotation inventory are shared, the HTTP authority/runtime pattern is mirrored, the redaction helper is to be shared, and there is no parallel connection table.
+  2. Lock order: catalog writes (company FOR UPDATE), registration (`authorize_company` NO KEY UPDATE, then connection) and dispatch (`prelock_on`, then fence/attempt/run, then connection/operation FOR SHARE) all take the company row first, and no catalog path takes run locks. No inversion found.
+  3. No network I/O inside transactions in either the eager or the lazy path.
+  4. At most one `tools/call`: it requires marker and entry. The eager session is single-use, reinit is off, and `get_stream` is disabled, so neither SSE resumption nor reconnect can resend. Losing claimants close unused sessions.
+  5. The effect-state hint only skips I/O and reservation still decides. A stale hint allows discovery-only I/O (F005).
+  6. The `isError` label is overridden by the DB predicate (F002).
+  7. Pre-marker and non-committed outcomes are not specified (F001).
+  8. An immutable endpoint with a mutable auth mode cannot reach another service, and the `credential_revision` check covers token replacement.
+  9. Grants are limited to 32 per connection, so the 256-operation bound is moot but harmless.
+- Checks: SHA256 recomputed (match). No tests, fixture/DB access or project edits. Lightly reviewed: rmcp internals (relied on the existing adapter tests that POST is never retried and that resumption only goes through `get_stream`), the legacy harness adaptation, and UI route details.
+- Outcome: **CHANGES REQUIRED.**
+  - Actionable: 04.10-F001 (medium, outcome table for pre-marker and non-committed paths), 04.10-F002 (low, `mcp.tool_error` safety label versus the shared predicate), 04.10-F003 (medium, race/recovery matrix and affected-suite gate).
+  - Optional: 04.10-F004 (declared vs absent outputSchema), F005 (I3 wording), F006 (local capacity consumes attempts), F007 (operation-level CAS).
+  - The core architecture holds up: a single MCP owner, immutable endpoint, operations table with grant-FK cascade, routing through publication/binding/admission, `McpActionAuthority` lock order, the eager/lazy possible-dispatch boundary, envelope validation and cleanup. The corrections are decision text and verification scope and should not reopen the structure. Details: [findings](agent-review-findings.md).
+- Process feedback:
+  - The gate is justified (schema, ownership, cross-subsystem result contract). The batch is large (adapter, persistence, schema, runtime, legacy adaptation, UI) but cohesive and reviewable as one unit.
+  - D1's explicit invariants and failure-mode list were useful. Missing: an outcome table mapping each handler result to failure code/class/safety and the *effective* RecoveryDecision.
+  - Candidate instruction (scope: phase 04/06 action providers): "A gate that introduces handler failure classifications tabulates every outcome, including pre-marker authority failures, non-committed observations and crash/lease loss, with the handler safety and the effective decision after `workflow_action_retry_safe`." Evidence: F001/F002. The accepted HTTP precedent (`http_runtime.rs:106-123`, `http_tests.rs:114-190`) never pinned the run outcome either.
+  - Second candidate: "When a gated decision changes a shared function, list the suites of its graft callers in the batch gate." Evidence: F003 item 9.
+  - No instruction edits made. Graft reported ≥4,805 estimated tokens saved in its unfiltered outputs this round.
+
+
+## 04.10-R002 — Correction recheck 04.10-D2 — CHANGES REQUIRED
+- Identity: 2026-10-17; workflow implement-opus-reviewed-2.1; batch 04.10 MCP, stage correction recheck (architecture gate). Reviewer B: Opus 5.5, xhigh requested; same retained context as R001. Artifact: base `8ce1fd4`, decision 04.10-D2 `logs/04.10/decision-D2.md`, SHA256 `84d532eec3476569a878bca7188ed914ecde7f8ff9f09e4b462679e55330ded5`, verified before review. D1 is unchanged at `3f10553022b5d631876b8174d57d0ea270ff3c7d150b25d5812fd776e285035e`. Author response: [TASK](TASK.md) "04.10-R001 response — D2".
+- Correction delta reviewed by finding ID:
+  - F001: item 10 table, rows 1–12.
+  - F002: row 9 and I8.
+  - F003: verification matrix items 1–8 and the batch gate.
+  - Adopted optional findings: F005 (I3), F006 (bounded permit wait), F007 (operation revision CAS). Declined: F004.
+- Shared recovery-default change reviewed beyond the delta, as asked. D2 introduces `marker_owned_effect_kind` = `mcp.call|http.request|tool.call`, consulted by `recovery::report` and `pending_recovery::unknown_effect`. The evidence it is sound:
+  1. The marker is written in the same fenced transaction as the reservation (`action_dispatch.rs` `insert`; local effects also write marker, effect and receipt in one transaction at `action_dispatch.rs:206-213`).
+  2. Every retirement path locks the job row through `lock_scope`/`lock_fence` before reading `workflow_action_retry_safe`. A committed marker is therefore always visible, and a later reservation is refused by its fence.
+  3. The latest predicate (`20260930180000_workflow_action_evidence.sql:185-205`) returns NULL only when the execution has no marker.
+  4. The SQL retirement guards (`check_workflow_fenced_retirement`) only check that labels are consistent; they hold no kind-based default, so there is no Rust/SQL mirror to keep equivalent.
+  5. Maintenance deadline/cancel retirement keeps its unconditional 'unknown', but those runs are terminal.
+  6. Existing DB tests use `context.load`/`memory.save`/`data.map` sources for unknown-default cases (one `http.request` source exists, in a publication test), so no accepted expectation flips.
+  7. The only production handler for `http.request`/`tool.call` is `HttpRuntime`, which dispatches only through ActionService (`adapters/workflow_http/mod.rs:85-87`). D2 changes accepted 04.9 behaviour for those kinds: a crash or lease loss before the marker now retries instead of parking.
+- Assessment of the author's HTTP follow-up: it is a real defect, logged as F008 with a dated follow-up appended to the 04.9-R004 note. In short:
+  - The 04.9 handler maps every pre-marker refusal and ApprovalRequired to Unknown. That produces a waiting/reconciliation state with no reconciliation fact (`action_uncertainty.rs:15` inserts only unresolved remote markers). Operator retry is refused because the label is 'unknown', so only the run deadline ends it.
+  - D2 makes http.request internally inconsistent: a crash before the marker retries, while the same refusal returned by the handler is a permanent wait.
+  - Aligning the handler is local and the HTTP suites are already in the gate. Recommendation: align it in this batch.
+- Problems introduced by adopted items:
+  - F009: F006's bounded wait in the current global-then-endpoint order lets waiters on one hot endpoint hold every global permit.
+  - F010: F007's revision restarts at 1 after a revoke or cascade delete, so a stale writer can hit an ABA match.
+  - Optional F011: record the handler-composition invariant that keeps the classifier truthful.
+- Checks: SHA256 recomputed (match). Inspection only; no tests, no DB/fixture access, no project edits. Unchanged R001 evidence reused for items 1, 3, 4, 5, 7 and 8.
+- Outcome: **CHANGES REQUIRED**.
+  - F001, F002 and F003 are resolved at decision level. F004's decline is accepted as a documented limitation. F005 is resolved.
+  - F006 and F007 were adopted but introduced F009 and F010.
+  - New actionable findings: F008 (medium), F009 (low), F010 (low). Optional: F011.
+  - The remaining corrections are small decision-text deltas and the structure stays as gated. A recheck should cover only F008–F010 and the HTTP handler alignment, if adopted.
+- Process feedback:
+  - The outcome table fixed the classification ambiguity cleanly, and the predicate-as-sole-source rule (I8) is a good generalisation.
+  - Lesson: adopting optional suggestions still needs a quick self-check for new hazards (lock order, ABA). Candidate instruction (scope: authors in this workflow): "When adopting an optional finding, state the new failure modes it introduces."
+  - A recurring theme: run outcomes for pre-marker failures were never pinned by tests in 04.9. R001's candidate instruction (tabulate effective recovery decisions) would have caught F008 in 04.9.
+
+
+## 04.10-R003 — Correction recheck 04.10-D3 — PASS (architecture gate; F012 carried to implementation)
+- Identity: 2026-10-17; workflow implement-opus-reviewed-2.1; batch 04.10 MCP, stage correction recheck (architecture gate). Reviewer B: Opus 5.5, xhigh requested, same retained context as R001/R002.
+- Artifact: `logs/04.10/decision-D3.md`, SHA256 `f89b0a89afa11ec9b789ce8e25fc3370a9678bbb43ff1e60c7dcb3e050e7b32b`, verified. It amends D2 (`84d532eec3476569a878bca7188ed914ecde7f8ff9f09e4b462679e55330ded5`, unchanged); D1 is unchanged. Base `8ce1fd4`. The effective gated decision is **D2 as amended by D3**. Author response: [TASK](TASK.md) "04.10-R002 response — D3". Root adopted the HTTP alignment into 04.10.
+- Rechecked by finding ID:
+  - F010 → D3 A: a random UUID v4 version per write, CAS for register/revoke, create-only `None`. Versions are never reissued across revoke, grant cascade or soft delete, so there is no ABA; competing tests added.
+  - F009 → D3 B: endpoint permit first, then global, under one shared ≤ 5 s deadline. Waiters on a busy endpoint hold no global permit; starvation test added.
+  - F008 → D3 C/D/E/F: the shared `action_step_failure` mapping is used by both the MCP and HTTP handlers. The predicate is the only source of Unknown; I9 is added; HTTP DB tests assert run/attempt/marker/receipt/fact state.
+  - F011 → documentation on the classifier and `WorkflowHandler`, plus a 06/08 obligation.
+- Side effect on D2 row 4 checked: a reservation refusal before the marker becomes `mcp.unresolved` Retryable, i.e. RetryAt costing one backoff attempt. On that next attempt the hint is still `prepared`, and the eager `mcp_for_action` check (readiness, grant, operation, actor, live run, credential, run before any network) rejects it as `mcp.rejected` with no session opened. If attempts are already exhausted the result is FinalError. No wait, no fact. Acceptable.
+- Regression check of the shared mapping against accepted 04.9 HTTP behaviour:
+  - Committed results and `call_tool` are unchanged.
+  - Post-marker HTTP failures change class from Terminal to Retryable, but the effective decision is still Reconcile with a fact (predicate false). No SQL guard constrains the class for Reconcile (claim-budget/evidence guards check run state only).
+  - Pre-marker failures change from a dead-end wait to FinalError or RetryAt (the intended change).
+  - Exactly one accepted assertion flips by design: `http_tests.rs:100` asserts the handler-returned safety `EffectOutcomeUnknown` (optional F013 asks D3 to name its replacement).
+  - Not as intended: slotted `http.request` preparation does not check connection readiness (F012).
+- Checks: SHA256 recomputed (match). Inspection only; no tests, no DB/fixture access, no project edits. Reused unchanged R001/R002 evidence (classifier soundness, lock order, schema, transport).
+- Outcome: **PASS for the architecture gate** on D3 SHA256 `f89b0a89afa11ec9b789ce8e25fc3370a9678bbb43ff1e60c7dcb3e050e7b32b`, with D2 as amended by D3 as the effective decision.
+  - F008, F009 and F010 are resolved at decision level; F011 is adopted.
+  - **04.10-F012 (low, actionable)** is a local classification detail that is cheap to fix and does not affect schema, ownership, transactions or concurrency. It is carried as a mandatory implementation obligation: it must be fixed and tested before batch acceptance (blocking batch acceptance, not the gate).
+  - Optional: 04.10-F013.
+- Watch items for the batch review:
+  - Closing per-endpoint semaphores held in the Weak map on shutdown, and checking for shutdown before creating new ones.
+  - The `action_step_failure` mapping by AppError variant (only NotFound, BadRequest and InvalidCredentials may become `rejected`).
+  - The replacement assertion at `http_tests.rs:100`.
+- Process feedback: amendment-style revisions (D3 = D2 + named replacements) kept the recheck small and traceable. No new instruction candidate beyond R001/R002.
+
+
+## 04.10-R004 — Whole-batch code/integration review
+- Identity: 2026-10-17; workflow `implement-astra-reviewed-2.1`; batch 04.10, whole-batch implementation and integration review. Independent Reviewer B, requested `gpt-6-astra`/medium, fresh context; no author reasoning inherited and no subagents. Host context/compaction occupancy is not exposed. Records: [TASK](TASK.md), [REVIEW](REVIEW.md).
+- Artifact: base `8ce1fd49b5a961da705fddf0b92cac3182da427b`; digest `cb1b1dba9f6a803d7e35308917786c2863e89e73e7abddd4d2f722f2927a6210`; sole exclusion `plan/workflow-foundation/docs`. Independently recomputed before review using the specified snapshot script and task-only macOS realpath shim. Effective gated decisions: D2 amended by D3, preserving their historical text.
+- Original requirements reviewed: phase04 action contract, execution/uncertainty and MCP/shared acceptance; EXPANSION row04.10; relevant BRIEF04.1–04.9 obligations (authority, marker-first identity, no metadata-based replay, receipt ownership, recovery, reconciliation and cancellation); stop handoff. Applicable root/src/application/persistence AGENTS and skill references read. Graft map, ask, skeleton and caller discovery preceded source inspection.
+- Whole-batch coverage: immutable endpoint migration and tenant/grant foreign keys; operation registration/revocation with company-first lock order, catalog revision and fresh UUID CAS; grant set difference and refresh/output-schema changes; publication, binding and admission routing and exact current operation checks; frozen step/direct-tool request and identity; eager preparation versus lazy evidence-authorized provider entry; credential recheck and rotation; shared result-envelope compiler/runtime schema, redaction, inert links and tool-error receipts; adapter endpoint-first bounded permits, shutdown and tracked session cleanup; HTTP preparation/failure alignment; recovery and pending-recovery defaults. Traced shared result-validation callers into receipt read/write and evidence verification, publication/readiness callers into admission/replay/binding, and catalog writers into management/refresh. Production composition remains a seam for phase06/08, as originally scoped.
+- Assertions independently inspected: real publish/bind/admit/worker typed-reference JSON/SSE execution; competing dispatchers and fresh-runtime receipt replay without any MCP request; model-call identity change/refusal; pre-marker refusal/protection/drift/unavailability and post-entry output/transport/session-expiry failures; tool-error receipt and effective terminal/safe retirement; stale/drop cancellation paths; revocation/credential rotation races; catalog competitor/CAS/cascade/tenant tests; HTTP run/attempt/marker/fact checks. Existing transport guards, legacy harness and broad shared action histories were reviewed at changed seams and through focused-suite evidence, not re-audited line by line.
+- Gated-decision assessment: D2/D3 behavior is implemented. F001/F002/F008 use one Safe handler mapping with only the durable predicate promoting unknown. F005 current committed hints avoid network. F006/F009 use endpoint-first admission with a shared deadline, global-capacity and shutdown tests. F007/F010 use non-reused UUID versions with competing/stale-writer tests. F011 is documented at both code and phase06/08 seams. F004's accepted missing-structuredContent limitation remains explicit.
+- F003 lazy-path concern from the stop handoff is resolved without weakening the planned DB boundary: `mcp_reconciliation_tests.rs:57–155` invokes the real reconciliation service/persistence with a test-host registered verifier, then the real lazy MCP runtime and HTTP fixture. It proves exactly one extra call after final-not-applied and no call on lazy drift. This is not an application-fake substitute and installs no production verifier.
+- F012 implementation closure evidence: HTTP `ready_on` (`http_runtime.rs:104–110`) is called by both step and direct preparation; MCP `current_on` is shared by preparation and use. `workflow_http_current_revocation_and_protection_prevent_network` asserts disabled connection and missing bearer secret become `http.rejected`, failed run, terminal/safe, zero marker/fact and exactly one attempt. The focused real-DB log records this test passing. MCP refusal tests cover the corresponding readiness states.
+- Verification inspected so far: fresh migrations and schema equivalence PASS (`fresh-migrations.log`, `schema-comparison.log`); production fixture migration/schema gates PASS; focused real-DB suite **504 passed, 0 failed, 0 ignored** (`gate-focused.log`, final result). The additional permit-timeout test postdates that binary and must be covered by the current stock run. Reviewer ran no DB/cargo checks, preserving serialized fixtures. Stock and subsequent SQLx/build/static gates are still running at this checkpoint; their completion must not be inferred from this note.
+- Preliminary outcome: **CODE REVIEW PASS**, no new concrete finding or optional suggestion. Final per-batch evidence and post-review digest check will be appended to this same round before return; no final batch acceptance yet.
+- Process feedback: batch size was cohesive and reviewable using the split source/test files and gated outcome table. Durable decisions and earlier findings made the intended HTTP behavioral change distinguishable from regression. No new instruction candidate is supported beyond the earlier outcome-table/caller-suite lessons. No project files or instructions edited.
+
+- Verification update, 2026-10-17 17:49 UTC: initial scoped stock-2048-KiB gate **FAILED: 390 passed / 3 failed / 0 ignored**. `gate-stock.log` identifies completion-first persistence-bound timeout and two lease-release commit-outcome-unknown failures in existing reconciliation tests; it reports no stack-budget failure. The new `workflow_mcp_permit_timeout_retires_safely_then_retries_once` passed in this binary. Cause is not established by the log. Root is investigating and rerunning affected checks; subsequent SQLx/build/static gates have not run in this gate invocation. This failure blocks final verification acceptance, and a focused green rerun alone will not replace the required scoped gate.
+
+- Final R004 outcome, 2026-10-17: **CHANGES REQUIRED for verification (04.10-F014, medium)**; code inspection remains PASS with no new code defect found. The focused stock recheck passed3/0, but the second full scoped run failed391/2 on different tests (resolution adoption counts and cancellation transaction-release oracle). Both failure logs are retained; no unsupported "pre-existing" or harmless-load conclusion is made. Subsequent static gates remain outstanding. F012 is fixed; earlier decision corrections are implemented, with F003 executed-gate closure pending F014. Reviewer independently recomputed the snapshot after review: base and digest unchanged at `cb1b1dba9f6a803d7e35308917786c2863e89e73e7abddd4d2f722f2927a6210`, exact exclusion unchanged. Root may unfreeze for investigation/corrections, then request one affected-delta/evidence recheck on the retained reviewer handle. Full task/final phase04 all-target, full-stock and lease-budget gates remain the planned04.11 gate, not coverage claimed here. No04.11 implementation was reviewed.
+
+
+## 04.10-R005 — F014 correction and evidence recheck
+- Identity: 2026-10-17; workflow `implement-astra-reviewed-2.1`; independent Reviewer B (requested gpt-6-astra/medium), same retained role/context. Batch04.10 correction recheck, [TASK](TASK.md), [REVIEW](REVIEW.md). Base `8ce1fd49b5a961da705fddf0b92cac3182da427b`; corrected digest `2be42e3e5d8b0651ad1d6bc523cf356dd6bb55ac254050b99914bede669ebc4c`, sole exclusion `plan/workflow-foundation/docs`, independently matched before review. D2+D3 unchanged. R004 unaffected whole-batch coverage retained.
+- Delta inspected: `action_dispatch_resolution_tests.rs:249–272` replaces release with the existing `Gate::drain` before observing rows and removing backend-abort configuration. `lease_resolution_gate.rs:66–150` uses transaction-scoped advisory locking; reacquisition waits for the already blocked transaction's commit/rollback, so an elapsed resolution return is no longer mistaken for durable completion. Result classification, exact durable counts, provider-call assertions and mandatory classified replacement within the existing void ceiling remain unchanged.
+- `action_cancellation_order_tests.rs:250–276` now polls a fresh pg_stat_activity snapshot for backend quiescence under the existing10-second hang guard. This is a post-result cleanup observation, not a substitute for ownership or timing proof. Traced every `assert_drained` caller into ordinary receipt/completion/cancellation races and their negative controls. Exact run NOWAIT probes, expected winning results, actual release deadlines and `completed` versus `resolved_applied` persistence-recording assertions remain intact. GUIDANCE DEC002/012/014 reviewed: no production/lease/stack bound, global test parallelism, ordinary-attempt oracle or broad retry policy is changed.
+- MCP correction is only two automatic-dereference substitutions at catalog read calls (`mcp.rs:36,198`); no changed authority/SQL behavior.
+- Evidence inspected: `synchronization-recheck.log` **12 passed / 0 failed / 0 ignored**, current stock stack; all recorded classified branches reached attempt1. Includes every changed cleanup-helper caller plus late-release receipt and resolved-COMMIT completion negative controls. Source inspection confirms these controls still require ordinary-oracle rejection, not merely eventual business success. The first R004 timeout/commit-ambiguity failures are not retroactively deemed harmless; their logs remain retained.
+- Preliminary outcome: affected correction **CODE REVIEW PASS**, no new finding. F014 remains open until the corrected complete scoped/default-parallel stock gate and all remaining static gates pass. Reviewer performed no DB/cargo checks and no project edits. Final evidence and post-review snapshot check will be appended before return.
+- Process feedback: this narrow correction preserves the difference between an operation result, transaction drain and ordinary primary success. Existing GUIDANCE already specifies the important distinction; no new instruction candidate is supported.
+
+- Final evidence, 2026-10-17: inspected `corrected-gate-status.log` and underlying outputs. Corrected scoped/default-parallel stock2048KiB gate **393 passed / 0 failed / 0 ignored**,303.74s; all five tests that failed across R004's two runs are present and pass, as is the added MCP permit-timeout test. SQLx prepare and prepare-check, locked offline all-target compilation, strict Clippy, fmt, diff whitespace, transport boundary and regression, credential-key CLI regression and graph build all **PASS**. Initial fresh migration/schema equivalence and focused504/0/0 evidence remains valid for unchanged schema/provider behavior; affected correction12/0/0 evidence is current. No cache/source drift was introduced by checks. Reviewed commands are recorded in `corrected-gates.sh`.
+- Final outcome: **PASS for batch04.10** on digest `2be42e3e5d8b0651ad1d6bc523cf356dd6bb55ac254050b99914bede669ebc4c`, independently recomputed after all checks with the same exact exclusion. **F014 resolved**; F012 remains fixed and F003's per-batch execution gate is now satisfied. No new findings or outstanding04.10 acceptance blocker. R004's original failures remain historical evidence; this pass does not assert timing independence or a diagnosed cause for every original transient failure. The corrected synchronization flaws and unchanged real-time oracles are explicitly documented above.
+- Limits of this PASS: it accepts04.10's required scoped gate, not the entire user task. Combined full all-target tests, full stock-stack and lease-budget gates remain required after04.11 as originally planned. No04.11 architecture/implementation was reviewed in this round. Reviewer retains handle/context for the next assignment.
+
+
+## 04.11-R001 — Architecture review interrupted by user STOP; INCOMPLETE
+- Identity: 2026-10-17; workflow `implement-astra-reviewed-2.1`; independent Reviewer B, requested gpt-6-astra/medium; retained reviewer context. Actual host metadata/context occupancy unavailable. No subagents.
+- Artifact: `logs/04.11/decision-D1.md`, SHA256 `ebb523dfdfcf5d7b937ddf48b47161bb79b70ad9bc2d890b511f63ef58b8ad83`, independently matched at review start and stop checkpoint. No04.11 implementation exists. Accepted04.10 remains R005/base8ce1fd49b5a961da705fddf0b92cac3182da427b/digest2be42e3e5d8b0651ad1d6bc523cf356dd6bb55ac254050b99914bede669ebc4c.
+- Status: **INCOMPLETE, NO PASS, NO IMPLEMENTATION AUTHORIZATION**. User requested safe checkpoint and STOP before grouped review delivery. No further investigation performed after stop instruction. Findings below are provisional observations for the resumed architecture review, not a completed gate verdict.
+- Requirements inspected: phase04 and EXPANSION04.11, accepted04.1–04.10 obligations, explicit users/channels only (groups rejected), exact-source reply, canonical-message/delivery/action atomicity, provider acceptance semantics, accepted siblings never resent, shared direct/step service.
+- Discovery/inspection completed: graft map/ask/skeleton/callers before targeted source reads; delivery queue begin/complete/aggregate and cancellation callers; composer and deterministic email Message-ID; workflow wait/commit/completion/polling/worker/supervisor seams; deferred dispatch and retirement guards; shared failure/recovery/pending-recovery and retry-safe/effect-state SQL; registry content schema. No DB, cargo or implementation edits.
+- Main open observations: F001 new delivery-kind/message recovery outcomes and owner integration need explicit coverage; F002 D1 assumes an existing action admission bound that author reports does not exist; F003 subject schema MAX_TEXT exceeds DB2048-byte limit; F004 optional cursor/producer-race invariant clarification. See findings for evidence and limits.
+- Cursor concern is NOT an established lost-event defect: locking every required delivery parent and aggregating authoritative state before cursor advancement can make lower-sequence late commits safe. Resume reviewer should verify that exact invariant, not demand a replacement design by assumption.
+- Author independently identified F002/F003 and proposed bounded16 action-consumption pages plus a bounded129 probe refusing new delivery marker admission at128 existing dispatches; this proposal is **not yet reviewed or adopted in D1**. Do not treat it as gated architecture.
+- Remaining work on resume: finish action-count/recovery contract inspection as necessary, assess grouped findings, obtain author decision revision if needed, rehash artifact and return explicit architecture gate verdict. Keep R001 incomplete history; append disposition rather than overwrite. No new instruction candidate yet.
+
+## 04.11-R002 — Architecture gate 04.11-D1 completed — CHANGES REQUIRED
+- Identity: 2026-10-17; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging, stage architecture gate (pre-implementation), completing interrupted [04.11-R001](#0411-r001--architecture-review-interrupted-by-user-stop-incomplete). Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested per [TASK](TASK.md) §"04.11 continuation"; effective effort and context occupancy are not visible to the reviewer. Fresh independent context (no author transcript; R001 was written by a different reviewer). Records: [TASK](TASK.md) §§"04.10 + 04.11", "04.11-D1 architecture gate proposed", "04.11 continuation"; [REVIEW](REVIEW.md) §04.11.
+- Artifact: base `8ce1fd49b5a961da705fddf0b92cac3182da427b`; decision `logs/04.11/decision-D1.md`, SHA256 `ebb523dfdfcf5d7b937ddf48b47161bb79b70ad9bc2d890b511f63ef58b8ad83`, recomputed at review start (match). Supporting `logs/04.11/investigation.md` read as context only, not as proof. Gated decision ID 04.11-D1. No 04.11 implementation exists; no code digest.
+- Requirements derived from originals: phase 04 "Action contract", "Execution and uncertainty" items 1–7, "Provider-neutral messaging", "Acceptance"; EXPANSION row 04.11 and cross-point preservation (04.11 atomically creates message/delivery/action/wait; aggregates each destination without sibling resend; combined phase04 gate); BRIEF-04.10 (F011 marker-owned invariant, shared failure classification); user decision users/channels only, groups rejected; AGENTS.md (no backward compatibility, CI parity, focused-then-full verification, raised-limit rule), `src/AGENTS.md` (bounds at boundaries), `src/application/AGENTS.md` (one logical commit, poison-batch tests, no default port methods), `src/adapters/persistence/AGENTS.md` (DB-boundary invariants, tenant FKs, guards preserved).
+- Coverage (inspection only; every D1 section 1–6 reviewed):
+  - §1 routing/authority: registry `actions.rs:7-16`, `schemas.rs:39-58` (group enum, `content()`, `message_result()`); `registry/mod.rs:34-36`; `CanonicalContent::parse` `transport/ingress.rs:36-43,109-118`; `messages` table `init_schema.sql:2767-2789`; `authorize_company` and `supported_publication` `workflow/authority.rs:9-80`; `action_authority.rs:35-120`.
+  - §2 atomic publication: `ActionService` `actions/service.rs`, intents `persistence/workflow/actions.rs:16-120` (no admission bound), `authorize_prelocked_on` `action_dispatch.rs:74-146` (lock order), dispatch guard `20260930120000_workflow_action_dispatch.sql:56-88`; `DeliveryComposer::compose/interface` `transport/compose.rs:131-243`; `EmailRenderer::message_id_for/part_key` `email/egress.rs:207-345`; `insert_message_on`/`store_email_correlated` `thread/message.rs:435-682`; `external_messages`/`email_message_metadata` schema; `create_message_with_deliveries` `thread/mod.rs:610-635`; outreach precedent `services/outreach_tool.rs:370-446`.
+  - §3 suspension: `supervise_io` `supervise.rs:23-101`, `WorkflowWorker::process/execute_io` `worker.rs:98-168`, `park_on` `waits.rs:145-210`, `resume_on/advance/expire` `wait_commit.rs:5-132`, waits schema `20260928070000`, `20260928144000`.
+  - §4 receipts/progression: `CANDIDATES_SQL` `polling.rs:82-112`; `workflow_action_retry_safe` `20260930180000:185-206`; `workflow_action_effect_states` `20260930182000:102-118`; `action_uncertainty::record`; receipts/uncertainty/evidence effect_kind constraints across 20260930* migrations.
+  - §5 cancellation/permission/callbacks: `begin_part`/`complete_part`/`aggregate_parent_on` `delivery/queue.rs:164-457` (confirmed `complete_part` has no `part.status='sending'` predicate at 229-240), reaper `queue.rs:566-600`, `cancellation.rs:68-227`; `remove_member` `company_invite.rs:349-384`.
+  - Recovery: `recovery.rs:21-137` (`report()` default, retry-safe override), `pending_recovery.rs:46-145`, `failure.rs:1-20` (`marker_owned_effect_kind`).
+  - Existing thread consumers: `find_outbound_reply_after` `thread/mod.rs:637-668` with callers `services/task_worker.rs:990-1010`, `use_cases/thread/dispatch.rs:416-420`; RFC fallback `use_cases/thread/mod.rs:1025-1041` → `views.rs:587-608`.
+  - §6 verification plan against CI `.github/workflows/ci.yml:51-117` and `scripts/` (stack-budget, lease-budget, test-network-isolation, transport-boundary-check).
+- Assumptions challenged: (a) "existing action-count bounds" — none at preparation (F002); (b) one canonical message with several email intents fits existing threading — it does not (F005); (c) new delivery marker fits shared recovery predicates unchanged — it does not (F001); (d) cursor high-water safety — safe if parent-lock invariant is explicit (F004, optional); (e) commit-time proof for an atomically closed job — capture provenance unspecified (F007); (f) effect waits fit existing resume/poll — only if deadline equals run deadline (F008).
+- Sound as proposed (no finding): group removal/runtime rejection; never a default channel; refusal without run channel for email; exact-source reply and private-content non-promotion intent; trusted built-in ToolSnapshots instead of HTTP routing (`supported_publication` currently routes slotless tools to HTTP); reuse of `authorize_on` lock order (company/actor → fence → run → current owners → intent) then channels/threads → deliveries; no network I/O inside transactions; Message-ID stability from invocation-derived idempotency keys (`message_id_for` is a pure function of `email:<key>`); explicit suspended handler outcome instead of error/lease-loss; direct-tool Pending seam consistent with HTTP/MCP 06/08 boundary; run-before-parent lock order for cancellation and workflow begin_part with parent-only callbacks; the `complete_part` overwrite gap is real and correctly targeted; "No raised resource limits".
+- Checks: none run (assignment forbids cargo builds and fixture start/stop). No tested behavior is claimed; all conclusions are code/schema inspection. Graft queries/skeleton/grep/callers and targeted reads only.
+- Lightly reviewed / not covered: `fair_polling.rs` internals, workflow controls (cancel/pause/retry) code paths, `maintenance::expire_on`, `completion_job::finish` owner variants, the delivery worker service loop, and channel ACL effects on internal-user replies. These bear on F001/F008 implementation details; D2 should name the affected paths.
+- Outcome: **CHANGES REQUIRED — no PASS for `ebb523df…ad83`.** Actionable: [04.11-F001](agent-review-findings.md#0411-f001--r002-disposition-confirmed-revised-medium) (medium), [F002](agent-review-findings.md#0411-f002--r002-disposition-confirmed-medium) (medium), [F003](agent-review-findings.md#0411-f003--r002-disposition-confirmed-revised-low) (low), [F005](agent-review-findings.md#0411-f005--canonical-message-classification-and-per-recipient-provider-identity-are-unspecified) (medium), [F006](agent-review-findings.md#0411-f006--verification-plan-omits-ci-gates-and-the-tests-f001f005-require) (low), [F007](agent-review-findings.md#0411-f007--commit-time-and-receipt-proofs-are-not-database-derived) (low), [F008](agent-review-findings.md#0411-f008--effect-wait-deadline-and-resume-semantics-unspecified) (low). Optional: [F004](agent-review-findings.md#0411-f004--r002-disposition-confirmed-optional) (low). Provisional F001–F004 from R001: F001 confirmed and expanded; F002 confirmed; F003 confirmed with the binding bound corrected to 998 bytes and destination count added; F004 confirmed as optional (no lost-event defect). None withdrawn.
+- On unreviewed author proposals (16-action consumption pages; 129-row probe refusing new delivery-marker admission at 128 dispatches): not adopted in D1 and not accepted here. F002 requires a concrete enforced bound; either shape can satisfy it if refusal precedes any marker/publication, is a distinct terminal (not unknown) outcome, keeps the per-execution count at or below the existing 128-dispatch proof ceiling of `workflow_action_retry_safe`, and is tested at the boundary. Review on D2.
+- Process and instruction feedback: batch size fine for one gate; the gate was warranted (schema, recovery, transaction and concurrency contracts). D1 is dense and terse; it omits two decisions that 04.10-F001 already showed are costly: the effective recovery outcome of a new effect kind across shared predicates (recurrence of 04.10-F001), and how new canonical messages are classified for existing thread consumers. Candidate instructions (scope: architecture gates in this plan): (1) "A decision introducing a new effect kind tabulates its outcome in every shared predicate — `marker_owned_effect_kind`, `workflow_action_retry_safe`, `workflow_action_effect_states`, `action_uncertainty::record`, reconciliation commands — for pre-marker, post-marker and terminal cases" (evidence F001, 04.10-F001); (2) "A decision that writes canonical messages states author/direction/role/audience/entry kind, provider-key mapping per delivery, and lists existing thread consumers it affects" (evidence F005). Tooling note: a caveman output-compression hook elided code bodies in Bash/Read output during this review; exact text was recovered via `caveman_retrieve` before relying on it.
+- Follow-up 2026-10-17 ([04.11-R003](#0411-r003--correction-recheck-of-0411-d2--changes-required)): F001's required correction above offered "or justify a documented deferral against phase 04 items 5–6". R003 judged the deferral D2 then made, and found that the accepted 04.7/04.10 reading of item 6 does not support it: MCP met item 6 with a test-host verifier through the real reconciliation service, and no production verifier was required. That remedy option was therefore too permissive, and the remaining gap is now [04.11-F010](agent-review-findings.md#0411-f010--message-deliveries-with-unknown-outcome-have-no-authorized-reconciliation-path). The original R002 outcome stands.
+
+## 04.11-R003 — Correction recheck of 04.11-D2 — CHANGES REQUIRED
+- Identity: 2026-10-17; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging, stage architecture-gate correction recheck. Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested; effective effort not visible. Same reviewer and context as [04.11-R002](#0411-r002--architecture-gate-0411-d1-completed--changes-required). Records: [TASK](TASK.md) §"04.11-D2 correction" (author status and root's note that it does not accept the §5.3 deferral); [REVIEW](REVIEW.md) §04.11.
+- Artifact: `logs/04.11/decision-D2.md`, SHA256 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44`, recomputed at start (match). Base `8ce1fd49b5a961da705fddf0b92cac3182da427b`. D2 supersedes D1 (`ebb523df…ad83`, retained). Gated decision ID 04.11-D2. No implementation exists.
+- Scope: recheck by finding ID (F001–F008), broadened to every contract D2 changed:
+  - one `message` effect kind for every message invocation;
+  - one canonical message per destination; new tables and triggers;
+  - `EffectParked` owner and `confirm_suspension`;
+  - consumer discovery and poison handling;
+  - the reaper lock-order change;
+  - the `scripts/lease-budget.sh` change;
+  - root's requested judgement on the §5.3 deferral.
+- New evidence inspected this round:
+  - control retry reopens the same execution's failed job only: `control_retry.rs:3-42`, so the same invocation is replayed;
+  - recorder callers: `controls.rs:181`, `maintenance.rs:41`, `pending_recovery.rs:92`, `recovery.rs:86`;
+  - reconciliation table, CHECK and run-state guard: `20260930170000:2-35`;
+  - receipt triggers, none fence-bound: `20260930180000:229-256`;
+  - `workflow_action_replay_supported` / `not_applied_available` remote-only first checks: `20260930150000:51`, `20261001090000:8`;
+  - `waiting_reason` allows `effect`: `20260928133000:8`;
+  - `message_deliveries_message_audience_check`: `init_schema.sql:2706`;
+  - `thread_messages` entry kinds: `init_schema.sql:3577`;
+  - `sanitize_string` strip-only: `domain/entities/unicode_sanitization.rs:128-156`;
+  - email renders exactly one part, whose body digest is "what a reconciliation lookup can compare": `email/egress.rs:386-395`;
+  - every `UPDATE message_deliveries` producer, with no dead_letter→pending redrive: `queue.rs`, `cancellation.rs`, `approval.rs:469`, `task/operations.rs:190,310`, `task/controls.rs:199`; `orphan_stuck_dependents_on` (`queue.rs:656-683`) applies only to dependent deliveries, and workflow deliveries have none;
+  - `controls::control` lock order is `authorize_company` then run `FOR UPDATE` (`controls.rs:64-74`), consistent with D2's workflow `begin_part` order;
+  - CI steps `ci.yml:47-117`;
+  - `scripts/stack-budget.sh:30` passes arguments through;
+  - `scripts/lease-budget.sh` in full;
+  - BRIEF-04.7 (verifier port, no production verifier) and BRIEF-04.10:60 (test-host verifier through the real reconciliation service).
+- Findings rechecked (details and dispositions are in the findings log):
+  - F001: resolved at decision level, apart from the evidence-path deferral, which is split into F010.
+  - F002, F003, F005, F006, F007, F008: resolved at decision level.
+  - F004 (optional): adopted and resolved, but the "no exit path" premise must be revisited under F010.
+- New findings: [04.11-F009](agent-review-findings.md#0411-f009--sql-backstops-admission-count-race-and-step-close-identity-optional) (optional, low), [04.11-F010](agent-review-findings.md#0411-f010--message-deliveries-with-unknown-outcome-have-no-authorized-reconciliation-path) (medium, actionable), [04.11-F011](agent-review-findings.md#0411-f011--lease-budget-measurement-of-new-message-operations-undefined) (low, actionable).
+- §5.3 judgement for root: **(b) fails the criteria.**
+  - Phase 04 item 5 is met.
+  - Item 6 is not. It requires authorized commands to record applied or not-applied, and only proven not-applied permits retry. The Acceptance line requires tests covering reconciliation, and EXPANSION has 04.11 run the combined matrix "including all provider criteria".
+  - The accepted 04.7/04.9/04.10 reading of item 6 needs no production verifier. The command accepts only attestations from a host-installed `ActionEvidenceVerifier`, and MCP (BRIEF-04.10:60) proved not-applied retry through the real service with a test-host verifier.
+  - D2 instead refuses message invocations outright (`reconciliation.unsupported_effect`). An `outcome_unknown` delivery therefore cannot be settled even with proof. A proven not-applied delivery can never be retried, which is the "retry only unresolved safely retryable work" case, and the run can only fail at its deadline.
+  - D2's rationale (no email ledger or verifier) applies equally to MCP, which still integrated the path.
+  - It would only become (c) if the user explicitly reduced scope. The exact choice: "accept that in 04.11 an unconfirmed email delivery can never be settled by evidence and is held until the run deadline, with the verifier-attested per-delivery path deferred to a named later point" versus "require that path in 04.11, exercised with a test-host verifier and with no production verifier claimed". Root must not and does not decide this.
+- Reaper change: sound.
+  - Locking stranded parents `ORDER BY id FOR UPDATE SKIP LOCKED` before the part update matches the parent-before-part order of `begin_part`, `complete_part` and cancellation.
+  - It keeps the expiry predicate on the locked rows. Rows the consumer holds `FOR SHARE` or a live writer holds are reaped on a later sweep, never blocked.
+  - The reaper locks no run or action rows, so it adds no cycle.
+  - It keeps the pre-existing unbounded stranded set; this is not widened, and is recorded only as an observation.
+  - D2 §8.2 adds a reaper-versus-consumer no-deadlock test. The existing delivery and cancellation suites must remain green.
+- Lease-budget change: sound in direction. No threshold is raised (`BUDGET_PCT` stays 50), and the required-op check makes the new operations fail loudly if a filter drifts. It is incomplete, though: the gate compares work against each event's `attempt_bound_ms`, and D2 defines neither the consumer transaction's client bound nor the leading-lock boundary for `message.publish`/`message.consume`. See F011.
+- Sound as revised (no finding):
+  - outcome table rows 1–14, cross-checked against `recovery.rs`, `pending_recovery.rs`, `retry_safe`, `control_retry`;
+  - the marker-owned invariant (marker is the first write; provider I/O only after commit);
+  - admission 128 with a pre-write refusal;
+  - consumption one action per transaction, at most 20 parents, `LIMIT 41`, poison backoff to `stalled`;
+  - event production by parent-status trigger with consumer locks taken before the read (F004 invariant holds);
+  - one canonical message per destination, matching the `email_message_metadata` PK and the outreach precedent;
+  - the classification table;
+  - `message.send` never writing into existing threads; the external reply counting as the answer (explicit and intended);
+  - DB-captured `fence_expires_at` with ordering enforced;
+  - a receipt guard recomputing the result from terminal delivery states (stable, since no exits);
+  - effect-wait deadline equal to the run deadline, plus an explicit `resume_on` branch and receipt-gated discovery (no hot re-poll);
+  - CI-parity final gate and disk plan.
+- Checks: none run (read-only assignment). Every conclusion comes from inspecting the code and schema.
+- Lightly reviewed: the exact `completion_job` owner interplay (`EffectParked` at park versus `Parked` at resume), the claim/episode/budget SQL for message rows in `workflow_action_reconciliations`, `fair_polling` internals, and `inspection`. These are deferred to the batch review; D2 names them.
+- Outcome: **CHANGES REQUIRED — no PASS for `1dcd1a9e…3a44`.** Blocking: F010 (medium) and F011 (low). Optional: F009. If F010 is fixed by adding the path, recheck the F004 "no exit path" premise, the event bound (`LIMIT 41` already allows two events per delivery), the state guard (`uncertain` → `pending`/`accepted`/`failed`) and the §5.1 rows 11–13.
+- Process feedback: D2 is thorough and finding-indexed, and §0 made the recheck efficient. The miss in R002 is mine: F001's remedy allowed "or justify a documented deferral against phase 04 items 5–6" without first checking the accepted 04.7/04.10 reading. That reading shows item 6 is satisfied per provider kind with a test-host verifier. Candidate instruction (scope: reviewers in this plan): "When a remedy offers a deferral against an original criterion, check the accepted precedent for how earlier points met that criterion before offering it." Evidence: R002 F001 → R003 F010.
+
+## 04.11-R004 — Correction recheck of 04.11-D3 (delta over D2) — CHANGES REQUIRED
+- Identity: 2026-10-17; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging; architecture-gate correction recheck. Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested; effective effort not visible. Same reviewer and context as R002/R003. Records: [TASK](TASK.md) §"04.11-D3 correction"; [REVIEW](REVIEW.md) §04.11.
+- Artifact: the effective decision is D2 `logs/04.11/decision-D2.md` SHA256 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44` plus D3 `logs/04.11/decision-D3.md` SHA256 `c462e4eb56cb76ac816fa107b7b01f7651706796b8723fed8f206c6315858a89`. Both recomputed at start (match). Base `8ce1fd49b5a961da705fddf0b92cac3182da427b`. No implementation exists.
+- Scope:
+  - F009, F010 and F011 by ID.
+  - The premises F010 changes: the F004 assumption that "terminal deliveries never change", §5.1 rows 11–13 and the new rows 15–21, and the `ReconciliationTarget::MessageDelivery` integration with the 04.7 service and the accepted 04.10 MCP path.
+  - The §L deferral (phase 06 reopens `model_tool`-origin agent executions).
+  - Broadened to the 04.7 schema D3 extends.
+- New evidence inspected this round:
+  - `workflow_action_evidence` columns, CHECKs and the one-final-coverage unique index: `20260930180000:5-37`;
+  - the evidence-conflict table: `20260930180000:89-103`, `20260930182000:18-30`;
+  - the conflict predicate: `20260930180000:129-133`;
+  - `workflow_action_receipt_finality_conflict`, with the comment "a finality breach … permanently vetoes automatic continuation even if a usable receipt now exists": `20260930180000:240-256`, redefined `20260930181000:83-108`;
+  - `workflow_action_conflict_park_pending`: `20260930181000:109-126`;
+  - the latest `workflow_action_evidence_commit_guard`: `20260930181000:127-151`;
+  - `applied_request` attribution and its guard: `20260930181000:1-22`;
+  - the continuation veto in `complete_io`: `completion.rs:106-125`, and its absence from `wait_commit.rs`, `batch_commit.rs` and `completion_job.rs`;
+  - 04.7 `continue_on`, which reopens a reconciliation-parked job: `action_reconciliation/settlement.rs:154-202`;
+  - `workflow_action_reconciliation_reopen_safe`: `20261001100000:281-306`;
+  - `settle_cancelled_on` and `settle_stranded_cancellations_on`, which never move an `outcome_unknown` parent: `cancellation.rs:234-343`;
+  - `LeasePolicy::attempt_bound/resolution_bound`: `lease.rs:48-54`;
+  - the recorder's `locks_held` and `Injected`: `persistence_bound.rs:510-536`;
+  - `workflow_action_effect_states` users: only `mcp.rs:342` and tests;
+  - `supported_publication` refusing agent snapshots: `authority.rs:53-60`.
+- Findings rechecked (details in the findings log):
+  - F009: resolved.
+  - F010: resolved at decision level. Remaining integration gaps are logged as F012 and F013.
+  - F011: resolved.
+  - F004 premise: restated correctly.
+    - `delivered` and `dead_letter` are final and trigger-enforced.
+    - `outcome_unknown` exits only through evidence; the new re-entry only through §I.
+    - No existing path moves an `outcome_unknown` parent: the fenced settle requires a live lease, the stranded settle needs `status='sending'`, and the reaper marks unknown before settling.
+    - The event bound is driven by commands; the consumer reads only `max(seq)`.
+  - Rows 11–13 and 15–19, 21: consistent with the code.
+  - Row 20: see F012. Row 16's effect-state column: see F013.
+  - MCP/04.7 path:
+    - remote branches are unchanged;
+    - `workflow_action_not_applied_available` and `retry_safe` stay remote-only, and message proofs are consumed only by reopen rows;
+    - message receipts have no `remote_entry_id`/`reconciliation_evidence_id`, so the remote finality-conflict trigger is not falsely triggered by a successful reopen and resend;
+    - the request digest gains a versioned `target` for both kinds. That changes accepted 04.7/04.10 command bytes, which is acceptable under no-BC with a reset, and D3 §K reruns the `action_reconciliation` and `mcp_reconciliation` filters.
+- New findings, both actionable:
+  - [04.11-F012](agent-review-findings.md#0411-f012--effect-wait-resume-bypasses-the-finality-breach-continuation-veto) (low): the effect-wait resume bypasses the finality-breach continuation veto.
+  - [04.11-F013](agent-review-findings.md#0411-f013--message-evidence-shape-and-projection-gaps-against-the-047-schema) (low): message evidence shape and projection gaps against the 04.7 schema.
+- §L deferral: **acceptable against the phase 04 criteria**, with conditions.
+  - Phase 04 items 4–6 hold for `model_tool` origin:
+    - the receipt is recorded before any tool output;
+    - the agent execution parks conservatively when interrupted;
+    - its deliveries are reconcilable through the same command;
+    - only proven not-applied resends, and only that delivery.
+  - Acceptance "identical grants, approval, and idempotency" holds; one service serves both.
+  - Resuming an agent execution is the phase 06 saved-call owner's job (phase 04 "Action contract" and EXPANSION 06). It is unreachable in phase 04, because publication refuses agent snapshots (`authority.rs:53-60`). That matches the accepted 04.10 boundary ("production worker/tool exposure remains a phase06/08 obligation").
+  - Divergence to record: the 04.7 `continue_on` does reopen a reconciliation-parked owner for remote invocations, while D3's message settlement never does.
+  - Conditions:
+    1. BRIEF-04.11 records the obligation, with its trigger: reopen once every message marker of a `model_tool` execution has a receipt and `workflow_action_reconciliation_reopen_safe` holds.
+    2. The implementation keeps message outcomes out of the shared `continue_on` (D3 §H.4), so `NotAppliedRecorded` for a delivery cannot reopen the agent job.
+    3. A port-seam test shows the parked agent execution stays parked, its receipts are recorded, and `retry_safe` becomes TRUE once every marker is receipted.
+- Checks: none run (read-only). Conclusions come from inspecting the code and schema.
+- Lightly reviewed: the exact Rust shapes of `ReconciliationSnapshot`/`SubjectFacts` against `actions/reconciliation/{contracts,service,verification}.rs`. I relied on D3's statement that the remote fields are unchanged, and the batch review must verify it. The claim/episode/budget SQL for message rows also gets only a light pass; D3 keeps it remote-only.
+- Outcome: **CHANGES REQUIRED — no PASS for D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89`.** F012 and F013 are both low and should be cheap to fix in one delta. No other open actionable findings.
+- Process feedback: the delta format (D3's header table) made a focused recheck practical. The remaining gaps come from extending an accepted subsystem (04.7) whose invariants live in migration comments and scattered guards. Candidate instruction (scope: decisions that extend accepted action machinery): "List the accepted invariants of the extended subsystem — guards, triggers, vetoes — and state each one's behavior for the new kind." Evidence: F012 (continuation veto) and F013 (applied_request guard, conflict orientation, projection precedence).
+
+## 04.11-R005 — Correction recheck of 04.11-D4 (delta over D2+D3) — PASS
+- Identity: 2026-10-17; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging; architecture-gate correction recheck. Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested; effective effort not visible. Same reviewer and context as R002–R004. Records: [TASK](TASK.md) §"04.11-D4 correction"; [REVIEW](REVIEW.md) §04.11.
+- Artifact: the effective decision is
+  - D2 `logs/04.11/decision-D2.md` SHA256 `1dcd1a9e99e57cd32e15bf095490961722f185153c66945cd82d29bd4d943a44`;
+  - plus D3 `logs/04.11/decision-D3.md` SHA256 `c462e4eb56cb76ac816fa107b7b01f7651706796b8723fed8f206c6315858a89`;
+  - plus D4 `logs/04.11/decision-D4.md` SHA256 `6bf5efcb3de54949df516b45725c8c9d4fe8cc1ff968a38671a367862e1fa276`.
+
+  All three were recomputed at start and at end, and all matched. Base `8ce1fd49b5a961da705fddf0b92cac3182da427b`. No implementation exists.
+- Scope: F012, F013 items 1–4 and the three R004 §L conditions, by ID. Broadened only to the contracts D4 changes: the `applied_request='delivery'` value and its shape CHECK, and the reopen outcome renamed to `DeliveryReopened` with no job scheduled.
+- Evidence inspected this round:
+  - **Run settlement:** `recovery::settle_run` is an unconditional run update, so it can move `waiting/effect` to `waiting/reconciliation` (`recovery.rs:156-172`). `finish_job` writes `failed` for a Reconcile decision (`recovery.rs:174-192`).
+  - **Wait CHECK:** the `workflow_wait_failure` CHECK currently allows only `activation_limit`/`invalid_output` (`20260928144500:5-6`). D4 extends it.
+  - **Run lock:** `waits::lock` takes the run `FOR UPDATE` (`waits.rs:95`).
+  - **Conflict veto:** `retry_safe` is false under a conflict (`20260930180000:189`). That makes both `workflow_action_reconciliation_reopen_safe` and `workflow_control_retry_safe` false (`20261001100000:281-330`), so neither `continue_on` nor control retry can reopen a §M park.
+  - **Command table:** the outcome is free jsonb; its CHECK allows `scheduled_job_id` only with kind `scheduled` from `waiting/reconciliation` (`20260930180000:50-73`).
+  - **Claim-episode binding:** `workflow_action_bind_schedule` raises for any `scheduled` outcome that lacks a current schedule witness (`20261001100000:69-80`). D3's `Scheduled{receipt_only:false}` reopen outcome would have hit this, so D4's `DeliveryReopened` with a NULL `scheduled_job_id` is required, not just a rename.
+  - **Conflict-table anchors:** `20260930180000:89-103` and `20260930182000:18-30`, checked against D4 §Q's orientation.
+- Dispositions (details in the findings log):
+  - **F012:** resolved at decision level. D4 §M checks the conflict with the same `conflicted_on` under the run lock, before reading the receipt. On a conflict it applies the Reconcile park that `complete_io` would (wait `failed/evidence_conflict`, job `failed`, run `waiting/reconciliation`, uncertainty row, audit) and supersedes unsent sibling deliveries. Discovery wakes on a conflict without hot re-polling, because a handled wait is no longer `waiting`.
+  - **F013.1:** resolved. `'delivery'` is added to the `applied_request` CHECK and the shape CHECK, and the commit guard enforces message applied ⇔ `'delivery'`.
+  - **F013.2:** resolved. The SQL reopen guard checks for a conflict after taking the run lock.
+  - **F013.3:** resolved. The message branch follows the receipt branch, ahead of the generic evidence branches.
+  - **F013.4:** resolved. Existing orientation; the CHECKs are satisfied.
+  - **§L conditions 1–3:** satisfied at decision level.
+    - BRIEF-04.11 must state the phase 06 obligation, the reopen trigger and the divergence from 04.7.
+    - Every message outcome returns before `continue_on`.
+    - The port-seam test asserts the parked agent execution stays parked, its receipts are recorded and `retry_safe` becomes TRUE.
+- New optional suggestion: [04.11-F014](agent-review-findings.md#0411-f014--clarify-the-null-shape-alternative-and-conflict-refusal-for-later-message-entries-optional) (low): clarify the NULL shape alternative, and add an execution-conflict refusal at publication and `begin_part`. Not blocking.
+- Checks: none run (read-only). The verdict rests on inspection plus R002–R004 evidence that this delta does not affect. That evidence remains valid because D2/D3 sections not amended by D4 are unchanged (hashes verified).
+- Outcome: **PASS for the effective decision D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`** at the architecture gate. No open actionable findings for 04.11 at decision level. Optional F004 and F009 are adopted and F014 is open as an optional suggestion.
+- This PASS covers the gated decisions only. It does not cover implementation, tests, the combined phase 04 gate or the whole-batch review; all of those remain required before acceptance. The lightly reviewed areas from R003/R004 are carried into the batch review:
+  - `completion_job` owner interplay;
+  - the Rust shapes of the reconciliation contracts;
+  - the claim/episode/budget SQL for message rows;
+  - `fair_polling` and `inspection`.
+- Process feedback: the delta chain D2 → D3 → D4 kept each recheck narrow and verifiable. The D3→D4 round surfaced one latent defect that a check of the accepted subsystem's triggers caught: the `scheduled` outcome CHECK and the claim-episode binding. This reinforces the R004 candidate instruction (state the accepted invariants of an extended subsystem for the new kind). No new candidate.

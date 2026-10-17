@@ -76,11 +76,10 @@ async fn mcp_initializes_discovers_and_explicitly_calls_json_and_sse_then_shuts_
                 )
                 .await
                 .unwrap();
-            assert_eq!(result["isError"], false);
-            assert!(
-                serde_json::to_string(&result)
-                    .unwrap()
-                    .contains("record-value")
+            assert!(!result.is_error);
+            assert_eq!(
+                result.envelope(),
+                json!({"content":[{"type":"text","text":"record-value"}],"isError":false})
             );
             client.close().await.unwrap();
         })
@@ -122,6 +121,122 @@ fn initialize() -> Vec<ScriptedExchange> {
 fn adapter(url: &str) -> HttpMcpClient {
     HttpMcpClient::new(EndpointPolicy::new([format!("{}/", url.trim_end_matches('/'))]).unwrap())
 }
+
+#[tokio::test]
+async fn mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links() {
+    let output = json!({"type":"object","properties":{"name":{"type":"string"}}});
+    let mut exchanges = initialize();
+    exchanges.push(exchange(
+        "tools/list",
+        Some(1),
+        json!({"tools":[{
+            "name":"lookup","inputSchema":{"type":"object"},"outputSchema":output
+        }]}),
+    ));
+    exchanges.push(exchange(
+        "tools/call",
+        Some(2),
+        json!({
+            "content":[{"type":"text","text":"echo mcp-key"},
+                {"type":"resource_link","uri":"https://example.invalid/private","name":"inert"}],
+            "structuredContent":{"name":"mcp-key","authorization":"Bearer other-secret"},
+            "_meta":{"secret":"mcp-key"},"unknown":"mcp-key"
+        }),
+    ));
+    let server = scripted_scenario(exchanges).await;
+    let client = adapter(&server.base_url);
+    let session = client
+        .connect(
+            &server.base_url.clone().try_into().unwrap(),
+            Some(SecretString::from("mcp-key")),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        session.discover().await.unwrap()[0].output_schema,
+        Some(output)
+    );
+    let result = session
+        .call(
+            &"lookup".to_owned().try_into().unwrap(),
+            json!({"key":"record"}),
+        )
+        .await
+        .unwrap();
+    assert!(!result.is_error, "absent isError defaults to false");
+    let envelope = result.envelope();
+    let encoded = envelope.to_string();
+    assert!(!encoded.contains("mcp-key") && !encoded.contains("other-secret"));
+    assert!(envelope.get("_meta").is_none() && envelope.get("unknown").is_none());
+    assert_eq!(
+        envelope["content"][1]["uri"],
+        "https://example.invalid/private"
+    );
+    session.close().await.unwrap();
+    client.shutdown().await.unwrap();
+    assert_eq!(server.finish().await, Ok(4));
+}
+
+#[tokio::test]
+async fn mcp_busy_endpoint_waiters_leave_global_capacity_and_shutdown_promptly() {
+    let client = HttpMcpClient::new(EndpointPolicy::default());
+    let busy: McpEndpoint = "https://busy.example/mcp".to_owned().try_into().unwrap();
+    let other: McpEndpoint = "https://other.example/mcp".to_owned().try_into().unwrap();
+    let mut held = Vec::new();
+    for _ in 0..4 {
+        held.push(client.permits(&busy).await.unwrap());
+    }
+    let mut waiters = Vec::new();
+    for _ in 0..40 {
+        waiters.push(Box::pin(client.permits(&busy)));
+    }
+    for waiter in &mut waiters {
+        assert!(
+            tokio::time::timeout(Duration::from_millis(1), waiter)
+                .await
+                .is_err()
+        );
+    }
+    assert_eq!(client.capacity.available_permits(), 28);
+    let available = tokio::time::timeout(Duration::from_secs(1), client.permits(&other))
+        .await
+        .expect("another endpoint is not starved")
+        .unwrap();
+    client.shutdown().await.unwrap();
+    for waiter in waiters {
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), waiter)
+                .await
+                .unwrap()
+                .is_err()
+        );
+    }
+    assert!(client.permits(&other).await.is_err());
+    drop((available, held));
+}
+
+#[tokio::test]
+async fn mcp_endpoint_permit_wait_expires_without_consuming_global_capacity() {
+    let mut client = HttpMcpClient::new(EndpointPolicy::default());
+    client.permit_wait = Duration::from_millis(20);
+    let endpoint: McpEndpoint = "https://busy.example/mcp".to_owned().try_into().unwrap();
+    let held = client
+        .endpoint_capacity(&endpoint)
+        .unwrap()
+        .acquire_many_owned(4)
+        .await
+        .unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), client.permits(&endpoint))
+            .await
+            .unwrap()
+            .is_err()
+    );
+    assert_eq!(client.capacity.available_permits(), 32);
+    drop(held);
+    assert!(client.permits(&endpoint).await.is_ok());
+}
+
 #[tokio::test]
 async fn mcp_discovery_rejects_duplicates_external_schemas_secret_echoes_and_oversized_data() {
     let tool = json!({"name":"lookup","description":"safe","inputSchema":{"type":"object"}});

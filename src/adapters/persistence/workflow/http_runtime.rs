@@ -2,12 +2,17 @@ use super::*;
 use crate::application::workflow::{lease::ClaimedWorkflow, polling::WorkflowStepKind};
 use std::collections::BTreeMap;
 
-struct RunFacts {
-    actor: WorkflowActor,
-    bundle: std::sync::Arc<PublishedBundle>,
-    resources: BTreeMap<crate::domain::workflow::ResourceName, RuntimeResourceId>,
+/// The locked run's actor, frozen bundle and saved binding resources (shared with MCP).
+pub(in crate::adapters::persistence::workflow) struct RunFacts {
+    pub(in crate::adapters::persistence::workflow) actor: WorkflowActor,
+    pub(in crate::adapters::persistence::workflow) bundle: std::sync::Arc<PublishedBundle>,
+    pub(in crate::adapters::persistence::workflow) resources:
+        BTreeMap<crate::domain::workflow::ResourceName, RuntimeResourceId>,
 }
-async fn facts(tx: &mut Transaction<'_, Postgres>, scope: ActionScope) -> AppResult<RunFacts> {
+pub(in crate::adapters::persistence::workflow) async fn facts(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: ActionScope,
+) -> AppResult<RunFacts> {
     let actor = action_authority::prelock_on(tx, scope)
         .await?
         .ok_or_else(missing)?;
@@ -50,19 +55,60 @@ fn request(
         target,
         contract: tool,
         arguments,
-        context: ActionPolicyContext {
-            actor: facts.actor.user_id(),
-            capability_ceiling: facts
-                .bundle
-                .snapshots()
-                .tools
-                .iter()
-                .map(|tool| tool.policy.capability.clone())
-                .collect(),
-            approval_required: false,
-        },
+        context: context(facts),
     })
 }
+/// The run's actor and the frozen bundle's capability ceiling.
+pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {
+    ActionPolicyContext {
+        actor: facts.actor.user_id(),
+        capability_ceiling: facts
+            .bundle
+            .snapshots()
+            .tools
+            .iter()
+            .map(|tool| tool.policy.capability.clone())
+            .collect(),
+        approval_required: false,
+    }
+}
+/// The claimed execution's frozen inputs, proving the claim's step and its kind.
+pub(in crate::adapters::persistence::workflow) async fn frozen_inputs(
+    tx: &mut Transaction<'_, Postgres>,
+    facts: &RunFacts,
+    claim: &ClaimedWorkflow,
+    kind: &WorkflowStepKind,
+) -> AppResult<Value> {
+    let scope = claim.fence.scope;
+    let (step, inputs): (String, Value) = sqlx::query_as("SELECT step_id,frozen_inputs FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+    if step != claim.activation.step.as_str() || inputs != claim.activation.inputs {
+        return Err(missing());
+    }
+    if facts
+        .bundle
+        .compiled()
+        .graph()
+        .definition()
+        .steps
+        .get(&claim.activation.step)
+        .is_none_or(|step| step.step_type.as_str() != kind.0)
+    {
+        return Err(missing());
+    }
+    Ok(inputs)
+}
+/// Preparation enforces the same current resource readiness as reservation (enabled
+/// connection, bearer secret present, operation supported), so a revoked or unready
+/// connection is a classified refusal here rather than a retried reservation refusal.
+async fn ready_on(tx: &mut Transaction<'_, Postgres>, request: &ActionRequest) -> AppResult<()> {
+    let id = http_target(&request.target)?;
+    let connection = connection_on(tx, request.scope.company, id)
+        .await?
+        .ok_or_else(missing)?;
+    validate_resource(request, &status_on(tx, &connection).await?)
+}
+
 #[async_trait]
 impl HttpActionPreparation for PostgresPersistence {
     async fn http_step_request(
@@ -77,22 +123,7 @@ impl HttpActionPreparation for PostgresPersistence {
         };
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
-        let (step, inputs): (String, Value) = sqlx::query_as("SELECT step_id,frozen_inputs FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
-        if step != claim.activation.step.as_str() || inputs != claim.activation.inputs {
-            return Err(missing());
-        }
-        if facts
-            .bundle
-            .compiled()
-            .graph()
-            .definition()
-            .steps
-            .get(&claim.activation.step)
-            .is_none_or(|step| step.step_type.as_str() != kind.0)
-        {
-            return Err(missing());
-        }
+        let inputs = frozen_inputs(&mut tx, &facts, claim, kind).await?;
         let (name, slot, arguments) = match kind.0.as_str() {
             "http.request" => {
                 let slot = inputs
@@ -133,6 +164,7 @@ impl HttpActionPreparation for PostgresPersistence {
         };
         policy_on(&mut tx, scope.company, id, &tool).await?;
         let result = request(scope, &facts, id, tool, arguments)?;
+        ready_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)
     }
@@ -155,6 +187,7 @@ impl HttpActionPreparation for PostgresPersistence {
             return Err(missing());
         }
         let result = request(scope, &facts, call.connection, tool, call.arguments.clone())?;
+        ready_on(&mut tx, &result).await?;
         tx.commit().await?;
         Ok(result)
     }

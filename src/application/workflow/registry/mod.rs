@@ -7,7 +7,7 @@ mod examples;
 mod facts;
 mod families;
 mod help;
-mod mcp;
+pub(crate) mod mcp;
 mod metadata;
 mod schemas;
 pub use examples::{AuthoringExample, example};
@@ -19,6 +19,7 @@ use crate::application::workflow::compiler::{
 use crate::domain::workflow::{
     Binding, ResourceName, Routes, StepId, TypeName, VersionId, WorkflowId,
 };
+pub(crate) use actions::message_tool_schemas;
 pub(crate) use checks::InputCheck;
 pub use facts::{CapabilityProfile, CatalogueFacts, ChildContract, ToolContract};
 pub use help::{AuthoringHelp, authoring_help};
@@ -32,6 +33,10 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.2";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
+/// Destinations of one `message.send`: the established per-commit fan-out bound
+/// (`transport::ingress::MAX_THREAD_ASSOCIATIONS`). One send writes at most this many threads,
+/// messages and deliveries in one transaction, and a receipt locks at most this many parents.
+pub const MAX_MESSAGE_DESTINATIONS: usize = 20;
 pub const MAX_ITEMS: usize = 256;
 pub const MAX_TEXT: usize = 16_384;
 pub const MAX_HEADERS: usize = 64;

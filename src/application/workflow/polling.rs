@@ -14,6 +14,8 @@ pub enum PollWork {
     ExpiredRun,
     ExhaustedPending,
     Wait,
+    /// Message deliveries changed outcome since the action's cursor (04.11-D3 §E).
+    MessageReceipt,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PollCandidate {

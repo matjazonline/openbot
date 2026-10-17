@@ -1,6 +1,43 @@
 # Workflow foundation resume
 
-## 04.9 crash recovery — 2026-10-17 (current)
+## USER STOP — 2026-10-17 (current)
+
+**Stopped at a safe checkpoint.** Read the [current handoff](docs/HANDOFF-04.11-USER-STOP-20261017.md).
+04.10 is accepted (R005 PASS); 04.11-D1 architecture review is incomplete
+(R001, NO PASS), with provisional F001–F004 saved. No04.11 implementation.
+User chose users/channels and rejection of groups. Reviewer stopped; task PostgreSQL
+at `/private/tmp/workflow0410-20261017` stopped cleanly, data retained; no author
+checks running. Worktree and all evidence preserved. Combined full-suite/stock/lease
+verification remains pending. Continue only after a new user instruction.
+
+## 04.10 accepted; 04.11 next — 2026-10-17 (historical, before latest stop)
+
+User renewed continuation under implement-astra-reviewed-2.1 and confirmed root as
+Astra/high author. Scope remains04.10 then04.11; no commits, deployment, migration
+squash or phases05+. Preserve all existing work. Task fixture at
+`/private/tmp/workflow0410-20261017` (port55450) is running for serialized checks.
+04.10 is root-accepted after independent R004 whole-batch inspection and R005
+correction/evidence PASS; no blocking finding remains. Accepted digest
+`2be42e3e5d8b0651ad1d6bc523cf356dd6bb55ac254050b99914bede669ebc4c`
+(before this administrative status edit). Focused504/0, correction12/0 and
+scoped stock393/0 passed, as did fresh migrations/schema, SQLx and all static gates.
+Prior failed logs are preserved. See latest TASK/REVIEW for exact evidence.
+04.11 investigation is recorded in `docs/logs/04.11/investigation.md`; no architecture
+gate or implementation yet. User confirmed users/channels and rejection of groups.
+Combined full-suite/stock/lease verification remains required after04.11.
+
+## 04.10 USER STOP — 2026-10-17 (historical)
+
+**04.10 incomplete; stopped at the user's checkpoint request.** Read
+[stop handoff](HANDOFF-04.10-USER-STOP-20261017.md) before resuming. User authorized
+04.10 then 04.11 under implement-opus-reviewed-2.1. Architecture gate accepted at decision
+level (D2 as amended by D3, independent PASS 04.10-R003); implementation is written but
+unverified: all-target compile not yet clean, no tests run, not frozen or code-reviewed.
+Open finding 04.10-F012 must close before batch acceptance. Task fixture
+`/private/tmp/workflow0410-20261017` (port 55450) stopped, data retained. 04.11 not started.
+No commits, deployment, migration squash or phases 05+. 04.9 entry below is accepted history.
+
+## 04.9 crash recovery — 2026-10-17 (accepted; historical)
 
 User authorized continuation and confirmed root as Astra/high author under
 implement-astra-reviewed-2.1. Starting HEAD is `e634a82837d50e7ed4aba4bb003f0a98ec294b10`,

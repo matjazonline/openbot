@@ -60,3 +60,12 @@ pub(super) fn content() -> Value {
         MAX_ITEMS,
     )
 }
+
+/// The `mcp.call` result envelope. One definition serves the compiled step contract that
+/// types `steps.<id>.output` and the runtime validation of every committed MCP receipt.
+pub(crate) fn tool_result(output_schema: &Value) -> Value {
+    object(
+        json!({"content":content(),"structuredContent":embedded(output_schema.clone(),"mcp-output"),"isError":{"type":"boolean"},"_meta":metadata()}),
+        &["content", "isError"],
+    )
+}

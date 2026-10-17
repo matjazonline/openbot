@@ -5,7 +5,7 @@ mod worker;
 use crate::{
     app_error::{AppError, AppResult},
     entities::mcp::*,
-    services::mcp_client::{McpClient, McpSession},
+    services::mcp_client::{McpCallResult, McpClient, McpSession},
 };
 use async_trait::async_trait;
 use policy::EndpointPolicy;
@@ -28,6 +28,8 @@ pub struct HttpMcpClient {
     endpoints: std::sync::Mutex<std::collections::HashMap<McpEndpoint, std::sync::Weak<Semaphore>>>,
     workers: tokio::sync::Mutex<tokio::task::JoinSet<()>>,
     shutdown: tokio_util::sync::CancellationToken,
+    /// One bound for acquiring both session permits.
+    permit_wait: Duration,
 }
 impl HttpMcpClient {
     pub fn new(policy: EndpointPolicy) -> Self {
@@ -37,6 +39,7 @@ impl HttpMcpClient {
             endpoints: Default::default(),
             workers: Default::default(),
             shutdown: Default::default(),
+            permit_wait: Duration::from_secs(5),
         }
     }
 }
@@ -47,6 +50,7 @@ fn failed(message: &str) -> AppError {
 impl McpClient for HttpMcpClient {
     async fn shutdown(&self) -> AppResult<()> {
         self.capacity.close();
+        self.close_endpoint_capacity();
         self.shutdown.cancel();
         let mut workers = self.workers.lock().await;
         let mut failed_worker = false;
@@ -67,12 +71,7 @@ impl McpClient for HttpMcpClient {
         endpoint: &McpEndpoint,
         token: Option<SecretString>,
     ) -> AppResult<Box<dyn McpSession>> {
-        let permit = self
-            .capacity
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| failed("MCP connection capacity exhausted"))?;
-        let endpoint_permit = self.endpoint_permit(endpoint)?;
+        let (endpoint_permit, permit) = self.permits(endpoint).await?;
         let http = self.policy.client(endpoint).await?;
         let mut config =
             StreamableHttpClientTransportConfig::with_uri(endpoint.as_str().to_owned());
@@ -175,8 +174,14 @@ impl Session {
                     name,
                     description: tool.description.map(|v| v.into_owned()).unwrap_or_default(),
                     input_schema: Value::Object((*tool.input_schema).clone()),
+                    output_schema: tool
+                        .output_schema
+                        .map(|schema| Value::Object((*schema).clone())),
                 };
                 crate::services::tool_schema::compile(&tool.input_schema)?;
+                if let Some(schema) = &tool.output_schema {
+                    crate::services::tool_schema::compile(schema)?;
+                }
                 let encoded =
                     serde_json::to_string(&tool).map_err(|_| failed("Invalid MCP discovery"))?;
                 self.reject_secret(
@@ -208,7 +213,7 @@ impl McpSession for Session {
             .await
             .map_err(|_| failed("MCP discovery timed out"))?
     }
-    async fn call(&self, name: &McpToolName, arguments: Value) -> AppResult<Value> {
+    async fn call(&self, name: &McpToolName, arguments: Value) -> AppResult<McpCallResult> {
         self.remaining
             .store(MAX_MCP_DISCOVERY_BYTES, std::sync::atomic::Ordering::SeqCst);
         if arguments.to_string().len() > MAX_MCP_SCHEMA_BYTES {
@@ -246,9 +251,7 @@ impl McpSession for Session {
         let rmcp::model::ServerResult::CallToolResult(result) = result else {
             return Err(failed("MCP effect indeterminate; do not retry"));
         };
-        let result = serde_json::to_value(result).map_err(|_| failed("Invalid MCP result"))?;
-        self.reject_secret(&result)?;
-        Ok(result)
+        self.parse_result(result)
     }
     async fn close(mut self: Box<Self>) -> AppResult<()> {
         self.cancel_pending().await;
@@ -264,6 +267,33 @@ impl McpSession for Session {
 #[cfg(test)]
 mod tests;
 
+impl Session {
+    /// The typed boundary: `_meta` and unknown remote fields are dropped by rmcp's model,
+    /// an absent `isError` is false, and an echoed bearer token is redacted rather than
+    /// failing the call, so the observed result can still become the durable receipt.
+    fn parse_result(&self, result: rmcp::model::CallToolResult) -> AppResult<McpCallResult> {
+        let invalid = || failed("Invalid MCP result");
+        let mut content = result
+            .content
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| invalid())?;
+        let mut structured_content = result.structured_content;
+        let token = self.token.as_ref();
+        for value in content.iter_mut().chain(structured_content.as_mut()) {
+            if !crate::adapters::redaction::redact_json(value, token) {
+                return Err(invalid());
+            }
+        }
+        Ok(McpCallResult {
+            content,
+            structured_content,
+            is_error: result.is_error.unwrap_or(false),
+        })
+    }
+}
+
 fn contains_secret(value: &Value, secret: &str) -> bool {
     match value {
         Value::String(text) => text.contains(secret),
@@ -276,7 +306,36 @@ fn contains_secret(value: &Value, secret: &str) -> bool {
 }
 
 impl HttpMcpClient {
-    fn endpoint_permit(&self, endpoint: &McpEndpoint) -> AppResult<OwnedSemaphorePermit> {
+    /// Endpoint permit first, then the global one, under one deadline. A caller queued for a
+    /// busy endpoint holds no global permit, so one hot endpoint (possibly shared by several
+    /// tenants) cannot starve sessions to every other endpoint. Shutdown fails waiters at once.
+    async fn permits(
+        &self,
+        endpoint: &McpEndpoint,
+    ) -> AppResult<(OwnedSemaphorePermit, OwnedSemaphorePermit)> {
+        let deadline = tokio::time::Instant::now() + self.permit_wait;
+        let endpoint_permit = self
+            .acquire(self.endpoint_capacity(endpoint)?, deadline)
+            .await?;
+        let permit = self.acquire(self.capacity.clone(), deadline).await?;
+        Ok((endpoint_permit, permit))
+    }
+    async fn acquire(
+        &self,
+        semaphore: Arc<Semaphore>,
+        deadline: tokio::time::Instant,
+    ) -> AppResult<OwnedSemaphorePermit> {
+        tokio::select! {
+            biased;
+            _ = self.shutdown.cancelled() => Err(failed("MCP client is shutting down")),
+            permit = tokio::time::timeout_at(deadline, semaphore.acquire_owned()) => match permit {
+                Ok(Ok(permit)) => Ok(permit),
+                Ok(Err(_)) => Err(failed("MCP client is shutting down")),
+                Err(_) => Err(failed("MCP connection capacity exhausted")),
+            },
+        }
+    }
+    fn endpoint_capacity(&self, endpoint: &McpEndpoint) -> AppResult<Arc<Semaphore>> {
         let mut endpoints = self
             .endpoints
             .lock()
@@ -287,9 +346,14 @@ impl HttpMcpClient {
             .and_then(std::sync::Weak::upgrade)
             .unwrap_or_else(|| Arc::new(Semaphore::new(4)));
         endpoints.insert(endpoint.clone(), Arc::downgrade(&capacity));
-        capacity
-            .try_acquire_owned()
-            .map_err(|_| failed("MCP endpoint capacity exhausted"))
+        Ok(capacity)
+    }
+    fn close_endpoint_capacity(&self) {
+        if let Ok(endpoints) = self.endpoints.lock() {
+            for capacity in endpoints.values().filter_map(std::sync::Weak::upgrade) {
+                capacity.close();
+            }
+        }
     }
 }
 

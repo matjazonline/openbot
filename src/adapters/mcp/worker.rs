@@ -9,7 +9,7 @@ enum Command {
     Call {
         name: McpToolName,
         args: Value,
-        reply: oneshot::Sender<AppResult<Value>>,
+        reply: oneshot::Sender<AppResult<McpCallResult>>,
     },
     Close(oneshot::Sender<AppResult<()>>),
 }
@@ -34,7 +34,7 @@ impl McpSession for ProxySession {
             .await
             .map_err(|_| failed("MCP discovery cancelled"))?
     }
-    async fn call(&self, name: &McpToolName, args: Value) -> AppResult<Value> {
+    async fn call(&self, name: &McpToolName, args: Value) -> AppResult<McpCallResult> {
         let (reply, result) = oneshot::channel();
         self.sender
             .try_send(Command::Call {

@@ -4,7 +4,7 @@ use crate::adapters::{
     workflow_http::{HttpDestinationPolicy, HttpRuntime},
 };
 use crate::application::workflow::{
-    actions::*, http::*, lease::*, polling::WorkflowStepKind, worker::WorkflowHandler,
+    actions::*, http::*, lease::*, polling::WorkflowStepKind,
 };
 use crate::domain::entities::correlation::CorrelationId;
 use secrecy::ExposeSecret;
@@ -19,6 +19,7 @@ use support::*;
 
 #[path = "http_authority_tests.rs"]
 mod authority_tests;
+use super::action_outcome_support::*;
 
 #[tokio::test]
 async fn workflow_http_real_publication_admission_receipt_restart_and_competitors() {
@@ -27,8 +28,8 @@ async fn workflow_http_real_publication_admission_receipt_restart_and_competitor
     let setup = Box::pin(setup(&origin, Entrance::Http)).await;
     let runtime = runtime(&setup);
     let (a, b) = tokio::join!(
-        runtime.execute(&setup.kind, &setup.claim),
-        runtime.execute(&setup.kind, &setup.claim)
+        runtime.run(&setup.kind, &setup.claim),
+        runtime.run(&setup.kind, &setup.claim)
     );
     assert!(a.is_ok() || b.is_ok());
     let request = server.await.unwrap();
@@ -38,7 +39,7 @@ async fn workflow_http_real_publication_admission_receipt_restart_and_competitor
         HttpDestinationPolicy::default(),
         lease(),
     )
-    .execute(&setup.kind, &setup.claim)
+    .run(&setup.kind, &setup.claim)
     .await
     .unwrap();
     assert_eq!(
@@ -61,7 +62,7 @@ async fn workflow_http_registered_tool_and_direct_model_call_share_receipt() {
         server("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}").await;
     let setup = Box::pin(setup(&origin, Entrance::Tool)).await;
     let runtime = runtime(&setup);
-    let result = runtime.execute(&setup.kind, &setup.claim).await.unwrap();
+    let result = runtime.run(&setup.kind, &setup.claim).await.unwrap();
     server.await.unwrap();
     let call = HttpToolCall {
         connection: setup.connection.id,
@@ -93,13 +94,9 @@ async fn workflow_http_remote_failure_remains_unknown_without_second_entry() {
     let (origin, server) = server("HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n").await;
     let setup = Box::pin(setup(&origin, Entrance::Http)).await;
     let runtime = runtime(&setup);
-    let failure = runtime
-        .execute(&setup.kind, &setup.claim)
-        .await
-        .unwrap_err();
-    assert_eq!(failure.safety, RetrySafety::EffectOutcomeUnknown);
+    let failure = runtime.run(&setup.kind, &setup.claim).await.unwrap_err();
     server.await.unwrap();
-    assert!(runtime.execute(&setup.kind, &setup.claim).await.is_err());
+    assert!(runtime.run(&setup.kind, &setup.claim).await.is_err());
     assert_eq!(
         action_counts(&setup.fixture).await,
         ActionCounts {
@@ -107,6 +104,20 @@ async fn workflow_http_remote_failure_remains_unknown_without_second_entry() {
             entries: 1,
             receipts: 0,
         }
+    );
+    // 04.10-D3: the handler labels Safe; the shared predicate sees the unresolved marker
+    // and makes the effective outcome unknown: a settleable reconciliation wait.
+    assert_eq!(failure.failure.code().as_str(), "http.unresolved");
+    assert_eq!(
+        retire(&setup.fixture.persistence, &setup.claim, lease(), failure).await,
+        Retired::new(
+            "waiting",
+            Some("reconciliation"),
+            "http.unresolved",
+            "retryable",
+            "unknown",
+            1
+        )
     );
 }
 
@@ -173,18 +184,83 @@ async fn workflow_http_current_revocation_and_protection_prevent_network() {
                     .unwrap();
             }
         }
-        assert!(
-            runtime(&setup)
-                .execute(&setup.kind, &setup.claim)
-                .await
-                .is_err()
-        );
+        let failure = runtime(&setup)
+            .run(&setup.kind, &setup.claim)
+            .await
+            .unwrap_err();
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_action_dispatches")
             .fetch_one(p.pool())
             .await
             .unwrap();
         assert_eq!(count, 0, "{change}");
+        // Pre-marker refusals are classified terminal failures, never waits (04.10-F008);
+        // a disabled connection or removed secret is refused by preparation (F012).
+        let code = if change == "approval" {
+            "http.approval_required"
+        } else {
+            "http.rejected"
+        };
+        assert_eq!(
+            retire(p, &setup.claim, lease(), failure).await,
+            Retired::new("failed", None, code, "terminal", "safe", 0),
+            "{change}"
+        );
+        let attempts: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM task_attempts WHERE task_id=$1")
+                .bind(setup.claim.fence.scope.job.0)
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        assert_eq!(attempts, 1, "{change}: no retry loop");
     }
+}
+
+#[tokio::test]
+async fn workflow_http_crash_before_marker_retries_and_after_marker_reconciles() {
+    // No marker: the classifier default is Safe, so lease loss retries instead of parking.
+    let unmarked = Box::pin(setup("http://127.0.0.1:1", Entrance::Http)).await;
+    let p = &unmarked.fixture.persistence;
+    release(p, &unmarked.claim, lease(), LeaseReleaseCause::LeaseLost).await;
+    assert_eq!(
+        retired(p, &unmarked.claim).await,
+        Retired::new(
+            "running",
+            None,
+            "workflow.interrupted",
+            "retryable",
+            "safe",
+            0
+        )
+    );
+    let status: String = sqlx::query_scalar("SELECT status FROM background_tasks WHERE id=$1")
+        .bind(unmarked.claim.fence.scope.job.0)
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(status, "pending");
+    // A marker without a receipt: the same lease loss is an unknown effect (one fact).
+    let (origin, server) = server("HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n").await;
+    let marked = Box::pin(setup(&origin, Entrance::Http)).await;
+    let p = &marked.fixture.persistence;
+    assert!(
+        runtime(&marked)
+            .run(&marked.kind, &marked.claim)
+            .await
+            .is_err()
+    );
+    server.await.unwrap();
+    release(p, &marked.claim, lease(), LeaseReleaseCause::LeaseLost).await;
+    assert_eq!(
+        retired(p, &marked.claim).await,
+        Retired::new(
+            "waiting",
+            Some("reconciliation"),
+            "workflow.interrupted",
+            "retryable",
+            "unknown",
+            1
+        )
+    );
 }
 
 #[tokio::test]
@@ -323,7 +399,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
     );
     assert!(
         runtime(&setup)
-            .execute(&setup.kind, &setup.claim)
+            .run(&setup.kind, &setup.claim)
             .await
             .is_err()
     );

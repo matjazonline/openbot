@@ -85,6 +85,10 @@ pub struct McpDiscoveredTool {
     pub name: McpToolName,
     pub description: String,
     pub input_schema: serde_json::Value,
+    /// The reviewed `outputSchema`, when the server declared one. Part of the reviewed
+    /// contract: a changed output schema is drift, exactly like a changed input schema.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

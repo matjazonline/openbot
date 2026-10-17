@@ -1,13 +1,9 @@
 use super::*;
-use crate::application::workflow::binding::{
-    ResourceDirectory, ResourceReadiness, ResourceStatus, validate_resource,
-};
-use crate::entities::mcp::McpAuth;
-use std::collections::BTreeSet;
+use crate::application::workflow::binding::{ResourceDirectory, ResourceStatus, validate_resource};
 
-/// Only the existing MCP UUID owner is supported. A connection being ready
-/// promises no tool policy or execution grant. Contract labels have no current
-/// authority mapping, so supported_contracts intentionally remains empty.
+/// HTTP connections and company MCP connections are the supported resource owners.
+/// Supported contracts are the currently approved operation names; a ready resource still
+/// grants nothing by itself.
 pub(super) async fn inspect_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -16,26 +12,10 @@ pub(super) async fn inspect_on(
     if let Some(connection) = http::connection_on(tx, company, id.as_uuid()).await? {
         return http::status_on(tx, &connection).await.map(Some);
     }
-    let Some(connection) =
-        super::super::mcp::connection_on(&mut *tx, company.as_uuid(), id.as_uuid()).await?
-    else {
-        return Ok(None);
-    };
-    let readiness = if !connection.enabled || connection.tool_grants.is_empty() {
-        ResourceReadiness::Revoked
-    } else if connection.auth == McpAuth::Bearer && !connection.secret_set {
-        ResourceReadiness::Unavailable
-    } else {
-        ResourceReadiness::Ready
-    };
-    Ok(Some(ResourceStatus {
-        id,
-        company_id: company,
-        kind: TypeName::parse("mcp").map_err(|_| invalid())?,
-        supported_contracts: BTreeSet::new(),
-        authorized: true,
-        readiness,
-    }))
+    match mcp::connection_on(tx, company, id.as_uuid()).await? {
+        Some(connection) => mcp::status_on(tx, &connection).await.map(Some),
+        None => Ok(None),
+    }
 }
 
 #[async_trait]
@@ -58,15 +38,32 @@ pub(super) async fn check_readiness(
     tx: &mut Transaction<'_, Postgres>,
     configuration: &binding::ConfiguredBinding,
 ) -> AppResult<()> {
+    let company = configuration.company_id();
+    let definition = configuration.bundle().compiled().graph().definition();
     for tool in &configuration.bundle().snapshots().tools {
-        if let Some(slot) = &tool.contract.connection {
-            let id = configuration.resources().get(slot).ok_or_else(missing)?;
-            let connection = http::connection_on(tx, configuration.company_id(), id.as_uuid())
-                .await?
-                .ok_or_else(missing)?;
-            http::policy_on(tx, connection.company, connection.id, tool).await?;
-        } else {
-            http::registered_on(tx, configuration.company_id(), tool).await?;
+        let Some(slot) = &tool.contract.connection else {
+            http::registered_on(tx, company, tool).await?;
+            continue;
+        };
+        let id = configuration
+            .resources()
+            .get(slot)
+            .ok_or_else(missing)?
+            .as_uuid();
+        match slot_kind(definition, slot) {
+            Some("http") => {
+                let connection = http::connection_on(tx, company, id)
+                    .await?
+                    .ok_or_else(missing)?;
+                http::policy_on(tx, connection.company, connection.id, tool).await?;
+            }
+            Some("mcp") => {
+                let connection = mcp::connection_on(tx, company, id)
+                    .await?
+                    .ok_or_else(missing)?;
+                mcp::policy_on(tx, &connection, tool).await?;
+            }
+            _ => return Err(missing()),
         }
     }
     for requirement in &configuration
@@ -83,4 +80,16 @@ pub(super) async fn check_readiness(
         validate_resource(configuration.company_id(), id, requirement, &status)?;
     }
     Ok(())
+}
+
+/// The declared resource kind of a tool's slot in this exact workflow definition.
+pub(super) fn slot_kind<'a>(
+    definition: &'a crate::domain::workflow::WorkflowDefinition,
+    slot: &crate::domain::workflow::ResourceName,
+) -> Option<&'a str> {
+    definition
+        .resources
+        .iter()
+        .find(|resource| &resource.slot == slot)
+        .map(|resource| resource.kind.as_str())
 }

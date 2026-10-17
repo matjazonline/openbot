@@ -85,6 +85,13 @@ impl WorkflowWaits for PostgresPersistence {
         }
         Ok(settled)
     }
+    async fn consume_message_receipts(
+        &self,
+        scope: ActivationRequest,
+        policy: crate::application::workflow::lease::LeasePolicy,
+    ) -> AppResult<u16> {
+        message::receipts::consume_page(self, scope, policy).await
+    }
 }
 
 pub(super) async fn lock(

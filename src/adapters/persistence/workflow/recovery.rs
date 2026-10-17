@@ -99,10 +99,14 @@ fn report(reason: &Retirement, kind: &str) -> AppResult<WorkflowFailure> {
     if let Retirement::Interrupted(LeaseReleaseCause::Classified(report)) = reason {
         return Ok(report.clone());
     }
-    // These engine-owned read handlers cannot dispatch an effect. Every other
+    // These engine-owned read handlers cannot dispatch an effect, and action-owned kinds
+    // dispatch only after a committed marker, so without a marker nothing was sent (the
+    // shared predicate overrides this default whenever a marker exists). Every other
     // interrupted handler is ambiguous until its owning subsystem reconciles it.
     // Refusing new work does not prove that earlier charged effects are safe.
-    let safety = if matches!(kind, "context.load" | "memory.load") {
+    let safety = if matches!(kind, "context.load" | "memory.load")
+        || crate::application::workflow::actions::marker_owned_effect_kind(kind)
+    {
         RetrySafety::SafeToRetry
     } else {
         RetrySafety::EffectOutcomeUnknown
@@ -149,7 +153,7 @@ async fn close_attempt(
     Ok(())
 }
 
-async fn settle_run(
+pub(super) async fn settle_run(
     db: &mut PgConnection,
     scope: ActivationRequest,
     decision: RecoveryDecision,
@@ -279,4 +283,52 @@ pub(super) async fn route_pending_failure(
         &failure,
     )
     .await
+}
+
+/// A parked message step whose receipt failed (04.11-D2 §4.4): the same final-error decision
+/// and writer as retirement, never a resend and no retry budget. The caller has completed the
+/// wait and returned the run to running; this takes the frozen `final_error` route or fails
+/// the run, then closes the parked job as a final error does.
+pub(super) async fn route_effect_failure(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    failure: &StepFailure,
+) -> AppResult<bool> {
+    let run=sqlx::query_as::<_,Snapshot>("SELECT binding_id,max_steps,deadline,clock_timestamp() AS now FROM workflow_runs WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+    let binding = admission_binding::read_saved_binding(
+        db,
+        scope.company,
+        WorkflowBindingId::new(run.binding_id),
+        scope.run.as_uuid(),
+    )
+    .await?;
+    let step: String = sqlx::query_scalar(
+        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    let step = StepId::parse(step).map_err(|_| invalid())?;
+    let routed = route_failure(
+        db,
+        scope,
+        &run,
+        binding.bundle().compiled().graph(),
+        &step,
+        failure,
+    )
+    .await?;
+    if !routed {
+        sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    }
+    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
+        .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    if closed.rows_affected() != 1 {
+        return Err(invalid());
+    }
+    Ok(routed)
 }

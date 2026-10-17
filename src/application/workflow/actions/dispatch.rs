@@ -207,12 +207,21 @@ pub(crate) fn validate_action_result(action: &FrozenAction, result: Value) -> Ap
         line: 1,
         column: 1,
     };
-    Schema::compile(
-        action.request().contract.contract.output_schema.clone(),
-        "/output",
-        span,
-    )
-    .and_then(|schema| schema.validate(&result, "/output", span))
-    .map_err(|_| AppError::BadRequest("Invalid action result".into()))?;
+    Schema::compile(result_schema(action), "/output", span)
+        .and_then(|schema| schema.validate(&result, "/output", span))
+        .map_err(|_| AppError::BadRequest("Invalid action result".into()))?;
     Ok(result)
+}
+
+/// MCP providers commit the `mcp.call` envelope, whose structuredContent carries the frozen
+/// output schema; every other provider commits a result of the frozen output schema itself.
+fn result_schema(action: &FrozenAction) -> Value {
+    let request = action.request();
+    let output = &request.contract.contract.output_schema;
+    match &request.target {
+        ActionTarget::Connection { resource_kind, .. } if resource_kind.as_str() == "mcp" => {
+            crate::application::workflow::registry::mcp::tool_result(output)
+        }
+        _ => output.clone(),
+    }
 }

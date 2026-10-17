@@ -15,12 +15,14 @@ pub enum StopReason {
 #[derive(Debug)]
 pub enum SupervisedResult {
     Ready(FencedWorkflowResult),
+    /// The handler's own commit parked the step; the port confirmed the exact close.
+    Suspended(crate::domain::workflow::WaitId),
     Stopped(StopReason),
 }
 
 /// `handler` must be the operation itself, never a detached task's JoinHandle.
 /// Call only with a committed claim. No transaction is held while polling it.
-pub async fn supervise_io<P, H, C>(
+pub async fn supervise_io<P, H, C, O>(
     port: &P,
     claim: ClaimedWorkflow,
     policy: LeasePolicy,
@@ -30,7 +32,8 @@ pub async fn supervise_io<P, H, C>(
 ) -> SupervisedResult
 where
     P: WorkflowLeases,
-    H: Future<Output = WorkflowHandlerResult>,
+    H: Future<Output = O>,
+    O: Into<WorkflowHandlerOutcome>,
     C: Future<Output = ()>,
 {
     let fence = claim.fence;
@@ -63,6 +66,21 @@ where
                 }
             }
             output = &mut handler => {
+                let output = match output.into() {
+                    WorkflowHandlerOutcome::Completed(output) => output,
+                    WorkflowHandlerOutcome::Suspended(suspended) => {
+                        let confirmed = tokio::select! { biased;
+                            _ = &mut cancel => break SupervisedResult::Stopped(StopReason::Cancelled),
+                            result = timeout(policy.supervision_guard(),port.confirm_suspension(fence,suspended.wait)) => result,
+                        };
+                        // Never complete or release a parked attempt: its job is already closed.
+                        break match confirmed {
+                            Ok(Ok(true)) => SupervisedResult::Suspended(suspended.wait),
+                            Ok(Ok(false)) => SupervisedResult::Stopped(StopReason::LeaseLost),
+                            _ => SupervisedResult::Stopped(StopReason::Persistence),
+                        };
+                    }
+                };
                 let output = match output { Ok(output) => output, Err(error) => { failure = Some(error); break SupervisedResult::Stopped(StopReason::HandlerFailed); } };
                 if serde_json::to_vec(&output).map_or(true, |bytes| bytes.len()>claim.max_result_bytes) {
                     break SupervisedResult::Stopped(StopReason::OversizedResult);

@@ -4,16 +4,12 @@ impl Registration<'_> {
         match self.name() {
             "http.request" => self.http(),
             "tool.call" | "mcp.call" => self.tool(),
-            "message.send" => Ok(contract(
-                json!({"content":content(),"destinations":array(object(json!({"kind":{"enum":["user","group","channel"]},"id":identifier()}), &["kind","id"]),1,MAX_SELECTIONS)}),
-                &["content", "destinations"],
-                message_result(),
-            )),
-            "message.reply" => Ok(contract(
-                json!({"source_message":identifier(),"content":content()}),
-                &["source_message", "content"],
-                message_result(),
-            )),
+            name @ ("message.send" | "message.reply") => {
+                let name = name.to_owned();
+                self.check(InputCheck::Message)?;
+                let (properties, required) = message_inputs(&name).expect("message family");
+                Ok(contract(properties, required, message_result()))
+            }
             _ => unreachable!("action family"),
         }
     }
@@ -69,6 +65,13 @@ impl Registration<'_> {
                 "tool",
             ));
         };
+        if crate::application::workflow::message::is_builtin_message_tool(name) {
+            return Err(self.error(
+                "registry.tool",
+                "Built-in messaging is a step type, not a selectable tool",
+                "tool",
+            ));
+        }
         let tool = self
             .facts
             .tools
@@ -91,11 +94,7 @@ impl Registration<'_> {
         let mut properties = json!({"tool":{"const":name},"arguments":arguments});
         if let Some(connection) = connection {
             properties["connection"] = json!({"const":connection});
-            let content = mcp::content();
-            let output = object(
-                json!({"content":content,"structuredContent":embedded(tool.output_schema.clone(),"mcp-output"),"isError":{"type":"boolean"},"_meta":mcp::metadata()}),
-                &["content", "isError"],
-            );
+            let output = mcp::tool_result(&tool.output_schema);
             Ok(contract(
                 properties,
                 &["connection", "tool", "arguments"],
@@ -109,4 +108,36 @@ impl Registration<'_> {
             ))
         }
     }
+}
+
+/// One definition for both the step contract and the trusted built-in tool snapshot.
+fn message_inputs(name: &str) -> Option<(Value, &'static [&'static str])> {
+    match name {
+        "message.send" => {
+            let mut destinations = array(
+                object(
+                    json!({"kind":{"enum":["user","channel"]},"id":uuid()}),
+                    &["kind", "id"],
+                ),
+                1,
+                MAX_MESSAGE_DESTINATIONS,
+            );
+            destinations["uniqueItems"] = json!(true);
+            Some((
+                json!({"content":content(),"destinations":destinations}),
+                &["content", "destinations"],
+            ))
+        }
+        "message.reply" => Some((
+            json!({"source_message":uuid(),"content":content()}),
+            &["source_message", "content"],
+        )),
+        _ => None,
+    }
+}
+
+/// The (input, output) schemas of a built-in messaging tool, as its step contract states them.
+pub(crate) fn message_tool_schemas(name: &str) -> Option<(Value, Value)> {
+    let (properties, required) = message_inputs(name)?;
+    Some((object(properties, required), message_result()))
 }

@@ -27,7 +27,7 @@ mod publication_owner;
 pub use publication_owner::HttpPublicationDirectory;
 pub use publication_owner::HttpPublicationSelection;
 #[path = "http_runtime.rs"]
-mod runtime;
+pub(super) mod runtime;
 
 pub(super) async fn registered_on(
     tx: &mut Transaction<'_, Postgres>,
@@ -339,9 +339,7 @@ impl PostgresPersistence {
             WorkflowActor::authenticated(request.context.actor)?,
         )
         .await?;
-        let live: Option<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 AND actor_id=$3 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR SHARE")
-            .bind(company.as_uuid()).bind(request.scope.run.as_uuid()).bind(request.context.actor).fetch_optional(&mut *tx).await?;
-        live.ok_or_else(missing)?;
+        live_run_on(&mut tx, request).await?;
         let connection = connection_on(&mut tx, company, id)
             .await?
             .ok_or_else(missing)?;
@@ -368,4 +366,14 @@ impl PostgresPersistence {
         tx.commit().await?;
         Ok((connection, secret))
     }
+}
+
+/// The action's run is still live, unexpired and owned by the frozen actor.
+pub(super) async fn live_run_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &ActionRequest,
+) -> AppResult<()> {
+    let live: Option<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 AND actor_id=$3 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR SHARE")
+        .bind(request.scope.company.as_uuid()).bind(request.scope.run.as_uuid()).bind(request.context.actor).fetch_optional(&mut **tx).await?;
+    live.map(|_| ()).ok_or_else(missing)
 }
