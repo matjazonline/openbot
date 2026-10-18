@@ -9,7 +9,7 @@ use crate::application::workflow::{
 use serde_json::{Value, json};
 
 #[path = "message_test_support.rs"]
-mod support;
+pub(super) mod support;
 use support::*;
 #[path = "message_authority_tests.rs"]
 mod authority_tests;
@@ -25,6 +25,9 @@ mod recovery_tests;
 mod sql_tests;
 #[path = "message_thread_tests.rs"]
 mod thread_tests;
+
+#[path = "action_approval_message_tests.rs"]
+mod approval_tests;
 
 fn completed(outcome: WorkflowHandlerOutcome) -> WorkflowHandlerResult {
     match outcome {
@@ -240,12 +243,19 @@ async fn workflow_message_receipt_failed_delivery_takes_final_error_and_never_re
         ),
         ("failed", "failed", Some("completed"))
     );
-    // The final-error writer closed the parked job as retirement does; the wait no longer
-    // owns the step, so a repeated resume is refused and changes nothing.
-    assert!(matches!(
-        p.resume_wait(scope).await.unwrap(),
-        WaitProgress::Refused
-    ));
+    // The closed job replays the persisted final outcome without another delivery.
+    let WaitProgress::Completed(replay) = p.resume_wait(scope).await.unwrap() else {
+        panic!("completed effect wait must replay its final outcome");
+    };
+    assert_eq!(
+        replay.disposition,
+        crate::application::workflow::completion::CommitDisposition::Replayed
+    );
+    assert_eq!(
+        replay.route,
+        crate::domain::workflow::RouteSelection::FinalError
+    );
+    assert!(replay.successor.is_none());
     let row = delivery_row(setup.pool(), delivery).await;
     assert_eq!((row.status.as_str(), row.attempt_count), ("dead_letter", 1));
     assert_eq!(rows(setup.pool(), run).await.deliveries, 1);

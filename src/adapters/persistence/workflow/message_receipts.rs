@@ -289,7 +289,7 @@ pub(in crate::adapters::persistence::workflow) async fn conflicted_effect_park_o
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<()> {
-    sqlx::query("UPDATE workflow_waits SET state='failed',failure_code='evidence_conflict',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
+    sqlx::query("UPDATE workflow_waits SET state='failed',failure_code='evidence_conflict',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND reason='effect' AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;

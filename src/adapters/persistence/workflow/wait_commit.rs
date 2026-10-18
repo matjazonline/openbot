@@ -12,7 +12,7 @@ pub(super) async fn resume_on(
     let Some(run) = waits::lock(db, scope).await? else {
         return Ok(WaitProgress::Refused);
     };
-    let Some(wait) = waits::row(db, scope).await? else {
+    let Some(wait) = waits::row(db, scope, waits::WaitSelection::Execution).await? else {
         return Ok(WaitProgress::Refused);
     };
     match wait.state.as_str() {
@@ -48,6 +48,13 @@ pub(super) async fn resume_on(
     if run.state != "waiting" || (wait.reason == "event" && wait.deadline <= now) {
         return expire(db, scope, &run.state).await;
     }
+    if wait.reason == "decision" {
+        // Submission settles a decision in its own command; a worker only times it out.
+        if wait.deadline > now {
+            return Ok(WaitProgress::Pending);
+        }
+        return Box::pin(decision_timed_out(db, scope)).await;
+    }
     let wake = if wait.reason == "effect" {
         // Explicit, before the generic event lookup (04.11-D2 §4.4, D4 §M).
         match message::receipts::effect_resume_on(db, scope, wait.id).await? {
@@ -69,8 +76,10 @@ pub(super) async fn resume_on(
         }
         Wake::Timer
     } else {
-        let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND event_name=$4 AND correlation=$5 ORDER BY created_at,id LIMIT 1 FOR UPDATE")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).fetch_optional(&mut *db).await?;
+        // Run-scoped: the oldest unconsumed event with this name and correlation, whenever it
+        // arrived (05-D2 §11). Decision waits have no name, so they never match.
+        let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL ORDER BY created_at,id LIMIT 1 FOR UPDATE")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).fetch_optional(&mut *db).await?;
         let Some(event) = event else {
             return Ok(WaitProgress::Pending);
         };
@@ -87,6 +96,35 @@ enum Wake {
     Effect(Value),
 }
 
+/// A decision past its own deadline (before the run's): Terminal `decision.timed_out` takes the
+/// declared `error` route, whose successor receives `null`, or fails the run with
+/// `terminal_execution_id` set. The code stays durable as the audit event kind (05-D2 §4.3).
+async fn decision_timed_out(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> AppResult<WaitProgress> {
+    sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    let approval: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2 AND subject_kind='action_approval')")
+        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
+    if approval {
+        decisions::approvals::fail(db, scope, "approval_expired").await?;
+        return Ok(WaitProgress::Expired(CommitDisposition::Committed));
+    }
+    waits::audit(db, scope, DECISION_TIMED_OUT).await?;
+    let failure = crate::domain::workflow::StepFailure::new(
+        crate::domain::workflow::FailureClass::Terminal,
+        crate::domain::workflow::FailureCode::parse(DECISION_TIMED_OUT).map_err(|_| invalid())?,
+        None,
+    )
+    .map_err(|_| invalid())?;
+    recovery::route_parked_failure(db, scope, &failure).await?;
+    Ok(WaitProgress::Expired(CommitDisposition::Committed))
+}
+pub(super) const DECISION_TIMED_OUT: &str = "decision.timed_out";
+
 /// A failed message receipt: the wait completes and the failure takes the shared final-error
 /// writer with Terminal `message.delivery_failed`; nothing resends (04.11-D2 §4.4).
 async fn effect_failed(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<WaitProgress> {
@@ -95,7 +133,7 @@ async fn effect_failed(db: &mut PgConnection, scope: ActivationRequest) -> AppRe
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     let failure = crate::application::workflow::message::message_delivery_failed().failure;
-    recovery::route_effect_failure(db, scope, &failure).await?;
+    recovery::route_parked_failure(db, scope, &failure).await?;
     waits::audit(db, scope, "message_delivery_failed").await?;
     saved(db, scope, CommitDisposition::Committed, true).await
 }
@@ -145,6 +183,13 @@ async fn advance(
             && matches!(completion.target, TransitionTarget::Step(_)))
     {
         return fail(db, scope, WaitFailureReason::ActivationLimit).await;
+    }
+    if let Some(event) = event {
+        let consumed = sqlx::query("UPDATE workflow_wait_events SET consumed_execution_id=$3 WHERE company_id=$1 AND run_id=$2 AND id=$4 AND consumed_execution_id IS NULL")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(event).execute(&mut *db).await?;
+        if consumed.rows_affected() != 1 {
+            return Err(invalid());
+        }
     }
     sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp(),consumed_event_id=$4 WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(event).execute(&mut *db).await?;
@@ -201,12 +246,7 @@ async fn saved(
     disposition: CommitDisposition,
     effect: bool,
 ) -> AppResult<WaitProgress> {
-    let routes = if effect {
-        "('success','final_error')"
-    } else {
-        "('success')"
-    };
-    let saved=sqlx::query_as::<_,SavedResult>(&format!("SELECT committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IN {routes}"))
+    let saved=sqlx::query_as::<_,SavedResult>("SELECT committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL AND committed_route IS NOT NULL")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     let Some(saved) = saved else {
         if !effect {
@@ -239,17 +279,27 @@ async fn saved(
     Ok(WaitProgress::Completed(Box::new(CommittedWorkflowStep {
         disposition,
         output: saved.committed_output,
-        route: if saved.committed_route == "final_error" {
-            RouteSelection::FinalError
-        } else {
-            RouteSelection::Success
-        },
+        route: saved_route(&saved.committed_route)?,
         target,
         successor,
     })))
 }
 
-async fn fail(
+/// Replay every committed route: `success`, `final_error` and a decision's `choice:<name>`.
+pub(super) fn saved_route(route: &str) -> AppResult<RouteSelection> {
+    Ok(match route {
+        "success" => RouteSelection::Success,
+        "final_error" => RouteSelection::FinalError,
+        other => RouteSelection::Choice(
+            crate::domain::workflow::ChoiceName::parse(
+                other.strip_prefix("choice:").ok_or_else(invalid)?,
+            )
+            .map_err(|_| invalid())?,
+        ),
+    })
+}
+
+pub(super) async fn fail(
     db: &mut PgConnection,
     scope: ActivationRequest,
     reason: WaitFailureReason,

@@ -5,6 +5,7 @@ use serde::Serialize;
 #[serde(rename_all = "snake_case")]
 pub(crate) enum InputCheck {
     Deadline,
+    Approval,
     Http,
     Message,
 }
@@ -31,6 +32,11 @@ impl InputCheck {
                         "deadline",
                         span,
                     ));
+                }
+            }
+            Self::Approval => {
+                if let Some(approval) = inputs.get("approval") {
+                    Self::Deadline.validate(approval, &format!("{root}/approval"), span)?;
                 }
             }
             Self::Http => check_http(inputs, root, span)?,

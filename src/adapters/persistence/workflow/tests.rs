@@ -5,6 +5,8 @@ mod action_outcome_support;
 mod admission_binding_tests;
 #[path = "admission_tests.rs"]
 mod admission_tests;
+#[path = "approval_test_support.rs"]
+mod approval_test_support;
 #[path = "binding_association_tests.rs"]
 mod binding_association_tests;
 #[path = "binding_schema_tests.rs"]
@@ -92,6 +94,20 @@ struct Fixture {
     persistence: PostgresPersistence,
     target: DefinitionTarget,
 }
+/// Record a run-scoped event with the old boolean answer: stored or an identical duplicate is
+/// `true`; unmatched ingress or a conflicting id reuse is `false`; invalid input is an error.
+async fn recorded(
+    p: &PostgresPersistence,
+    event: crate::application::workflow::waits::WorkflowEvent,
+) -> AppResult<bool> {
+    use crate::application::workflow::waits::{EventIngress, WorkflowWaits};
+    match p.record_event(event).await {
+        Ok(EventIngress::Recorded | EventIngress::Duplicate) => Ok(true),
+        Ok(EventIngress::Unmatched) | Err(AppError::Conflict(_)) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
 impl Fixture {
     async fn new() -> Self {
         let db = Arc::new(

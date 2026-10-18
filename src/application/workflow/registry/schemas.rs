@@ -21,11 +21,19 @@ pub(super) fn scope() -> Value {
         object(json!({"kind":{"enum":["agent","user"]},"id":identifier()}), &["kind","id"])
     ]})
 }
-pub(super) fn selector() -> Value {
-    object(
-        json!({"kind":{"enum":["user","group"]},"id":identifier()}),
-        &["kind", "id"],
-    )
+/// Explicit company-member reviewers: 1..16 unique `{"kind":"user","id":<uuid>}` items, the
+/// 04.11 destination shape. There are no groups or external reviewers (05-D2 §4.1).
+pub(super) fn reviewers() -> Value {
+    let mut list = array(
+        object(
+            json!({"kind":{"const":"user"},"id":uuid()}),
+            &["kind", "id"],
+        ),
+        1,
+        MAX_REVIEWERS,
+    );
+    list["uniqueItems"] = json!(true);
+    list
 }
 pub(super) fn profile(facts: &CatalogueFacts) -> Value {
     let mut list = array(identifier(), 0, MAX_SELECTIONS);

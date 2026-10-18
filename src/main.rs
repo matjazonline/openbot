@@ -173,6 +173,12 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/workflow-foundation/README.md",
     "plan/workflow-foundation/BRIEF-04.10.md",
     "plan/workflow-foundation/BRIEF-04.11.md",
+    "plan/workflow-foundation/05-human-decisions-and-waits.md",
+    "plan/workflow-foundation/06-agent-context-memory-and-capabilities.md",
+    "plan/workflow-foundation/07-child-workflows-and-review-revisions.md",
+    "plan/workflow-foundation/08-triggers-and-application-replacement.md",
+    "plan/workflow-foundation/09-authoring-and-operations-ui.md",
+    "plan/workflow-foundation/10-verification-and-cutover.md",
     "plan/workflow-library/README.md",
     "plan/workflows/configurable-workflows-architecture.md",
     "plan/workflows/post-approval-workflow-execution.md",
@@ -182,9 +188,11 @@ async fn serve() -> anyhow::Result<()> {
     // Logged before migrations run, so it is visible when one fails against existing data.
     warn!(
         notes = ?NO_BACKWARD_COMPATIBILITY_NOTES,
-        "No backward compatibility: schema and persisted data are not migrated across releases; \
-         reset the database when a migration does not apply cleanly. Remove this warning and the \
-         listed notes when compatibility is required."
+        "No backward compatibility: schema and persisted data are not migrated across releases. \
+         The schema is a single init migration edited in place, so an existing database whose \
+         recorded migrations or checksum no longer match must be reset. When compatibility is required, \
+         freeze the init schema, reinstate follow-up migrations, and remove this warning and the \
+         listed notes."
     );
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;

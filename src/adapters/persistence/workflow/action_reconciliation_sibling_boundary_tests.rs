@@ -173,6 +173,7 @@ impl SiblingDispatchDiagnostic {
         outcome: &RemoteDispatchObservation,
     ) -> String {
         let variant = match outcome {
+            RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",
             RemoteDispatchObservation::ApprovalRequired => "ApprovalRequired",
             RemoteDispatchObservation::PossibleDispatchExists => "PossibleDispatchExists",
             RemoteDispatchObservation::Committed(_) => "Committed",

@@ -120,21 +120,24 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
     ) -> WorkflowHandlerOutcome {
-        self.run(kind, claim).await.into()
+        self.run(kind, claim).await
     }
 }
 impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: RemoteAction>
     HttpActions<P, D, R>
 {
-    /// The step's completed result: HTTP steps never suspend.
+    /// Protected calls suspend until their frozen invocation is approved.
     pub async fn run(
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> WorkflowHandlerResult {
+    ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
         let outcome = match self.step(kind, claim).await {
-            Ok(RemoteDispatchObservation::Committed(receipt)) => return Ok(receipt.result),
+            Ok(RemoteDispatchObservation::Committed(receipt)) => return Ok(receipt.result).into(),
+            Ok(RemoteDispatchObservation::ApprovalParked(wait)) => {
+                return WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait });
+            }
             Ok(RemoteDispatchObservation::ApprovalRequired) => Outcome::ApprovalRequired,
             Ok(RemoteDispatchObservation::PossibleDispatchExists) => {
                 Outcome::PossibleDispatchExists
@@ -144,15 +147,17 @@ impl<P: HttpActionPreparation + ActionIntents + Clone, D: ActionDispatch, R: Rem
                 return Err(action_step_failure(
                     ActionFamily::Http,
                     Outcome::Preparation(&error),
-                ));
+                ))
+                .into();
             }
             Err(StepError::Dispatch(error)) => {
                 return Err(action_step_failure(
                     ActionFamily::Http,
                     Outcome::Dispatch(&error),
-                ));
+                ))
+                .into();
             }
         };
-        Err(action_step_failure(ActionFamily::Http, outcome))
+        Err(action_step_failure(ActionFamily::Http, outcome)).into()
     }
 }

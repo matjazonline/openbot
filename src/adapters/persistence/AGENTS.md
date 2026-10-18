@@ -27,7 +27,9 @@ Before adding a composite foreign key:
 
 - query for existing mismatches and decide how they will be repaired;
 - add the required composite `UNIQUE` key on the referenced table when necessary;
-- use an additive migration and validate compatibility before removing weaker constraints; and
+- pre-release, edit the constraint in the init schema and verify it on a freshly migrated schema
+  (once compatibility is required: an additive migration, validated before weaker constraints are
+  removed); and
 - add a rollback-only or transaction-scoped database test that demonstrates the invalid
   cross-tenant row is rejected.
 
@@ -157,8 +159,11 @@ designated KMS), record a key version, and expose narrow credential-specific rea
 projections should omit ciphertext as well as plaintext unless the caller explicitly needs the
 secret.
 
-A credential migration requires staged compatibility: support legacy reads, backfill encrypted
-values, switch writers/readers, remove plaintext, and rotate the external credentials. Do not log,
+Pre-release, a credential schema change edits the init schema and resets the data instead of
+staging legacy reads or backfills; rotate the external credentials where the change exposes them.
+Once compatibility is required, a credential migration requires staged compatibility: support
+legacy reads, backfill encrypted values, switch writers/readers, remove plaintext, and rotate the
+external credentials. Do not log,
 serialize into durable task payloads, derive debug output from, or return secret material in broad
 entities.
 
@@ -185,21 +190,22 @@ working-set metric, or a threshold log, that can supply the evidence needed to r
 
 # 1. Migration
 
-A migration is immutable as soon as it has been applied to any persistent development database.
-Refine it with a new timestamped follow-up migration; never edit the applied file or rewrite SQLx
-checksums. `20260817000000_init_schema.sql` is the squashed baseline every database has already
-applied. The minimal shape is one `ALTER TABLE ... ADD COLUMN`; the multi-statement shape backfills
-in an `UPDATE` between the `ADD COLUMN` and the `SET NOT NULL`.
+Pre-release (remove before the first production deploy, together with the startup warning in
+`src/main.rs`): nothing is deployed and existing data is not preserved.
+`migrations/20260817000000_init_schema.sql` is the only migration and holds the whole schema: a
+schema change edits it in place, and the development and test databases are dropped and recreated
+rather than upgraded. Do not add follow-up migrations, backfills, compatibility shims or
+populated-upgrade tests; verify against a freshly migrated schema. State a column's `DEFAULT` in SQL
+when queries that predate the change read it.
 
-A `NOT NULL` column needs a `DEFAULT` (or an `UPDATE` backfill before `SET NOT NULL`) — existing rows
-must come out valid, because production has rows and your dev database mostly doesn't. State the
-default in SQL rather than relying on the application to fill it in; the column is read by queries
-that predate your change.
+Once compatibility is required, the init schema is frozen: every later change is a new timestamped
+follow-up migration, and a `NOT NULL` column then needs a `DEFAULT` or a backfill so existing rows
+come out valid.
 
-Apply it locally **before** step 7:
+Reset locally **before** step 7 (an edited init schema no longer matches the recorded checksum):
 
 ```sh
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" sqlx migrate run
+./scripts/reset-db.sh --all
 ```
 
 Then confirm the shape you think you wrote is the shape that exists: `psql "$DATABASE_URL" -c '\d <table>'`.

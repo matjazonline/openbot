@@ -256,6 +256,7 @@ fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
     match result {
         Ok(RemoteDispatchObservation::Interrupted) => "Interrupted".into(),
         Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
+        Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),
         Ok(RemoteDispatchObservation::ApprovalRequired) => "ApprovalRequired".into(),
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => "PossibleDispatchExists".into(),
         Err(error) => format!("Err({error:?})"),
@@ -507,10 +508,8 @@ fn interrupted_by(loss: Loss, seen: &Seen, run: &PendingRun) -> Result<(), Strin
             }
         }
         Loss::RunDeadline => {
-            let set = run.run_deadline_set.ok_or("the run deadline was not set")?;
-            if entry.deadline > set + RUN_WINDOW {
-                return Err("the entry was not bounded by the run deadline".into());
-            }
+            run.run_deadline_set.ok_or("the run deadline was not set")?;
+            // Judge the genuine persisted window, including the lease-first negative control.
             run_limits_entry(&entry, seen.windows())?;
             if probes.iter().any(|(_, owned)| *owned != Some(true)) {
                 return Err("ownership was refused before the deadline".into());
@@ -561,8 +560,7 @@ fn run_limits_entry(entry: &Entered, windows: Option<Windows>) -> Result<(), Str
 /// How far the run deadline must precede the lease expiry before the run is credited as the limit.
 const RUN_MARGIN: Duration = Duration::from_millis(250);
 
-/// Whether the run window is set right after the renewal (the run deadline is the limit), or only
-/// once the lease has nearly run out (F-007's lease-first counterexample, the negative control).
+/// Whether the run deadline precedes the fresh lease or follows it (F-007's negative control).
 #[derive(Clone, Copy, Debug)]
 enum RunPremise {
     RunFirst,
@@ -583,22 +581,38 @@ struct PendingOutcome {
     phases: String,
 }
 
+async fn prepare_pending_window(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    loss: Loss,
+    premise: RunPremise,
+) -> Option<Instant> {
+    renew(f, request).await;
+    if !matches!(loss, Loss::RunDeadline) {
+        return None;
+    }
+    match premise {
+        RunPremise::RunFirst => {
+            sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+$1")
+                .bind(RUN_WINDOW)
+                .execute(f.persistence().pool())
+                .await
+                .unwrap();
+        }
+        RunPremise::LeaseFirst => {
+            // Preserve the full 3 s lease for reservation/entry instead of burning 2 s before
+            // dispatch. The existing 4 s watchdog and persisted-window oracle still bound it.
+            sqlx::query("UPDATE workflow_runs AS run SET deadline=job.lock_expires_at+$1 FROM background_tasks AS job WHERE job.company_id=run.company_id AND run.id=$2 AND job.id=$3")
+                .bind(RUN_MARGIN).bind(request.scope().run.as_uuid()).bind(request.fence.scope.job.0)
+                .execute(f.persistence().pool()).await.unwrap();
+        }
+    }
+    Some(Instant::now())
+}
+
 async fn pending_run(loss: Loss, premise: RunPremise) -> PendingOutcome {
     let (f, request) = setup().await;
-    renew(&f, &request).await;
-    if matches!(premise, RunPremise::LeaseFirst) {
-        // S's counterexample: the run window starts 2 s into the 3 s lease, so it ends after it.
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    }
-    let mut run_deadline_set = None;
-    if matches!(loss, Loss::RunDeadline) {
-        sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+$1")
-            .bind(RUN_WINDOW)
-            .execute(f.persistence().pool())
-            .await
-            .unwrap();
-        run_deadline_set = Some(Instant::now());
-    }
+    let run_deadline_set = prepare_pending_window(&f, &request, loss, premise).await;
     let provider = PendingProvider {
         started: Notify::new(),
         polls: AtomicUsize::new(0),
@@ -705,8 +719,12 @@ async fn workflow_action_dispatch_pending_actual_provider_dropped_on_loss_cancel
 async fn workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limited_entry() {
     let outcome = pending_run(Loss::RunDeadline, RunPremise::LeaseFirst).await;
     let entry = outcome.seen.entered().expect("entered");
-    let set = outcome.run.run_deadline_set.expect("run window set");
-    assert!(entry.deadline <= set + RUN_WINDOW, "{}", outcome.phases);
+    let windows = outcome.seen.windows().expect("persisted windows");
+    assert!(
+        entry.deadline <= windows.read_after + Duration::from_secs_f64(windows.run_seconds),
+        "{}",
+        outcome.phases
+    );
     assert!(outcome.run.returned >= entry.deadline, "{}", outcome.phases);
     assert!(
         outcome
@@ -718,12 +736,13 @@ async fn workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limi
         outcome.phases
     );
     let verdict = interrupted_by(Loss::RunDeadline, &outcome.seen, &outcome.run);
+    let rejected = verdict.expect_err("a lease-limited entry must not pass as run-deadline proof");
     assert!(
-        verdict.is_err(),
-        "a lease-limited entry must not pass as run-deadline proof; {}",
+        rejected.starts_with("the lease ends no later than the run deadline"),
+        "{rejected}; {}",
         outcome.phases
     );
-    eprintln!("lease-first control rejected: {}", verdict.unwrap_err());
+    eprintln!("lease-first control rejected: {rejected}");
 
     let at = Instant::now();
     let entered = Entered {

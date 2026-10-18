@@ -9,6 +9,8 @@ mod admission_history_tests;
 mod admission_source_tests;
 #[path = "batch_tests.rs"]
 mod batch_tests;
+#[path = "decision_tests.rs"]
+mod decision_tests;
 #[path = "lease_tests.rs"]
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
 use crate::domain::entities::correlation::CorrelationId;

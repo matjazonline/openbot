@@ -54,7 +54,11 @@ impl ActionEvidenceVerifier for RejectedCall {
     }
 }
 
-async fn settle_rejected(setup: &McpSetup, claim: &ClaimedWorkflow, failure: WorkflowFailure) {
+pub(super) async fn settle_rejected(
+    setup: &McpSetup,
+    claim: &ClaimedWorkflow,
+    failure: WorkflowFailure,
+) {
     let p = &setup.fixture.persistence;
     let request = p.mcp_step_request(claim, &kind()).await.unwrap();
     let intent = ActionService::new(p.clone())
@@ -122,7 +126,11 @@ async fn workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift(
         let p = &setup.fixture.persistence;
         let claim = claimed(&setup).await;
         let runtime = setup.runtime();
-        let failure = runtime.run(&kind(), &claim).await.unwrap_err();
+        let failure = runtime
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
         assert_eq!(setup.server.calls(), 1);
         Box::pin(settle_rejected(&setup, &claim, failure)).await;
         let next = reclaim(p, claim.fence.scope).await;
@@ -139,7 +147,7 @@ async fn workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift(
             action_counts(p).await
         );
         if drift {
-            let failure = result.unwrap_err();
+            let failure = result.completed_result().unwrap_err();
             assert_eq!(code(&failure), "mcp.unresolved");
             assert_eq!(setup.server.calls(), 1);
             assert_eq!(
@@ -148,7 +156,10 @@ async fn workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift(
             );
             assert_eq!(action_counts(p).await, counts(1, 2, 0));
         } else {
-            assert_eq!(result.unwrap()["structuredContent"]["name"], "Ada");
+            assert_eq!(
+                result.completed_result().unwrap()["structuredContent"]["name"],
+                "Ada"
+            );
             assert_eq!(setup.server.calls(), 2);
             assert_eq!(action_counts(p).await, counts(1, 2, 1));
         }

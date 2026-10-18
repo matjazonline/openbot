@@ -13,9 +13,10 @@ fn source(timer: bool) -> Value {
     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
     source
 }
-fn signal(scope: ActivationRequest) -> WorkflowSignal {
-    WorkflowSignal {
-        scope,
+fn signal(scope: ActivationRequest) -> WorkflowEvent {
+    WorkflowEvent {
+        company: scope.company,
+        run: scope.run,
         id: WorkflowEventId(Uuid::new_v4()),
         name: WorkflowEventName("review.completed".into()),
         correlation: WorkflowEventCorrelation("request-1".into()),
@@ -82,7 +83,7 @@ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
     let event = signal(scope);
     let record = || async {
         barrier.wait().await;
-        p.record_signal(event.clone()).await.unwrap()
+        recorded(p, event.clone()).await.unwrap()
     };
     let (a, b) = tokio::join!(record(), record());
     assert!(a && b);
@@ -117,7 +118,7 @@ async fn workflow_wait_competing_park_signal_resume_and_lost_ack() {
     );
     let mut conflicting = event;
     conflicting.payload = json!({"text":"changed"});
-    assert!(!p.record_signal(conflicting).await.unwrap());
+    assert!(!recorded(p, conflicting).await.unwrap());
 }
 #[tokio::test]
 async fn workflow_wait_event_before_park_and_concurrent_arrival() {
@@ -126,7 +127,7 @@ async fn workflow_wait_event_before_park_and_concurrent_arrival() {
         let p = f.persistence();
         let event = signal(scope);
         if before {
-            assert!(p.record_signal(event.clone()).await.unwrap());
+            assert!(recorded(p, event.clone()).await.unwrap());
             p.park_wait(scope).await.unwrap().unwrap();
         } else {
             let barrier = Barrier::new(2);
@@ -136,7 +137,7 @@ async fn workflow_wait_event_before_park_and_concurrent_arrival() {
             };
             let record = async {
                 barrier.wait().await;
-                p.record_signal(event).await.unwrap()
+                recorded(p, event).await.unwrap()
             };
             let (_, saved) = tokio::join!(park, record);
             assert!(saved);
@@ -150,23 +151,25 @@ async fn workflow_wait_refuses_scope_kind_and_invalid_events() {
     let (f, scope) = fixture_source(source(false)).await;
     let p = f.persistence();
     let before = snapshot_all(&f).await;
-    for part in ["name", "correlation", "company", "run", "execution", "job"] {
+    // Run-scoped ingress (05-D2 §11): an undeclared name or a foreign company or run is
+    // ordinary ingress, and nothing is stored.
+    for part in ["name", "company", "run"] {
         let mut event = signal(scope);
         match part {
             "name" => event.name.0 = "other".into(),
-            "correlation" => event.correlation.0 = "other".into(),
-            "company" => event.scope.company = CompanyId::new(Uuid::new_v4()),
-            "run" => event.scope.run = RunId::new(Uuid::new_v4()),
-            "execution" => event.scope.execution = ExecutionId::new(Uuid::new_v4()),
-            _ => event.scope.job = WorkflowJobId(Uuid::new_v4()),
+            "company" => event.company = CompanyId::new(Uuid::new_v4()),
+            _ => event.run = RunId::new(Uuid::new_v4()),
         };
-        assert!(!p.record_signal(event).await.unwrap());
+        assert_eq!(
+            p.record_event(event).await.unwrap(),
+            EventIngress::Unmatched
+        );
         assert_eq!(snapshot_all(&f).await, before);
     }
     for payload in [json!(12), json!({"text":"x".repeat(100000)})] {
         let mut event = signal(scope);
         event.payload = payload;
-        assert!(p.record_signal(event).await.is_err());
+        assert!(recorded(p, event).await.is_err());
         assert_eq!(snapshot_all(&f).await, before);
     }
     for kind in ["data.map", "decision.human", "context.load"] {
@@ -199,7 +202,7 @@ async fn workflow_wait_park_and_resume_write_failures_roll_back() {
         let p = f.persistence();
         if !park {
             p.park_wait(scope).await.unwrap().unwrap();
-            assert!(p.record_signal(signal(scope)).await.unwrap());
+            assert!(recorded(p, signal(scope)).await.unwrap());
         }
         let before = snapshot_all(&f).await;
         sqlx::raw_sql(&format!("CREATE FUNCTION wait_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF {condition} THEN RAISE EXCEPTION 'injected'; END IF; RETURN NEW; END $$; CREATE TRIGGER wait_fault AFTER INSERT OR UPDATE ON {table} FOR EACH ROW EXECUTE FUNCTION wait_fault();")).execute(p.pool()).await.unwrap();

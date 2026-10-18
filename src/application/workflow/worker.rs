@@ -1,6 +1,9 @@
 //! Reusable single-slot worker. Production handler wiring belongs to the owning
 //! action/agent subsystems; notification delivery is never a prerequisite.
-use super::{activation::*, batch::*, completion::*, lease::*, polling::*, supervise::*, waits::*};
+use super::{
+    activation::*, batch::*, completion::*, decisions::*, lease::*, polling::*, supervise::*,
+    waits::*,
+};
 use crate::application::app_error::AppResult;
 use async_trait::async_trait;
 use std::time::Duration;
@@ -28,6 +31,9 @@ pub trait WorkflowHandler: Send + Sync {
 pub struct WorkflowWorker<'a, P, H> {
     pub port: &'a P,
     pub handler: &'a H,
+    /// Renders `decision.human` notices inside the park transaction. Without it the worker
+    /// leaves decision steps unsupported.
+    pub notices: Option<&'a DecisionNotices>,
     pub worker: WorkflowWorkerId,
     pub lease: LeasePolicy,
     pub poll: PollPolicy,
@@ -38,6 +44,7 @@ where
         + WorkflowFairPolling
         + WorkflowBatch
         + WorkflowWaits
+        + WorkflowDecisions
         + WorkflowLeases
         + WorkflowLeaseRecovery
         + WorkflowCompletion,
@@ -135,6 +142,14 @@ where
             }
             "wait.event" | "wait.timer" => {
                 if self.port.park_wait(scope).await?.is_some() {
+                    self.port.resume_wait(scope).await?;
+                }
+            }
+            "decision.human" if self.notices.is_some() => {
+                let notices = self.notices.ok_or_else(|| {
+                    crate::app_error::AppError::Internal("Decision notices unavailable".into())
+                })?;
+                if self.port.park_decision(scope, notices).await?.is_some() {
                     self.port.resume_wait(scope).await?;
                 }
             }

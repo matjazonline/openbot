@@ -42,7 +42,7 @@ async fn workflow_wait_expiry_and_cancellation_do_not_schedule() {
         let (f, scope) = fixture_source(source(false)).await;
         let p = f.persistence();
         p.park_wait(scope).await.unwrap().unwrap();
-        p.record_signal(signal(scope)).await.unwrap();
+        recorded(p, signal(scope)).await.unwrap();
         if cancel {
             sqlx::query(
                 "UPDATE workflow_runs SET state='cancelled',waiting_reason=NULL WHERE id=$1",
@@ -75,7 +75,7 @@ async fn workflow_wait_cancel_races_resume_under_run_lock() {
         let (f, scope) = fixture_source(source(false)).await;
         let p = f.persistence();
         p.park_wait(scope).await.unwrap().unwrap();
-        p.record_signal(signal(scope)).await.unwrap();
+        recorded(p, signal(scope)).await.unwrap();
         let barrier = Barrier::new(2);
         let cancel = async {
             barrier.wait().await;
@@ -117,7 +117,7 @@ async fn workflow_wait_commit_crossing_deadline_rolls_back() {
         let p = f.persistence();
         if !park {
             p.park_wait(scope).await.unwrap().unwrap();
-            p.record_signal(signal(scope)).await.unwrap();
+            recorded(p, signal(scope)).await.unwrap();
         }
         sqlx::query("UPDATE workflow_runs SET deadline=clock_timestamp()+interval '600 milliseconds' WHERE id=$1").bind(scope.run.as_uuid()).execute(p.pool()).await.unwrap();
         let before = snapshot_all(&f).await;
@@ -155,7 +155,7 @@ async fn workflow_wait_same_thread_messages_remain_independent() {
     let scope_b = scope_for(p, &b).await;
     p.park_wait(scope_a).await.unwrap().unwrap();
     p.park_wait(scope_b).await.unwrap().unwrap();
-    p.record_signal(signal(scope_b)).await.unwrap();
+    recorded(p, signal(scope_b)).await.unwrap();
     let next = completed(p.resume_wait(scope_b).await.unwrap())
         .successor
         .unwrap();

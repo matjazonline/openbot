@@ -82,6 +82,7 @@ where
             | MessagePublication::PossibleDispatchExists => MessageObservation::Pending,
             MessagePublication::Uncertain => MessageObservation::Uncertain,
             MessagePublication::ApprovalRequired => MessageObservation::ApprovalRequired,
+            MessagePublication::ApprovalParked(wait) => MessageObservation::ApprovalParked(wait),
             MessagePublication::ActionLimit => MessageObservation::ActionLimit,
         })
     }
@@ -498,7 +499,7 @@ where
                     WorkflowHandlerOutcome::Completed(Err(message_delivery_failed()))
                 };
             }
-            Ok(MessagePublication::Suspended(wait)) => {
+            Ok(MessagePublication::Suspended(wait) | MessagePublication::ApprovalParked(wait)) => {
                 return WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait });
             }
             // Refused before any marker: classified exactly as a preparation refusal.

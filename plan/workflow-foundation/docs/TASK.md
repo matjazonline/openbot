@@ -2387,3 +2387,721 @@ averages are in `logs/S/sr001-full-suite-status.log`.
   gate: S stays **not accepted** pending a green full run after the user frees host
   resources. Meanwhile A starts phase 05 investigation and gate drafting only
   (read-only; no source edits).
+
+- User (2026-10-18): approved amending `src/adapters/persistence/AGENTS.md` §1, line 30
+  and line 160 to the in-place init-schema model, and asked for a startup log flagging
+  it for removal. Assigned to A within batch S (startup `serve()` warning updated; file
+  already in NO_BACKWARD_COMPATIBILITY_NOTES). Root host check 10:01: swap used 4.2 GiB
+  of 5 GiB (sticky), memory-free 79%, load 1.26 — A to rerun the full suite on the
+  updated tree; B rechecks the delta.
+
+- Root (2026-10-18): A's agent-relayed AGENTS.md edit was blocked by the permission
+  classifier and reverted. The user approved the change directly to root, so root applied it:
+  `src/adapters/persistence/AGENTS.md` (§1 in-place init schema + reset-db, composite-FK
+  bullet, credential paragraph; all marked pre-release/temporary) and the `serve()`
+  warning text in `src/main.rs`. fmt/diff-check pass. HEAD is now `feefe3e` (user commit
+  "plan", contains frozen S tree; A verified S digest reproduces). A runs clippy, no-run,
+  full suite, stack budget on this tree; B to recheck the delta.
+
+#### Batch S — user-approved AGENTS/startup log — 2026-10-18 (A)
+
+- **Edits.** Root applied them (user-approved): `src/adapters/persistence/AGENTS.md` (§1, the
+  composite-FK bullet, the credential paragraph; all marked pre-release) and the `serve()` warning
+  in `src/main.rs`. A reviewed both and found no defect. No test pins the warning text or the notes
+  list (searched `*.rs`, `*.sh`, `*.toml`, `*.yml`).
+- **Freeze.** Base `feefe3e060a851fd8860e4bacb90c11c7b284888` (user commit "plan"). That commit
+  reproduces the frozen S digest `33ae9028…4552` against base 4b54485, with added files hashed as the
+  untracked set. Snapshot digest `03ca0bea615bfc261ce6191b60147d4df20f9bab8115d0ec5b2dbebbaa40cbae`;
+  changed files `src/adapters/persistence/AGENTS.md` and `src/main.rs`.
+- **Checks.** All logs are under `logs/S/`; host state is in `s-final-status.log`.
+
+| Check | Result | Log |
+| --- | --- | --- |
+| Strict Clippy (`--locked --offline --all-targets -D warnings`) | PASS | `s-final-clippy.log` |
+| `cargo test --no-run` | PASS | `s-final-no-run.log` |
+| Network-isolated full suite | **PASS**: 2665 + 5 passed, 0 failed, 22 ignored. Start 08:09:18Z (load 2.83, memory free 61%); end 08:16:53Z (load 5.90, memory free 72%); swap 4.2 GiB sticky | `s-final-full-suite.log` |
+| Stack budget (2 MiB), run 1 | **FAIL** (exit 101, "unrelated to the stack budget"): 2663 passed, 2 failed — `workflow_message_publish_competing_dispatchers_publish_once` (`message.unresolved`), `workflow_message_recovery_control_retry_replays_the_failed_receipt` (`lease.claim` persistence bound elapsed) | `s-final-stack-budget.log` |
+| Stack budget, rerun 08:25–08:32Z (load 2.76 → 3.64) | **FAIL** (exit 101, unrelated): 2662 passed, 3 *different* failures — `…siblings_128_and_129_…` (`action.commit_remote` bound elapsed), `workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back`, `workflow_message_sql_evidence_attribution_shape_rejects_forgeries` (`message.unresolved`) | `s-final-stack-budget-rerun.log` |
+| All 5 stack-run failures in isolation at `RUST_MIN_STACK=2097152` | PASS (5/5) | `s-final-stack-isolated.log` |
+
+- **Stack budget conclusion.** No stack overflow occurred in either run; the script itself classifies
+  both failures as unrelated. The failures fall in the known persistence-bound/lease timing family,
+  differ between runs, and pass in isolation at 2 MiB. The stack-budget gate is **not green** and is
+  not claimed. The full suite is green.
+
+### Phase 05 — investigation and D1 — 2026-10-18 (A)
+
+Docs only: no source, migration or test edits, and no cargo was run for these. The base is the tree
+above.
+
+| Deliverable | SHA-256 |
+| --- | --- |
+| `logs/05/investigation.md` | `484af70eab2fcdcf0be924aecb68d1f85263dfec39a103a8f1c08de90187975e` |
+| `logs/05/decision-D1.md` | `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` |
+
+D1 proposes:
+
+- **Batches.** Two: 05A (the decision core, member reviewers, comments, timeout/cancel, and the
+  run-scoped event inbox) and 05B (external credentials, decision notices, action approval, and the
+  phase 05 gate). The split sits at the stable decision model and settlement contract.
+- **Questions for B and root.** Eight open questions in D1 §16.
+- **Plan-text amendments** for explicit-only reviewers are in investigation §6.
+- **`NO_BACKWARD_COMPATIBILITY_NOTES`** is covered in investigation §7 and D1 §15. A
+  `BRIEF-05.md`, if created, must carry the note and be listed. The phase plans `05-…` to `10-…`
+  already carry the note but are not listed.
+
+The D1 gate awaits B.
+
+### Phase 05 — user answers to D1 §16 (2026-10-18, direct to root)
+
+- Q1 reviewers: explicit list of 1–16, first valid authorized response wins.
+- Q2 timeout: Terminal `decision.timed_out` over the declared `error` route; no route → run fails.
+- Q6 external reviewers: **none in phase 05** — external email-only reviewer credentials
+  deferred (user scope reduction). Plan text/acceptance line "external decision
+  credentials" to be amended accordingly.
+- Q8 production wiring of deliverer/sweeper/producer stays in phase 08.
+- Q3/4/5/7 (technical) left to A's recommendation subject to B's judgement.
+
+Batch S: full suite green on `03ca0bea…cbae` (base feefe3e); stack-budget runs exit 101 on
+timing-bound tests only (no overflow); root proposes reusing the S-gate stack pass (delta
+is one string literal + docs) subject to B S-R003. B also running 05-R001 on D1
+`4e3a46eb…7931`.
+
+- User (2026-10-18, direct to root): add plans 05–10 to `NO_BACKWARD_COMPATIBILITY_NOTES`
+  in `src/main.rs`. Deferred to the start of 05A implementation so B's in-flight S-R003
+  digest `03ca0bea…cbae` stays valid; A owns the edit (list entries only).
+
+### Batch S ROOT ACCEPTED — 2026-10-18
+
+B S-R003 PASS for digest `03ca0bea615bfc261ce6191b60147d4df20f9bab8115d0ec5b2dbebbaa40cbae`
+(base `feefe3e060a851fd8860e4bacb90c11c7b284888`); S-R001/S-R002 covered the squash and
+equivalence proof (S-F001/S-F002 resolved). Evidence on this tree: strict Clippy, no-run,
+fmt/diff PASS; network-isolated full suite 2665+5/0/22 ignored PASS. Stack budget: the
+command exited 101 in both runs (timing-bound tests only); every lib test completed at
+2 MiB in at least one run with zero overflows, and all 5 failures pass alone at 2 MiB —
+root accepts the stack requirement on that current-tree evidence (correcting root's
+earlier "one string literal" premise per B) and discloses the non-zero exit as a gap.
+Host timing flakiness of the lease/dispatch/reconciliation family is a recorded open risk.
+Optional S-R003 nit: warning could say "recorded migrations or checksum".
+**Batch S ACCEPTED.**
+
+- 2026-10-18: B 05-R001 — CHANGES REQUIRED for D1 `4e3a46eb…7931`: medium 05-F001 (timeout
+  indistinguishable on error route), 05-F002 (drop all external/credential design; legacy
+  email-link approval dependency in REPLACEMENT-MAP:72 needs user decision), 05-F003
+  (notice transport → delivery engine; audit unique-index defect); low 05-F004…F007.
+
+- User (2026-10-18, direct to root): email-link approvals are **dropped with the legacy
+  approval code** — approvals member-only; phase 08 removes legacy approvals with no link
+  replacement; REPLACEMENT-MAP §4 gate to be amended. A assigned D2 for 05-F001…F007.
+
+### Phase 05 — D2 correction — 2026-10-18 (A)
+
+Docs only; no source edits and no cargo. D2 supersedes D1 as an explicit delta (§1 gives
+every D1 section's status).
+
+| Deliverable | SHA-256 |
+| --- | --- |
+| `logs/05/decision-D2.md` | `831890270a87273b2cbbccf580a942c4582841cc2c4430b15d542d95754815b3` |
+
+- **User decision (2026-10-18, direct to root).** Email-link approvals are dropped with the legacy
+  approval code. Approvals are member-only. Phase 08 removes legacy approvals with no link
+  replacement, so non-member `approver_email` approvals stop working. Recorded in D2 §2. The
+  REPLACEMENT-MAP §4 amendments are rows 72 and 74, and NOT_PLANNED gains a new row (D2 §15).
+- **Dispositions** (D2 §0; all of 05-F001…F007 fixed):
+  - **F001:** choice (a) — `decision.reviewer_unavailable` fails the run, unrouted. The error route
+    carries `null`. The code is durable as the audit event `decision.timed_out`. The phase 07
+    obligation is recorded, with two tests.
+  - **F002:** all external and credential design removed with no seams. The reviewer item is
+    `{kind:"user", id}`. The complete plan-text list is D2 §15.
+  - **F003:** notices are standalone `notification` deliveries enqueued in the 05A park
+    transaction. The notice run event is dropped, and the reviewer row links to its delivery.
+  - **F004:** `companies FOR SHARE`, the claim corrected, a two-runs test.
+  - **F005:** an advisory-lock-exact bound, run-scope semantics stated, competing-producers and
+    stale-event tests.
+  - **F006:** the 05B addendum is D2 §16, gated with D2. Approvers are owner/admin, rechecked at
+    submit.
+  - **F007:** all five clarifications.
+- **Batches.** 05A now also carries the member notices. 05B is the dispatch-seam batch (action
+  approval and per-reason wait uniqueness) plus the phase 05 gate.
+- **Status.** D2 awaits B recheck by finding ID.
+
+- Root (2026-10-18): D2 `83189027…15b3` sent to B for recheck 05-R002 (incl. §16 05B addendum).
+
+### Phase 05 — D3 correction — 2026-10-18 (A)
+
+D3 is a narrow delta to D2: it replaces D2 §16.2, the `workflow_decision_reviewers` block in D2
+§5.1, D2 §7.1 steps 5–6 and one D2 §10 bullet, and appends to D2 §16.1. Docs only; no source
+edits and no cargo.
+
+| Deliverable | SHA-256 |
+| --- | --- |
+| `logs/05/decision-D3.md` | `0424a6e8b761e9c74668202f034ebfe5054d5cb4f6d09c908e29d444d60d2df7` |
+
+- **05-F008 (medium), fixed.**
+  - The parked attempt is consumed at reopen (`retry_count + 1`). The park close is unchanged,
+    the same shape as the accepted effect park.
+  - Park precondition: `retry_count + 1 < max_retries`. Otherwise the call fails Terminal
+    `approval_required` and nothing parks.
+  - New deferred branch in `check_workflow_fenced_completion`: every workflow
+    `completed → pending` is refused unless it is the approval reopen. That requires the
+    `approval_parked` attempt, `+1` accounting with an unchanged bound and ids, an open
+    execution, the run `running`, and `approve` submitted in the same transaction (new
+    `workflow_decisions.submitted_xact = pg_current_xact_id()`).
+  - Three tests.
+- **05-F009 (low), fixed.**
+  - `UNIQUE (notice_delivery_id)`; the delivery is inserted first; the column is `NOT NULL`
+    with `NO ACTION`; the reviewer row is fully immutable.
+  - A BEFORE INSERT provenance trigger binds purpose, standalone shape and the key prefix
+    (decision and principal) to the tenant-scoped decision.
+  - A transaction-scoped DB test rejects another decision's, another company's or another
+    principal's delivery, and a non-notification delivery.
+- **Composer observation, classified terminal.** Composition runs before any write, and a
+  `BadRequest` settles `decision.reviewer_unavailable` (run fails, unrouted). Tested.
+- **05B observation.** The approval park with 16 approvers is in the lease-budget coverage, with a
+  bound test.
+- **Self-approval by the run actor.** A placeholder is in D3 §1, awaiting the user's answer via
+  root.
+- **Status.** D3 awaits B recheck of 05-F008 and 05-F009.
+
+- User (2026-10-18, direct to root): self-approval **allowed** — any listed owner/admin,
+  including the run actor, may approve a protected action. A fills D3 §1.
+
+- **User decision (2026-10-18, given directly to root): self-approval is allowed.** Any listed
+  owner or admin may approve, including the run actor. D3 §1 now records it in place of the
+  placeholder; the rules in D2 §16.1 are unchanged. Test:
+  `workflow_action_approval_run_actor_may_approve` (the actor approves, the action dispatches
+  once; demoted before the submit, the actor gets `NotFound`).
+- **D3 re-hashed after this edit:** `logs/05/decision-D3.md` `bd937b8630e48e6c7e2bf0bfeb223cd879004e4c3cfb898bb302b0d432af0b69`. This supersedes the hash
+  recorded above.
+
+### Phase 05 — D4 correction — 2026-10-18 (A)
+
+D4 is a small delta to D3, fixing 05-F010 with root's option (a). Docs only; no source edits and no
+cargo.
+
+| Deliverable | SHA-256 |
+| --- | --- |
+| `logs/05/decision-D4.md` | `e8ed88c46e1420e3ededa3da33b282a8e6c9cefc9495e3146a420ed77fe1fc86` |
+
+- **The provable-key check.** After composing each notice and before any write, the park checks the
+  expected unhashed key prefix (`notification:workflow-decision:{decision}:principal:{principal}:`).
+  If it is missing, the park settles `ReviewerUnavailable`: the run fails, the failure is never
+  routed, nothing is parked and nothing is retried. The provenance trigger remains as the backstop.
+- **Correction.** D3 §3.1's "bounded address" sentence is corrected: member addresses are
+  unbounded, and a key is hashed for an address over 391 bytes.
+- **Test.** `workflow_decision_park_unprovable_notice_key_fails_run_unrouted`, plus a 05B twin.
+- **Not adopted.** A separate `decision.notice_unavailable` code: it gives the same outcome, and
+  the existing code already covers "the reviewer cannot be reached".
+- **Out of scope.** Option (b), bounding `users.email`.
+- **Status.** D4 awaits B recheck of 05-F010.
+
+### Phase 05 architecture gate ACCEPTED — 2026-10-18
+
+B 05-R004 PASS for effective decision D1 `4e3a46eb…7931` + D2 `83189027…15b3` + D3
+`bd937b86…0b69` + D4 `e8ed88c4…fc86`; 05-F001…F010 resolved. Root accepts the gate at
+decision level. Deferred outside phase 05: phase07 timeout-code mapping (D2 §4.3), phase08
+routes/production wiring, bounding member email (option b). Next: A implements 05A (first
+edit: plan-text amendments + plans 05–10 in NO_BACKWARD_COMPATIBILITY_NOTES), focused
+checks, freeze, B whole-batch review; then 05B; then phase05 gate.
+
+### 05A implementation — 2026-10-18 (A, implement-opus-reviewed-2.1)
+
+Effective decision: D1+D2+D3+D4, gate accepted by 05-R004. Base: HEAD `feefe3e` plus the
+user-approved AGENTS.md/main.rs edits (S digest `03ca0bea…`).
+
+- Step 1 (done): the D2 §15 plan-text amendments (plan 05 lines 18, 63-65, 68-69 and the
+  acceptance line; EXPANSION 05.3; NOT_PLANNED line 17 plus a new row; REPLACEMENT-MAP rows 72
+  and 74); plans 05–10 in `NO_BACKWARD_COMPATIBILITY_NOTES`; the S-R003 wording nit in `serve()`
+  ("recorded migrations or checksum").
+- Progress log: each later step is appended below as it lands.
+
+#### 05A USER STOP — 2026-10-18 (A)
+
+Stopped at a safe checkpoint, on the user's instruction relayed by root. The tree **compiles**:
+`cargo check --locked --offline --all-targets` passes with one warning (unused
+`DecisionNotices::unrenderable`, a test-only hook not yet used by a test). No cargo, rustc or
+test process is running. The PostgreSQL fixture was stopped with
+`pg_ctl -D /private/tmp/workflow0410-20261017 -m fast stop` after verifying system id
+7697669855432439122; the data is kept. The init schema was edited in place, so before the next
+run, reset the fixture's `workflow0410_test` and `workflow0410_fresh_test`.
+
+**First edit (D2 §15): every item done.**
+- Plan 05 lines 18, 63-65, 68-69 and acceptance line 89.
+- EXPANSION 05.3.
+- NOT_PLANNED line 17, plus the new email-only row.
+- REPLACEMENT-MAP row 72 (owner column and gate) and row 74 (both phrases).
+- `NO_BACKWARD_COMPATIBILITY_NOTES` gains plans 05–10.
+- The S-R003 `serve()` wording nit ("recorded migrations or checksum").
+
+**Implemented (compiles; mostly untested):**
+- **Domain.** `Binding::references()`, a recursive walk (`domain/workflow/context/mod.rs`).
+- **Registry and language.**
+  - `reviewers` replaces `reviewer`: 1–16 unique `{"kind":"user","id":<uuid>}` items, `MAX_REVIEWERS`.
+  - A static-root check that accepts only `params` references (`registry/mod.rs` `static_roots`).
+  - The `wait.event` literal-name rule with one schema per name (`event_identity`).
+  - Help text, the example, `CONTRACT_REVISION` bumped to `workflow-catalogue-v1.3`.
+  - Fixtures: `reviewed-support.yaml`, `human-revision-round.yaml` (reviewer moved from `/input`
+    to `/params`) and `repeated-human-revision.yaml`.
+- **Schema (init, in place).**
+  - New tables `workflow_decisions`, `workflow_decision_reviewers` and
+    `workflow_decision_comments`, with keys, FKs, immutability triggers, and the reviewer guard
+    (person principal plus the D3/D4 notice provenance prefix).
+  - `UNIQUE (notice_delivery_id)`, `NOT NULL`, `NO ACTION`.
+  - `workflow_wait_events` is run-scoped: `execution_id` dropped; `consumed_execution_id` added
+    with its FK, UNIQUE partial index, unconsumed index and FK to runs; the immutability function
+    allows only the one consumption mark.
+  - The waits consumed-event FK is run-scoped.
+  - `check_workflow_wait_commit` is extended to `decision`, plus the consumed-event ownership
+    check.
+- **Application.**
+  - `application/workflow/decisions.rs` (new): commands, views, `WorkflowDecisions` port,
+    `specification`, `prepare_submission`, `hex_digest`, `DecisionNotices` (compose plus the
+    unhashed-prefix check).
+  - `waits.rs`: `WorkflowEvent`, `EventIngress`, `MAX_UNCONSUMED_EVENTS`, `record_event`.
+  - `worker.rs`: an optional `notices` field; `decision.human` → `park_decision` →
+    `resume_wait`.
+- **Persistence.**
+  - `persistence/workflow/decisions.rs` (new): park with resolution, composition and notice
+    deliveries inserted in the transaction; `ReviewerUnavailable` and `InvalidInput`
+    settlements; submit, comment and read under the §8 lock order; replay;
+    `closed_at_commit` (23514 → Conflict).
+  - `authority.rs`: `authorize_reviewer_on` (companies `FOR SHARE`).
+  - `waits.rs`: `record_event_on` with the per-run advisory lock, run-scoped dedup, the exact
+    bound, ingress payload validation and `Unmatched`.
+  - `wait_commit.rs`: run-scoped consumption, `decision_timed_out` (audit `decision.timed_out`,
+    `route_parked_failure`), `saved` and `saved_route` for every committed route, `fail` made
+    `pub(super)`.
+  - `polling.rs`: the event clause is run-scoped and limited to event waits.
+  - `pending_recovery.rs`: the `ReviewerUnavailable` variant, and `decision.human` in the
+    known-no-effect list.
+  - `recovery.rs`: `route_effect_failure` renamed to `route_parked_failure`.
+- **Tests migrated.** All event-test call sites now use the run-scoped port through the new
+  `recorded()` helper in `workflow/tests.rs`; `wait_tests` covers the scope parts as
+  `Unmatched`. `WorkflowWorker` literals gain `notices: None`.
+
+**Checks run:**
+- `cargo check --locked --offline --all-targets`: PASS, one warning.
+- `cargo test --lib -- registry:: compiler:: fixtures::`: 69 passed, **1 failed**
+  (`registry::runtime_tests::workflow_registry_each_type_validates_dynamic_required_inputs`).
+  It binds the old `reviewer` field to `/input/value`. The test needs updating for the new
+  `reviewers` field and the static-root rule. Log: `logs/05/05a-focused-language.log`.
+- Nothing else has run: no DB-backed tests, fmt, Clippy, schema or SQLx gates.
+
+**Not started:**
+- Every new 05A test named by D1–D4: decision park/submit/comment/timeout/cancel/notices/auth/
+  stale/invalid/restart, the race tests, bounds, the provenance and immutability SQL tests,
+  two-runs-one-company, composition error, unprovable key, past deadline, reviewer unavailable,
+  sixteen reviewers, competing producers, stale event, compile disclosure, static-root and
+  event-name compile tests, and timeout routing with and without an error route.
+- Updates to existing registry tests: `runtime_tests.rs:72`, `contract_tests.rs:55`, and any
+  catalogue or revision pins.
+- The full verification gates.
+
+**Deviation (flag for root/B):**
+- D2 §4.2's static-reviewer rule rejects `/input` references. The phase-07 placeholder fixture
+  `human-revision-round.yaml` read its reviewer from `/input/reviewer`. I moved it to
+  `/params/reviewer` with a parameter schema and dropped the parent's input mapping.
+- **Phase 07 obligation:** a child round must receive its reviewers through its binding
+  parameters, or through a 07 language change. No gated decision was changed.
+- Minor: `CONTRACT_REVISION` bumped, because the catalogue contract for `decision.human` changed.
+
+**Next steps:**
+1. Restart the fixture: `pg_ctl -D /private/tmp/workflow0410-20261017 -l <log> start`, then
+   drop and recreate `workflow0410_test` and `workflow0410_fresh_test` and run
+   `cargo sqlx migrate run` (the init file was edited).
+2. Fix `runtime_tests.rs:72`, `contract_tests.rs:55` and any pins; rerun
+   `registry:: compiler:: fixtures::`.
+3. Run the existing focused DB filters: `workflow_wait_`, `wait_guard`, `wait_deadline`,
+   `control_wait_order`, `polling`, `fairness`, `workflow_message_`, `control_`,
+   `adapters::persistence::workflow::tests`. Fix regressions.
+4. Write the new 05A tests listed above (a new `decision_tests.rs` with test support from
+   `message_test_support::member`), using `DecisionNotices::unrenderable` for the
+   composition-error test.
+5. Run the full gate list; record it under "05A implementation"; freeze; report.
+
+- **WIP snapshot (unreviewed, not frozen for review):** base
+  `feefe3e060a851fd8860e4bacb90c11c7b284888`, digest
+  `c90f78c3733ccb02ffb7c66b474efc8cd335f1b05334f33abc368a863454f52d`.
+
+### USER STOP — 2026-10-18 (root)
+
+Stopped at the user's request after A's safe checkpoint ("05A USER STOP" above). Root
+verified: WIP digest `c90f78c3…f52d` on base `feefe3e` recomputed and matching; fixture
+stopped; no cargo/rustc/test/postgres processes. Handoff:
+[HANDOFF-05A-USER-STOP-20261018](HANDOFF-05A-USER-STOP-20261018.md). Workers stopped (idle).
+Further work requires a new user instruction.
+
+### Phase 05 resumed — 2026-10-18 — implement-astra-reviewed-2.1
+
+User renewed continuation and confirmed root as Astra/high author. Root owns authorship;
+a fresh independent Astra/medium reviewer will start at the first review boundary.
+Scope remains 05A, then 05B, then final phase05 gates; no commits, deployment or phase06+.
+Preserve all inherited edits. Starting HEAD is feefe3e060a851fd8860e4bacb90c11c7b284888;
+resume digest ec4d7426c256190fed2c601e8a9d17173ff75cc9af11f968d4027d85bc998846
+(exact exclusion: plan/workflow-foundation/docs), different from historical stop digest;
+no prior code acceptance is claimed. Reuse the task-local realpath wrapper documented above.
+Host compaction threshold/occupancy unavailable; continue with host defaults and checkpoints.
+
+Verified retained PostgreSQL system identifier 7697669855432439122; restarted fixture
+/private/tmp/workflow0410-20261017, port55450. Reset workflow0410_test and
+workflow0410_fresh_test only, preserving S evidence databases. Fresh test migration passed.
+Root owns all fixture-mutating checks. Language check running in logs/05/resume-language.log.
+Fixed inherited registry pins: dynamic decision input test now exercises deadline; static
+reviewer shape test uses reviewers array and valid UUID with prohibited extra field.
+Required checks and batch order remain D2 §14, amended D3/D4; current state unreviewed.
+
+#### 05A resume implementation checkpoint
+
+Root author changes: corrected registry pins; added decision lifecycle/replay/auth/comment/
+notice/race tests and SQL provenance/bounds tests; added static reviewer/event-name compile
+checks and run-inbox competing-producer/stale-correlation tests. Updated inherited event
+fixtures/assertions for consumed_execution_id. Corrected decision lock order to put
+association before execution/job. Wait lock now permits unleased failed jobs so a timeout
+can replay its persisted outcome. Consolidated canonicalization with actions, retaining
+action bounds and using domain context bounds for decision artifacts; normalized JSON
+numbers and bounded fingerprint input before cloning. These remain unreviewed.
+
+Evidence:
+- resume-language.log: 70 passed.
+- resume-regression.log: 699 passed / 6 failed. Five old event-test expectations corrected;
+  reconciliation control_serialization_expire_before_command failed a drain assertion.
+- decision-first/second logs: test compile corrections, preserved.
+- decision-third.log: 31 passed / 2 failed; reconciliation drain test passed in this focused
+  run; timeout replay and bound expectation corrected.
+- decision-fourth.log: 58 passed / 2 test-fixture failures (user vs principal id; fault
+  injection expected wrong error class); corrected.
+- decision-fifth.log: 59 passed / 0 failed (decision, registry, wait, shared action tests).
+- Added decision_lifecycle_tests.rs after fifth run: past deadline/unavailable reviewer,
+  crossing-deadline rollback and two-runs-one-company concurrency; not run yet.
+No reviewer spawned or 05A freeze yet. Fixture remains running. Next: finish remaining
+05A acceptance coverage, focused/static/schema gates, then freeze and independent B review;
+05B has not started. Scope and exact snapshot exclusion unchanged.
+
+#### 05A frozen for independent batch review — implement-astra-reviewed-2.1
+
+Base feefe3e060a851fd8860e4bacb90c11c7b284888, digest
+e2a59ac010a2b8c819f88a490729a21d97e9dde868ec4a8681ae54277a3e053a;
+exact exclusion `plan/workflow-foundation/docs`. Manifest logs/05/05a-review-snapshot.txt.
+Root author (user-confirmed Astra/high); fresh B Astra/medium independent context.
+No project edits while B reviews. Prior S AGENTS changes are preserved; reviewer scope
+is all 05A source/schema/tests/plan changes since base, including inherited unreviewed WIP.
+D1–D4 accepted gate remains authoritative, with /params child fixture deviation flagged.
+
+Latest focused decision-sixth.log: 17/0 including crossing-deadline rollback and two runs
+one company. New notice atomicity/privacy/dead-letter/late-delivery, disclosure compiler and
+recursive binding walk tests are included in the ongoing batch gate.
+05a-gates.sh has passed fmt/diff/transport/credential-deploy/offline/strict Clippy,
+fresh-schema dump equality, sqlx prepare and --check (no .sqlx diff). No-run/workflow
+and delivery regression suites are in progress. Root owns fixture, serial gate process.
+Acceptance is pending B PASS and all batch checks; full suite/stack/lease gate follows 05B.
+
+Reviewer handle: /root/reviewer_05 (Astra/medium, fresh context). All-target no-run passed;
+network-isolated 944-test workflow/application/domain batch suite running. B owns REVIEW,
+review-notes and findings; root owns TASK and serialized check resources. No edits since freeze.
+
+#### 05A R005 corrections and reopened architecture gate
+
+05-R005 CHANGES REQUIRED, F011–F013. Source unfrozen after completed review. Gate
+05a-gate-workflow-suite.log: 937/7; five reconciliation persistence/lease timeouts,
+message failed-wait replay expectation, and whole-object disclosure compile assertion.
+Delivery regression and graft passed. Corrected replay expectation to saved final error;
+resolved-input disclosure rejection test passes (stage amendment pending D5).
+Correction-first.log: 23/4. Actual membership removal is blocked by new principal FKs;
+visibility fixture used absent slug column; feedback boundary exceeded default context.
+D5 reopens architecture for local historical identity snapshots and disclosure-stage
+amendment. No dependent schema edits before reviewer PASS. Other corrections in progress.
+Disk exhaustion avoided by cargo clean -p mail_agents (regenerable package artifacts,
+50.7GiB reported removed); use CARGO_INCREMENTAL=0 for subsequent builds. Evidence and
+PostgreSQL data preserved. Reviewer reused /root/reviewer_05 for D5.
+
+05-R006 D5 gate CHANGES REQUIRED, F014 actual remove_member lifecycle. D6 amends D5
+with external/NULL conversion, FOR SHARE snapshot checks, bounded contention semantics
+(no claimed global no-cycle proof), actual-port and raw-delete history/race coverage.
+Dependent schema edits still held pending D5+D6 PASS.
+
+Root accepts architecture gate 05-R007 PASS for D5 ec061ebe…cdb + D6 93aabee9…c80;
+F014 architecture resolved. Implementing local historical identity snapshots and tests.
+No batch acceptance or 05B implementation yet.
+
+#### D5+D6 implementation checkpoint
+
+Removed the three ephemeral-principal FKs only; added write-time tenant/person snapshot
+checks with FOR SHARE, immutable reviewer user_id populated by the guard, and read
+projection from that snapshot. Park eligibility locks member/principal. Fresh test DB
+reset/migration passed (d5-schema-reset.log). correction-second.log: 34 passed / 1 failed
+(channel test attempted immutable binding association update); fixture now creates a
+new binding. Other passing coverage includes actual remove_member preserving open and
+settled history, actual removal waiting on submitted/parked authority, conversion-first
+refusal, raw delete membership races, cross-tenant snapshot/decision/wait guards,
+notice unique/provenance isolation, character/byte feedback bounds and context limits.
+Added explicit message-input mapping positive and invalid whole-object activation proof,
+raw-delete settled history and in-flight park/remove races; fourth focused run includes
+these plus original reconciliation timeout failures. Earlier third compile diagnostic
+(PreparedInputs.value accessor) corrected; all logs retained. No correction review
+freeze yet; no 05B work. Known graft tally at this checkpoint >=663047 tokens saved
+across the continued task, excluding one truncated early lookup's unavailable tally.
+
+#### Corrected 05A artifact frozen for recheck
+
+Focused correction-fourth.log passed 44/0, including all five original reconciliation
+timeout failures, the new disclosure activation/mapping cases, raw-deletion settled
+history, in-flight park removal, actual-port removal and all F011–F013 checks.
+Freeze base feefe3e060a851fd8860e4bacb90c11c7b284888; digest
+2a428cd707ec4427ddb31ca9ea60d875ba829c1bb0c4c743ab7f38929d99bef3;
+exact exclusion plan/workflow-foundation/docs, unchanged. Manifest
+logs/05/05a-correction-snapshot.txt. No source edits during correction review.
+B /root/reviewer_05 rechecks F011–F013 and D5+D6 implementation plus affected integration.
+Root owns serialized broader correction gates. Independent strict clippy is running;
+05a-correction-gates.sh reruns static/schema/SQLx/no-run/workflow/delivery/graph checks.
+05B remains unstarted until matching PASS and required batch checks pass.
+
+#### 05A accepted — implement-astra-reviewed-2.1
+
+Root accepts 05A on base feefe3e060a851fd8860e4bacb90c11c7b284888, digest
+2a428cd707ec4427ddb31ca9ea60d875ba829c1bb0c4c743ab7f38929d99bef3, exact exclusion
+plan/workflow-foundation/docs. Root recomputed matching digest after all gates
+(logs/05/05a-acceptance-snapshot.txt). Independent 05-R008 CODE PASS matches; F011–F013
+resolved, D5+D6/05-R007 accepted and F014 architecture resolved; no open batch blocker.
+
+Evidence: correction-fourth.log 44/0; correction-clippy.log strict all-target PASS;
+05a-correction-gate-status.log all PASS (fmt, diff, transport, credential/deploy, locked
+offline all targets, fresh-schema dump equality, SQLx prepare/check with no .sqlx diff,
+all-target no-run, network-isolated workflow/application/domain suite 961/0, delivery
+regressions 47/0, graft build). The earlier 937/7 gate and all failed correction logs
+remain retained; no baseline claim is made about the earlier timeout failures.
+
+05B may now begin under D1 §9, D2 §16, D3 §2–4 and D5/D6 history invariants. Root remains
+Astra/high author, B /root/reviewer_05 independent Astra/medium. Read-only preparation is
+logs/05/05b-investigation.md. Final full suite, stock stack and lease budgets remain
+required after 05B. PostgreSQL fixture running, root owns checks. No commits/deployments.
+Known cumulative graft savings >=860241 tokens; priced recent calls report $0.10 plus
+five < $0.01 entries (earlier calls supplied no dollar value).
+
+
+#### 05B implementation in progress (continuation)
+
+05A acceptance above remains historical. 05B is not frozen or independently reviewed.
+Implemented approval schema/dispatch/settlement/wait selection and HTTP/MCP/message
+suspension plumbing under D1–D6. Third all-target offline compile passed
+(`logs/05/05b-compile-third.log`) after test-only explicit completed-outcome extraction
+and exhaustive diagnostic matches. The task test database alone was reset; edited
+schema migration passed (`05b-schema-reset.log`). Presquash/postsquash databases preserved.
+
+Audit found arbitrary operation names cannot classify approval rejection/expiry;
+classification now uses the restored frozen target resource kind (http/mcp/messaging).
+New real HTTP and registered-tool tests are in progress (`05b-http-first.log`);
+no 05B test pass or batch acceptance yet. Production runtime composition remains phase08;
+tests directly compose the existing HttpActions with notice-enabled SQL dispatch.
+Remaining: full 05B acceptance matrix, targeted regressions/lease budget, freeze and
+independent review, final phase05 full verification. Root retains serialized checks.
+
+05B continuation: fresh HTTP integration exposed two corrections: direct http.request
+must strip workflow-only approval before provider argument validation; http_for_action's
+last credential/access check must recognize exact persisted approval after current
+checks. Corrected both. 05b-http-fourth.log was 6/1 (registry + refusal/bound/SQL guards
+passed, resumed HTTP failed); diagnostics identified the provider-side check. New MCP
+pre-open and message two-wait tests are compiling/debugging; no 05B acceptance.
+
+D7 architecture amendment submitted to retained B /root/reviewer_05: decision-D7.md
+SHA256 d980ffa58aea5eb8f58b7627e2ba4b68506a8912b47f6dc2db72ec30a13ebcf9.
+D1's provider-replay predicate does not cover the alternative not-applied proof path;
+D7 specifies one remote entry per approval, DB guard and consumed-approval refusal.
+Dependent replay correction held pending PASS. Reviewer owns only review records/logs,
+read-only inspection; root retains serialized DB checks. Other 05B work proceeds.
+
+Root accepts D7 architecture 05-R009 PASS at the recorded SHA256; implementing the
+consumed-approval reservation refusal, marker non-reuse, and deferred second-entry guard.
+05b-focused-third.log: 10 passed / 2 failed (MCP fixture named wrong step; message passed
+workflow approval into action arguments). Fixed fixture step and message input stripping.
+The passing checks include real approved HTTP + registered-tool competing dispatch,
+self-approval/replay/supervisor history, 16 approvers, expiry/reject, admin demotion,
+reviewer competition, SQL reopen refusal and registry matrix. D7 not covered by that run.
+
+05b-focused-sixth.log passed 18/0: HTTP/tool and MCP positive dispatch, one effect under
+competition, exact digest refusal/FK matrix, D7 genuine not-applied + raw SQL refusal,
+message two-wait history, local/remote/message lost-ack applied/aborted resolution,
+expiry/reject/demotion/last-attempt/reviewer races, registry reviewer/deadline matrix.
+The final business-submission helper extraction and test-only tuple cleanup followed
+this run; the upcoming 05B broader gate covers them. reserve_action extraction was
+covered by the sixth run. No raised resource limits. lease-budget default filters now
+include workflow_action_approval_ (deliberate-delay tests mark Injected).
+
+05B gate script logs/05/05b-gates.sh runs static checks, locked offline all targets,
+strict Clippy, fresh-schema equality, SQLx prepare/check, all-target no-run, isolated
+workflow/application/domain and delivery regressions, lease budget and graph refresh.
+Root owns the serialized checks. After all pass: freeze whole 05B and request independent
+code review, resolve all findings, accept, then final phase05 full/stock verification
+and combined-integration review. No source freeze or 05B acceptance yet.
+
+
+#### USER STOP — 05B safe checkpoint, 2026-10-18
+
+User requested handoff and stop. See [handoff](HANDOFF-05B-USER-STOP-20261018.md).
+05A remains historically accepted (05-R008); D7 accepted (05-R009). 05B has no
+independent code review or acceptance. Focused18/0 predates final submit_business_on
+extraction and test tuple cleanup. Subsequent gate PASS: fmt/diff/transport,
+credential-deploy, locked offline all-target compile, strict Clippy, fresh schema,
+SQLx prepare. SQLx check interrupted at stop; no-run/workflow/delivery/lease/graph
+and final full/stock verification remain outstanding. Evidence retained in logs/05.
+Gate process tree terminated; task PG stopped cleanly, all data retained. Reviewer
+completed/idle. No commits/deployment/phase06+. Resume only on new user instruction.
+WIP snapshot: logs/05/05b-user-stop-20261018-snapshot.txt; exact exclusion remains
+plan/workflow-foundation/docs. Checkpoint only, not a reviewed/accepted artifact.
+
+Stop checkpoint identity:
+```text
+base:   feefe3e060a851fd8860e4bacb90c11c7b284888
+digest: 68b1c01bf2e2e9eb6ae5a21f8d712e9129a8be32d99d0be39b9f8b789a3a2d4b
+```
+
+
+#### RESUMED — 05B, 2026-10-18
+
+User authorized continuation under implement-astra-reviewed-2.1; prior root author
+confirmation retained. Preserved stopped-check evidence; resumed gates start at
+SQLx check, with new logs 05b-resumed-gate-*. Root owns task PG and serialized checks.
+05B remains unaccepted pending all gates and independent whole-batch review.
+
+
+05B resumed batch gates PASS: SQLx check, all-target no-run, network-isolated workflow
+979/0 and delivery47/0, lease115/0, graph refresh. Exact commands and logs:
+logs/05/05b-resumed-gates.sh and 05b-resumed-gate-status.log. Prior static/offline/
+Clippy/fresh-schema/SQLx-prepare passes remain applicable to unchanged production.
+Author audit found the explicit approve-versus-expiry competing-claimant case missing;
+added workflow_action_approval_submit_competes_with_expiry using the established
+run-lock/deadline race pattern. Only test source changed. First focused compile stopped
+to correct its new state-query join (background_tasks has workflow_execution_id, not
+workflow_run_id); no result claimed. Second focused run: 05b-resumed-focused-second.log.
+
+#### 05B frozen whole-batch review assignment
+
+Artifact base feefe3e060a851fd8860e4bacb90c11c7b284888, digest
+b42023ba2177a20937e6aa0c14b4abf6dc6e41fcbcf2a89a6fa711370f6fd630;
+exact sole exclusion plan/workflow-foundation/docs. Manifest logs/05/05b-review-snapshot.txt.
+Independent retained B /root/reviewer_05 assigned whole 05B actual code/criteria/callers
+review under D1–D7. Source frozen; root retains DB check ownership, no checks running.
+B may inspect read-only; coordinate any DB-mutating checks. B owns only review records.
+05B implemented/verified at batch scope but not independently code-reviewed or accepted.
+
+Latest test delta: approval-focused17/0 including submit-vs-expiry; fmt/diff/strict
+Clippy/SQLx prepare/check/graft all PASS (05b-race-gate-status.log). Earlier production
+regressions workflow979/0, delivery47/0 and lease115/0 remain applicable; new test alone
+followed them. Full phase05 all-target/stock checks remain after batch acceptance.
+Final script prepared at logs/05/phase05-final-gates.sh, not yet run.
+
+
+05-R010 CHANGES REQUIRED, one low verification finding 05-F015; no implementation
+bypass identified. Source unfrozen for test-only corrections: direct SQL reopen matrix
+(prior-transaction approval, reject, wrong retry count, valid positive control), exact
+guard-message assertion on existing no-submission case, and long-address approval notice
+refusal with no waits/decisions/reviewers/deliveries/dispatch/entry/receipt or provider call.
+Focused run logs/05/05b-f015-focused.log. Production and architecture unchanged.
+
+05-F015 correction frozen for one recheck. Focused approval19/0 and fmt/diff/strict
+Clippy/SQLx prepare/check/graft PASS; logs/05/05b-f015-focused.log and
+05b-f015-gate-status.log. Production unchanged; prior broad evidence reused.
+base:   feefe3e060a851fd8860e4bacb90c11c7b284888
+digest: ac6e12f99bf53762a9056a6fcea62ac4a90513d4315dc47e5e3b087d21d4a84a
+Exact sole exclusion plan/workflow-foundation/docs. Retained B assigned delta and
+affected criteria by 05-F015; root owns PG, no tests running.
+
+
+#### 05B ROOT ACCEPTED — 2026-10-18
+
+05-R011 independent PASS matches root recomputation: base feefe3e060a851fd8860e4bacb90c11c7b284888,
+digest ac6e12f99bf53762a9056a6fcea62ac4a90513d4315dc47e5e3b087d21d4a84a;
+sole exclusion plan/workflow-foundation/docs. 05-F015 resolved; no open findings.
+Review records and disposition persisted. Whole 05B coverage 05-R010 plus correction
+05-R011, focused19/0 and static/SQLx passes, unchanged production broad979/0,
+delivery47/0 and lease115/0. No source edits after freeze.
+
+Starting final phase05 gate logs/05/phase05-final-gates.sh. Root owns serialized PG
+checks; retained reviewer idle until final combined-integration evidence review.
+Final full/stock verification pending; phase05 not yet declared complete.
+
+Final gate first full-suite result:2726 passed/1 failed/22 ignored. Failure is
+workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limited_entry,
+action_dispatch_remote_tests.rs:622. Captured entry425ms/deadline389ms; dispatch
+correctly returned Interrupted before provider polling. Test's LeaseFirst premise
+sleeps2s inside the unchanged3s lease before reservation/entry; measured real windows
+were run0.865s/lease0.361s. This is a fixture timing failure, not a waived baseline
+claim. All other library tests passed; cargo stopped before other targets. First
+stock gate still running; no source change yet. Planned correction keeps the fresh
+lease and sets the negative run deadline after the persisted lease, retaining4s
+watchdog, real provider polling/drop, and persisted-window causal assertions. No
+production bound/protocol changes. Root will rerun affected tests and final proof,
+then obtain independent delta/combined-integration review before phase completion.
+
+
+First final gate complete: stock script2727/0/22ignored at2048KiB, lease118/0
+(see log for authoritative count), graph PASS; full suite failed as recorded above.
+Test-only correction applied to action_dispatch_remote_tests.rs after gate completion:
+prepare_pending_window keeps fresh lease, LeaseFirst puts run deadline after the persisted
+lease by existing RUN_MARGIN. Removed the negative control's2s pre-dispatch sleep.
+Causal oracle still checks genuine persisted windows; negative control now asserts the
+specific lease-first rejection, while real provider poll/drop and4s watchdog remain.
+No runtime/resource bounds raised. Caller trace covers pending_case and both tests.
+Focused filter workflow_action_dispatch_pending_; then corrected final full all-target
+suite at RUST_MIN_STACK=2097152 jointly proves full+stock on corrected source. This
+supersedes the first full failure and supplements its unchanged-production stock PASS.
+Static/SQLx and lease rechecks included; unchanged schema/migration/transport evidence
+reused. Final independent delta/combined-integration review required before completion.
+
+
+#### Final phase05 verification PASS; final review assignment
+
+Corrected gate logs/05/phase05-corrected-gate-status.log: fmt/diff/offline/strict
+Clippy/SQLx prepare/check/no-run/full-stock-suite/lease/graph all PASS. Full all-target
+suite under network isolation with RUST_MIN_STACK=2097152:2727 library+5 binary
+passed,0 failed,22 existing ignored. Lease118/0, maximum measured code-owned work
+35.7% of its bound (budget.reserve357ms/1000ms; threshold50%);106 injected events
+excluded under existing policy. Fresh migration/schema equality, transport and
+credential/deploy script passes reused from the first final gate: no production or
+schema edits since. No resource limits raised. Initial full failure, focused compiler
+error and every interrupted/failed log retained; no baseline waiver.
+
+Final code delta since 05-R011 is only action_dispatch_remote_tests.rs fixture setup
+and causal assertions. Focused2/0 (final-deadline-focused-second.log); full/stock and
+lease checks cover it. RESUME updated administratively with final verification.
+Root assigns final delta and combined-integration evidence review to retained B.
+Production composition/member HTTP routes remain phase08; child feedback propagation
+and timeout-code mapping remain phase07. Frontend CI/browser steps, query-statistics
+probe and stack-frames diagnostic not run; no corresponding changes or expanded
+claims. PG still running for review; root owns it and no author checks are active.
+
+Frozen final review identity:
+```text
+base:   feefe3e060a851fd8860e4bacb90c11c7b284888
+digest: 59fde0cfbc2a70abdd01614b15dedc6d5929c4e40aeec74d66fb41120983edba
+```
+Exact sole exclusion plan/workflow-foundation/docs. Source frozen for B.
+
+
+#### PHASE05 COMPLETE — ROOT FINAL ACCEPTANCE, 2026-10-18
+
+Independent final delta/combined-integration PASS05-R012 matches root recomputation:
+base feefe3e060a851fd8860e4bacb90c11c7b284888, digest
+59fde0cfbc2a70abdd01614b15dedc6d5929c4e40aeec74d66fb41120983edba,
+sole exclusion plan/workflow-foundation/docs. Root manifest:
+logs/05/phase05-root-final-snapshot.txt. No open findings; F015 resolved under05-R011.
+05A accepted under05-R008,05B under05-R010/R011, final fixture correction and combined
+integration under05-R012. All notes/findings/dispositions persisted.
+
+Completed authorized scope: phase05A+05B and final verification. Corrected full all-target
+suite at2MiB passed2732 total (2727library+5binary),0fail,22existingignored. Lease118/0;
+all required static, offline, migration/schema, SQLx, transport and graph checks PASS,
+with the evidence reuse and first failed run documented above. No runtime/resource
+bounds raised. No commits, deployments, production resets or phase06+ implementation.
+Production runtime/member-route wiring remains phase08; phase07 owns the recorded
+child-feedback/timeout-code obligations. Other CI/diagnostic omissions are listed above.
+
+Resources: task PostgreSQL `/private/tmp/workflow0410-20261017` (PG18,port55450,
+role workflow0410,system identifier7697669855432439122) stopped cleanly via
+pg_ctl -m fast -w stop after final review. All data retained, including
+workflow0410_test/workflow0410_fresh_test and workflow0410_presquash/postsquash.
+Verified no task gate or task PostgreSQL process remains. Reviewer /root/reviewer_05
+completed/idle; no worker activity outstanding. Continue phase06 only on a new user
+instruction. Preserve current worktree and all evidence.
+
+This continuation's reported graft savings total169586 tokens; no dollar estimate
+was supplied by those calls, so none is inferred.

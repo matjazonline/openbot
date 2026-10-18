@@ -41,11 +41,13 @@ pub(crate) enum RemoteReservationResult {
     Reserved(Box<RemoteReservation>),
     Committed(ActionReceipt),
     ApprovalRequired,
+    ApprovalParked(crate::domain::workflow::WaitId),
     PossibleDispatchExists,
 }
 pub enum LocalDispatchResult {
     Committed(ActionReceipt),
     ApprovalRequired,
+    ApprovalParked(crate::domain::workflow::WaitId),
     PossibleDispatchExists,
 }
 
@@ -106,6 +108,7 @@ pub trait RemoteAction: Send + Sync {
 /// Only committed receipts are accepted step/tool output.
 pub enum RemoteDispatchObservation {
     ApprovalRequired,
+    ApprovalParked(crate::domain::workflow::WaitId),
     PossibleDispatchExists,
     Committed(ActionReceipt),
     Interrupted,
@@ -148,6 +151,9 @@ pub(crate) async fn supervise_remote(
                 return Ok(RemoteDispatchObservation::Interrupted);
             }
             return Ok(RemoteDispatchObservation::Committed(receipt));
+        }
+        RemoteReservationResult::ApprovalParked(wait) => {
+            return Ok(RemoteDispatchObservation::ApprovalParked(wait));
         }
         RemoteReservationResult::ApprovalRequired => {
             return Ok(RemoteDispatchObservation::ApprovalRequired);

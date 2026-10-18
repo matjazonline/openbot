@@ -83,3 +83,20 @@ pub(super) async fn retired(persistence: &PostgresPersistence, claim: &ClaimedWo
     .await
     .unwrap()
 }
+
+/// Existing completion tests must fail if a handler unexpectedly parks.
+pub(super) trait CompletedOutcome {
+    fn completed_result(self) -> crate::application::workflow::lease::WorkflowHandlerResult;
+}
+
+impl CompletedOutcome for crate::application::workflow::lease::WorkflowHandlerOutcome {
+    fn completed_result(self) -> crate::application::workflow::lease::WorkflowHandlerResult {
+        use crate::application::workflow::lease::WorkflowHandlerOutcome;
+        match self {
+            WorkflowHandlerOutcome::Completed(result) => result,
+            WorkflowHandlerOutcome::Suspended(wait) => {
+                panic!("unexpected suspension: {:?}", wait.wait)
+            }
+        }
+    }
+}

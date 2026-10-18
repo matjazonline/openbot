@@ -108,9 +108,10 @@ impl Registration<'_> {
                 output["properties"]["feedback"] = json!({"type":"string","maxLength":MAX_TEXT});
                 output["required"] = json!(["choice", "data", "feedback"]);
                 self.check(InputCheck::Deadline)?;
+                self.static_roots("reviewers")?;
                 contract(
-                    json!({"proposal":true,"reviewer":selector(),"deadline":text(MAX_DEADLINE),"data_schema":declaration,"feedback_required":feedback}),
-                    &["proposal", "reviewer", "deadline", "data_schema"],
+                    json!({"proposal":true,"reviewers":reviewers(),"deadline":text(MAX_DEADLINE),"data_schema":declaration,"feedback_required":feedback}),
+                    &["proposal", "reviewers", "deadline", "data_schema"],
                     output,
                 )
             }
@@ -131,6 +132,7 @@ impl Registration<'_> {
             ));
         }
         let schema = self.declared_schema("payload_schema")?;
+        self.event_identity(&schema)?;
         Ok(contract(
             json!({"event":identifier(),"correlation":text(MAX_CORRELATION),"deadline":text(MAX_DEADLINE),"payload_schema":{"const":schema}}),
             &["event", "correlation", "deadline", "payload_schema"],

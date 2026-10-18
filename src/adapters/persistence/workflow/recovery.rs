@@ -285,11 +285,12 @@ pub(super) async fn route_pending_failure(
     .await
 }
 
-/// A parked message step whose receipt failed (04.11-D2 §4.4): the same final-error decision
-/// and writer as retirement, never a resend and no retry budget. The caller has completed the
-/// wait and returned the run to running; this takes the frozen `final_error` route or fails
-/// the run, then closes the parked job as a final error does.
-pub(super) async fn route_effect_failure(
+/// A parked step's Terminal failure: a message step whose receipt failed (04.11-D2 §4.4) or a
+/// decision past its deadline (05-D2 §7.3). The same final-error decision and writer as
+/// retirement, never a resend and no retry budget. The caller has settled the wait and returned
+/// the run to running; this takes the frozen `final_error` route (output `null`) or fails the
+/// run with `terminal_execution_id`, then closes the parked job as a final error does.
+pub(super) async fn route_parked_failure(
     db: &mut PgConnection,
     scope: ActivationRequest,
     failure: &StepFailure,

@@ -298,7 +298,19 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             }
         };
         if approval_required {
-            return Ok(End::Rollback(MessagePublication::ApprovalRequired));
+            return Ok(
+                match super::super::decisions::approvals::park(
+                    tx,
+                    request,
+                    &action,
+                    self.decision_notices.as_ref(),
+                )
+                .await?
+                {
+                    Some(wait) => End::Commit(MessagePublication::ApprovalParked(wait)),
+                    None => End::Rollback(MessagePublication::ApprovalRequired),
+                },
+            );
         }
         // Remote dispatch refuses new work in a conflicted execution; messaging matches (F014.2).
         if super::super::action_uncertainty::conflicted_on(tx, request.scope()).await? {
@@ -372,6 +384,10 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
         let mut tx = bound.begin(&mut conn).await?;
         let stored = async {
             lease::lock_scope(&mut tx, request.fence.scope, bound.server_timeout()).await?;
+            if let Some(wait) = super::super::decisions::approvals::parked(&mut tx, request).await?
+            {
+                return Ok(Some(MessagePublication::ApprovalParked(wait)));
+            }
             if !Self::existing(&mut tx, request).await? {
                 return Ok(None);
             }

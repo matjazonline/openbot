@@ -131,10 +131,9 @@ impl HttpActionPreparation for PostgresPersistence {
                     .and_then(Value::as_str)
                     .ok_or_else(invalid)?;
                 let mut arguments = inputs.clone();
-                arguments
-                    .as_object_mut()
-                    .ok_or_else(invalid)?
-                    .remove("connection");
+                let arguments_object = arguments.as_object_mut().ok_or_else(invalid)?;
+                arguments_object.remove("connection");
+                arguments_object.remove("approval");
                 ("http.request", Some(slot), arguments)
             }
             "tool.call" => (

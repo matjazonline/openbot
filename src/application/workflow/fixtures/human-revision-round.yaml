@@ -7,11 +7,17 @@ input_schema:
     message: {type: string}
     previous_body: {type: string}
     feedback: {type: string}
-    reviewer: {type: string, maxLength: 128}
     deadline: {type: string, maxLength: 64}
-  required: [message, previous_body, feedback, reviewer, deadline]
+  required: [message, previous_body, feedback, deadline]
   additionalProperties: false
-parameter_schema: {type: object, additionalProperties: false}
+# Reviewers are static (05-D2 §4.2): a round reads them from its binding parameters, never from
+# run input. Phase07 owns how a child round receives those parameters.
+parameter_schema:
+  type: object
+  properties:
+    reviewer: {type: string, maxLength: 128}
+  required: [reviewer]
+  additionalProperties: false
 output_schema:
   type: object
   properties:
@@ -47,7 +53,7 @@ steps:
     type: decision.human
     with:
       proposal: {ref: /steps/draft/output}
-      reviewer: {object: {kind: {literal: user}, id: {ref: /input/reviewer}}}
+      reviewers: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
       deadline: {ref: /input/deadline}
       data_schema:
         literal:

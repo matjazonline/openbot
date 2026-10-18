@@ -142,7 +142,11 @@ impl MessageActionPreparation for PostgresPersistence {
         let message_kind = MessageKind::parse(&kind.0).ok_or_else(missing)?;
         let mut tx = begin_http(self).await?;
         let facts = facts(&mut tx, scope).await?;
-        let inputs = frozen_inputs(&mut tx, &facts, claim, kind).await?;
+        let mut inputs = frozen_inputs(&mut tx, &facts, claim, kind).await?;
+        inputs
+            .as_object_mut()
+            .ok_or_else(invalid)?
+            .remove("approval");
         let request = message_request(scope, &facts, message_kind, inputs)?;
         tx.commit().await?;
         Ok(request)

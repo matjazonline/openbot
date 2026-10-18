@@ -1,9 +1,9 @@
 use super::contracts::*;
 use super::service::{ActionRequest, FrozenAction};
 use crate::application::app_error::AppResult;
+pub(super) use crate::application::workflow::canonical::canonical;
 use crate::application::workflow::compiler::{Schema, SourceSpan};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub(super) const MAX_ARGUMENT_BYTES: usize = 65_536;
@@ -109,85 +109,5 @@ fn validate_arguments(request: &ActionRequest, arguments: &Value) -> AppResult<(
 }
 
 pub(super) fn digest(value: &Value) -> AppResult<ArgumentDigest> {
-    let bytes = serde_json::to_vec(value).map_err(|_| invalid())?;
-    Ok(ArgumentDigest(format!("{:x}", Sha256::digest(bytes))))
-}
-
-pub(super) fn canonical(value: &Value, bytes: usize) -> AppResult<Value> {
-    let mut remaining = 4096;
-    let mut remaining_bytes = bytes;
-    bound(value, 0, &mut remaining, &mut remaining_bytes)?;
-    let mut remaining = 4096;
-    let value = sorted(value, 0, &mut remaining)?;
-    if serde_json::to_vec(&value).map_err(|_| invalid())?.len() > bytes {
-        return Err(invalid());
-    }
-    Ok(value)
-}
-
-// Bound allocations before cloning/serializing caller-controlled values.
-fn bound(value: &Value, depth: usize, items: &mut usize, bytes: &mut usize) -> AppResult<()> {
-    if depth > 32 {
-        return Err(invalid());
-    }
-    *items = items.checked_sub(1).ok_or_else(invalid)?;
-    *bytes = bytes.checked_sub(2).ok_or_else(invalid)?;
-    match value {
-        Value::String(text) => *bytes = bytes.checked_sub(text.len()).ok_or_else(invalid)?,
-        Value::Object(object) => {
-            for (key, item) in object {
-                *bytes = bytes.checked_sub(key.len() + 3).ok_or_else(invalid)?;
-                bound(item, depth + 1, items, bytes)?;
-            }
-        }
-        Value::Array(array) => {
-            for item in array {
-                bound(item, depth + 1, items, bytes)?;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn sorted(value: &Value, depth: usize, remaining: &mut usize) -> AppResult<Value> {
-    if depth > 32 {
-        return Err(invalid());
-    }
-    *remaining = remaining.checked_sub(1).ok_or_else(invalid)?;
-    match value {
-        Value::Number(number) => Ok(Value::Number(canonical_number(number)?)),
-        Value::Object(object) => {
-            let mut keys: Vec<_> = object.keys().collect();
-            keys.sort();
-            let mut result = serde_json::Map::new();
-            for key in keys {
-                result.insert(key.clone(), sorted(&object[key], depth + 1, remaining)?);
-            }
-            Ok(Value::Object(result))
-        }
-        Value::Array(array) => array
-            .iter()
-            .map(|item| sorted(item, depth + 1, remaining))
-            .collect(),
-        _ => Ok(value.clone()),
-    }
-}
-
-fn canonical_number(number: &serde_json::Number) -> AppResult<serde_json::Number> {
-    if !number.is_f64() {
-        return Ok(number.clone());
-    }
-    let value = number.as_f64().ok_or_else(invalid)?;
-    // JSONB erases signed zero and exponent/integral spelling. Normalize before hashing,
-    // including schema numbers, so decoding the committed operation preserves identity.
-    if value.fract() == 0.0 {
-        if value >= i64::MIN as f64 && value < i64::MAX as f64 {
-            return Ok(serde_json::Number::from(value as i64));
-        }
-        if value >= 0.0 && value < u64::MAX as f64 {
-            return Ok(serde_json::Number::from(value as u64));
-        }
-    }
-    serde_json::Number::from_f64(value).ok_or_else(invalid)
+    crate::application::workflow::canonical::digest(value).map(ArgumentDigest)
 }

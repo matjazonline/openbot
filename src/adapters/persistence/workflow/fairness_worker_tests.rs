@@ -78,6 +78,7 @@ fn runner<'a>(
     WorkflowWorker {
         port: p,
         handler: h,
+        notices: None,
         worker: id,
         lease: lease(),
         poll: PollPolicy::new(Duration::from_millis(50), 128).unwrap(),
@@ -256,6 +257,7 @@ async fn workflow_fairness_complementary_workers_reach_actual_supported_dispatch
             let runner = WorkflowWorker {
                 port: f.persistence(),
                 handler: &handlers[index],
+                notices: None,
                 worker: ids[index],
                 lease: lease(),
                 poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),
@@ -309,6 +311,7 @@ async fn workflow_fairness_worker_stops_full_page_at_first_denied_demand() {
     let runner = WorkflowWorker {
         port: p,
         handler: &h,
+        notices: None,
         worker: w,
         lease: lease(),
         poll: PollPolicy::new(Duration::from_millis(50), 128).unwrap(),

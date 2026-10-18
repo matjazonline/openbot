@@ -30,7 +30,6 @@ steps:
           message: {ref: /input/message}
           previous_body: {literal: ""}
           feedback: {literal: ""}
-          reviewer: {ref: /params/reviewer}
           deadline: {ref: /params/deadline}
     routes: {success: outcome}
   outcome:

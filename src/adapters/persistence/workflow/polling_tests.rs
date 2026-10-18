@@ -37,6 +37,7 @@ fn polling<'a>(
     WorkflowWorker {
         port: p,
         handler: h,
+        notices: None,
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
@@ -70,9 +71,10 @@ fn wait_source(timer: bool) -> Value {
     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
     source
 }
-fn signal(scope: ActivationRequest) -> WorkflowSignal {
-    WorkflowSignal {
-        scope,
+fn signal(scope: ActivationRequest) -> WorkflowEvent {
+    WorkflowEvent {
+        company: scope.company,
+        run: scope.run,
         id: WorkflowEventId(Uuid::new_v4()),
         name: WorkflowEventName("review.completed".into()),
         correlation: WorkflowEventCorrelation("request-1".into()),
@@ -144,7 +146,7 @@ async fn workflow_poll_stored_events_before_park_and_during_downtime_resume() {
         if !before_park {
             p.park_wait(scope).await.unwrap().unwrap();
         }
-        p.record_signal(signal(scope)).await.unwrap();
+        recorded(p, signal(scope)).await.unwrap();
         let fresh = PostgresPersistence::new(p.pool().clone());
         let handler = scripted();
         let worker = polling(&fresh, &handler);
@@ -314,6 +316,7 @@ async fn workflow_poll_shutdown_drops_actual_future_and_leaves_recoverable_lease
     let runner = WorkflowWorker {
         port: p,
         handler: &handler,
+        notices: None,
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),

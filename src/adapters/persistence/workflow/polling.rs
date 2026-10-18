@@ -125,10 +125,12 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
                     OR (wait.id IS NOT NULL AND (
                         wait.deadline <= clock_timestamp() OR run.deadline <= clock_timestamp()
                         OR run.state IN ('cancelled','failed','succeeded')
-                        OR EXISTS (SELECT 1 FROM workflow_wait_events AS event
+                        -- Run-scoped events wake only event waits (05-D2 §11): a persisted,
+                        -- unconsumed match, however early it arrived.
+                        OR (wait.reason = 'event' AND EXISTS (SELECT 1 FROM workflow_wait_events AS event
                             WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
-                              AND event.execution_id = wait.execution_id
-                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation)
+                              AND event.consumed_execution_id IS NULL
+                              AND event.event_name = wait.event_name AND event.correlation = wait.correlation))
                         -- An effect wait wakes on its action's receipt or on a finality breach
                         -- (04.11-D2 §4.4, D4 §M); otherwise only at the run deadline.
                         OR (wait.reason = 'effect' AND (

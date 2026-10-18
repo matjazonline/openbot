@@ -110,17 +110,15 @@ async fn compete(
 async fn ordered_case(first: First) {
     let (f, scope) = Box::pin(fixture_source(waiting_source())).await;
     f.persistence().park_wait(scope).await.unwrap().unwrap();
-    f.persistence()
-        .record_signal(wait_signal(scope))
-        .await
-        .unwrap();
+    recorded(f.persistence(), wait_signal(scope)).await.unwrap();
     let before = control_state(&f).await;
     let (cancel, resume) = Box::pin(compete(&f, scope, first)).await;
     let after = control_state(&f).await;
-    assert_eq!(
-        after["workflow_wait_events"],
-        before["workflow_wait_events"]
-    );
+    let mut expected_events = before["workflow_wait_events"].clone();
+    if matches!(first, First::Resume) {
+        expected_events[0]["consumed_execution_id"] = json!(scope.execution.as_uuid());
+    }
+    assert_eq!(after["workflow_wait_events"], expected_events);
     assert_eq!(
         after["workflow_waits"][0]["notification_intent"],
         before["workflow_waits"][0]["notification_intent"]

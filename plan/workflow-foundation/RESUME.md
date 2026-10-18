@@ -1,6 +1,60 @@
 # Workflow foundation resume
 
-## Accepted — 04.11 and phase04 complete, 2026-10-18 (current)
+## Phase05 verification complete — 2026-10-18 (current)
+
+05A and 05B passed independent review and their batch gates. Final corrected all-target
+suite passed at 2 MiB: 2727 library + 5 binary tests, zero failures, 22 existing ignored.
+Lease118/0, formatting, offline compilation, strict Clippy, fresh migration/schema,
+SQLx and transport checks passed. Earlier failed/interrupted evidence is retained.
+The final fixture correction and combined-integration review, artifact digest, root
+acceptance and resource status are authoritative in [TASK](docs/TASK.md) and
+[REVIEW](docs/REVIEW.md). Production runtime composition/member routes remain phase08;
+phase07 owns child feedback/timeout-code mapping. No commits or deployments.
+Next implementation phase is06, only under a new user instruction. Preserve the task
+PostgreSQL data and pre/post squash evidence databases described in TASK.
+
+## RESUMED — phase 05B, 2026-10-18 (historical)
+
+User authorized continuation under implement-astra-reviewed-2.1. Root retains
+confirmed author role; resume unfinished 05B gates, independent review and final
+phase05 verification. See latest docs/TASK.md. Prior stop is superseded.
+
+## USER STOP — phase 05B, 2026-10-18 (historical)
+
+Stopped at the user's safe-checkpoint request. Read the
+[stop handoff](docs/HANDOFF-05B-USER-STOP-20261018.md) and latest [TASK](docs/TASK.md).
+05A accepted (05-R008); D7 architecture accepted (05-R009). 05B implemented but
+not independently code-reviewed or accepted. Focused tests 18/0 passed before the
+last helper extraction; static/offline/Clippy/schema/SQLx prepare passed afterward.
+SQLx check interrupted; remaining batch and final verification outstanding.
+Task PostgreSQL stopped cleanly, data retained; verification process tree stopped.
+No reviewer work running. Preserve all WIP and pre/post squash evidence databases.
+Continue only on a new user instruction. No commits, deployment or phase06+.
+
+## RESUMED — phase 05B implementation, 2026-10-18 (historical)
+
+User authorized continuation with `implement-astra-reviewed-2.1` and confirmed root as
+Astra/high author. Scope: 05A → 05B → final phase05 verification; no commits, deployment
+or phase06+. 05A is root-accepted after 05-R008 CODE PASS; D5+D6/05-R007 accepted.
+05B is WIP, not frozen or reviewed. Third all-target offline compile and fresh task-test
+schema migration passed; first approval integration tests are being added and debugged.
+Read latest [TASK](docs/TASK.md), [REVIEW](docs/REVIEW.md), and D1–D6 in `docs/logs/05/`.
+Independent reviewer `/root/reviewer_05` retained. Task PostgreSQL
+`/private/tmp/workflow0410-20261017`, port55450, running; root owns serialized checks.
+Preserve pre/post squash evidence databases. Use `CARGO_INCREMENTAL=0` for builds.
+Historical stops below are superseded.
+
+## USER STOP — phase 05A in progress, 2026-10-18 (historical)
+
+**Stopped at a safe checkpoint.** Read the [handoff](docs/HANDOFF-05A-USER-STOP-20261018.md).
+Batch S (migration squash) accepted (S-R003). Phase 05 architecture gate accepted
+(05-R004, decision D1–D4 in `docs/logs/05/`). 05A is partially implemented, compiles,
+mostly untested and unreviewed: WIP digest `c90f78c3…f52d` on base `feefe3e`. Fixture
+`/private/tmp/workflow0410-20261017` stopped, data retained; test databases need a reset.
+No processes running. No commits, deployment or phases 06+. Continue only after a new
+user instruction.
+
+## Accepted — 04.11 and phase04 complete, 2026-10-18 (historical)
 
 **04.11 VERIFIED and root-accepted** under implement-opus-reviewed-2.1 after independent
 architecture gate (04.11-R005 PASS, decision D2+D3+D4 in `docs/logs/04.11/`) and

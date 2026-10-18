@@ -182,6 +182,7 @@ fn pending_source_result(
         Ok(result) => {
             let variant = match result {
                 RemoteDispatchObservation::Committed(_) => "Committed",
+                RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",
                 RemoteDispatchObservation::ApprovalRequired => "ApprovalRequired",
                 RemoteDispatchObservation::PossibleDispatchExists => "PossibleDispatchExists",
                 RemoteDispatchObservation::Interrupted => "Interrupted",

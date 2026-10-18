@@ -39,6 +39,45 @@ pub enum Binding {
     Not(Box<Binding>),
 }
 
+impl Binding {
+    /// Every context reference anywhere in this binding tree, in source order.
+    pub fn references(&self) -> Vec<&ContextReference> {
+        let mut found = Vec::new();
+        self.collect_references(&mut found);
+        found
+    }
+
+    fn collect_references<'a>(&'a self, found: &mut Vec<&'a ContextReference>) {
+        match self {
+            Binding::Literal(_) => {}
+            Binding::Reference(reference) | Binding::Exists(reference) => found.push(reference),
+            Binding::Default {
+                reference,
+                fallback,
+            } => {
+                found.push(reference);
+                fallback.collect_references(found);
+            }
+            Binding::Object(fields) => fields
+                .values()
+                .for_each(|field| field.collect_references(found)),
+            Binding::Array(items)
+            | Binding::Concat(items)
+            | Binding::And(items)
+            | Binding::Or(items) => items.iter().for_each(|item| item.collect_references(found)),
+            Binding::Compare { left, right, .. } => {
+                left.collect_references(found);
+                right.collect_references(found);
+            }
+            Binding::In { value, items } => {
+                value.collect_references(found);
+                items.collect_references(found);
+            }
+            Binding::Not(inner) => inner.collect_references(found),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Comparison {
     Eq,

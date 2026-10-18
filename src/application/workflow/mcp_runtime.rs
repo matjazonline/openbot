@@ -152,7 +152,7 @@ where
             client: self.client.clone(),
             opened: Mutex::new(None),
         };
-        if state == ActionEffectState::Prepared && !request.context.approval_required {
+        if state == ActionEffectState::Prepared {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return Ok(RemoteDispatchObservation::Interrupted),
@@ -190,7 +190,7 @@ where
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
     ) -> WorkflowHandlerOutcome {
-        self.run(kind, claim).await.into()
+        self.run(kind, claim).await
     }
 }
 impl<P, D> McpActions<P, D>
@@ -198,14 +198,14 @@ where
     P: McpActionPreparation + McpActionUse + ActionIntents + ActionEffectStates + Clone + 'static,
     D: ActionDispatch,
 {
-    /// The step's completed result: MCP steps never suspend.
+    /// Protected calls suspend before opening a provider session.
     pub async fn run(
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> WorkflowHandlerResult {
+    ) -> WorkflowHandlerOutcome {
         use ActionStepOutcome as Outcome;
-        match self.step(kind, claim).await {
+        let result = match self.step(kind, claim).await {
             Ok(RemoteDispatchObservation::Committed(receipt)) => {
                 if mcp_result_is_error(&receipt.result) {
                     // The receipt keeps the bounded error result; a tool error never proves
@@ -214,6 +214,9 @@ where
                 } else {
                     Ok(receipt.result)
                 }
+            }
+            Ok(RemoteDispatchObservation::ApprovalParked(wait)) => {
+                return WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait });
             }
             Ok(RemoteDispatchObservation::ApprovalRequired) => fail(Outcome::ApprovalRequired),
             Ok(RemoteDispatchObservation::PossibleDispatchExists) => {
@@ -224,7 +227,8 @@ where
             Err(Failure::Unavailable) => fail(Outcome::Unavailable),
             Err(Failure::ContractChanged) => fail(Outcome::ContractChanged),
             Err(Failure::Dispatch(error)) => fail(Outcome::Dispatch(&error)),
-        }
+        };
+        result.into()
     }
 }
 

@@ -323,3 +323,109 @@ Root accepted 04.11 and the combined phase04 gate on R007 PASS for digest
 - The network-isolated full-suite rerun is not needed for this PASS. It was still running at review time with no failure so far; a failure in it would reopen the batch.
 - The `src/adapters/persistence/AGENTS.md` conflict (§1 plus lines 30 and 160) remains open for the user.
 - No open Batch S findings.
+
+### S-R003 — 2026-10-18 delta recheck (user-approved AGENTS.md and startup warning) — PASS
+**PASS** for base `feefe3e060a851fd8860e4bacb90c11c7b284888`, digest `03ca0bea615bfc261ce6191b60147d4df20f9bab8115d0ec5b2dbebbaa40cbae` (recomputed). The base reproduces the S-R002 digest `33ae9028…4552`.
+
+[Round note](agent-review-notes.md#s-r003--delta-recheck-of-batch-s-user-approved-agentsmd-and-startup-warning--pass); checks in `logs/S-R003/`.
+- `src/adapters/persistence/AGENTS.md`: §1, the composite-FK bullet and the credential paragraph now follow the pre-release in-place init-schema model, with the post-release rule kept. No other rule changed. This resolves the S-R001 AGENTS observation by the user's approval.
+- The `serve()` warning is accurate and logged before migrations. Optional nit: say "recorded migrations or checksum". The file is still listed in `NO_BACKWARD_COMPATIBILITY_NOTES`.
+- Stack budget: I agree with root's conclusion but not its premise. The code delta since the S-gate pass also includes the S-R001 corrections. This tree's two 2 MiB runs completed every library test with no overflow. Their timing failures are disjoint, so every test completed at 2 MiB at least once, and all five also pass alone. Record the result on that basis, with the command's exit 101 disclosed.
+- No open Batch S findings.
+
+## Phase 05 (implement-opus-reviewed-2.1)
+
+### 05-R001 — 2026-10-18 architecture gate of 05-D1 — CHANGES REQUIRED
+**No PASS** for `logs/05/decision-D1.md` SHA-256 `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` (investigation `484af70e…975e`; both confirmed). The user's answers relayed by root are applied: Q1 a list of 1–16 with first valid wins; Q2 a timeout over the `error` route; Q6 no external reviewers in phase 05; Q8 wiring in phase 08.
+
+[Round note](agent-review-notes.md#05-r001--phase-05-architecture-gate-05-d1--changes-required).
+- Medium:
+  - [05-F001](agent-review-findings.md#05-f001--the-error-route-carries-no-failure-code-so-a-timeout-is-indistinguishable-in-graph): the error route commits `null` and no binding root carries a code. A timeout is therefore indistinguishable in-graph from invalid input and from `reviewer_unavailable`, and D1's plan-07 `data.map` claim is wrong.
+  - [05-F002](agent-review-findings.md#05-f002--q6-removes-external-reviewers-d1-must-drop-the-credential-design-and-re-home-what-depends-on-it): drop the whole credential/external design without seams. Re-home its dependents (REPLACEMENT-MAP:72 "scoped single-use link", the phase 08 legacy-approval removal gate, the plan and EXPANSION text).
+  - [05-F003](agent-review-findings.md#05-f003--notice-transport-must-be-re-decided-without-credentials-and-the-notice-audit-collides-per-execution): re-decide notice transport for members only; prefer standalone `notification` deliveries enqueued in the park transaction. Also, the `decision_notice_failed` per-execution audit collides on the unique index once two reviewers' notices fail.
+- Low:
+  - [05-F004](agent-review-findings.md#05-f004--member-decision-commands-take-the-company-row-for-no-key-update): use `companies FOR SHARE` for member commands.
+  - [05-F005](agent-review-findings.md#05-f005--run-scoped-event-inbox-inexact-128-bound-and-unstated-late-event-semantics): the event bound is inexact under concurrency, and the late-event semantics are unstated.
+  - [05-F006](agent-review-findings.md#05-f006--05b-is-direction-level-require-a-05b-decision-addendum-before-05b-code): a 05B decision addendum (risks I§5.1–5.3, approver eligibility) before 05B code.
+  - [05-F007](agent-review-findings.md#05-f007--clarifications-to-carry-into-the-revision): clarifications.
+- Accepted:
+  - the two-batch split;
+  - the wait row as lifecycle owner, and the decision and comment model;
+  - settlement and continuation atomic through `batch_commit::complete(Parked)`;
+  - the lock order, which is consistent with controls and the dispatch prelock;
+  - the race table and competing-claimant tests;
+  - the bounds signals;
+  - the verification plan;
+  - the questions: Q5 (params are admin binding snapshots; the check must be recursive), Q7 (05B), and Q4 as direction (eligibility decided in the 05B addendum).
+- Next: A issues D2 resolving F001–F007; B rechecks by ID.
+
+### 05-R002 — 2026-10-18 correction recheck of 05-D2 (over D1) — CHANGES REQUIRED
+**No PASS** for `logs/05/decision-D2.md` SHA-256 `831890270a87273b2cbbccf580a942c4582841cc2c4430b15d542d95754815b3` over D1 `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` (both confirmed). This includes the user's decision of 2026-10-18 to drop email-link approvals with the legacy code, which is carried in D2 §2 and §15.
+
+[Round note](agent-review-notes.md#05-r002--correction-recheck-of-the-phase-05-gate-05-d2-over-d1--changes-required); [dispositions](agent-review-findings.md#05-r002-dispositions-for-05-f001-to-05-f007).
+- Resolved: 05-F001, F002, F003, F004, F005 and F007.
+- 05-F006 is addressed by the §16 addendum. §16.1, §16.3 and §16.4 are accepted.
+- Widened and accepted: notices on the delivery engine in the 05A park transaction; the non-routed `ReviewerUnavailable` settle variant; the producer-only advisory event bound.
+- Open:
+  - [05-F008](agent-review-findings.md#05-f008--the-approval-reopen-reuses-the-parked-attempt-number-and-is-unguarded) **medium**: §16.2 keeps `retry_count` unchanged across the approval park and reopen. The next claim therefore reuses the parked attempt's number, which `UNIQUE (task_id, attempt_number)` refuses. The park precondition is vacuous, and the new completed→pending transition has no database guard.
+  - [05-F009](agent-review-findings.md#05-f009--notice_delivery_id-needs-uniqueness-insert-only-writing-and-a-provenance-binding) **low**: the id-only FK is acceptable, since standalone deliveries are tenant-less. It still needs `UNIQUE`, insert-only writing (`NOT NULL`, or SET NULL only) and an idempotency-key provenance check, with a DB test.
+- Next: A fixes 05-F008 and 05-F009 in a narrow delta; B rechecks by ID.
+
+### 05-R003 — 2026-10-18 correction recheck of 05-D3 (over D1+D2) — CHANGES REQUIRED
+**No PASS** for `logs/05/decision-D3.md` SHA-256 `bd937b8630e48e6c7e2bf0bfeb223cd879004e4c3cfb898bb302b0d432af0b69` over D2 `831890270a87273b2cbbccf580a942c4582841cc2c4430b15d542d95754815b3` and D1 `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` (all three confirmed). The user's decision of 2026-10-18 to allow self-approval is recorded in D3 §1, with no rule change and an added test.
+
+[Round note](agent-review-notes.md#05-r003--correction-recheck-of-the-phase-05-gate-05-d3-over-d1d2--changes-required); [dispositions](agent-review-findings.md#05-r003-dispositions-for-05-f008-and-05-f009).
+- 05-F008 resolved. The parked attempt is consumed at reopen, and the park requires `k+1 < max_retries`. A deferred completed→pending guard keyed on `submitted_xact = pg_current_xact_id()` allows at most one reopen per approval.
+- 05-F009 resolved for integrity: UNIQUE, NOT NULL/NO ACTION, insert-only, a provenance trigger, and a rejection test.
+- Widened and accepted: `submitted_xact` with the reopen branch; a composer `BadRequest` settling unrouted as `decision.reviewer_unavailable`; the 16-delivery lease-budget coverage.
+- Open: [05-F010](agent-review-findings.md#05-f010--the-notice-key-is-not-proven-unhashed-so-a-long-member-address-loops-the-park) **low**. No member-address bound exists, so a key can be hashed once the address exceeds 391 bytes. The provenance trigger's 23514 then makes the park retry until the run deadline. Fix: a pre-write key check that settles as `reviewer_unavailable`, or bound `users.email`.
+- Next: A fixes 05-F010 (small delta); B rechecks by ID.
+
+### 05-R004 — 2026-10-18 recheck of 05-D4 (over D1+D2+D3) — PASS
+**PASS** for the effective phase 05 decision: D1 `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` + D2 `831890270a87273b2cbbccf580a942c4582841cc2c4430b15d542d95754815b3` + D3 `bd937b8630e48e6c7e2bf0bfeb223cd879004e4c3cfb898bb302b0d432af0b69` + D4 `e8ed88c46e1420e3ededa3da33b282a8e6c9cefc9495e3146a420ed77fe1fc86` (all four confirmed).
+
+[Round note](agent-review-notes.md#05-r004--recheck-of-the-phase-05-gate-05-d4-over-d1d2d3--pass); [disposition](agent-review-findings.md#05-r004-disposition-for-05-f010).
+- 05-F010 resolved by option (a): a pre-write unhashed-prefix check settles `decision.reviewer_unavailable` unrouted with no retry. The 05B twin fails Terminal `approval_required` with no park.
+- No phase 05 gate findings remain open (05-F001 to F010 resolved).
+- 05B code proceeds under the accepted §16 addendum; implementation deviations return to B first.
+- Deferred, outside phase 05: the phase 07 timeout-code mapping, the phase 08 routes and wiring, and member-address bounding.
+
+
+### 05-R005 — 2026-10-18 whole 05A batch — CHANGES REQUIRED
+Artifact `e2a59ac010a2b8c819f88a490729a21d97e9dde868ec4a8681ae54277a3e053a`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshot matches. Workflow `implement-astra-reviewed-2.1`, independent Reviewer B.
+
+[Round note](agent-review-notes.md#05-r005--whole-05a-batch--changes-required). Open findings: 05-F011 (medium: actual membership/visibility revocation and authorization acceptance tests), 05-F012 (low: cross-run concurrent event-id reuse yields Database instead of Conflict), 05-F013 (low: outstanding explicit provenance/composite-FK and boundary cases). See [findings](agent-review-findings.md).
+
+The `/params` fixture adjustment conforms to static reviewer assignment; phase07 child parameter propagation and timeout-code obligations remain. Broader gates were incomplete with failures reported by root; no batch acceptance. Author fixes all findings and gate failures before one correction recheck.
+
+
+### 05-R006 — D5 correction architecture gate — CHANGES REQUIRED
+Decision D5 `ec061ebe8a01fedf18b18258337c09dcbd1567394d59d13226374eef8c9a1cdb` (2026-10-18). [Note](agent-review-notes.md#05-r006--d5-correction-architecture-gate--changes-required); open 05-F014 low: account for actual remove_member conversion to external/NULL user before membership deletion and exercise that port in lifecycle/race tests. Local snapshots and runtime disclosure rejection are otherwise accepted direction. No dependent schema approval until the narrow decision correction passes; 05-F011–013 remain open for implementation recheck.
+
+
+### 05-R007 — D5+D6 architecture correction recheck — PASS
+**PASS** for D5 `ec061ebe8a01fedf18b18258337c09dcbd1567394d59d13226374eef8c9a1cdb` + D6 `93aabee933500c4d2f9a02535901be92768f31ff47a2b19493525652d1f54c80` over D1–D4. [Note](agent-review-notes.md#05-r007--d5d6-architecture-correction-recheck--pass); [F014 disposition](agent-review-findings.md#05-r007-disposition-for-05-f014). Actual production conversion, raw deletion, snapshot history and bounded contention are now specified distinctly. Dependent implementation may proceed. 05-F011–013 and corrected 05A artifact/gates still require recheck; this is not batch acceptance.
+
+
+### 05-R008 — Corrected 05A consolidated recheck — CODE PASS; broader gates pending
+**CODE PASS** for exact artifact `2a428cd707ec4427ddb31ca9ea60d875ba829c1bb0c4c743ab7f38929d99bef3`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshots match. [Note](agent-review-notes.md#05-r008--corrected-05a-consolidated-recheck--code-pass); [F011–F013 resolutions](agent-review-findings.md#05-r008-dispositions--05-f011-05-f012-and-05-f013-resolved).
+
+D5+D6 snapshot/history and runtime disclosure amendments implemented and reviewed. Focused correction evidence: 44/0, strict Clippy passes. No open review findings. Root must still complete correction static/schema/SQLx/workflow/delivery/graph gates and reconfirm the artifact before accepting 05A. Earlier broad failures are not waived; final phase05 full/stack/lease gates remain after 05B.
+
+
+### 05-R009 — D7 one-entry approval architecture gate — PASS
+**PASS** for immutable decision D7 SHA-256 `d980ffa58aea5eb8f58b7627e2ba4b68506a8912b47f6dc2db72ec30a13ebcf9` over D1–D6. [Note](agent-review-notes.md#05-r009--d7-one-entry-approval-architecture-gate--pass). Actual marker reuse and deferred entry callers confirm the not-applied-proof alternative bypasses the old replay predicate; D7 closes it while preserving current authorization, receipt replay and truthful reconciliation. Dependent correction may proceed. No new finding; source WIP, 05B batch acceptance and final verification remain outstanding.
+
+
+### 05-R010 — Whole 05B batch — CHANGES REQUIRED
+Artifact `b42023ba2177a20937e6aa0c14b4abf6dc6e41fcbcf2a89a6fa711370f6fd630`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshot matches. [Note](agent-review-notes.md#05-r010--whole-05b-batch--changes-required). One open finding: [05-F015](agent-review-findings.md#05-f015--05b-omits-explicit-accepted-reopen-guard-and-notice-failure-cases), low, missing explicit D3 stale/reject/accounting reopen tests and D4 unprovable-notice approval twin. No implementation bypass identified. Batch gate evidence passes; final phase05 full/stock gates remain pending. Complete focused corrections before one recheck; 05B is not yet accepted.
+
+
+### 05-R011 — 05B F015 correction recheck — PASS
+**PASS** for `ac6e12f99bf53762a9056a6fcea62ac4a90513d4315dc47e5e3b087d21d4a84a`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`. [Note](agent-review-notes.md#05-r011--05b-f015-consolidated-correction-recheck--pass); [F015 resolution](agent-review-findings.md#05-r011-disposition--05-f015-resolved). Test-only correction supplies all requested reopen variants with positive control and exact guard evidence, plus unprovable-notice approval refusal. Focused19/0 and static/SQLx gates pass; prior broad production evidence reused. No open review findings. Root snapshot confirmation precedes batch acceptance; final phase05 full/stock checks remain pending.
+
+
+### 05-R012 — Final phase05 delta and combined integration evidence — PASS
+**PASS** for `59fde0cfbc2a70abdd01614b15dedc6d5929c4e40aeec74d66fb41120983edba`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshots match. [Round note](agent-review-notes.md#05-r012--final-phase05-delta-and-combined-integration-evidence--pass).
+
+The final test fixture preserves every timing/resource bound and strengthens the genuine lease-first negative control to require its specific causal rejection. Prior accepted production/integration review remains applicable. Corrected full all-target suite at 2 MiB: 2727 library + 5 binary passed, zero failed, 22 existing ignored; focused deadline2/0; lease118/0, maximum measured code-work35.7% against50%. Static/offline/Clippy/SQLx/graph gates pass; unchanged-schema migration/equality and transport/credential/deploy evidence reused. Earlier failed evidence remains recorded. No open findings. Root may accept phase05 after snapshot confirmation; deferred phase07/08 work remains outside acceptance, with no commits, deployment or phase06+ authorized.

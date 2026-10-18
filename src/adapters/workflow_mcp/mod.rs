@@ -54,12 +54,12 @@ impl McpRuntime {
         // Bound the provider/SQL composition at the external seam.
         Box::pin(self.inner.call_tool(fence, call, cancel)).await
     }
-    /// The step's completed result; MCP steps never suspend.
+    /// Returns the durable result or protected-action suspension.
     pub async fn run(
         &self,
         kind: &WorkflowStepKind,
         claim: &ClaimedWorkflow,
-    ) -> crate::application::workflow::lease::WorkflowHandlerResult {
+    ) -> crate::application::workflow::lease::WorkflowHandlerOutcome {
         Box::pin(self.inner.run(kind, claim)).await
     }
 }

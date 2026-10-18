@@ -404,3 +404,41 @@ fn exact_binding_and_pointer_limits() {
         Err(ContextError::Limit("output bytes"))
     ));
 }
+
+#[test]
+fn binding_reference_walk_covers_every_recursive_variant() {
+    let input = ContextReference::parse("/input/reviewer").unwrap();
+    let params = ContextReference::parse("/params/reviewer").unwrap();
+    let leaf = || Binding::Reference(input.clone());
+    let variants = vec![
+        leaf(),
+        Binding::Object(BTreeMap::from([("nested".into(), leaf())])),
+        Binding::Array(vec![leaf()]),
+        Binding::Default {
+            reference: params.clone(),
+            fallback: Box::new(leaf()),
+        },
+        Binding::Concat(vec![leaf()]),
+        Binding::Compare {
+            op: Comparison::Eq,
+            left: Box::new(Binding::Literal(json!(0))),
+            right: Box::new(leaf()),
+        },
+        Binding::In {
+            value: Box::new(Binding::Literal(json!(0))),
+            items: Box::new(leaf()),
+        },
+        Binding::Exists(input.clone()),
+        Binding::And(vec![leaf()]),
+        Binding::Or(vec![leaf()]),
+        Binding::Not(Box::new(leaf())),
+    ];
+    for binding in variants {
+        assert!(binding.references().contains(&&input));
+    }
+    assert!(
+        Binding::Literal(json!({"ref":"/input/reviewer"}))
+            .references()
+            .is_empty()
+    );
+}

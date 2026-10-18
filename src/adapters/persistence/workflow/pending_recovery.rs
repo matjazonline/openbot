@@ -9,6 +9,9 @@ pub(super) enum PendingFailure {
     ActivationLimit,
     AttemptsExhausted,
     RootBudgetExhausted,
+    /// A listed decision reviewer cannot be assigned or given a provable notice. Never routed:
+    /// a configuration failure is not presented as a business timeout (05-D2 §7.1, 05-D4 §2).
+    ReviewerUnavailable,
 }
 impl PendingFailure {
     fn code(self) -> &'static str {
@@ -18,6 +21,7 @@ impl PendingFailure {
             Self::ActivationLimit => "workflow.activation_limit",
             Self::AttemptsExhausted => "workflow.attempts_exhausted",
             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
+            Self::ReviewerUnavailable => "decision.reviewer_unavailable",
         }
     }
 }
@@ -140,7 +144,13 @@ async fn unknown_effect(db: &mut PgConnection, scope: ActivationRequest) -> AppR
     let kind = definition.step_type.as_str();
     Ok(!matches!(
         kind,
-        "data.map" | "decision.rule" | "context.load" | "memory.load" | "wait.event" | "wait.timer"
+        "data.map"
+            | "decision.rule"
+            | "decision.human"
+            | "context.load"
+            | "memory.load"
+            | "wait.event"
+            | "wait.timer"
     ) && !crate::application::workflow::actions::marker_owned_effect_kind(kind))
 }
 

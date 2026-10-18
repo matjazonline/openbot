@@ -69,7 +69,7 @@ fn notes(name: &str) -> &'static str {
             "Execution unavailable. Ordered pure rule with required default; all choices must be explicit routes. Data follows data_schema."
         }
         "decision.human" => {
-            "Execution unavailable. Durable review deadline required; never automatically accepts. Reviewer is a user/group selector; optional feedback requirements name declared choices."
+            "Execution unavailable. Durable review deadline required; never automatically accepts. Reviewers are an explicit static list of company users; first valid authorized submission wins. Timeout fails Terminal decision.timed_out through the declared error route; optional feedback requirements name declared choices."
         }
         "decision.agent" => {
             "Execution unavailable. Model can select only declared eligible choices; data follows data_schema."
@@ -93,7 +93,7 @@ fn notes(name: &str) -> &'static str {
             "Execution unavailable. Sequential pinned child, inherited budgets; 1..10000 rounds. Next-round mapping, exit predicate and exhaustion control belong to phase07."
         }
         "wait.event" | "wait.timer" => {
-            "Execution unavailable. RFC3339 deadline required; future-relative validation needs runtime clock. Durable suspension, no sleeping worker. Event consumption must be scoped and atomic."
+            "Execution unavailable. RFC3339 deadline required; future-relative validation needs runtime clock. Durable suspension, no sleeping worker. Events are run-scoped by literal name and correlation, consumed once and atomically; repeated waits must carry the iteration in the correlation."
         }
         _ => unreachable!("registered help"),
     }

@@ -59,6 +59,7 @@ pub struct PostgresActionDispatch<A, L> {
     pub(super) persistence: PostgresPersistence,
     pub(super) authority: A,
     local: L,
+    pub(super) decision_notices: Option<crate::application::workflow::decisions::DecisionNotices>,
 }
 impl<A, L> PostgresActionDispatch<A, L> {
     pub fn new(persistence: PostgresPersistence, authority: A, local: L) -> Self {
@@ -66,7 +67,15 @@ impl<A, L> PostgresActionDispatch<A, L> {
             persistence,
             authority,
             local,
+            decision_notices: None,
         }
+    }
+    pub fn with_decision_notices(
+        mut self,
+        notices: crate::application::workflow::decisions::DecisionNotices,
+    ) -> Self {
+        self.decision_notices = Some(notices);
+        self
     }
 }
 
@@ -137,11 +146,23 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         if intent.is_none() {
             return Err(missing());
         }
-        let policy = json!({"tool":current.policy.tool,"approval_required":current.policy.approval_required});
+        let mut policy = json!({"tool":current.policy.tool,"approval_required":current.policy.approval_required});
+        let approved = decisions::approvals::approved(
+            tx,
+            request.fence.scope,
+            &request.subject,
+            authority.action.operation_digest().as_str(),
+        )
+        .await?;
+        if let Some(id) = approved {
+            policy["approval_required"] = json!(true);
+            policy["approval_decision"] = json!(id);
+        }
         Ok(AuthorizedAction {
             action: authority.action,
             current_policy: policy,
-            approval_required: decision == ActionAccessDecision::ApprovalRequired,
+            approval_required: decision == ActionAccessDecision::ApprovalRequired
+                && approved.is_none(),
         })
     }
 
@@ -194,7 +215,12 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> ActionDispatch for PostgresAction
             let mut tx = bound.begin(&mut conn).await?;
             let dispatched: AppResult<End<_>> = async {
                 let AuthorizedAction { action, current_policy: policy, approval_required: protected } = self.authorize_on(&mut tx, request, bound.server_timeout()).await?;
-                if protected { return Ok(End::Rollback(LocalDispatchResult::ApprovalRequired)); }
+                if protected {
+                    return Ok(match decisions::approvals::park(&mut tx, request, &action, self.decision_notices.as_ref()).await? {
+                        Some(wait) => End::Commit(LocalDispatchResult::ApprovalParked(wait)),
+                        None => End::Rollback(LocalDispatchResult::ApprovalRequired),
+                    });
+                }
                 if action_uncertainty::conflicted_on(&mut tx, request.scope()).await? { return Err(conflict()); }
                 if Self::existing(&mut tx, request).await? {
                     let saved: Option<Value> = saved_receipt(&mut tx, request).await?;
@@ -230,17 +256,22 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> ActionDispatch for PostgresAction
                         let saved = async {
                             lease::lock_scope(&mut tx, request.fence.scope, bound.server_timeout())
                                 .await?;
-                            saved_receipt(&mut tx, request).await
+                            if let Some(wait) =
+                                decisions::approvals::parked(&mut tx, request).await?
+                            {
+                                return Ok(Some(LocalDispatchResult::ApprovalParked(wait)));
+                            }
+                            Ok(saved_receipt(&mut tx, request).await?.map(|result| {
+                                LocalDispatchResult::Committed(ActionReceipt {
+                                    subject: request.subject.clone(),
+                                    result,
+                                })
+                            }))
                         }
                         .await;
                         let saved = bound.roll_back(tx, saved).await?;
                         // Stored only after validate_action_result, so it is already canonical.
-                        Ok(saved.map_or(Evidence::NotApplied, |result| {
-                            Evidence::Applied(LocalDispatchResult::Committed(ActionReceipt {
-                                subject: request.subject.clone(),
-                                result,
-                            }))
-                        }))
+                        Ok(saved.map_or(Evidence::NotApplied, Evidence::Applied))
                     }))
                     .await
             }
@@ -318,7 +349,10 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         let resolution = self.reserved_on(bound, request, entry, marker);
         match bound.resolve_retryable(Box::pin(resolution)).await? {
             None => Err(bound.not_applied()),
-            Some(fresh) => match stashed.zip(fresh).and_then(adopt) {
+            Some(ReservationEvidence::Approval(wait)) => {
+                Ok(RemoteReservationResult::ApprovalParked(wait))
+            }
+            Some(ReservationEvidence::Entry(fresh)) => match stashed.zip(fresh).and_then(adopt) {
                 Some(reservation) => {
                     bound.adopted();
                     Ok(RemoteReservationResult::Reserved(Box::new(reservation)))
@@ -338,13 +372,16 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         request: &ActionDispatchRequest,
         entry: Uuid,
         marker: Option<Uuid>,
-    ) -> AppResult<Evidence<Option<LeaseWindow>>> {
+    ) -> AppResult<Evidence<ReservationEvidence>> {
         let observed = Instant::now();
         let mut conn = bound.acquire(self.persistence.pool()).await?;
         let mut tx = bound.begin(&mut conn).await?;
         let evidence = async {
             let fenced =
                 lease::lock_fence(&mut tx, request.fence, bound.server_timeout()).await?;
+            if let Some(wait) = decisions::approvals::parked(&mut tx, request).await? {
+                return Ok(Evidence::Applied(ReservationEvidence::Approval(wait)));
+            }
             let owner: Option<EntryOwner> = sqlx::query_as(
                 "SELECT dispatch_id, invocation_id, job_id, attempt_number, execution_generation, worker_id \
                  FROM workflow_action_remote_entries WHERE company_id=$1 AND id=$2",
@@ -356,9 +393,9 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
             Ok(match owner {
                 None => Evidence::NotApplied,
                 Some(owner) if fenced && owner.is(request, marker) => {
-                    Evidence::Applied(lease::live_window(&mut tx, request.fence, observed).await?)
+                    Evidence::Applied(ReservationEvidence::Entry(lease::live_window(&mut tx, request.fence, observed).await?))
                 }
-                Some(_) => Evidence::Applied(None),
+                Some(_) => Evidence::Applied(ReservationEvidence::Entry(None)),
             })
         }
         .await;
@@ -367,13 +404,101 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
 }
 
 /// How a reservation attempt ended its transaction, before the result is built from it.
+enum ReservationEvidence {
+    Approval(crate::domain::workflow::WaitId),
+    Entry(Option<LeaseWindow>),
+}
+
 enum Reserving {
+    Approval(crate::domain::workflow::WaitId),
     /// A receipt already exists: rolled back, then checked against the window read before.
     Receipt(ActionReceipt, LeaseWindow),
     /// Rolled back with nothing written.
     Refused(RemoteReservationResult),
     /// COMMIT sent: the reservation waits in `pending`.
     Reserved,
+}
+
+impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
+    async fn reserve_action(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        contract: Option<&ProviderReplayContract>,
+        bound: &WriteBound,
+        entry: Uuid,
+        pending: &PendingReservation,
+    ) -> AppResult<End<Reserving>> {
+        let AuthorizedAction {
+            action,
+            current_policy: mut policy,
+            approval_required: protected,
+        } = self
+            .authorize_on(tx, request, bound.server_timeout())
+            .await?;
+        if protected {
+            return Ok(
+                match decisions::approvals::park(
+                    tx,
+                    request,
+                    &action,
+                    self.decision_notices.as_ref(),
+                )
+                .await?
+                {
+                    Some(wait) => End::Commit(Reserving::Approval(wait)),
+                    None => End::Rollback(Reserving::Refused(
+                        RemoteReservationResult::ApprovalRequired,
+                    )),
+                },
+            );
+        }
+        if action_uncertainty::conflicted_on(tx, request.scope()).await? {
+            return Err(conflict());
+        }
+        if let Some(receipt) = self.receipt_on(tx, request, &action).await? {
+            let window = lease::live_window(tx, request.fence, bound.started())
+                .await?
+                .ok_or_else(conflict)?;
+            // This branch wrote nothing: ROLLBACK, so a stall cannot leave it
+            // ambiguous (and fail closed for no reason).
+            return Ok(End::Rollback(Reserving::Receipt(receipt, window)));
+        }
+        if decisions::approvals::consumed(tx, request).await? {
+            return Ok(End::Rollback(Reserving::Refused(
+                RemoteReservationResult::ApprovalRequired,
+            )));
+        }
+        let window = lease::live_window(tx, request.fence, bound.started())
+            .await?
+            .ok_or_else(conflict)?;
+        let provider = self.provider_on(tx, request, &action, contract).await?;
+        policy["provider_replay"] = provider.proof()?;
+        let Some(marker) = self
+            .marker_on(tx, request, &action, policy, &provider)
+            .await?
+        else {
+            return Ok(End::Rollback(Reserving::Refused(
+                RemoteReservationResult::PossibleDispatchExists,
+            )));
+        };
+        if !Self::reserve_entry_on(tx, request, marker, entry).await? {
+            return Ok(End::Rollback(Reserving::Refused(
+                RemoteReservationResult::PossibleDispatchExists,
+            )));
+        }
+        // Held before COMMIT is sent, so an ambiguous acknowledgement can still hand
+        // back this same reservation once the resolution proves it committed.
+        *pending.lock().map_err(|_| conflict())? = Some(RemoteReservation {
+            marker,
+            entry,
+            action,
+            request: request.clone(),
+            window,
+            provider,
+        });
+        Ok(End::Commit(Reserving::Reserved))
+    }
 }
 
 #[async_trait]
@@ -390,65 +515,12 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> RemoteDispatch for PostgresAction
         let bound = WriteBound::start("action.reserve_remote", request.lease);
         let attempt = bound
             .attempt(Box::pin(async {
-                let started = bound.started();
                 let mut conn = bound.acquire(self.persistence.pool()).await?;
                 let mut tx = bound.begin(&mut conn).await?;
-                let reserving = async {
-                    let AuthorizedAction {
-                        action,
-                        current_policy: mut policy,
-                        approval_required: protected,
-                    } = self
-                        .authorize_on(&mut tx, request, bound.server_timeout())
-                        .await?;
-                    if protected {
-                        return Ok(End::Rollback(Reserving::Refused(
-                            RemoteReservationResult::ApprovalRequired,
-                        )));
-                    }
-                    if action_uncertainty::conflicted_on(&mut tx, request.scope()).await? {
-                        return Err(conflict());
-                    }
-                    if let Some(receipt) = self.receipt_on(&mut tx, request, &action).await? {
-                        let window = lease::live_window(&mut tx, request.fence, started)
-                            .await?
-                            .ok_or_else(conflict)?;
-                        // This branch wrote nothing: ROLLBACK, so a stall cannot leave it
-                        // ambiguous (and fail closed for no reason).
-                        return Ok(End::Rollback(Reserving::Receipt(receipt, window)));
-                    }
-                    let window = lease::live_window(&mut tx, request.fence, started)
-                        .await?
-                        .ok_or_else(conflict)?;
-                    let provider = self
-                        .provider_on(&mut tx, request, &action, contract)
-                        .await?;
-                    policy["provider_replay"] = provider.proof()?;
-                    let Some(marker) = self
-                        .marker_on(&mut tx, request, &action, policy, &provider)
-                        .await?
-                    else {
-                        return Ok(End::Rollback(Reserving::Refused(
-                            RemoteReservationResult::PossibleDispatchExists,
-                        )));
-                    };
-                    if !Self::reserve_entry_on(&mut tx, request, marker, entry).await? {
-                        return Ok(End::Rollback(Reserving::Refused(
-                            RemoteReservationResult::PossibleDispatchExists,
-                        )));
-                    }
-                    // Held before COMMIT is sent, so an ambiguous acknowledgement can still hand
-                    // back this same reservation once the resolution proves it committed.
-                    *pending.lock().map_err(|_| conflict())? = Some(RemoteReservation {
-                        marker,
-                        entry,
-                        action,
-                        request: request.clone(),
-                        window,
-                        provider,
-                    });
-                    Ok(End::Commit(Reserving::Reserved))
-                }
+                // Box the SQL phase so approval composition does not enlarge the supervisor frame.
+                let reserving = Box::pin(
+                    self.reserve_action(&mut tx, request, contract, &bound, entry, &pending),
+                )
                 .await;
                 match bound.end(tx, reserving).await? {
                     Reserving::Receipt(receipt, window) => {
@@ -458,6 +530,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> RemoteDispatch for PostgresAction
                         Ok(RemoteReservationResult::Committed(receipt))
                     }
                     Reserving::Refused(result) => Ok(result),
+                    Reserving::Approval(wait) => Ok(RemoteReservationResult::ApprovalParked(wait)),
                     // Unreachable when empty: only the resolution also takes it, and it runs
                     // only when this COMMIT's outcome is ambiguous.
                     Reserving::Reserved => {

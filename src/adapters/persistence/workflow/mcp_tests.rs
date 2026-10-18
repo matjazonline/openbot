@@ -47,6 +47,7 @@ async fn workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs() {
         let worker = WorkflowWorker {
             port: p,
             handler: &runtime,
+            notices: None,
             worker: WorkflowWorkerId(Uuid::new_v4()),
             lease: lease(),
             poll: PollPolicy::new(Duration::from_millis(50), 16).unwrap(),
@@ -131,7 +132,7 @@ async fn workflow_mcp_competitors_restart_and_direct_tool_share_one_call() {
     let runtime = setup.runtime();
     let step = kind();
     let (a, b) = tokio::join!(runtime.run(&step, &claim), runtime.run(&step, &claim));
-    assert!(a.is_ok() || b.is_ok());
+    assert!(a.completed_result().is_ok() || b.completed_result().is_ok());
     assert_eq!(
         setup.server.calls(),
         1,
@@ -145,7 +146,11 @@ async fn workflow_mcp_competitors_restart_and_direct_tool_share_one_call() {
         Arc::new(HttpMcpClient::new(EndpointPolicy::default())),
         lease(),
     );
-    let saved = restarted.run(&kind(), &claim).await.unwrap();
+    let saved = restarted
+        .run(&kind(), &claim)
+        .await
+        .completed_result()
+        .unwrap();
     assert_eq!(saved["structuredContent"]["name"], "Ada");
     // The same logical invocation through the direct agent tool path shares the receipt.
     let RemoteDispatchObservation::Committed(direct) = restarted
@@ -199,7 +204,11 @@ async fn workflow_mcp_tool_error_commits_receipt_and_takes_final_error() {
     let p = &setup.fixture.persistence;
     let claim = claimed(&setup).await;
     let runtime = setup.runtime();
-    let failure = runtime.run(&kind(), &claim).await.unwrap_err();
+    let failure = runtime
+        .run(&kind(), &claim)
+        .await
+        .completed_result()
+        .unwrap_err();
     assert_eq!(code(&failure), "mcp.tool_error");
     assert_eq!(action_counts(p).await, counts(1, 1, 1));
     let receipt: Value = sqlx::query_scalar("SELECT result FROM workflow_action_receipts")
@@ -233,7 +242,12 @@ async fn workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted(
         let setup = Box::pin(mcp_setup(call)).await;
         let p = &setup.fixture.persistence;
         let claim = claimed(&setup).await;
-        let result = setup.runtime().run(&kind(), &claim).await.unwrap();
+        let result = setup
+            .runtime()
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap();
         match call {
             Call::Link => {
                 assert_eq!(result["content"][0]["type"], "resource_link");
@@ -265,11 +279,21 @@ async fn workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_
         let p = &setup.fixture.persistence;
         let claim = claimed(&setup).await;
         let runtime = setup.runtime();
-        let failure = runtime.run(&kind(), &claim).await.unwrap_err();
+        let failure = runtime
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
         assert_eq!(code(&failure), "mcp.unresolved", "{call:?}");
         assert_eq!(action_counts(p).await, counts(1, 1, 0));
         let seen = setup.server.log().len();
-        assert!(runtime.run(&kind(), &claim).await.is_err());
+        assert!(
+            runtime
+                .run(&kind(), &claim)
+                .await
+                .completed_result()
+                .is_err()
+        );
         assert_eq!(
             setup.server.log().len(),
             seen,
@@ -298,7 +322,12 @@ async fn workflow_mcp_drift_and_missing_tool_fail_before_any_marker() {
         let p = &setup.fixture.persistence;
         setup.server.set_tools(tools);
         let claim = claimed(&setup).await;
-        let failure = setup.runtime().run(&kind(), &claim).await.unwrap_err();
+        let failure = setup
+            .runtime()
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
         assert_eq!(code(&failure), "mcp.contract_changed");
         assert_eq!(setup.server.calls(), 0);
         assert_eq!(setup.server.count("POST tools/list"), 1);
@@ -324,7 +353,12 @@ async fn workflow_mcp_unavailable_before_marker_retries_and_dispatches_once() {
     setup.server.fail_initialize(true);
     let scope = admitted(&setup, "mcp-unavailable").await;
     let first = claim(p, scope).await;
-    let failure = setup.runtime().run(&kind(), &first).await.unwrap_err();
+    let failure = setup
+        .runtime()
+        .run(&kind(), &first)
+        .await
+        .completed_result()
+        .unwrap_err();
     assert_eq!(code(&failure), "mcp.unavailable");
     assert_eq!(action_counts(p).await, counts(0, 0, 0));
     assert_eq!(
@@ -333,7 +367,14 @@ async fn workflow_mcp_unavailable_before_marker_retries_and_dispatches_once() {
     );
     setup.server.fail_initialize(false);
     let second = reclaim(p, scope).await;
-    assert!(setup.runtime().run(&kind(), &second).await.is_ok());
+    assert!(
+        setup
+            .runtime()
+            .run(&kind(), &second)
+            .await
+            .completed_result()
+            .is_ok()
+    );
     assert_eq!(setup.server.calls(), 1);
     assert_eq!(action_counts(p).await, counts(1, 1, 1));
 }
@@ -422,7 +463,11 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
         } else {
             assert!(direct.is_err(), "{change}");
         }
-        let failure = runtime.run(&kind(), &claim).await.unwrap_err();
+        let failure = runtime
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
         let expected = if change == "approval" {
             "mcp.approval_required"
         } else {
@@ -443,3 +488,6 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
 mod catalog_tests;
 #[path = "mcp_recovery_tests.rs"]
 mod recovery_tests;
+
+#[path = "action_approval_mcp_tests.rs"]
+mod approval_tests;

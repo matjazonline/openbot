@@ -348,6 +348,7 @@ impl PostgresPersistence {
             request,
             &policy_on(&mut tx, company, id, &request.contract).await?,
         )? != ActionAccessDecision::CurrentAccessConfirmed
+            && !decisions::approvals::approved_request(&mut tx, request).await?
         {
             return Err(missing());
         }

@@ -90,6 +90,7 @@ fn outcome(result: AppResult<RemoteDispatchObservation>) -> AppResult<&'static s
     result.map(|observation| match observation {
         RemoteDispatchObservation::Interrupted => "interrupted",
         RemoteDispatchObservation::Committed(_) => "committed",
+        RemoteDispatchObservation::ApprovalParked(_) => "ApprovalParked",
         RemoteDispatchObservation::ApprovalRequired => "approval_required",
         RemoteDispatchObservation::PossibleDispatchExists => "possible_dispatch_exists",
     })

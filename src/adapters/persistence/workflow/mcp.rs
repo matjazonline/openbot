@@ -322,12 +322,13 @@ impl McpActionUse for PostgresPersistence {
         if (connection.auth == McpAuth::Bearer) != token.is_some() {
             return Err(missing());
         }
+        let approved = decisions::approvals::approved_request(&mut tx, request).await?;
         tx.commit().await?;
         Ok(McpUse {
             endpoint: connection.endpoint,
             token,
             credential_revision: connection.credential_revision,
-            approval_required: decision == ActionAccessDecision::ApprovalRequired,
+            approval_required: decision == ActionAccessDecision::ApprovalRequired && !approved,
         })
     }
 }

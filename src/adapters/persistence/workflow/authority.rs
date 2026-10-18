@@ -1,5 +1,41 @@
 use super::*;
 
+/// A company member's current authority over decision commands (05-D2 §8, §9.1). The company
+/// row is taken `FOR SHARE`, not `FOR NO KEY UPDATE` as controls do, so decision commands never
+/// serialize with one another, yet still block owner and role changes until they commit.
+pub(super) struct ReviewerAuthority {
+    pub principal: Uuid,
+    /// Owner or admin: required for a channel-less run.
+    pub privileged: bool,
+}
+pub(super) async fn authorize_reviewer_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+) -> AppResult<ReviewerAuthority> {
+    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR SHARE")
+        .bind(company.as_uuid())
+        .fetch_optional(&mut *db)
+        .await?
+        .ok_or_else(missing)?;
+    let (principal, role): (Uuid, String) = sqlx::query_as(
+        "SELECT principal.id, member.role FROM company_members AS member \
+         JOIN principals AS principal ON principal.company_id = member.company_id \
+           AND principal.user_id = member.user_id AND principal.kind = 'person' \
+         WHERE member.company_id = $1 AND member.user_id = $2 \
+         ORDER BY principal.id LIMIT 1 \
+         FOR SHARE OF member, principal",
+    )
+    .bind(company.as_uuid())
+    .bind(actor.user_id())
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
+    Ok(ReviewerAuthority {
+        principal,
+        privileged: owner == actor.user_id() || role == "admin" || role == "owner",
+    })
+}
 /// Lock the actual owners, not a cached authorization result. Company-first is
 /// also the MCP owner's configuration lock order. NO KEY UPDATE serializes
 /// authority changes while allowing runtime foreign-key KEY SHARE checks;

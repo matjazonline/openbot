@@ -238,6 +238,7 @@ fn describe(result: &AppResult<RemoteDispatchObservation>) -> String {
     match result {
         Ok(RemoteDispatchObservation::Committed(_)) => "Committed".into(),
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => "PossibleDispatchExists".into(),
+        Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),
         Ok(RemoteDispatchObservation::ApprovalRequired) => "ApprovalRequired".into(),
         Ok(RemoteDispatchObservation::Interrupted) => "Interrupted".into(),
         Err(error) => format!("{error:?}"),

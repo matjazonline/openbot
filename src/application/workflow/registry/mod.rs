@@ -30,9 +30,12 @@ use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.2";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.3";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
+/// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
+/// reviewer rows and notice deliveries are written by one park transaction.
+pub const MAX_REVIEWERS: usize = 16;
 /// Destinations of one `message.send`: the established per-commit fan-out bound
 /// (`transport::ingress::MAX_THREAD_ASSOCIATIONS`). One send writes at most this many threads,
 /// messages and deliveries in one transaction, and a receipt locks at most this many parents.
@@ -140,6 +143,45 @@ impl<'a> Registration<'a> {
                 field,
             )),
         }
+    }
+    /// Reviewer assignment is deterministic: only literals and admin-configured binding
+    /// parameters may supply it, never run input, step output or run context (05-D2 §4.2).
+    fn static_roots(&self, field: &'static str) -> Result<(), Diagnostic> {
+        let Some(binding) = self.parsed.definition.steps[self.id].inputs.get(field) else {
+            return Ok(());
+        };
+        if binding
+            .references()
+            .iter()
+            .all(|reference| reference.root_name() == "params")
+        {
+            Ok(())
+        } else {
+            Err(self.error(
+                "registry.static_reviewers",
+                "Reviewers must be literal or come from binding parameters",
+                field,
+            ))
+        }
+    }
+    /// A run-scoped event is identified by its literal name; every `wait.event` declaring that
+    /// name shares one payload schema, so ingress can validate before any wait exists (05-D1 §11).
+    fn event_identity(&mut self, schema: &Value) -> Result<(), Diagnostic> {
+        let name = self.literal("event")?;
+        let conflicting = self.parsed.definition.steps.iter().any(|(id, step)| {
+            id != self.id
+                && step.step_type.as_str() == "wait.event"
+                && matches!(step.inputs.get("event"), Some(Binding::Literal(other)) if *other == name)
+                && !matches!(step.inputs.get("payload_schema"), Some(Binding::Literal(other)) if other == schema)
+        });
+        if conflicting {
+            return Err(self.error(
+                "registry.event_schema",
+                "Every wait for one event name must declare the same payload_schema",
+                "payload_schema",
+            ));
+        }
+        Ok(())
     }
     fn declared_schema(&mut self, field: &'static str) -> Result<Value, Diagnostic> {
         let value = self.literal(field)?;
@@ -269,6 +311,8 @@ mod tests;
 
 #[cfg(test)]
 mod contract_tests;
+#[cfg(test)]
+mod decision_tests;
 #[cfg(test)]
 mod profile_tests;
 #[cfg(test)]

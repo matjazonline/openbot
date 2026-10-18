@@ -320,7 +320,7 @@ Later04.8–11 and05–10 obligations remain; no production provider/UI integrat
 | --- | --- |
 | 05.1 Decision contract | Workflow decision domain/application/persistence: declared choices, schema-valid edits, reviewed artifact/revision; immutable original output. |
 | 05.2 Comments/submission | Separate append-only comment and idempotent expected-revision submit commands; settlement+continuation atomic; reviewer/timeout/cancel races and invalid input stays open. |
-| 05.3 Assignment/auth/notify | Deterministic eligible reviewers, current access, expiring single-use external credentials, durable precise notifications; action digest subject separate from business review. No eligible reviewer fails. |
+| 05.3 Assignment/auth/notify | Explicit member reviewers (no groups, no external reviewers), current access, durable precise notifications; action digest subject separate from business review. No eligible reviewer fails. |
 | 05.4 Other waits | Scoped durable event/timer correlation, schemas/deadline/sweeper; duplicate and event-before-park/restart checks; phase05 gate. |
 | 06.1 Rig integration | Refactor agent runner/harness via action/checkpoint contracts; bounded repairs/root budgets, resume saved calls, remove alternate runtime when migrated; no implicit context/memory/delivery. |
 | 06.2 Explicit preparation | Context history cutoff/provenance, scoped memory load/save, bounded classifier/agent-choice handlers; committed result reused, choices not authority. |

@@ -54,6 +54,7 @@ async fn provider_timeout(
 fn observation(observed: &AppResult<RemoteDispatchObservation>) -> String {
     match observed {
         Err(error) => format!("Err({error:?})"),
+        Ok(RemoteDispatchObservation::ApprovalParked(_)) => "ApprovalParked".into(),
         Ok(RemoteDispatchObservation::ApprovalRequired) => "Ok(ApprovalRequired)".into(),
         Ok(RemoteDispatchObservation::PossibleDispatchExists) => {
             "Ok(PossibleDispatchExists)".into()

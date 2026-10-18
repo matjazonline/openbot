@@ -67,9 +67,9 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         provider: &ProviderInvocation,
     ) -> AppResult<Option<Uuid>> {
         let previous: Option<(Uuid, i32, bool)> = sqlx::query_as(
-            "SELECT id,attempt_number,((current_policy->'provider_replay'=$3 AND \
+            "SELECT id,attempt_number,(current_policy->'approval_required'='false'::jsonb AND ((current_policy->'provider_replay'=$3 AND \
              COALESCE(workflow_action_replay_supported(company_id,invocation_id),false)) OR \
-             workflow_action_not_applied_available(company_id,invocation_id) IS NOT NULL) \
+             workflow_action_not_applied_available(company_id,invocation_id) IS NOT NULL)) \
              FROM workflow_action_dispatches WHERE company_id=$1 AND invocation_id=$2 \
              AND effect_kind='remote' AND replay_subject=$4",
         )

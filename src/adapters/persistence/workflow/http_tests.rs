@@ -29,7 +29,7 @@ async fn workflow_http_real_publication_admission_receipt_restart_and_competitor
         runtime.run(&setup.kind, &setup.claim),
         runtime.run(&setup.kind, &setup.claim)
     );
-    assert!(a.is_ok() || b.is_ok());
+    assert!(a.completed_result().is_ok() || b.completed_result().is_ok());
     let request = server.await.unwrap();
     assert!(request.contains("fixture-http-secret"));
     let saved = HttpRuntime::new(
@@ -39,6 +39,7 @@ async fn workflow_http_real_publication_admission_receipt_restart_and_competitor
     )
     .run(&setup.kind, &setup.claim)
     .await
+    .completed_result()
     .unwrap();
     assert_eq!(
         saved["body"]["ok"], true,
@@ -60,7 +61,11 @@ async fn workflow_http_registered_tool_and_direct_model_call_share_receipt() {
         server("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}").await;
     let setup = Box::pin(setup(&origin, Entrance::Tool)).await;
     let runtime = runtime(&setup);
-    let result = runtime.run(&setup.kind, &setup.claim).await.unwrap();
+    let result = runtime
+        .run(&setup.kind, &setup.claim)
+        .await
+        .completed_result()
+        .unwrap();
     server.await.unwrap();
     let call = HttpToolCall {
         connection: setup.connection.id,
@@ -92,9 +97,19 @@ async fn workflow_http_remote_failure_remains_unknown_without_second_entry() {
     let (origin, server) = server("HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n").await;
     let setup = Box::pin(setup(&origin, Entrance::Http)).await;
     let runtime = runtime(&setup);
-    let failure = runtime.run(&setup.kind, &setup.claim).await.unwrap_err();
+    let failure = runtime
+        .run(&setup.kind, &setup.claim)
+        .await
+        .completed_result()
+        .unwrap_err();
     server.await.unwrap();
-    assert!(runtime.run(&setup.kind, &setup.claim).await.is_err());
+    assert!(
+        runtime
+            .run(&setup.kind, &setup.claim)
+            .await
+            .completed_result()
+            .is_err()
+    );
     assert_eq!(
         action_counts(&setup.fixture).await,
         ActionCounts {
@@ -185,6 +200,7 @@ async fn workflow_http_current_revocation_and_protection_prevent_network() {
         let failure = runtime(&setup)
             .run(&setup.kind, &setup.claim)
             .await
+            .completed_result()
             .unwrap_err();
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_action_dispatches")
             .fetch_one(p.pool())
@@ -244,6 +260,7 @@ async fn workflow_http_crash_before_marker_retries_and_after_marker_reconciles()
         runtime(&marked)
             .run(&marked.kind, &marked.claim)
             .await
+            .completed_result()
             .is_err()
     );
     server.await.unwrap();
@@ -399,6 +416,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         runtime(&setup)
             .run(&setup.kind, &setup.claim)
             .await
+            .completed_result()
             .is_err()
     );
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_action_dispatches")
@@ -482,3 +500,6 @@ async fn workflow_http_publication_rejects_forged_policy_and_registration_revoca
             .is_err()
     );
 }
+
+#[path = "action_approval_http_tests.rs"]
+mod approval_tests;

@@ -52,8 +52,8 @@ fn workflow_registry_static_declarations_and_nested_configuration_are_checked() 
         ("memory.save", "scope", json!({"kind":"user"})),
         (
             "decision.human",
-            "reviewer",
-            json!({"kind":"user","id":"a","extra":1}),
+            "reviewers",
+            json!([{"kind":"user","id":"00000000-0000-0000-0000-000000000006","extra":1}]),
         ),
         (
             "message.send",

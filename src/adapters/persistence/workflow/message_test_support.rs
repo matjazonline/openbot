@@ -73,7 +73,10 @@ pub(super) async fn new_channel(fixture: &Fixture, slug: &str) -> Uuid {
 }
 
 /// A company member with `role` and a principal; their address is `<id>@example.test`.
-pub(super) async fn member(fixture: &Fixture, role: &str) -> Uuid {
+pub(in crate::adapters::persistence::workflow::tests) async fn member(
+    fixture: &Fixture,
+    role: &str,
+) -> Uuid {
     let user = Uuid::new_v4();
     let pool = fixture.persistence.pool();
     let company = fixture.target.company.as_uuid();

@@ -1093,3 +1093,290 @@ Round [S-R002](agent-review-notes.md#s-r002--correction-recheck-of-batch-s-s-f00
   - The `frozen_v2` control grants.
   - Root's decision to keep the sealing branch is recorded in TASK.
 - **S-F002 (optional) — RESOLVED.** `init_function_body` is bounded to its own statement and panics naming a function without a dollar-quoted body; a `should_panic` test pins this. Emulated against all 148 functions: 140 exact, 8 refused (`logs/S-R002/checks.log`). The vestigial parameter is removed.
+
+# Phase 05 — architecture gate (05-R001)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; phase 05; architecture gate; round [05-R001](agent-review-notes.md#05-r001--phase-05-architecture-gate-05-d1--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`). Artifact: `logs/05/decision-D1.md` SHA-256 `4e3a46ebb03137ba5c86e1b3d64e1d3b0abf756c54eaa59efc8cee8301707931` (supporting `logs/05/investigation.md` `484af70e…975e`). The user's answers Q1, Q2, Q6 and Q8, relayed by root, are applied.
+
+## 05-F001 — The error route carries no failure code, so a timeout is indistinguishable in-graph
+- Classification: actionable defect, **medium**, design accuracy. It affects the viability of the user's Q2 answer for phase 07.
+- Evidence:
+  - `route_failure` commits the `FinalError` route with `output: serde_json::Value::Null` (`recovery.rs:217-219`).
+  - The binding roots are only `Input | Params | Step | RunId | ParentRunId` (`domain/workflow/context/mod.rs:60-67`). No root carries a failure code, so an error-route successor reading the decision step sees `null`.
+  - On a `decision.human` step, the error route is reached by `workflow.invalid_input` (`pending_recovery.rs:66-75` routes `InvalidInput`), by D1's `decision.reviewer_unavailable` (§5.1 step 4) and by `decision.timed_out` (§5.4). All three look identical downstream.
+  - D1 §2 says "Plan 07's child maps the failure code to `choice: "timeout"` with `data.map`". That is not possible: no failure code reaches the graph.
+  - Plan 07 (`07-…:52-63`) needs the child output `choice: "timeout"` and a parent "timeout: declared timeout route".
+  - D1 itself rejects a dedicated route because downstream type projection has no second output shape. Exposing a code on the error edge has the same cost.
+- Required correction: with Q2 fixed, D1 must state accurately what the error route exposes and choose a mechanism:
+  - **(a)** `decision.reviewer_unavailable` fails the run instead of routing, so a configuration failure is never presented as a business timeout. This is the closest reading of plan 05:66 and is recommended. Document that the error route of a decision then means timeout or invalid input.
+  - **(b)** Or keep both on the error route, and record that in-graph they are indistinguishable.
+
+  In either case:
+  - record where the code is durable (the audit `decision_timed_out`, attempt or run state);
+  - write the phase 07 obligation explicitly: the child's `timeout` choice, or the parent's "timeout route", must come from the child run's terminal failure code (07.1 durable completion), or from a 07 language change. Do not claim it comes from `data.map`.
+  - Add a 05A test that an error-route successor of a timed-out decision receives `null` and runs, and that a run without an error route fails with `terminal_execution_id` set.
+- Instruction lesson: none new. Verify every "downstream can map X" claim against the committed output writer.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F002 — Q6 removes external reviewers: D1 must drop the credential design and re-home what depends on it
+- Classification: actionable defect, **medium**, scope consistency (user decision Q6, 2026-10-18).
+- Evidence: D1 embeds external email-only reviewers and their credentials throughout.
+  - §0 rows 2 and 7; §1 05B "Credentials"; §1 point 3 (`DecisionAuthority::Credential`).
+  - §2: the `{"kind":"external","email":…}` reviewer item.
+  - §3.1: the reviewer `kind` column with `'external'`, and `submission_credential_id`.
+  - §3.2: `workflow_decision_credentials`.
+  - §6: lock-order steps 1 (externals) and 7 (credential), and the "credential redeemed twice" race and test.
+  - §7.2 (external comments), §7.3 (`external` park check), §7.4, §7.5 (credential company).
+  - §8 entirely.
+  - §10: minting in the claim transaction, the external address, and the credential link.
+  - §12: the credentials bound.
+  - §13: 05B credential modules.
+  - §14: `workflow_decision_credential_*` tests.
+  - Investigation §6's proposed plan text ("or existing email-only external participants").
+
+  Outside D1, these depend on the credentials:
+  - **REPLACEMENT-MAP:72** (protected-action approvals) assigns the human decision a "scoped single-use link", with removal gate "05, 08 … Move pending/answered links … before removing harness-specific approvals".
+  - **The legacy approvals** mail arbitrary `approver_email` addresses (init 4699-4721; `use_cases/approval.rs:259`; tests use non-member addresses such as `manager@acme.com`). Retiring them in phase 08 without a replacement drops that capability.
+  - EXPANSION 05.3 ("expiring single-use external credentials"), plan 05:68 and the acceptance line "external decision credentials". Root says these will be amended.
+- Required correction:
+  - Remove every item above from D1 rather than keeping it as a seam. Under no backward compatibility the schema and language can be extended in place later, so nullable credential columns, a single-value `kind` column or an unused authority variant are speculative.
+  - Keep the reviewer item as `{"kind":"user","id":<uuid>}`, the only kind, matching the 04.11 destination shape.
+  - Rewrite investigation §6's proposed plan text to "explicitly named company members".
+  - Record the deferral and its owner (a later phase, or NOT_PLANNED, as root and the user decide), and flag that REPLACEMENT-MAP:72 and phase 08's legacy-approval removal gate must be amended to match. Root/user decision: either the email-link approval capability is dropped with the legacy code, or the deferred credentials must land before that removal.
+  - Then confirm that §5–§7 still hold with members only. They should: authority is `authorize_reviewer_on` plus association, nothing else.
+- Instruction lesson: none.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F003 — Notice transport must be re-decided without credentials, and the notice audit collides per execution
+- Classification: actionable defect, **medium**, design (reuse versus a new state machine), plus one correctness defect.
+- Evidence:
+  - D1 §10's case for a bespoke direct sender and a `workflow_decision_notices` ledger (claim, `SKIP LOCKED`, backoff, 8 attempts, withdrawal, a new `DecisionNoticeSender` port and adapter) rests mainly on the credential.
+    - The first argument ("the delivery engine stores rendered parts durably, so a credential link would persist in plaintext") and the third ("precedent for one-time secrets") fall away under Q6.
+    - The second argument concerns the `notification_events` outbox, not the delivery engine.
+    - The fourth already concedes that members could use the delivery engine.
+  - The delivery engine already accepts unattributed `notification` deliveries to an address (CHECK at init 5036; `delivery/enqueue.rs:144-175` `insert_standalone_delivery_on`). The notification projection enqueues them inside its own transaction (`notification.rs:995-1004`). So a per-reviewer notice could be written in the park transaction, durable and atomic, with an idempotency key such as decision id plus reviewer. It would get the existing claims, retries, failure classes and dead-lettering, and its rendered content carries no secret. A failed delivery never approves, trivially.
+  - **Defect:** D1 §4/§10 audit `decision_notice_failed` "one event per execution". `workflow_run_event_execution_kind` is UNIQUE on `(company_id, run_id, execution_id, event_kind)` (init 10128). With 2–16 reviewers, a second failed notice's result transaction would violate it and could never be marked `failed`.
+- Required correction:
+  - Re-decide §10 and §16 Q3 for members only. Either use standalone `notification` deliveries enqueued in the park transaction (recommended, with no new port, ledger, deliverer or scheduling), or justify the bespoke ledger with a decision-relevant requirement the engine cannot meet.
+  - Fix the audit: record failure per reviewer on the notice or delivery row, or drop the run event.
+  - State what happens to a pending notice once the decision settles. A late email linking to a settled decision is harmless and may be accepted.
+  - Keep the content rule: no proposal and no comments in the email.
+- Instruction lesson: when a scope decision removes a design's primary constraint, re-run its alternatives table.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F004 — Member decision commands take the company row FOR NO KEY UPDATE
+- Classification: actionable defect, **low**, liveness/scalability. Correctness is preserved.
+- Evidence:
+  - D1 §7.1 has `authorize_reviewer_on` take "the same locks as `authorize_company`", that is, `companies … FOR NO KEY UPDATE` (`authority.rs:14-19`), before waiting for the run lock (up to the 1000 ms lock timeout).
+  - For admin-only controls this was acceptable. For submissions and comments by any member, one command waiting behind a busy run's worker makes every other decision command and control in the same company queue on the company row, and they can hit their own lock timeouts.
+  - §6 claims "shared locks never conflict with shared locks", which does not hold for this row.
+- Required correction: take `companies FOR SHARE` in `authorize_reviewer_on`, keeping the member ⋈ principal `FOR SHARE`.
+  - That still blocks concurrent owner or role changes (they need `FOR NO KEY UPDATE` or row deletion).
+  - It stays compatible with the workers' FK `KEY SHARE`.
+  - It cannot form a cycle, since every path takes the company row first.
+
+  Correct the §6 sentence. Alternatively, justify the serialization and record it with a test of a submission blocked behind a held run lock while a submission on another run of the same company proceeds.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F005 — Run-scoped event inbox: inexact 128 bound and unstated late-event semantics
+- Classification: actionable defect, **low**, concurrency and specification.
+- Evidence:
+  - §11 bounds "at most 128 unconsumed events per run; one more is a `Conflict`", while "the run row gets a plain read, not a lock". Under READ COMMITTED, concurrent producers each count 127 and all insert, so the bound and its over-limit test are not exact. Root AGENTS.md requires competing-claimant tests for a new concurrency protocol.
+  - Moving from execution scope to run scope (§3.1/§11) also means an unconsumed event can satisfy **any later** matching `wait.event` in the run, such as the next iteration of a repeated wait with a static correlation. Execution scoping prevented that. D1 does not state it.
+- Required correction:
+  - Make the bound exact without blocking on workers. For example, serialize producers per run with `pg_advisory_xact_lock` on the run key, then count and insert. Or redefine it as a soft bound with a stated overshoot and test that.
+  - Add a competing-producers test at the bound.
+  - State the late-event semantics: correlation must carry the iteration identity when a step repeats. Add a test that a stale event is consumed by the next matching wait only when its correlation matches.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F006 — 05B is direction-level: require a 05B decision addendum before 05B code
+- Classification: actionable defect, **low**, gating. 05A is not blocked.
+- Evidence: D1 §9 changes the phase 04 dispatch seam, yet the investigation's own risks are open:
+  - I§5.1: reopening a completed job against `workflow_action_capture_schedule` and `workflow_action_confirm_claim_retirement`, plus attempt numbering and `max_retries`;
+  - I§5.2: today a protected call rolls back its transaction, so the approval park must commit the wait and decision referencing an intent committed earlier;
+  - I§5.3: the full list of one-wait-per-execution lookups for per-reason uniqueness.
+  - D1 also leaves open who may approve a protected action. Q4 puts approvers on the step, but the protection itself comes from admin-level operator policy rows (`workflow_http_operations` and `workflow_mcp_operations.approval_required`).
+- Required correction:
+  - State in D1 that 05B starts with a decision addendum, reviewed by B before any 05B code. The addendum resolves I§5.1–5.3 against the code and enumerates the affected lookups with `graft callers`.
+  - The addendum also decides approver eligibility. I recommend that protected-action approvers be owner/admin, rechecked at submit.
+  - The rest of D1 §9 is accepted as direction: subject binding by FK to the frozen intent with both digests, Terminal on reject or expiry, no automatic replay, and at most one dispatch per approval.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+## 05-F007 — Clarifications to carry into the revision
+- Classification: actionable, **low**, specification completeness.
+- Items:
+  1. **Static reviewer roots.** The registry check must walk the binding tree recursively (`Object`, `Array`, `Default` reference and fallback, `Concat`, …) and accept only `Literal` and `Params` roots. Run `params` are admin-configured binding snapshots (verified), so Q5 is sound under that rule.
+  2. **Deadline not in the future at park.** State the outcome. Recommended: `workflow.invalid_input` through the existing pending-failure path, never a park.
+  3. **The park-time failure writer.** `decision.reviewer_unavailable` before any wait exists is a pending failure. Use `pending_recovery::settle` with a new variant (or F001's choice (a)), not `recovery::route_failure`, which is the `Recovered` completion owner.
+  4. **`NO_BACKWARD_COMPATIBILITY_NOTES`.** Root AGENTS.md requires every plan carrying the note to be listed. 05A should add `05-…` through `10-…` (and `BRIEF-05.md` if created), not only `05-…`.
+  5. **`validate_completion` visibility.** It is `pub(super)` in `application/workflow/batch.rs:115`; say where the decision command calls it from.
+- Resolution history: 2026-10-18 05-R001 OPEN.
+
+# Phase 05 — correction recheck (05-R002)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; phase 05 architecture gate; correction recheck; round [05-R002](agent-review-notes.md#05-r002--correction-recheck-of-the-phase-05-gate-05-d2-over-d1--changes-required); Reviewer B Opus 5.5. Artifact: `logs/05/decision-D2.md` `831890270a87273b2cbbccf580a942c4582841cc2c4430b15d542d95754815b3`, a delta over D1 `4e3a46eb…7931`.
+
+## 05-R002 dispositions for 05-F001 to 05-F007
+- **05-F001 — RESOLVED.**
+  - D2 §4.3/§7.1: `decision.reviewer_unavailable` is a non-routed `pending_recovery::settle` variant. Verified: `settle` runs on the pending, unleased park job (`pending_recovery.rs:47-96`), fails the run with `terminal_execution_id`, fails the job, and audits the code as event kind.
+  - The error route is stated to carry `null` and to mean timeout or invalid input.
+  - The durable code is the `decision.timed_out` audit.
+  - The phase 07 obligation is recorded, and four tests are named.
+- **05-F002 — RESOLVED.** No external or credential item remains: no `kind` column, credential table, `submission_credential_id` or authority variant. Plan, EXPANSION, NOT_PLANNED and REPLACEMENT-MAP 72/74 amendments are listed (D2 §15), consistent with the user's Q6 and email-link-approval decisions.
+- **05-F003 — RESOLVED** (the link integrity point moves to 05-F009).
+  - Standalone `notification` deliveries are enqueued in the park transaction through `insert_standalone_delivery_on`, following the `notification.rs:995-1004` precedent. There is no new port, ledger or deliverer.
+  - The `decision_notice_failed` run event is dropped.
+  - Late notices are accepted as harmless.
+- **05-F004 — RESOLVED.** `companies FOR SHARE` in `authorize_reviewer_on`. The §8 statement is corrected, and a two-runs-one-company test is added. Every `authorize_company` caller takes the company row before the run (graft callers), so there is no cycle.
+- **05-F005 — RESOLVED.**
+  - A producer-only per-run `pg_advisory_xact_lock` (precedent at init 771) makes the 128 bound exact. Consumption only lowers the count.
+  - Stale-event semantics are stated, and competing-producers and stale-event tests are added.
+- **05-F006 — ADDRESSED.** The §16 addendum is part of this gate. §16.1, §16.3 and §16.4 are accepted; §16.2 carries the new 05-F008.
+- **05-F007 — RESOLVED** (all five items).
+
+## 05-F008 — The approval reopen reuses the parked attempt number and is unguarded
+- Classification: actionable defect, **medium**, 05B correctness (the approved dispatch could never be claimed).
+- Evidence:
+  - §16.2 closes the approval-parked attempt and moves the job `processing`→`completed` "as `effect_parked` does". The effect park leaves `retry_count` unchanged (`message_publish.rs:263-266`: `retry_count+1=$6`, no increment).
+  - Approve then reopens `completed`→`pending` "with `run_at = now` and `retry_count` unchanged".
+  - A claim takes attempt `retry_count + 1` (`lease_claim.rs:64-69`) and inserts it (`:171`), but `task_attempts_task_attempt_key UNIQUE (task_id, attempt_number)` (init 8209) already holds that number for the `approval_parked` attempt. **The re-claim fails on every poll.**
+  - The cited precedent `control_retry.rs:37` reopens `failed`→`pending` *after* a retirement, and retirement incremented `retry_count`: `check_workflow_fenced_retirement` requires `NEW.retry_count = OLD.retry_count + 1`, and `workflow_action_claim_episode_guard` requires `job.retry_count = retired_attempt`. A completion does not increment it.
+  - So the stated park precondition `retry_count < max_retries` is vacuous: it held when the park attempt was claimed.
+  - Nothing guards the new `completed`→`pending` transition. Every other workflow job transition is guarded at the database (`check_workflow_fenced_completion`, `check_workflow_fenced_retirement`, `check_workflow_control_retry`).
+- Required correction (in §16.2):
+  - Consume the parked attempt on reopen, `retry_count = retry_count + 1`, or at the park close. Then make the park precondition `retry_count + 1 < max_retries`, so that `exhausted` (`lease.rs:409-411`) cannot fire on the reopened job.
+  - Add a deferred guard branch admitting `completed`→`pending` for a workflow job only when all of these hold:
+    - attempt `OLD.retry_count + 1` is `completed`/`approval_parked`;
+    - `NEW.retry_count = OLD.retry_count + 1` (or the chosen accounting), with `max_retries` and ids unchanged;
+    - the run is `running`;
+    - the execution's approval decision was submitted `approve` and its wait completed in this transaction.
+  - Tests:
+    - the approved dispatch claims attempt N+1 and dispatches once;
+    - a reopen without an approval is refused by the guard;
+    - a park with exactly one attempt left fails Terminal `approval_required` with no park.
+- Resolution history: 2026-10-18 05-R002 OPEN.
+
+## 05-F009 — `notice_delivery_id` needs uniqueness, insert-only writing and a provenance binding
+- Classification: actionable defect, **low**, database-boundary integrity (persistence AGENTS.md "Preserve invariants at the database boundary").
+- Judgement on the design point: an id-only FK `notice_delivery_id → message_deliveries(id)` is the only expressible FK, because standalone deliveries have `company_id` NULL by CHECK (init 5036). That is acceptable and matches `notifications.email_delivery_id` (init 12265). However:
+  - **The precedent also has `UNIQUE (email_delivery_id)`** (`notifications_email_delivery_key`, init 7930). D2 has no such key, so two reviewer rows, even in different companies, could reference one delivery.
+  - **D2 updates the reviewer row after insert** (§7.1 step 6: insert reviewers, then deliveries, then "set `notice_delivery_id`"), and §5.1 exempts the column from immutability generally, so a later update could re-point the link.
+  - The rule requires every side of a join to be proven to belong to the same tenant. A tenant-less delivery cannot carry the tenant, but its provenance can be proven. `delivery_key` is readable: `"notification:workflow-decision:{decision_id}:principal:{principal_id}:{destination}"` (`compose.rs:250-264`; well under 512 bytes, so never hashed here). The decision is tenant-scoped.
+- Required correction:
+  - Add `UNIQUE (notice_delivery_id)`.
+  - Insert each delivery first, then the reviewer row with its id, so the column is insert-only. Make it `NOT NULL` with `ON DELETE NO ACTION`: every member has `users.email NOT NULL`, and production never deletes deliveries. If `ON DELETE SET NULL` is kept, the immutability trigger must allow only value→NULL.
+  - Add a constraint trigger proving provenance: the referenced delivery is `purpose='notification'` with `idempotency_key` prefixed `'notification:workflow-decision:' || decision_id || ':principal:' || principal_id || ':'`.
+  - Add a transaction-scoped DB test that a reviewer row referencing another decision's (or another company's) delivery is rejected (the AGENTS composite-FK test obligation, adapted).
+- Resolution history: 2026-10-18 05-R002 OPEN.
+
+# Phase 05 — correction recheck (05-R003)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; phase 05 architecture gate; correction recheck; round [05-R003](agent-review-notes.md#05-r003--correction-recheck-of-the-phase-05-gate-05-d3-over-d1d2--changes-required); Reviewer B Opus 5.5. Artifact: `logs/05/decision-D3.md` `bd937b8630e48e6c7e2bf0bfeb223cd879004e4c3cfb898bb302b0d432af0b69` over D2 `83189027…15b3` and D1 `4e3a46eb…7931`.
+
+## 05-R003 dispositions for 05-F008 and 05-F009
+- **05-F008 — RESOLVED.** D3 §2.
+  - The parked attempt is consumed at reopen (`retry_count = k+1`, next claim `k+2`), and the park requires `k+1 < max_retries`.
+  - A deferred branch in `check_workflow_fenced_completion` refuses every workflow completed→pending except an approval reopen with `submitted_xact = pg_current_xact_id()`, the `approval_parked` attempt, unchanged identity and bounds, NULL lease fields, an open execution and a running run.
+  - At most one reopen per approval.
+  - Three tests.
+  - Verified: no other production path performs completed→pending (`control_retry.rs:37` and `action_reconciliation/settlement.rs:217` are failed→pending).
+- **05-F009 — RESOLVED** for integrity. D3 §3.1/§3.2.
+  - `UNIQUE (notice_delivery_id)`, `NOT NULL`, `NO ACTION`, an insert-only row with the delivery inserted first, and a `Created`-only result.
+  - The provenance trigger checks purpose, the standalone shape and the prefix `notification:workflow-decision:{decision}:principal:{principal}:`, proving the tenant through the decision's composite FK.
+  - The transaction-scoped rejection test covers six cases.
+  - The residual liveness edge is 05-F010.
+
+## 05-F010 — The notice key is not proven unhashed, so a long member address loops the park
+- Classification: actionable defect, **low**, liveness at park.
+- Evidence:
+  - D3 §3.1 says the destination is "the member's bounded address, so the key stays under the bound and is never hashed", and that if it were hashed the trigger refuses and "it fails closed".
+  - The key is `notification:workflow-decision:{36}:principal:{36}:email:{address}`, 121 bytes plus the address (`compose.rs:250-270`, `delivery.rs:86-93`). `delivery_key` hashes it to `notification:sha256:…` above 512 bytes (`delivery.rs:35`), that is, for an address over 391 bytes.
+  - Nothing bounds a member address:
+    - `users.email` has only a not-blank CHECK (init 5978-5987);
+    - `EmailAddress` is an unbounded newtype (`value_objects.rs:136`);
+    - registration only trims (`use_cases/user.rs:449`);
+    - I found no length validation in `src`.
+  - For such a member, the BEFORE INSERT provenance trigger raises 23514 inside the park transaction. That is a database error, not the D3 §3.2 `BadRequest` class, so it propagates and the park retries on every poll until the run deadline. That is exactly the path D3 §0 says it removed.
+  - Integrity is safe (fail closed). Liveness is not.
+- Required correction (either):
+  - **(a)** In D3 §3.2 step 6, after composing each notice and before any write, check that its idempotency key has the expected unhashed prefix. If not, `settle(ReviewerUnavailable)`, the same as a composition `BadRequest`.
+  - **(b)** Bound member addresses: for example `CHECK (octet_length(email) <= 320)` on `users`, edited in place, plus the matching validation at registration and account change.
+
+  (a) is local to phase 05 and recommended. Correct the "bounded address" sentence either way.
+- Test: `workflow_decision_park_unprovable_notice_key_fails_run_unrouted`. A member with an address over 391 bytes is listed; the run ends `failed` with `decision.reviewer_unavailable`, and nothing is parked or retried.
+- Resolution history: 2026-10-18 05-R003 OPEN.
+
+## 05-R004 disposition for 05-F010
+Round [05-R004](agent-review-notes.md#05-r004--recheck-of-the-phase-05-gate-05-d4-over-d1d2d3--pass), D4 `e8ed88c46e1420e3ededa3da33b282a8e6c9cefc9495e3146a420ed77fe1fc86`.
+- **05-F010 — RESOLVED** (option (a), root's choice).
+  - D4 §1 corrects the hashing statement: hashed above 512 bytes, i.e. addresses over 391 bytes; addresses are unbounded.
+  - D4 §2 adds a pre-write prefix check in `DecisionNotices`, returning the composition `BadRequest` class. The park then runs `settle(ReviewerUnavailable)`: unrouted, nothing parked, no retry.
+  - The 05B twin fails Terminal `<family>.approval_required` with no park.
+  - Named tests cover both batches. The provenance trigger remains as the fail-closed backstop.
+  - Bounding addresses (option (b)) is deferred out of phase 05.
+
+
+## 05-F011 — Decision authorization acceptance lacks actual revocation and visibility races
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; whole 05A batch, round 05-R005; Reviewer B requested `gpt-6-astra` / medium, independent context. [TASK](TASK.md), [REVIEW](REVIEW.md). Base `feefe3e060a851fd8860e4bacb90c11c7b284888`; artifact `e2a59ac010a2b8c819f88a490729a21d97e9dde868ec4a8681ae54277a3e053a`.
+- Classification: actionable defect, **medium**, verification/security acceptance.
+- Evidence: plan 05 acceptance explicitly requires revoked membership and non-member refusal; accepted D2 §14 requires revocation in both orders. All decision submit callers were enumerated with `graft grep submit_decision`. `decision_tests.rs:451-473` only demotes a still-present admin on a company-only run and supplies a random nonexistent company. It does not remove membership, use an actual non-member, exercise channel/thread visibility, or compete revocation against submission. All `DecisionFixture::configured` reviewers are admins (`decision_tests.rs:22-74`). Existing tests of the shared association helper do not exercise the new command's lock ordering and recheck integration.
+- Required correction: add decision-command database tests for a listed reviewer whose membership is actually removed and a non-member, and real existing cross-company decision access. Exercise channel visibility loss and the new command against membership/grant revocation with controlled competing transactions in both serialization orders. Assert refusal with no submission/continuation when revocation wins, and that revocation waits until commit when submission owns authority. Include read/comment refusal after access loss because these commands share the new authorization path. Keep the existing demotion test.
+- Instruction lesson: current root concurrency rule and D2 acceptance already require this; test names are not evidence of the mutation they claim. Candidate guidance: acceptance mapping should name the actual revoked row and lock-order witness, not only a test-name prefix.
+- Resolution history: 2026-10-18 05-R005 OPEN. This is a missing verification finding, not a demonstrated authorization bypass.
+
+## 05-F012 — Concurrent event-id reuse across runs escapes the promised Conflict classification
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; whole 05A batch, round 05-R005; Reviewer B requested `gpt-6-astra` / medium. [TASK](TASK.md), [REVIEW](REVIEW.md). Base `feefe3e060a851fd8860e4bacb90c11c7b284888`; artifact `e2a59ac010a2b8c819f88a490729a21d97e9dde868ec4a8681ae54277a3e053a`.
+- Classification: actionable defect, **low**, correctness/concurrency.
+- Evidence: `waits.rs:218-284` serializes producers on `(company,run)` but deduplicates on `(company,event id)`. The init schema's `workflow_wait_events_pkey` is `(company_id,id)` at line 9466. Two producers with the same event id and company, different valid runs and declared event names can both read no saved row under different advisory locks. One inserts, the other gets 23505 from the plain INSERT. `adapters/persistence/mod.rs:123-135` converts that into `AppError::Database`, while the public port (`application/workflow/waits.rs:35-36`) and D1/D2 promise `Conflict` for an id reused with different content/scope. Sequential replay correctly returns Conflict; concurrent replay does not.
+- Required correction: handle this specific id uniqueness collision as `Conflict` without converting unrelated database errors, or atomically resolve insertion and compare the saved identity. Preserve the per-run bound and absence of a consumer/advisory lock cycle. Add competing producers using one id across two valid runs; assert exactly one Recorded, one Conflict and one durable row. This conclusion is by code/interleaving inspection; no database reproduction was run during the fixture-owned gate.
+- Instruction lesson: align dedup serialization/error handling with the database unique key's scope, not merely the resource-bound scope. The accepted architecture specified per-run locking but did not spell out cross-run id collisions; this is a missed edge in 05-R004's effective design coverage.
+- Resolution history: 2026-10-18 05-R005 OPEN.
+
+## 05-F013 — Several explicit 05A boundary and provenance checks are absent
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; whole 05A batch, round 05-R005; Reviewer B requested `gpt-6-astra` / medium. [TASK](TASK.md), [REVIEW](REVIEW.md). Base `feefe3e060a851fd8860e4bacb90c11c7b284888`; artifact `e2a59ac010a2b8c819f88a490729a21d97e9dde868ec4a8681ae54277a3e053a`.
+- Classification: actionable defect, **low**, verification/accepted criteria.
+- Evidence: D3 §3.1 accepted notice provenance tests cover another company, non-notification delivery, uniqueness reuse and update as well as wrong principal/decision. `decision_sql_tests.rs:70-117` only substitutes two already-linked same-company notification deliveries (wrong principal and wrong decision); the update check exists separately at lines 39-50. No actual foreign-company reviewer/comment/decision relationship rejection test covers the new composite FKs, as persistence AGENTS requires. D2 §12 explicitly promises at-limit and over-limit checks for feedback and decision data; current command tests only reject an integer against a string schema, missing feedback and stale metadata (`decision_tests.rs:180-243`), and digest testing only checks an overdeep value. Comment/reviewer/event-count limits are covered and need not be repeated.
+- Required correction: complete the new decision-table cross-tenant/provenance database cases, distinguishing the expected constraint/trigger so one refusal cannot mask another; add accepted/rejected boundary cases for feedback (including character-versus-byte behavior) and decision data at the configured context limit. Assert invalid submissions leave the decision and continuation unchanged. Reuse existing generic validator tests only with explicit evidence of their coverage of the decision command composition/fingerprint path.
+- Instruction lesson: the existing accepted matrix suffices; reconcile promised cases against assertions before freezing. No instruction expansion is needed.
+- Resolution history: 2026-10-18 05-R005 OPEN.
+
+
+## 05-F014 — D5 must cover the actual member-removal lifecycle as well as raw deletion
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; correction architecture gate, round 05-R006; Reviewer B requested Astra/medium, independent context. [TASK](TASK.md), [REVIEW](REVIEW.md). Decision D5 SHA-256 `ec061ebe8a01fedf18b18258337c09dcbd1567394d59d13226374eef8c9a1cdb` over D1–D4; code is unfrozen correction WIP, not batch-accepted.
+- Classification: actionable defect, **low**, architecture evidence/verification.
+- Evidence: D5's opening explains membership revocation exclusively through `company_members` DELETE cascading to principals, based on `correction-first.log`'s 23503. That SQL failure is real, but the actual `CompanyInvitePersistence::remove_member` implementation (`src/adapters/persistence/company_invite.rs:355-384`) first updates the principal to `kind='external', user_id=NULL`, then deletes the member. Existing reviewer reads join that principal and decode `user_id` into non-null UUID (`decisions.rs:551-553`), so actual removal has a distinct broken-read mode even without deleting the principal. The production mutation also takes principal before member, unlike D2's stated member/principal authority sequence; raw DELETE-only race tests do not prove that real path.
+- Required correction: amend D5's evidence and verification to explicitly retain raw-delete provenance protection while also exercising the actual remove_member port before/after settlement and in the authority races. Confirm the snapshot read survives both principal disappearance and conversion to external/NULL user. State how the chosen lock sequence handles the actual principal-first mutation (safe transient timeout/retry must not be represented as a guaranteed success/no-cycle proof). No broad principal lifecycle redesign is requested.
+- Instruction lesson: follow the production mutation caller before deriving lifecycle semantics solely from FK cascade behavior. Existing graph/caller requirements already support this; no new general instruction needed.
+- Resolution history: 2026-10-18 05-R006 OPEN. The local snapshot design and disclosure-stage amendment are otherwise acceptable by inspection; see round note.
+
+
+## 05-R007 disposition for 05-F014
+- 2026-10-18; `implement-astra-reviewed-2.1`; Reviewer B requested Astra/medium. D5 `ec061ebe8a01fedf18b18258337c09dcbd1567394d59d13226374eef8c9a1cdb` + D6 `93aabee933500c4d2f9a02535901be92768f31ff47a2b19493525652d1f54c80`.
+- **05-F014 RESOLVED at architecture level.** D6 explicitly covers production principal conversion and raw cascading deletion separately, preserves historical user identity independently of either, upgrades initial provenance locks to FOR SHARE, acknowledges the opposing member/principal lock order without a global no-cycle claim, and requires actual-port lifecycle/race tests. Controlled ordering must reach durable success/refusal; a timeout is admissible only as a separately asserted rollback/contention outcome, not proof of the business branch.
+- Implementation and test outcomes remain subject to the corrected whole-batch review. This does not close 05-F011–013 or accept correction WIP.
+
+
+## 05-R008 dispositions — 05-F011, 05-F012 and 05-F013 RESOLVED
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; retained independent Reviewer B requested Astra/medium. Corrected 05A base `feefe3e060a851fd8860e4bacb90c11c7b284888`, digest `2a428cd707ec4427ddb31ca9ea60d875ba829c1bb0c4c743ab7f38929d99bef3`; sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#05-r008--corrected-05a-consolidated-recheck--code-pass).
+- **05-F011 RESOLVED.** `decision_authority_tests.rs:57-230` tests actual non-member/raw membership removal, read/comment/submit refusal, and controlled membership/grant revocation in both orders with backend lock witnesses and durable outcomes. Lines 244-455 cover production remove_member conversion before/after settlement, actual removal blocked by submit/park, conversion-first and raw-delete races, and history retained after both mutation types. `decision_provenance_tests.rs:53-116` uses an existing foreign company and independently exercises scoped relationships. The D5+D6 identity-snapshot correction is implemented, not just tested: initial tenant/person checks use FOR SHARE, reviewer user_id is populated by the guard and read from history, three ephemeral principal FKs removed, decision/wait composite FKs retained.
+- **05-F012 RESOLVED.** `waits.rs:282-292` maps only a unique violation on `workflow_wait_events_pkey` to Conflict. Other DB errors propagate. `workflow_wait_event_id_collision_across_competing_runs_is_conflict` holds a table lock until both producers reach INSERT under their distinct run locks, then asserts one Recorded, one Conflict and one row. This exercises the formerly missing interleaving without changing the producer bound or consumer protocol.
+- **05-F013 RESOLVED.** `decision_provenance_tests.rs:53-187` separately verifies tenant/person snapshot guards, decision/wait/comment/reviewer composite relationships, wrong-company notice provenance, unique notice links and non-notification refusal. Transaction-local disabling of the provenance trigger isolates the UNIQUE check; temporary removal of the delivery attribution CHECK isolates the purpose check; both rollback. `decision_boundary_tests.rs:20-69` checks feedback at/over MAX_TEXT for ASCII, two-byte and four-byte characters and exact configured committed-output byte boundary, with unchanged state on rejection. Existing comment/reviewer/event bounds reused.
+- Evidence: `logs/05/correction-fourth.log`, 44 passed / 0 failed, inspected alongside assertions. Strict all-target Clippy output inspected in `correction-clippy.log`. Broader correction gates are still pending; these dispositions close the reviewed defects, not root batch acceptance. 05-F014 remains resolved, now with implementation evidence above.
+
+
+## 05-F015 — 05B omits explicit accepted reopen-guard and notice-failure cases
+- Context: 2026-10-18; `implement-astra-reviewed-2.1`; whole 05B batch review 05-R010; retained independent Reviewer B requested Astra/medium, effective telemetry unavailable. [TASK](TASK.md), [REVIEW](REVIEW.md). Base `feefe3e060a851fd8860e4bacb90c11c7b284888`, digest `b42023ba2177a20937e6aa0c14b4abf6dc6e41fcbcf2a89a6fa711370f6fd630`, sole exclusion `plan/workflow-foundation/docs`.
+- Classification: actionable defect, **low**, verification/accepted architecture criteria; no implementation bypass demonstrated.
+- Evidence: D3 §2 explicitly requires completed→pending rejection with no approval, an approval committed in an earlier transaction, a reject choice, and wrong retry_count. `action_approval_http_tests.rs:268-291` tests only no submission. No source test references submitted_xact (`graft grep` exhaustive). The positive next-attempt test proves the happy path but cannot detect removal of the transaction-identity predicate or accidental admission of stale approvals. The guard is consequential persistent ownership enforcement, not a cosmetic check.
+- Separately, D4 §2 explicitly requires the 05B twin `workflow_action_approval_unprovable_notice_key_fails_without_park`. Exhaustive `graft grep unprovable` finds only the 05A business test. 05B has a different error mapping: `decision_approvals.rs:77-81` returns no park on BadRequest so the dispatch family yields Terminal approval_required, whereas business decisions settle reviewer_unavailable. Sharing the composer does not exercise this distinct transactional/failure path.
+- Required correction: add the three missing direct-SQL reopen variants, isolating the expected reopen guard rather than accepting an unrelated error. Include a prior-transaction approved decision with otherwise plausible accounting/attempt state, a rejected decision, and an approving transaction with wrong retry_count. Add the approval-specific long-address/unprovable-key case and assert Terminal family.approval_required, no approval wait/decision/reviewer/notice/dispatch/remote-entry rows, and no provider call. Run focused approval/guard checks and retain results; broader rechecks may reuse unaffected evidence for test-only additions.
+- Instruction lesson: the prior D3/D4 verification obligations were precise and sufficient; reconcile each promised branch with assertions before freeze. This is another acceptance-matrix coverage gap, following 05-F011/F013, not a request to expand design or add speculative cases.
+- Resolution history: 2026-10-18 05-R010 OPEN.
+
+
+## 05-R011 disposition — 05-F015 RESOLVED
+- 2026-10-18; `implement-astra-reviewed-2.1`; retained Reviewer B requested Astra/medium. Base `feefe3e060a851fd8860e4bacb90c11c7b284888`, corrected artifact `ac6e12f99bf53762a9056a6fcea62ac4a90513d4315dc47e5e3b087d21d4a84a`; sole exclusion `plan/workflow-foundation/docs`.
+- **05-F015 RESOLVED.** `action_approval_sql_tests.rs:129-202` supplies prior-transaction approval, reject, wrong retry_count and valid positive control. It verifies submitted_xact matches only the current transaction, targets the exact 23514 reopen message, and checks failed reopen leaves completed/retry_count=0. The existing missing-submission test now asserts the same exact guard. Thus unrelated constraint failure cannot masquerade as the target refusal.
+- `action_approval_sql_tests.rs:205-241` sets a long address that hashes the notice key, asserts Terminal http.approval_required, zero waits/decisions/reviewers/deliveries/dispatches/remote entries/receipts, and no provider response; the test server is aborted and joined. This exercises the distinct approval no-park mapping required by D4.
+- Evidence inspected: `05b-f015-focused.log` 19/0; `05b-f015-gate-status.log` fmt/diff/strict Clippy/SQLx prepare/check/graph PASS. Test-only delta permits reuse of unaffected 05-R010 production and broad batch evidence. No open review findings remain; final phase05 verification remains a separate gate.
+
+
+### 05-R012 final disposition
+No new findings from the final fixture delta or combined integration evidence review. All phase05 findings 05-F001–05-F015 remain resolved. Exact accepted review artifact and verification limitations are recorded in [05-R012](agent-review-notes.md#05-r012--final-phase05-delta-and-combined-integration-evidence--pass).

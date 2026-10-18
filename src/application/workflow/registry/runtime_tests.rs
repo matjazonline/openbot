@@ -69,7 +69,7 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
             "agent.run" | "decision.agent" => ("agent", json!(3)),
             "decision.rule" => ("data", json!(3)),
-            "decision.human" => ("reviewer", json!({"kind":"alien"})),
+            "decision.human" => ("deadline", json!("bad")),
             "data.map" => ("value", json!(3)),
             "http.request" => ("method", json!("BOGUS")),
             "tool.call" | "mcp.call" => ("arguments", json!({"key":3})),

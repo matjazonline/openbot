@@ -234,9 +234,39 @@ BEGIN
                                 JOIN workflow_message_actions AS action ON action.company_id = wait.company_id
                                     AND action.execution_id = wait.execution_id AND action.wait_id = wait.id
                                 WHERE wait.company_id = execution.company_id AND wait.execution_id = execution.id
-                                    AND wait.reason = 'effect' AND wait.state = 'waiting')))
+                                    AND wait.reason = 'effect' AND wait.state = 'waiting'))
+                        OR (attempt.stop_reason='approval_parked' AND execution.completed_at IS NULL
+                            AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='decision'
+                            AND OLD.retry_count + 1 < OLD.max_retries
+                            AND EXISTS (SELECT 1 FROM workflow_decisions AS decision
+                                JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+                                WHERE decision.company_id=execution.company_id AND decision.execution_id=execution.id
+                                    AND decision.subject_kind='action_approval' AND decision.submitted_at IS NULL
+                                    AND wait.reason='decision' AND wait.state='waiting')))
             ) THEN
             RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514';
+        END IF;
+    END IF;
+    IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
+        IF NEW.retry_count <> OLD.retry_count + 1 OR NEW.max_retries <> OLD.max_retries
+            OR NEW.retry_count >= NEW.max_retries
+            OR (NEW.company_id,NEW.workflow_execution_id) IS DISTINCT FROM (OLD.company_id,OLD.workflow_execution_id)
+            OR NEW.worker_id IS NOT NULL OR NEW.execution_generation IS NOT NULL OR NEW.lock_expires_at IS NOT NULL
+            OR NOT EXISTS (
+                SELECT 1 FROM workflow_executions AS execution
+                JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+                JOIN workflow_decisions AS decision ON decision.company_id=execution.company_id AND decision.execution_id=execution.id
+                JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.retry_count+1
+                WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
+                    AND execution.completed_at IS NULL AND execution.committed_route IS NULL
+                    AND run.state='running' AND run.deadline>clock_timestamp()
+                    AND attempt.status='completed' AND attempt.stop_reason='approval_parked'
+                    AND decision.subject_kind='action_approval' AND decision.choice='approve'
+                    AND decision.submitted_xact=pg_current_xact_id()
+                    AND wait.reason='decision' AND wait.state='completed'
+            ) THEN
+            RAISE EXCEPTION 'workflow job reopen requires an approval in this transaction' USING ERRCODE='23514';
         END IF;
     END IF;
     RETURN NULL;
@@ -366,13 +396,19 @@ CREATE FUNCTION public.check_workflow_wait_commit() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    IF NEW.notification_intent IS NOT NULL AND
+    IF (NEW.notification_intent IS NOT NULL OR NEW.reason='decision') AND
        (TG_OP='INSERT' OR (OLD.state='waiting' AND NEW.state='completed')) THEN
         IF EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
             AND run.id=NEW.run_id AND run.deadline<=clock_timestamp()) OR
-           (NEW.reason='event' AND NEW.deadline<=clock_timestamp()) THEN
+           (NEW.reason IN ('event','decision') AND NEW.deadline<=clock_timestamp()) THEN
             RAISE EXCEPTION 'workflow wait deadline reached before commit' USING ERRCODE='23514';
         END IF;
+    END IF;
+    -- A run-scoped event is consumed by exactly the wait that records it (05-D2 §11).
+    IF NEW.consumed_event_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM workflow_wait_events AS event
+        WHERE event.company_id=NEW.company_id AND event.run_id=NEW.run_id AND event.id=NEW.consumed_event_id
+            AND event.consumed_execution_id=NEW.execution_id) THEN
+        RAISE EXCEPTION 'workflow wait consumed an event it does not own' USING ERRCODE='23514';
     END IF;
     RETURN NULL;
 END $$;
@@ -878,7 +914,10 @@ CREATE FUNCTION public.immutable_workflow_wait_event() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    IF NEW IS DISTINCT FROM OLD THEN
+    IF (NEW.company_id, NEW.run_id, NEW.id, NEW.event_name, NEW.correlation, NEW.payload, NEW.created_at)
+            IS DISTINCT FROM (OLD.company_id, OLD.run_id, OLD.id, OLD.event_name, OLD.correlation, OLD.payload, OLD.created_at)
+        OR (OLD.consumed_execution_id IS NOT NULL AND NEW.consumed_execution_id IS DISTINCT FROM OLD.consumed_execution_id)
+        OR (OLD.consumed_execution_id IS NULL AND NEW.consumed_execution_id IS NULL) THEN
         RAISE EXCEPTION 'workflow event facts are immutable' USING ERRCODE='23514';
     END IF;
     RETURN NEW;
@@ -3673,6 +3712,9 @@ BEGIN
     SELECT * INTO marker FROM workflow_action_dispatches WHERE company_id=NEW.company_id AND invocation_id=NEW.invocation_id;
     proof:=workflow_action_not_applied_available(NEW.company_id,NEW.invocation_id,NEW.id);
     IF workflow_action_has_evidence_conflict(NEW.company_id,NEW.execution_id)
+        OR (marker.current_policy->'approval_required'='true'::jsonb
+            AND EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry
+                WHERE entry.company_id=NEW.company_id AND entry.invocation_id=NEW.invocation_id AND entry.id<>NEW.id))
         OR EXISTS(SELECT 1 FROM workflow_action_receipts WHERE company_id=NEW.company_id AND invocation_id=NEW.invocation_id)
         OR EXISTS(SELECT 1 FROM workflow_action_evidence WHERE company_id=NEW.company_id AND invocation_id=NEW.invocation_id AND disposition='applied')
         OR EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry
@@ -3841,6 +3883,98 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
                     AND other.id<>job AND other.status IN ('pending','processing'))
     )
 $$;
+
+
+--
+-- Name: workflow_decision_fact_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.workflow_decision_fact_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514';
+END $$;
+
+
+--
+-- Name: workflow_decision_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.workflow_decision_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- The only transition: one submission recorded once, bumping the revision (05-D2 §5.1).
+    IF OLD.submitted_at IS NULL AND NEW.submitted_at IS NOT NULL AND NEW.revision = OLD.revision + 1
+        AND (NEW.company_id, NEW.run_id, NEW.execution_id, NEW.id, NEW.wait_id, NEW.subject_kind,
+             NEW.proposal_digest, NEW.created_at, NEW.action_invocation_id, NEW.argument_digest, NEW.operation_digest)
+            IS NOT DISTINCT FROM (OLD.company_id, OLD.run_id, OLD.execution_id, OLD.id, OLD.wait_id,
+             OLD.subject_kind, OLD.proposal_digest, OLD.created_at, OLD.action_invocation_id, OLD.argument_digest, OLD.operation_digest) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514';
+END $$;
+
+
+--
+-- Name: workflow_decision_reviewer_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- Historical identities are checked and locked only when first recorded (05-D5/D6).
+CREATE FUNCTION public.workflow_decision_person_snapshot(company uuid, principal_id uuid) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE snapshot_user uuid;
+BEGIN
+    SELECT principal.user_id INTO snapshot_user FROM principals AS principal
+        WHERE principal.company_id=company AND principal.id=principal_id AND principal.kind='person'
+        FOR SHARE;
+    IF snapshot_user IS NULL THEN
+        RAISE EXCEPTION 'workflow decision identity is not a current tenant person' USING ERRCODE='23514';
+    END IF;
+    RETURN snapshot_user;
+END $$;
+
+CREATE FUNCTION public.workflow_decision_comment_identity() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM workflow_decision_person_snapshot(NEW.company_id, NEW.author_principal_id);
+    RETURN NEW;
+END $$;
+
+CREATE FUNCTION public.workflow_decision_submit_identity() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.submitted_by IS NOT NULL THEN
+        PERFORM workflow_decision_person_snapshot(NEW.company_id, NEW.submitted_by);
+        NEW.submitted_xact := pg_current_xact_id();
+    END IF;
+    RETURN NEW;
+END $$;
+
+CREATE FUNCTION public.workflow_decision_reviewer_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE snapshot_user uuid;
+BEGIN
+    snapshot_user := workflow_decision_person_snapshot(NEW.company_id, NEW.principal_id);
+    IF NEW.user_id IS NOT NULL AND NEW.user_id <> snapshot_user THEN
+        RAISE EXCEPTION 'workflow decision reviewer user snapshot mismatches principal' USING ERRCODE='23514';
+    END IF;
+    NEW.user_id := snapshot_user;
+    IF NOT EXISTS (SELECT 1 FROM message_deliveries AS delivery WHERE delivery.id=NEW.notice_delivery_id
+            AND delivery.purpose='notification' AND delivery.company_id IS NULL AND delivery.channel_id IS NULL
+            AND delivery.message_id IS NULL AND delivery.source_binding_id IS NULL
+            AND delivery.destination_binding_id IS NULL AND delivery.external_destination IS NOT NULL
+            AND starts_with(delivery.idempotency_key, 'notification:workflow-decision:' || NEW.decision_id
+                || ':principal:' || NEW.principal_id || ':')) THEN
+        RAISE EXCEPTION 'workflow decision reviewer lacks a provable member notice' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
 
 
 --
@@ -5574,7 +5708,7 @@ CREATE TABLE public.task_attempts (
     workflow_retirement text,
     CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
-    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text, 'effect_parked'::text]))),
+    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text, 'effect_parked'::text, 'approval_parked'::text]))),
     CONSTRAINT task_attempts_token_check CHECK ((((prompt_tokens IS NULL) OR (prompt_tokens >= 0)) AND ((completion_tokens IS NULL) OR (completion_tokens >= 0)))),
     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text])))))
 );
@@ -6586,6 +6720,76 @@ CREATE TABLE public.workflow_control_commands (
 
 
 --
+-- Name: workflow_decision_comments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_decision_comments (
+    company_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    sequence bigint NOT NULL,
+    author_principal_id uuid NOT NULL,
+    command_key text NOT NULL,
+    body text NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT workflow_decision_comments_body_check CHECK (((char_length(body) >= 1) AND (char_length(body) <= 16384))),
+    CONSTRAINT workflow_decision_comments_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
+    CONSTRAINT workflow_decision_comments_sequence_check CHECK (((sequence >= 1) AND (sequence <= 1000)))
+);
+
+
+--
+-- Name: workflow_decision_reviewers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_decision_reviewers (
+    company_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    ordinal smallint NOT NULL,
+    principal_id uuid NOT NULL,
+    notice_delivery_id uuid NOT NULL,
+    CONSTRAINT workflow_decision_reviewers_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 15)))
+);
+
+
+--
+-- Name: workflow_decisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_decisions (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    id uuid NOT NULL,
+    wait_id uuid NOT NULL,
+    subject_kind text NOT NULL,
+    action_invocation_id uuid,
+    argument_digest text,
+    operation_digest text,
+    submitted_xact xid8,
+    proposal_digest text NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    submitted_at timestamp with time zone,
+    submitted_by uuid,
+    command_key text,
+    command_fingerprint text,
+    choice text,
+    feedback text,
+    data jsonb,
+    CONSTRAINT workflow_decision_submission CHECK ((((submitted_at IS NULL) AND (submitted_by IS NULL) AND (command_key IS NULL) AND (command_fingerprint IS NULL) AND (choice IS NULL) AND (feedback IS NULL) AND (data IS NULL) AND (revision = 1)) OR ((submitted_at IS NOT NULL) AND (submitted_by IS NOT NULL) AND (command_key IS NOT NULL) AND (command_fingerprint IS NOT NULL) AND (choice IS NOT NULL) AND (feedback IS NOT NULL) AND (data IS NOT NULL) AND (revision = 2)))),
+    CONSTRAINT workflow_decisions_choice_check CHECK (((choice IS NULL) OR ((octet_length(choice) >= 1) AND (octet_length(choice) <= 140)))),
+    CONSTRAINT workflow_decisions_command_fingerprint_check CHECK (((command_fingerprint IS NULL) OR (command_fingerprint ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT workflow_decisions_command_key_check CHECK (((command_key IS NULL) OR ((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128)))),
+    CONSTRAINT workflow_decisions_data_check CHECK (((data IS NULL) OR (octet_length((data)::text) <= 1048576))),
+    CONSTRAINT workflow_decisions_feedback_check CHECK (((feedback IS NULL) OR (octet_length(feedback) <= 65536))),
+    CONSTRAINT workflow_decisions_proposal_digest_check CHECK ((proposal_digest ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT workflow_decisions_subject_kind_check CHECK ((subject_kind='business' AND action_invocation_id IS NULL AND argument_digest IS NULL AND operation_digest IS NULL) OR (subject_kind='action_approval' AND action_invocation_id IS NOT NULL AND argument_digest IS NOT NULL AND operation_digest IS NOT NULL)),
+    CONSTRAINT workflow_decisions_submission_xact CHECK ((submitted_at IS NULL) = (submitted_xact IS NULL))
+);
+
+
+--
 -- Name: workflow_definition_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -7057,12 +7261,12 @@ CREATE TABLE public.workflow_versions (
 CREATE TABLE public.workflow_wait_events (
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
-    execution_id uuid NOT NULL,
     id uuid NOT NULL,
     event_name text NOT NULL,
     correlation text NOT NULL,
     payload jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    consumed_execution_id uuid,
     CONSTRAINT workflow_wait_events_correlation_check CHECK (((octet_length(correlation) >= 1) AND (octet_length(correlation) <= 256))),
     CONSTRAINT workflow_wait_events_event_name_check CHECK (((octet_length(event_name) >= 1) AND (octet_length(event_name) <= 128))),
     CONSTRAINT workflow_wait_events_payload_check CHECK ((octet_length((payload)::text) <= 1048576))
@@ -8922,6 +9126,62 @@ ALTER TABLE ONLY public.workflow_control_commands
 
 
 --
+-- Name: workflow_decision_comments workflow_decision_comment_command; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_comments
+    ADD CONSTRAINT workflow_decision_comment_command UNIQUE (company_id, decision_id, author_principal_id, command_key);
+
+
+--
+-- Name: workflow_decision_comments workflow_decision_comments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_comments
+    ADD CONSTRAINT workflow_decision_comments_pkey PRIMARY KEY (company_id, decision_id, sequence);
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewer_notice; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_reviewers
+    ADD CONSTRAINT workflow_decision_reviewer_notice UNIQUE (notice_delivery_id);
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewer_ordinal; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_reviewers
+    ADD CONSTRAINT workflow_decision_reviewer_ordinal UNIQUE (company_id, decision_id, ordinal);
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_reviewers
+    ADD CONSTRAINT workflow_decision_reviewers_pkey PRIMARY KEY (company_id, decision_id, principal_id);
+
+
+--
+-- Name: workflow_decisions workflow_decision_execution; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decisions
+    ADD CONSTRAINT workflow_decision_execution UNIQUE (company_id, run_id, execution_id);
+
+
+--
+-- Name: workflow_decisions workflow_decisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decisions
+    ADD CONSTRAINT workflow_decisions_pkey PRIMARY KEY (company_id, id);
+
+
+--
 -- Name: workflow_definition_events workflow_definition_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9266,11 +9526,11 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflow_wait_events workflow_wait_events_company_id_run_id_execution_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_wait_events workflow_wait_events_company_id_run_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_wait_events
-    ADD CONSTRAINT workflow_wait_events_company_id_run_id_execution_id_id_key UNIQUE (company_id, run_id, execution_id, id);
+    ADD CONSTRAINT workflow_wait_events_company_id_run_id_id_key UNIQUE (company_id, run_id, id);
 
 
 --
@@ -9286,7 +9546,9 @@ ALTER TABLE ONLY public.workflow_wait_events
 --
 
 ALTER TABLE ONLY public.workflow_waits
-    ADD CONSTRAINT workflow_wait_execution UNIQUE (company_id, run_id, execution_id);
+    ADD CONSTRAINT workflow_wait_execution UNIQUE (company_id, run_id, execution_id, reason);
+
+CREATE UNIQUE INDEX workflow_wait_one_active ON public.workflow_waits(company_id,run_id,execution_id) WHERE state='waiting';
 
 
 --
@@ -10119,6 +10381,20 @@ CREATE INDEX workflow_message_destinations_run ON public.workflow_message_destin
 --
 
 CREATE UNIQUE INDEX workflow_one_execution_job ON public.background_tasks USING btree (company_id, workflow_execution_id) WHERE (queue_kind = 'workflow'::text);
+
+
+--
+-- Name: workflow_wait_event_consumer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX workflow_wait_event_consumer ON public.workflow_wait_events USING btree (company_id, consumed_execution_id) WHERE (consumed_execution_id IS NOT NULL);
+
+
+--
+-- Name: workflow_wait_event_unconsumed; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX workflow_wait_event_unconsumed ON public.workflow_wait_events USING btree (company_id, run_id, event_name, correlation, created_at, id) WHERE (consumed_execution_id IS NULL);
 
 
 --
@@ -11393,6 +11669,37 @@ CREATE CONSTRAINT TRIGGER workflow_wait_commit_deadline AFTER INSERT OR UPDATE O
 --
 
 CREATE TRIGGER workflow_wait_event_immutable BEFORE UPDATE ON public.workflow_wait_events FOR EACH ROW EXECUTE FUNCTION public.immutable_workflow_wait_event();
+
+
+--
+-- Name: workflow_decision_comments workflow_decision_comment_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_decision_comment_identity BEFORE INSERT ON public.workflow_decision_comments FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_comment_identity();
+CREATE TRIGGER workflow_decision_submit_identity BEFORE INSERT OR UPDATE ON public.workflow_decisions FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_submit_identity();
+
+CREATE TRIGGER workflow_decision_comment_immutable BEFORE UPDATE ON public.workflow_decision_comments FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewer_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_decision_reviewer_guard BEFORE INSERT ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_reviewer_guard();
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewer_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_decision_reviewer_immutable BEFORE UPDATE ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+
+
+--
+-- Name: workflow_decisions workflow_decision_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_decision_immutable BEFORE UPDATE ON public.workflow_decisions FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_immutable();
 
 
 --
@@ -13481,6 +13788,47 @@ ALTER TABLE ONLY public.workflow_control_commands
     ADD CONSTRAINT workflow_control_commands_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
 
 
+
+
+
+--
+-- Name: workflow_decision_comments workflow_decision_comments_decision_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_comments
+    ADD CONSTRAINT workflow_decision_comments_decision_fkey FOREIGN KEY (company_id, decision_id) REFERENCES public.workflow_decisions(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewers_decision_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_reviewers
+    ADD CONSTRAINT workflow_decision_reviewers_decision_fkey FOREIGN KEY (company_id, decision_id) REFERENCES public.workflow_decisions(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_decision_reviewers workflow_decision_reviewers_notice_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decision_reviewers
+    ADD CONSTRAINT workflow_decision_reviewers_notice_fkey FOREIGN KEY (notice_delivery_id) REFERENCES public.message_deliveries(id);
+
+
+
+
+
+
+
+
+--
+-- Name: workflow_decisions workflow_decisions_wait_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_decisions
+    ADD CONSTRAINT workflow_decisions_wait_fkey FOREIGN KEY (company_id, run_id, execution_id, wait_id) REFERENCES public.workflow_waits(company_id, run_id, execution_id, id) ON DELETE CASCADE;
+
+
 --
 -- Name: workflow_definition_events workflow_definition_events_company_id_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -13838,15 +14186,23 @@ ALTER TABLE ONLY public.workflow_versions
 --
 
 ALTER TABLE ONLY public.workflow_waits
-    ADD CONSTRAINT workflow_wait_consumed_event FOREIGN KEY (company_id, run_id, execution_id, consumed_event_id) REFERENCES public.workflow_wait_events(company_id, run_id, execution_id, id);
+    ADD CONSTRAINT workflow_wait_consumed_event FOREIGN KEY (company_id, run_id, consumed_event_id) REFERENCES public.workflow_wait_events(company_id, run_id, id);
 
 
 --
--- Name: workflow_wait_events workflow_wait_events_company_id_run_id_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_wait_events workflow_wait_event_consumer_execution; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_wait_events
-    ADD CONSTRAINT workflow_wait_events_company_id_run_id_execution_id_fkey FOREIGN KEY (company_id, run_id, execution_id) REFERENCES public.workflow_executions(company_id, run_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_wait_event_consumer_execution FOREIGN KEY (company_id, run_id, consumed_execution_id) REFERENCES public.workflow_executions(company_id, run_id, id);
+
+
+--
+-- Name: workflow_wait_events workflow_wait_events_company_id_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_wait_events
+    ADD CONSTRAINT workflow_wait_events_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -13868,3 +14224,10 @@ ALTER TABLE ONLY public.workflow_run_events
 --
 -- PostgreSQL database dump complete
 --
+
+-- Approval names one immutable operation, including both digests (05-D2 §16.3).
+ALTER TABLE public.workflow_action_intents ADD CONSTRAINT workflow_action_approval_identity
+    UNIQUE(company_id,run_id,execution_id,id,argument_digest,operation_digest);
+ALTER TABLE public.workflow_decisions ADD CONSTRAINT workflow_decisions_action_identity
+    FOREIGN KEY(company_id,run_id,execution_id,action_invocation_id,argument_digest,operation_digest)
+    REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest);

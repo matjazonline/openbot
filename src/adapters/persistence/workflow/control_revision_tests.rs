@@ -70,10 +70,7 @@ async fn workflow_control_revision_material_transitions_and_heartbeat_noops() {
         .execute(f.persistence().pool())
         .await
         .unwrap();
-    f.persistence()
-        .record_signal(wait_signal(scope))
-        .await
-        .unwrap();
+    recorded(f.persistence(), wait_signal(scope)).await.unwrap();
     assert_eq!(command(&f, scope, "event").await.expected_revision, parked);
     f.persistence().resume_wait(scope).await.unwrap();
     assert!(command(&f, scope, "resumed").await.expected_revision > parked);

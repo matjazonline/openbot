@@ -61,7 +61,7 @@ pub(super) async fn setup(origin: &str, entrance: Entrance) -> Setup {
     );
     // Box the real persistence/lifecycle seams to keep fixture setup on stock stacks.
     let connection = Box::pin(configured(&fixture, origin, entrance)).await;
-    let version = Box::pin(published(&fixture, &connection, entrance)).await;
+    let version = Box::pin(published(&fixture, &connection, entrance, None)).await;
     let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
     let claim = Box::pin(claimed(&fixture, target)).await;
     Setup {
@@ -124,10 +124,11 @@ pub(super) async fn configured(
     .await
     .unwrap()
 }
-async fn published(
+pub(super) async fn published(
     fixture: &Fixture,
     connection: &HttpConnection,
     entrance: Entrance,
+    approval: Option<Value>,
 ) -> VersionId {
     let p = &fixture.persistence;
     let tool = matches!(entrance, Entrance::Tool);
@@ -140,6 +141,9 @@ async fn published(
     let mut source: Value = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
     if tool {
         source["steps"]["start"]["with"] = json!({"tool":{"literal":name},"arguments":{"literal":{"method":"POST","path":"/messages","body":{"message":"hello"}}}});
+    }
+    if let Some(approval) = approval {
+        source["steps"]["start"]["with"]["approval"] = json!({"literal":approval});
     }
     let directory = http::HttpPublicationDirectory {
         persistence: p.clone(),
@@ -205,7 +209,7 @@ pub(super) async fn bound(
         .unwrap();
     target
 }
-async fn claimed(fixture: &Fixture, target: BindingTarget) -> ClaimedWorkflow {
+pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> ClaimedWorkflow {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let actor = fixture.target.actor;

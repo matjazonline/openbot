@@ -73,8 +73,8 @@ async fn workflow_phase03_admission_wait_retry_restart_combined() {
         ..scope
     };
     let event = signal(waiting);
-    assert!(p.record_signal(event.clone()).await.unwrap());
-    assert!(p.record_signal(event).await.unwrap());
+    assert!(recorded(p, event.clone()).await.unwrap());
+    assert!(recorded(p, event).await.unwrap());
     let fresh = PostgresPersistence::new(p.pool().clone());
     compete(
         &fresh,
@@ -87,6 +87,7 @@ async fn workflow_phase03_admission_wait_retry_restart_combined() {
     let failed = WorkflowWorker {
         port: &fresh,
         handler: &failure,
+        notices: None,
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),

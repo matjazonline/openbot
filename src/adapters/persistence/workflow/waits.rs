@@ -33,11 +33,11 @@ impl WorkflowWaits for PostgresPersistence {
         .await
         .map_err(|_| lease::timed_out())?
     }
-    async fn record_signal(&self, signal: WorkflowSignal) -> AppResult<bool> {
+    async fn record_event(&self, event: WorkflowEvent) -> AppResult<EventIngress> {
         tokio::time::timeout(Duration::from_secs(2), async {
             let mut tx = self.pool.begin().await?;
-            let result = signal_on(&mut tx, signal).await?;
-            if result {
+            let result = record_event_on(&mut tx, event).await?;
+            if result == EventIngress::Recorded {
                 tx.commit().await?;
             } else {
                 tx.rollback().await?;
@@ -115,7 +115,7 @@ pub(super) async fn lock(
     if execution.is_none() {
         return Ok(None);
     }
-    let payload:Option<Value>=sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status IN ('pending','completed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
+    let payload:Option<Value>=sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status IN ('pending','completed','failed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     match payload {
         Some(payload) => {
@@ -128,12 +128,23 @@ pub(super) async fn lock(
         _ => Ok(None),
     }
 }
+pub(super) enum WaitSelection {
+    Execution,
+    Decision,
+}
 pub(super) async fn row(
     db: &mut PgConnection,
     scope: ActivationRequest,
+    selection: WaitSelection,
 ) -> AppResult<Option<WaitRow>> {
-    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 FOR UPDATE")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(db).await?)
+    let selection = match selection {
+        WaitSelection::Execution => "execution",
+        WaitSelection::Decision => "decision",
+    };
+    // A completed approval does not complete its execution. Only the active wait or
+    // the actual terminal step wait can answer execution resume/replay.
+    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval')))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(selection).fetch_optional(db).await?)
 }
 pub(super) async fn now(db: &mut PgConnection) -> AppResult<DateTime<Utc>> {
     Ok(sqlx::query_scalar("SELECT clock_timestamp()")
@@ -156,7 +167,7 @@ async fn park_on(
     let Some(run) = lock(db, scope).await? else {
         return Ok(None);
     };
-    if let Some(wait) = row(db, scope).await? {
+    if let Some(wait) = row(db, scope, WaitSelection::Execution).await? {
         return Ok(Some(ParkedWorkflow {
             wait: WaitId::new(wait.id),
             deadline: wait.deadline,
@@ -215,69 +226,80 @@ async fn park_on(
         deadline,
     }))
 }
-async fn signal_on(db: &mut PgConnection, signal: WorkflowSignal) -> AppResult<bool> {
-    let scope = signal.scope;
-    let Some(run) = lock(db, scope).await? else {
-        return Ok(false);
-    };
-    if signal.name.0.is_empty()
-        || signal.name.0.len() > 128
-        || signal.correlation.0.is_empty()
-        || signal.correlation.0.len() > 256
+/// Persist a run-scoped event before any worker wakes for it (05-D1 §11, 05-D2 §11). Producers
+/// to one run serialize on an advisory lock, so the unconsumed bound is exact; consumers never
+/// take it, and a concurrent consumption only lowers the count.
+async fn record_event_on(db: &mut PgConnection, event: WorkflowEvent) -> AppResult<EventIngress> {
+    if event.name.0.is_empty()
+        || event.name.0.len() > 128
+        || event.correlation.0.is_empty()
+        || event.correlation.0.len() > 256
     {
-        return Ok(false);
+        return Err(AppError::BadRequest("Invalid workflow event".into()));
     }
-    let saved:Option<SavedSignal>=sqlx::query_as("SELECT run_id,execution_id,event_name,correlation,payload FROM workflow_wait_events WHERE company_id=$1 AND id=$2")
-        .bind(scope.company.as_uuid()).bind(signal.id.0).fetch_optional(&mut *db).await?;
+    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *db).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('workflow_wait_events:' || $1::text || ':' || $2::text, 0))")
+        .bind(event.company.as_uuid()).bind(event.run.as_uuid()).execute(&mut *db).await?;
+    let saved: Option<SavedEvent> = sqlx::query_as("SELECT run_id,event_name,correlation,payload FROM workflow_wait_events WHERE company_id=$1 AND id=$2")
+        .bind(event.company.as_uuid()).bind(event.id.0).fetch_optional(&mut *db).await?;
     if let Some(saved) = saved {
-        return Ok(saved.run_id == scope.run.as_uuid()
-            && saved.execution_id == scope.execution.as_uuid()
-            && saved.event_name == signal.name.0
-            && saved.correlation == signal.correlation.0
-            && saved.payload == signal.payload);
+        return if saved.run_id == event.run.as_uuid()
+            && saved.event_name == event.name.0
+            && saved.correlation == event.correlation.0
+            && saved.payload == event.payload
+        {
+            Ok(EventIngress::Duplicate)
+        } else {
+            Err(AppError::Conflict("Workflow event id was reused".into()))
+        };
     }
-    let now = now(db).await?;
-    if !matches!(run.state.as_str(), "queued" | "running" | "waiting") || run.deadline <= now {
-        return Ok(false);
-    }
-    if row(db, scope)
-        .await?
-        .is_some_and(|wait| wait.state != "waiting")
-    {
-        return Ok(false);
-    }
+    let run: Option<(Uuid, bool)> = sqlx::query_as("SELECT binding_id,state IN ('queued','running','waiting') AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
+        .bind(event.company.as_uuid()).bind(event.run.as_uuid()).fetch_optional(&mut *db).await?;
+    let Some((binding_id, true)) = run else {
+        return Ok(EventIngress::Unmatched);
+    };
     let binding = admission_binding::read_saved_binding(
         db,
-        scope.company,
-        WorkflowBindingId::new(run.binding_id),
-        scope.run.as_uuid(),
+        event.company,
+        WorkflowBindingId::new(binding_id),
+        event.run.as_uuid(),
     )
     .await?;
-    let activation = activation::activate_on(db, scope)
-        .await?
-        .ok_or_else(invalid)?;
-    let spec = specification(binding.bundle(), &activation)?;
-    if spec.timer
-        || spec.deadline <= now
-        || spec.name.as_ref() != Some(&signal.name.0)
-        || spec.correlation.as_ref() != Some(&signal.correlation.0)
-    {
-        return Ok(false);
-    }
-    crate::domain::workflow::validate_context_value(
-        &signal.payload,
-        binding.bundle().compiled().graph().context_limits(),
-    )
-    .map_err(|_| invalid())?;
-    prepare(binding.bundle(), &activation, signal.payload.clone())?;
-    let count:i64=sqlx::query_scalar("SELECT count(*) FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND execution_id=$3")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
-    if count >= 128 {
+    let compiled = binding.bundle().compiled();
+    let declared = Value::String(event.name.0.clone());
+    let Some(step) = compiled
+        .graph()
+        .definition()
+        .steps
+        .iter()
+        .find(|(_, step)| {
+            step.step_type.as_str() == "wait.event"
+                && matches!(step.inputs.get("event"), Some(Binding::Literal(name)) if *name == declared)
+        })
+        .map(|(id, _)| id.clone())
+    else {
+        return Ok(EventIngress::Unmatched);
+    };
+    // Every wait for one name shares one payload schema (registry rule), so this validates
+    // before any wait exists, as the execution-scoped signal did.
+    compiled
+        .validate_step_output(&step, &event.payload)
+        .map_err(|_| AppError::BadRequest("Invalid workflow event payload".into()))?;
+    let unconsumed: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND consumed_execution_id IS NULL")
+        .bind(event.company.as_uuid()).bind(event.run.as_uuid()).fetch_one(&mut *db).await?;
+    if unconsumed >= MAX_UNCONSUMED_EVENTS {
         return Err(AppError::Conflict("Workflow event limit reached".into()));
     }
-    sqlx::query("INSERT INTO workflow_wait_events(company_id,run_id,execution_id,id,event_name,correlation,payload) VALUES($1,$2,$3,$4,$5,$6,$7)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(signal.id.0).bind(signal.name.0).bind(signal.correlation.0).bind(signal.payload).execute(db).await?;
-    Ok(true)
+    sqlx::query("INSERT INTO workflow_wait_events(company_id,run_id,id,event_name,correlation,payload) VALUES($1,$2,$3,$4,$5,$6)")
+        .bind(event.company.as_uuid()).bind(event.run.as_uuid()).bind(event.id.0).bind(event.name.0).bind(event.correlation.0).bind(event.payload).execute(db).await.map_err(|error| {
+            // Different runs hold different producer locks but share the event-id namespace.
+            if error.as_database_error().is_some_and(|error| error.is_unique_violation() && error.constraint() == Some("workflow_wait_events_pkey")) {
+                AppError::Conflict("Workflow event id was reused".into())
+            } else {
+                error.into()
+            }
+        })?;
+    Ok(EventIngress::Recorded)
 }
 
 #[derive(sqlx::FromRow)]
@@ -288,9 +310,8 @@ struct SweepCandidate {
     job_id: Uuid,
 }
 #[derive(sqlx::FromRow)]
-struct SavedSignal {
+struct SavedEvent {
     run_id: Uuid,
-    execution_id: Uuid,
     event_name: String,
     correlation: String,
     payload: Value,

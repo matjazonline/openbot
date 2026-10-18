@@ -365,6 +365,7 @@ pub enum MessagePublication {
     /// Every destination is terminal and at least one outcome is unknown.
     Uncertain,
     ApprovalRequired,
+    ApprovalParked(WaitId),
     /// `MAX_MESSAGE_ACTIONS_PER_EXECUTION` reached; nothing was written.
     ActionLimit,
     /// A step re-entered an unresolved marker it cannot replay.
@@ -426,6 +427,7 @@ pub enum MessageObservation {
     Pending,
     Uncertain,
     ApprovalRequired,
+    ApprovalParked(WaitId),
     ActionLimit,
 }
 

@@ -1,7 +1,7 @@
 use super::*;
 impl Registration<'_> {
     pub(super) fn action(&mut self) -> Result<Contract, Diagnostic> {
-        match self.name() {
+        let mut contract = match self.name() {
             "http.request" => self.http(),
             "tool.call" | "mcp.call" => self.tool(),
             name @ ("message.send" | "message.reply") => {
@@ -11,7 +11,22 @@ impl Registration<'_> {
                 Ok(contract(properties, required, message_result()))
             }
             _ => unreachable!("action family"),
+        }?;
+        if let Some(binding) = self.parsed.definition.steps[self.id].inputs.get("approval") {
+            if !static_approval_reviewers(binding) {
+                return Err(self.error(
+                    "registry.static_reviewers",
+                    "Approvers must be literal or come from binding parameters",
+                    "approval",
+                ));
+            }
+            self.check(InputCheck::Approval)?;
         }
+        contract.input["properties"]["approval"] = object(
+            json!({"reviewers":reviewers(),"deadline":text(MAX_DEADLINE)}),
+            &["reviewers", "deadline"],
+        );
+        Ok(contract)
     }
     fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
         let connection = self.literal("connection")?;
@@ -140,4 +155,24 @@ fn message_inputs(name: &str) -> Option<(Value, &'static [&'static str])> {
 pub(crate) fn message_tool_schemas(name: &str) -> Option<(Value, Value)> {
     let (properties, required) = message_inputs(name)?;
     Some((object(properties, required), message_result()))
+}
+
+// Deadline bindings may be dynamic; only reviewer assignment must be static.
+fn static_approval_reviewers(binding: &Binding) -> bool {
+    match binding {
+        Binding::Object(fields) => fields.get("reviewers").is_none_or(|reviewers| {
+            reviewers
+                .references()
+                .iter()
+                .all(|r| r.root_name() == "params")
+        }),
+        Binding::Default {
+            reference,
+            fallback,
+        } => reference.root_name() == "params" && static_approval_reviewers(fallback),
+        other => other
+            .references()
+            .iter()
+            .all(|reference| reference.root_name() == "params"),
+    }
 }

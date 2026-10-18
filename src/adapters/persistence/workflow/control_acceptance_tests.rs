@@ -35,9 +35,10 @@ fn waiting_source() -> Value {
     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
     source
 }
-fn wait_signal(scope: ActivationRequest) -> WorkflowSignal {
-    WorkflowSignal {
-        scope,
+fn wait_signal(scope: ActivationRequest) -> WorkflowEvent {
+    WorkflowEvent {
+        company: scope.company,
+        run: scope.run,
         id: WorkflowEventId(Uuid::new_v4()),
         name: WorkflowEventName("review.completed".into()),
         correlation: WorkflowEventCorrelation("request-1".into()),
@@ -149,10 +150,7 @@ async fn workflow_control_cancel_resume_competitors_preserve_event_and_notificat
     for _ in 0..3 {
         let (f, scope) = fixture_source(waiting_source()).await;
         f.persistence().park_wait(scope).await.unwrap().unwrap();
-        f.persistence()
-            .record_signal(wait_signal(scope))
-            .await
-            .unwrap();
+        recorded(f.persistence(), wait_signal(scope)).await.unwrap();
         let before = control_state(&f).await;
         let cmd = command(&f, scope, "cancel").await;
         let barrier = Barrier::new(2);
@@ -176,10 +174,11 @@ async fn workflow_control_cancel_resume_competitors_preserve_event_and_notificat
             assert_eq!(state["workflow_executions"].as_array().unwrap().len(), 2);
             assert_eq!(state["workflow_waits"][0]["state"], "completed");
         }
-        assert_eq!(
-            state["workflow_wait_events"],
-            before["workflow_wait_events"]
-        );
+        let mut expected_events = before["workflow_wait_events"].clone();
+        if state["workflow_waits"][0]["state"] == "completed" {
+            expected_events[0]["consumed_execution_id"] = json!(scope.execution.as_uuid());
+        }
+        assert_eq!(state["workflow_wait_events"], expected_events);
         assert_eq!(
             state["workflow_waits"][0]["notification_intent"],
             before["workflow_waits"][0]["notification_intent"]
@@ -288,10 +287,7 @@ async fn workflow_control_cancel_deferred_faults_roll_back_complete_state() {
 async fn workflow_control_wait_and_retry_deferred_faults_roll_back_complete_state() {
     let (f, scope) = fixture_source(waiting_source()).await;
     f.persistence().park_wait(scope).await.unwrap().unwrap();
-    f.persistence()
-        .record_signal(wait_signal(scope))
-        .await
-        .unwrap();
+    recorded(f.persistence(), wait_signal(scope)).await.unwrap();
     install_fault(&f, "workflow_control_commands", "INSERT").await;
     let before = control_state(&f).await;
     let cmd = command(&f, scope, "cancel").await;

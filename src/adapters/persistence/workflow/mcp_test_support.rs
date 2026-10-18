@@ -389,7 +389,18 @@ pub(super) fn source() -> Value {
     })
 }
 
-pub(super) async fn published(fixture: &Fixture, connection: Uuid) -> VersionId {
+pub(super) fn published(
+    fixture: &Fixture,
+    connection: Uuid,
+) -> impl std::future::Future<Output = VersionId> {
+    published_source(fixture, connection, source())
+}
+
+pub(super) async fn published_source(
+    fixture: &Fixture,
+    connection: Uuid,
+    source: Value,
+) -> VersionId {
     let p = &fixture.persistence;
     let directory = mcp::McpPublicationDirectory {
         persistence: p.clone(),
@@ -402,7 +413,7 @@ pub(super) async fn published(fixture: &Fixture, connection: Uuid) -> VersionId 
     let definitions =
         DefinitionService::new(Preflight, p.clone(), WorkflowSourceDecoder, directory);
     let mut draft = fixture.save(None);
-    draft.content.source = source().to_string();
+    draft.content.source = source.to_string();
     definitions.save(draft).await.unwrap();
     let publication = fixture.publish();
     definitions.publish(publication.clone()).await.unwrap();

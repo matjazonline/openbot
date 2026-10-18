@@ -6,7 +6,7 @@ use super::{
     publication::PublishedBundle,
 };
 use crate::app_error::{AppError, AppResult};
-use crate::domain::workflow::{RouteSelection, WaitId};
+use crate::domain::workflow::{CompanyId, RouteSelection, RunId, WaitId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -18,14 +18,28 @@ pub struct WorkflowEventId(pub Uuid);
 pub struct WorkflowEventName(pub String);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkflowEventCorrelation(pub String);
+/// A correlated event addressed to a run, never to an execution, so it can arrive before the
+/// waiting step exists or parks (05-D1 §11, 05-D2 §11).
 #[derive(Debug, Clone, PartialEq)]
-pub struct WorkflowSignal {
-    pub scope: ActivationRequest,
+pub struct WorkflowEvent {
+    pub company: CompanyId,
+    pub run: RunId,
+    /// Producer deduplication identity.
     pub id: WorkflowEventId,
     pub name: WorkflowEventName,
     pub correlation: WorkflowEventCorrelation,
     pub payload: Value,
 }
+/// `Unmatched` tells an ingress adapter to treat the message as ordinary ingress. A reused id
+/// with different content, or a full inbox, is `Conflict`; an invalid payload is `BadRequest`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventIngress {
+    Recorded,
+    Duplicate,
+    Unmatched,
+}
+/// Unconsumed events one run may hold; producers serialize per run, so the bound is exact.
+pub const MAX_UNCONSUMED_EVENTS: i64 = 128;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParkedWorkflow {
     pub wait: WaitId,
@@ -53,8 +67,9 @@ pub enum WaitFailureReason {
 #[async_trait]
 pub trait WorkflowWaits: Send + Sync {
     async fn park_wait(&self, scope: ActivationRequest) -> AppResult<Option<ParkedWorkflow>>;
-    /// Internal producer port. Does not authorize a human decision or public ingress.
-    async fn record_signal(&self, signal: WorkflowSignal) -> AppResult<bool>;
+    /// Internal producer port. Never matches a human decision or a protected action
+    /// (BRIEF-03.6), and authorizes no public ingress.
+    async fn record_event(&self, event: WorkflowEvent) -> AppResult<EventIngress>;
     async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress>;
     /// Bounded database scan; transitions each selected run independently in run-first order.
     async fn sweep_waits(&self, limit: u16) -> AppResult<u16>;

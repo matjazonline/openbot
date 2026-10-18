@@ -168,7 +168,15 @@ impl WorkflowLeases for PostgresPersistence {
         fence: WorkflowFence,
         wait: crate::domain::workflow::WaitId,
     ) -> AppResult<bool> {
-        message::receipts::confirm_suspension(self, fence, wait.as_uuid()).await
+        if message::receipts::confirm_suspension(self, fence, wait.as_uuid()).await? {
+            return Ok(true);
+        }
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            decisions::approvals::confirm(self, fence, wait),
+        )
+        .await
+        .map_err(|_| AppError::Timeout("Approval suspension confirmation timed out".into()))?
     }
 }
 

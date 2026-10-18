@@ -32,6 +32,7 @@ async fn workflow_poll_failed_batch_is_not_immediately_reclaimed() {
     let runner = WorkflowWorker {
         port: p,
         handler: &handler,
+        notices: None,
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),
@@ -78,7 +79,7 @@ async fn workflow_poll_complete_chain_and_competing_wait_consumption() {
         job: WorkflowJobId(row.1),
         ..scope
     };
-    p.record_signal(signal(waiting)).await.unwrap();
+    recorded(p, signal(waiting)).await.unwrap();
     let candidate = p.poll_work(None, 2).await.unwrap().candidates[0];
     assert_eq!(candidate.work, PollWork::Wait);
     let left = polling(p, &handler);
@@ -175,6 +176,7 @@ async fn workflow_poll_unchanged_page_and_notification_storm_preserve_delay() {
     let runner = WorkflowWorker {
         port: p,
         handler: &handler,
+        notices: None,
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),

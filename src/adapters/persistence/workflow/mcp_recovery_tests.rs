@@ -20,6 +20,7 @@ async fn workflow_mcp_permit_timeout_retires_safely_then_retries_once() {
         tokio::time::timeout(Duration::from_secs(7), setup.runtime().run(&kind(), &first))
             .await
             .unwrap()
+            .completed_result()
             .unwrap_err();
     assert_eq!(code(&failure), "mcp.unavailable");
     assert_eq!(setup.server.count("POST initialize"), 4);
@@ -33,7 +34,14 @@ async fn workflow_mcp_permit_timeout_retires_safely_then_retries_once() {
         session.close().await.unwrap();
     }
     let second = reclaim(p, first.fence.scope).await;
-    assert!(setup.runtime().run(&kind(), &second).await.is_ok());
+    assert!(
+        setup
+            .runtime()
+            .run(&kind(), &second)
+            .await
+            .completed_result()
+            .is_ok()
+    );
     assert_eq!(setup.server.calls(), 1);
     assert_eq!(action_counts(p).await, counts(1, 1, 1));
     setup.client.shutdown().await.unwrap();
@@ -46,13 +54,23 @@ async fn workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinit
         let p = &setup.fixture.persistence;
         let claim = claimed(&setup).await;
         let runtime = setup.runtime();
-        let failure = runtime.run(&kind(), &claim).await.unwrap_err();
+        let failure = runtime
+            .run(&kind(), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
         assert_eq!(code(&failure), "mcp.unresolved", "{call:?}");
         assert_eq!(setup.server.calls(), 1);
         assert_eq!(setup.server.count("POST initialize"), 1, "no reinitialize");
         assert_eq!(action_counts(p).await, counts(1, 1, 0));
         let seen = setup.server.log().len();
-        assert!(runtime.run(&kind(), &claim).await.is_err());
+        assert!(
+            runtime
+                .run(&kind(), &claim)
+                .await
+                .completed_result()
+                .is_err()
+        );
         assert_eq!(setup.server.log().len(), seen);
         assert_eq!(
             retire(p, &claim, lease(), failure).await,
@@ -95,7 +113,12 @@ async fn workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_s
     setup.server.observed("POST notifications/cancelled").await;
     setup.server.observed("DELETE").await;
     // A restarted owner sees the possible dispatch and never calls again.
-    let failure = setup.runtime().run(&kind(), &claim).await.unwrap_err();
+    let failure = setup
+        .runtime()
+        .run(&kind(), &claim)
+        .await
+        .completed_result()
+        .unwrap_err();
     assert_eq!(code(&failure), "mcp.unresolved");
     assert_eq!(setup.server.calls(), 1);
 
@@ -160,7 +183,13 @@ async fn workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once() {
         )
     );
     let second = reclaim(p, scope).await;
-    assert!(runtime.run(&kind(), &second).await.is_ok());
+    assert!(
+        runtime
+            .run(&kind(), &second)
+            .await
+            .completed_result()
+            .is_ok()
+    );
     assert_eq!(setup.server.calls(), 1);
 }
 
@@ -192,7 +221,7 @@ async fn workflow_mcp_revocation_and_rotation_racing_dispatch_never_call() {
     .await
     .unwrap();
     setup.server.state.release.notify_one();
-    let failure = task.await.unwrap().unwrap_err();
+    let failure = task.await.unwrap().completed_result().unwrap_err();
     assert_eq!(
         code(&failure),
         "mcp.unresolved",
@@ -206,7 +235,11 @@ async fn workflow_mcp_revocation_and_rotation_racing_dispatch_never_call() {
     );
     setup.server.hang_list(false);
     let second = reclaim(p, scope).await;
-    let failure = runtime.run(&kind(), &second).await.unwrap_err();
+    let failure = runtime
+        .run(&kind(), &second)
+        .await
+        .completed_result()
+        .unwrap_err();
     assert_eq!(
         code(&failure),
         "mcp.rejected",
@@ -235,7 +268,7 @@ async fn workflow_mcp_revocation_and_rotation_racing_dispatch_never_call() {
     .await
     .unwrap();
     setup.server.state.release.notify_one();
-    let failure = task.await.unwrap().unwrap_err();
+    let failure = task.await.unwrap().completed_result().unwrap_err();
     assert_eq!(code(&failure), "mcp.unresolved");
     assert_eq!(setup.server.calls(), 0, "rotated credential: nothing sent");
     assert_eq!(action_counts(p).await, counts(1, 1, 0));
