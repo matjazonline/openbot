@@ -240,58 +240,21 @@ fn retry_audit(before: &Value, after: &Value, request: &ActionDispatchRequest, n
     ));
 }
 
-struct NativeFunction {
-    name: &'static str,
-    migration: &'static str,
-}
-
-fn native_body(definition: &NativeFunction) -> &'static str {
-    let start = definition
-        .migration
-        .find(&format!("FUNCTION {}(", definition.name))
-        .unwrap();
-    definition.migration[start..]
-        .split_once("$$")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .0
-}
-
 pub(super) async fn native_catalog(f: &AdmissionFixture) -> Value {
-    let binding =
-        include_str!("../../../../migrations/20260930181000_workflow_action_evidence_binding.sql");
-    let bounds =
-        include_str!("../../../../migrations/20261001090000_workflow_action_proof_bounds.sql");
-    let evidence =
-        include_str!("../../../../migrations/20260930180000_workflow_action_evidence.sql");
-    for definition in [
-        NativeFunction {
-            name: "workflow_action_reservation_identity",
-            migration: binding,
-        },
-        NativeFunction {
-            name: "workflow_action_consumption_commit_guard",
-            migration: binding,
-        },
-        NativeFunction {
-            name: "workflow_action_not_applied_available",
-            migration: bounds,
-        },
-        NativeFunction {
-            name: "workflow_action_remote_entry_commit_guard",
-            migration: evidence,
-        },
+    for name in [
+        "workflow_action_reservation_identity",
+        "workflow_action_consumption_commit_guard",
+        "workflow_action_not_applied_available",
+        "workflow_action_remote_entry_commit_guard",
     ] {
         let body: String = sqlx::query_scalar(
             "SELECT prosrc FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=$1",
         )
-        .bind(definition.name)
+        .bind(name)
         .fetch_one(f.persistence().pool())
         .await
         .unwrap();
-        assert_eq!(body, native_body(&definition), "native {}", definition.name);
+        assert_eq!(body, init_function_body(name), "native {name}");
     }
     let catalog: Value = sqlx::query_scalar("SELECT jsonb_agg(jsonb_build_object('name',tgname,'relation',tgrelid::regclass::text,'enabled',tgenabled,'type',tgtype,'deferred',tgdeferrable,'initially_deferred',tginitdeferred,'function',tgfoid::regproc::text,'definition',pg_get_triggerdef(oid)) ORDER BY tgname) FROM pg_trigger WHERE NOT tgisinternal AND tgname=ANY($1)")
         .bind(vec!["workflow_action_consumption_commit_guard", "workflow_action_consumption_reservation_identity", "workflow_action_entry_reservation_identity", "workflow_action_remote_entry_commit_guard"])

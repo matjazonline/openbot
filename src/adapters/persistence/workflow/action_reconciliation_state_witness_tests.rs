@@ -169,60 +169,18 @@ async fn witness_owner(source: Source) -> WitnessOwner {
         expected,
     }
 }
-fn function_body<'a>(migration: &'a str, name: &str) -> &'a str {
-    let start = migration
-        .find(&format!("FUNCTION {name}("))
-        .expect("immutable native definition");
-    migration[start..]
-        .split_once("$$")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .0
-}
 async fn native_catalog(f: &AdmissionFixture) -> Value {
     let defs = [
-        (
-            "check_workflow_control_retry",
-            include_str!(
-                "../../../../migrations/20260930184000_workflow_action_audit_commands.sql"
-            ),
-        ),
-        (
-            "workflow_action_state_witness_owner",
-            include_str!(
-                "../../../../migrations/20260930181000_workflow_action_evidence_binding.sql"
-            ),
-        ),
-        (
-            "workflow_action_capture_state_witness",
-            include_str!(
-                "../../../../migrations/20260930181000_workflow_action_evidence_binding.sql"
-            ),
-        ),
-        (
-            "workflow_action_capture_schedule",
-            include_str!("../../../../migrations/20261001100000_workflow_action_claim_budget.sql"),
-        ),
-        (
-            "workflow_action_bind_schedule",
-            include_str!("../../../../migrations/20261001100000_workflow_action_claim_budget.sql"),
-        ),
-        (
-            "workflow_action_claim_episode_guard",
-            include_str!("../../../../migrations/20261001100000_workflow_action_claim_budget.sql"),
-        ),
-        (
-            "workflow_action_reconciliation_reopen_safe",
-            include_str!("../../../../migrations/20261001100000_workflow_action_claim_budget.sql"),
-        ),
-        (
-            "workflow_action_reconciliation_budget_eligible",
-            include_str!("../../../../migrations/20261001100000_workflow_action_claim_budget.sql"),
-        ),
+        "check_workflow_control_retry",
+        "workflow_action_state_witness_owner",
+        "workflow_action_capture_state_witness",
+        "workflow_action_capture_schedule",
+        "workflow_action_bind_schedule",
+        "workflow_action_claim_episode_guard",
+        "workflow_action_reconciliation_reopen_safe",
+        "workflow_action_reconciliation_budget_eligible",
     ];
-    for (name, migration) in defs {
+    for name in defs {
         let bodies: Vec<String> = sqlx::query_scalar(
             "SELECT prosrc FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=$1",
         )
@@ -232,7 +190,7 @@ async fn native_catalog(f: &AdmissionFixture) -> Value {
         .unwrap();
         assert_eq!(
             bodies,
-            vec![function_body(migration, name)],
+            vec![init_function_body(name)],
             "exact immutable native body {name}"
         );
     }

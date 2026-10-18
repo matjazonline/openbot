@@ -206,35 +206,99 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
     held.rollback().await.unwrap();
 }
 
+/// S-F001: the sealing branch of `insert_workflow_budget_link` and the debit rule of
+/// `debit_workflow_budget_receipt`, on a fresh schema. A root run whose stored bundle is not
+/// compiler revision 2, or does not decode, is `sealed_legacy` with no limits, and every positive
+/// debit of it is `exhausted` without touching usage. The admitted current-revision root is
+/// `frozen_v2` and grants: the control.
 #[tokio::test]
-async fn workflow_budget_schema_retained_migration_preserves_exact_activations_and_seals() {
-    let (f, root) = limited().await;
-    let child = admit_child(&f, root, "start", "child").await;
-    f.persistence().activate(root).await.unwrap();
-    f.persistence().activate(child).await.unwrap();
-    // Recreate the pre-budget boundary only inside this isolated, rollback-only
-    // transaction. No retained database or migration checksum is changed.
-    let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::raw_sql("DROP TABLE workflow_budget_receipts,workflow_root_budget_usage,workflow_run_budgets,workflow_root_budgets CASCADE; DROP FUNCTION insert_workflow_budget_link(),preserve_workflow_budget_identity(),preserve_workflow_budget_receipt(),debit_workflow_budget_receipt(),preserve_workflow_budget_usage() CASCADE; ALTER TABLE workflow_runs DROP CONSTRAINT workflow_run_budget_parent_identity;")
-        .execute(&mut *tx).await.unwrap();
-    sqlx::raw_sql(include_str!(
-        "../../../../migrations/20260929070000_workflow_root_budgets.sql"
-    ))
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('provenance',budget.provenance,'activations',usage.activations,'model_calls',usage.model_calls,'repetitions',usage.repetitions,'receipts',(SELECT count(*) FROM workflow_budget_receipts)) FROM workflow_root_budgets AS budget JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)")
-        .fetch_one(&mut *tx).await.unwrap();
+async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
+    let (f, admitted) = limited().await;
+    let company = admitted.company.as_uuid();
+    let mut db = f.persistence().pool().acquire().await.unwrap();
+    let mut sealed = Vec::new();
+    for (case, bundle) in [
+        (
+            "older compiler revision",
+            "convert_to(jsonb_set(convert_from(source.bundle,'UTF8')::jsonb,'{compiler_revision}','\"1\"')::text,'UTF8')",
+        ),
+        ("malformed bundle", "convert_to('not a bundle','UTF8')"),
+    ] {
+        // A raw root run beside the admitted one, as an SQL-only writer would insert it.
+        let (run, execution) = (Uuid::new_v4(), Uuid::new_v4());
+        sqlx::query(&format!(
+            "INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle,input,params,resources,max_steps,max_context_bytes,deadline) \
+             SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),{bundle},input,params,resources,max_steps,max_context_bytes,deadline \
+               FROM workflow_runs AS source WHERE company_id=$1 AND id=$3"
+        ))
+        .bind(company)
+        .bind(run)
+        .bind(admitted.run.as_uuid())
+        .execute(&mut *db)
+        .await
+        .unwrap_or_else(|error| panic!("{case}: {error}"));
+        sqlx::query("INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'start',1)")
+            .bind(company).bind(run).bind(execution).execute(&mut *db).await
+            .unwrap_or_else(|error| panic!("{case}: {error}"));
+        sealed.push((
+            case,
+            ActivationRequest {
+                company: admitted.company,
+                run: RunId::new(run),
+                execution: ExecutionId::new(execution),
+                job: WorkflowJobId(Uuid::nil()),
+            },
+        ));
+    }
+    let budget = |run: RunId| {
+        sqlx::query_scalar::<_, Value>(
+            "SELECT jsonb_build_object('provenance',budget.provenance,'limits',jsonb_build_array(budget.activations,budget.model_calls,budget.repetitions),\
+               'usage',jsonb_build_array(usage.activations,usage.model_calls,usage.repetitions)) \
+             FROM workflow_root_budgets AS budget JOIN workflow_root_budget_usage AS usage USING (company_id,root_run_id) \
+             WHERE budget.company_id=$1 AND budget.root_run_id=$2",
+        )
+        .bind(company)
+        .bind(run.as_uuid())
+        .fetch_one(f.persistence().pool())
+    };
+    for (case, scope) in &sealed {
+        let sealed_budget =
+            json!({"provenance":"sealed_legacy","limits":[null,null,null],"usage":[0,0,0]});
+        assert_eq!(budget(scope.run).await.unwrap(), sealed_budget, "{case}");
+        for (resource, key) in [
+            ("activation", "activation"),
+            ("model_call", "sealed-call"),
+            ("repetition", "sealed-repeat"),
+        ] {
+            assert_eq!(
+                receipt(&mut db, *scope, resource, key, 1)
+                    .await
+                    .unwrap()
+                    .as_deref(),
+                Some("exhausted"),
+                "{case}: {resource}"
+            );
+        }
+        assert_eq!(
+            budget(scope.run).await.unwrap(),
+            sealed_budget,
+            "{case}: usage unchanged"
+        );
+    }
+    // The control: the admitted current-revision root carries its frozen limits and grants.
     assert_eq!(
-        saved,
-        json!({"provenance":"sealed_legacy","activations":2,"model_calls":0,"repetitions":0,"receipts":2})
+        budget(admitted.run).await.unwrap(),
+        json!({"provenance":"frozen_v2","limits":[2,2,2],"usage":[0,0,0]})
     );
     assert_eq!(
-        receipt(&mut tx, child, "model_call", "no-new-allowance", 1)
+        receipt(&mut db, admitted, "model_call", "frozen-call", 1)
             .await
             .unwrap()
             .as_deref(),
-        Some("exhausted")
+        Some("granted")
     );
-    tx.rollback().await.unwrap();
+    assert_eq!(
+        budget(admitted.run).await.unwrap()["usage"],
+        json!([0, 1, 0])
+    );
 }

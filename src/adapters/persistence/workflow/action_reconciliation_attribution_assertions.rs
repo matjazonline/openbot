@@ -4,54 +4,39 @@ use super::*;
 struct NativeGuard {
     name: &'static str,
     relation: &'static str,
-    migration: &'static str,
     timing: i16,
     deferred: bool,
 }
 
 fn guard_definitions() -> [NativeGuard; 5] {
-    let binding =
-        include_str!("../../../../migrations/20260930181000_workflow_action_evidence_binding.sql");
-    // 04.11 replaces the dispatch and evidence commit guards (message branches; the local and
-    // remote branches unchanged), so their latest definitions live in the messaging migration.
-    let messaging = include_str!("../../../../migrations/20261017120000_workflow_messaging.sql");
-    let dispatch = messaging;
-    let observations = include_str!(
-        "../../../../migrations/20260930183000_workflow_action_observation_guards.sql"
-    );
     [
         NativeGuard {
             name: "workflow_action_dispatch_commit_guard",
             relation: "workflow_action_dispatches",
-            migration: dispatch,
             timing: 5,
             deferred: true,
         },
         NativeGuard {
             name: "workflow_action_applied_request_guard",
             relation: "workflow_action_evidence",
-            migration: binding,
             timing: 7,
             deferred: false,
         },
         NativeGuard {
             name: "workflow_action_evidence_commit_guard",
             relation: "workflow_action_evidence",
-            migration: messaging,
             timing: 5,
             deferred: true,
         },
         NativeGuard {
             name: "workflow_action_receipt_finality_conflict",
             relation: "workflow_action_receipts",
-            migration: observations,
             timing: 5,
             deferred: false,
         },
         NativeGuard {
             name: "workflow_action_conflict_park_pending",
             relation: "workflow_action_evidence_conflicts",
-            migration: binding,
             timing: 5,
             deferred: false,
         },
@@ -79,18 +64,7 @@ pub(super) async fn native_catalog(f: &AdmissionFixture) -> Value {
         assert_eq!(record["timing"], definition.timing);
         assert_eq!(record["deferrable"], definition.deferred);
         assert_eq!(record["deferred"], definition.deferred);
-        let start = definition
-            .migration
-            .find(&format!("FUNCTION {}(", definition.name))
-            .unwrap();
-        let body = definition.migration[start..]
-            .split_once("$$")
-            .unwrap()
-            .1
-            .split_once("$$")
-            .unwrap()
-            .0;
-        assert_eq!(record["body"], body);
+        assert_eq!(record["body"], init_function_body(definition.name));
     }
     catalog
 }

@@ -74,15 +74,15 @@ BEGIN
         OR (captured.original->>'observed_at')::timestamptz<=single_entry.created_at THEN
         RAISE EXCEPTION 'native chronology pair identity mismatch';
     END IF;
-    -- Literal transcription of workflow_action_evidence_commit_guard (migration
-    -- 20260930181000_workflow_action_evidence_binding.sql:132-150) with NEW written as the stored
-    -- `evidence` row; each key is true when that disjunct does not fire, except
-    -- entry_after_observed, which is true when its half fires. verified_le_created copies the CHECK
-    -- (20260930180000_workflow_action_evidence.sql:27). The guard's final disjunct is split into
-    -- entry_after_observed (target) and all_entries_covered: that disjunct fires exactly when
+    -- Literal transcription of the remote branch of workflow_action_evidence_commit_guard (init
+    -- schema) with NEW written as the stored `evidence` row; each key is true when that disjunct
+    -- does not fire, except entry_after_observed, which is true when its half fires.
+    -- verified_le_created copies the workflow_action_evidence CHECK
+    -- `observed_at<=verified_at AND verified_at<=created_at`. The guard's final disjunct is split
+    -- into entry_after_observed (target) and all_entries_covered: that disjunct fires exactly when
     -- `entry_after_observed OR NOT all_entries_covered`.
-    -- Pair completeness the guard does not read: audit_pair copies the command scope guard
-    -- (20260930184000_workflow_action_audit_commands.sql:71-74), plus run head and single coverage.
+    -- Pair completeness the guard does not read: audit_pair copies
+    -- workflow_action_command_scope_guard (init schema), plus run head and single coverage.
     SELECT jsonb_build_object(
         'remote_marker',(marker.effect_kind='remote') IS TRUE,
         'observed_ge_marker',(NOT evidence.observed_at<marker.created_at) IS TRUE,

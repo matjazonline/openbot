@@ -285,17 +285,12 @@ impl Drop for OwnDatabase {
 /// skips. Migrations run once per database rather than once per binary, which is what the isolation
 /// costs: the database starts empty, so the test states every row that exists in it.
 pub async fn own_database() -> Option<OwnDatabase> {
-    // Keep the additional migration-selection seam off stock test stacks.
-    Box::pin(own_database_with_migrations(&sqlx::migrate!(
-        "./migrations"
-    )))
-    .await
+    // Keep the migrator and pool setup off stock test stacks.
+    Box::pin(migrated_own_database()).await
 }
 
-/// A task-owned database at an exact historical migration prefix, without schema reconstruction.
-pub async fn own_database_with_migrations(
-    migrations: &sqlx::migrate::Migrator,
-) -> Option<OwnDatabase> {
+/// A task-owned database migrated with the checkout's single init schema.
+async fn migrated_own_database() -> Option<OwnDatabase> {
     let url = test_database_url()?;
     // Generated, so it needs no quoting beyond the identifier quotes: `CREATE DATABASE` takes no
     // parameters.
@@ -316,10 +311,10 @@ pub async fn own_database_with_migrations(
         name,
         admin_url,
     };
-    migrations
+    sqlx::migrate!("./migrations")
         .run(&database.pool)
         .await
-        .expect("a fresh database accepts the selected migration history");
+        .expect("a fresh database accepts the init schema");
     prewarm(&database.pool).await;
     Some(database)
 }
@@ -611,6 +606,65 @@ pub async fn wait_until_backends_are_blocked(pool: &PgPool, count: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The checkout has one migration, the squashed init schema. A fresh database records exactly
+    /// it, a rerun changes nothing, and it seeds no rows: there is no upgrade path to exercise.
+    #[tokio::test]
+    async fn a_fresh_database_applies_only_the_init_schema() {
+        let migrator = sqlx::migrate!("./migrations");
+        let expected: Vec<_> = migrator
+            .iter()
+            .map(|migration| {
+                (
+                    migration.version,
+                    migration.description.to_string(),
+                    migration.checksum.to_vec(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            expected
+                .iter()
+                .map(|(version, description, _)| (*version, description.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(20260817000000, "init schema")]
+        );
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let ledger = || async {
+            sqlx::query_as::<_, (i64, String, Vec<u8>, bool)>(
+                "SELECT version, description, checksum, success FROM _sqlx_migrations ORDER BY version",
+            )
+            .fetch_all(&database.pool)
+            .await
+            .unwrap()
+        };
+        let recorded = ledger().await;
+        assert_eq!(
+            recorded
+                .iter()
+                .map(|(version, description, checksum, success)| {
+                    assert!(*success);
+                    (*version, description.clone(), checksum.clone())
+                })
+                .collect::<Vec<_>>(),
+            expected
+        );
+        migrator.run(&database.pool).await.unwrap();
+        assert_eq!(ledger().await, recorded, "a rerun applies nothing");
+        let populated: Vec<String> = sqlx::query_scalar(
+            "SELECT relname::text FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p') \
+               AND relname<>'_sqlx_migrations' AND (xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM public.%I', relname), false, true, '')))[1]::text<>'0'",
+        )
+        .fetch_all(&database.pool)
+        .await
+        .unwrap();
+        assert!(
+            populated.is_empty(),
+            "the init schema seeds no rows: {populated:?}"
+        );
+    }
 
     #[test]
     fn skipping_needs_a_real_value_not_just_a_present_variable() {

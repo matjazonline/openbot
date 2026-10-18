@@ -1052,3 +1052,44 @@ Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; batch 04.11 
   - Focused areas, full suite (2674/0/22), stack (2669/0/22) and lease budget all pass per the `r006-*` logs.
 - **04.11-F017 (optional) — RESOLVED.** `begin_part` rolls back on the expired-proof `LeaseLost` branch (`delivery/queue.rs:206-216`). The inspection claim is withdrawn through the accepted amendment A2 (D3 §E).
 - **04.11-F018 (optional) — ADDRESSED; residual accepted.** The TASK diagnosis wording is corrected and the oracle recorded. Test hardening is left to a reviewed change, and the stashed-baseline rerun is explicitly reported as not run.
+
+# Batch S — migration squash (S-R001)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; Batch S (migration squash, before phase 05); batch review; round [S-R001](agent-review-notes.md#s-r001--batch-review-of-batch-s-migration-squash--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`). Snapshot base `4b54485830495dfeb68d45c61c0d6d8dd684e4c5`, digest `0aeeca933e66244420f6b05b37d645cc79facbc2307890591b187d0f9ac43fa5`.
+
+## S-F001 — The removed budget replay carried the only assertion of the sealed-root debit rule
+- Classification: actionable defect, **low**, verification (lost non-upgrade coverage). Blocking for this batch. The review asks whether removing the upgrade tests lost any non-upgrade coverage, and TASK records all seven as populated-upgrade tests.
+- Evidence:
+  - The deleted `workflow_budget_schema_retained_migration_preserves_exact_activations_and_seals` (`budget_schema_tests.rs` at base) asserted two things:
+    - (a) the `20260929070000` backfill: provenance `sealed_legacy`, activations 2, 2 receipts. This is upgrade-only and is correctly gone.
+    - (b) after that, `receipt(&mut tx, child, "model_call", "no-new-allowance", 1)` is `Some("exhausted")`. This is runtime behaviour that still exists in the init schema.
+  - The rule lives in `debit_workflow_budget_receipt` (init `:424`), at `:446-447`: `granted` only `WHEN budget.provenance='frozen_v2' AND NEW.quantity>0 AND …`, otherwise `exhausted`.
+  - Sealing is live too. `insert_workflow_budget_link` (init `:925-955`, trigger `workflow_root_budget_link`) seals every root run whose stored bundle is not `compiler_revision` `'2'`, or is malformed (`data_exception`). The shapes are fixed by the CHECKs at `:6911-6912`.
+  - In the artifact, `grep -rn sealed_legacy src` finds nothing. No remaining test asserts the sealing or a sealed root's debit (`budget_schema_tests.rs`, `budget_runtime_tests.rs`, `budget_race_tests.rs` and the reconciliation suites only exercise `frozen_v2` roots).
+  - The SQL literal `'2'` is coupled to `compiler::SEMANTIC_REVISION` (`application/workflow/publication/storage.rs:105,126`). A revision bump that missed the literal would seal every new root, and only indirect budget failures would show it.
+- Required correction: add a fresh-schema test with no migration replay or schema reconstruction:
+  - a root run whose stored bundle is not revision 2, and one with a malformed bundle (rows inserted through the existing raw-run pattern, e.g. `run_schema_tests.rs:20`), records `workflow_root_budgets.provenance='sealed_legacy'` with NULL limits;
+  - a positive debit for each resource (`activation`, `model_call`, `repetition`) is `exhausted`, and usage is unchanged;
+  - a current-revision root is `frozen_v2`, as a control.
+
+  Alternatively, root or the user may decide that the sealing branch is a legacy path under the no-backward-compatibility rule and remove it in a reviewed phase-05 in-place init edit. That is outside Batch S, whose scope is pure equivalence, so record the decision either way. Recheck: the new test, focused `workflow_budget_schema`, fmt, clippy, no-run, and a new digest.
+- Instruction lesson: candidate. When deleting a test as upgrade-only, list each of its assertions and mark which ones exercise live schema or runtime behaviour, then replace those against a fresh schema.
+- Resolution history: 2026-10-18 S-R001 OPEN.
+
+## S-F002 — `init_function_body` reads past a function without a dollar-quoted body (optional)
+- Classification: optional suggestion, **low**, test robustness. Not blocking.
+- Evidence:
+  - `workflow/tests.rs:35-44` finds `CREATE FUNCTION public.{name}(`, then takes the first ` AS $` after it, without checking that it belongs to the same statement.
+  - The init schema has 8 SQL-standard-body functions, which have no ` AS $`: `valid_creation_provenance`, `notification_principal_can_view`, `transport_requires_installation`, `valid_binding_change_reason`, `valid_delivery_failure_class`, `valid_inbound_event_error_class`, `valid_inbound_event_ignore_reason`, `valid_inbound_safe_header_facts`. For any of them the helper would return the next function's body. Their `prosrc` is empty, so a pin would fail with a misleading mismatch, never pass falsely.
+  - No pinned name is affected; emulating the helper reproduces `prosrc` for all 140 dollar-quoted functions (`logs/S-R001/checks.log` §3).
+  - Related nit: `own_database_with_migrations` (`test_support.rs:296`) now has one caller with a fixed migrator, so its parameter is vestigial.
+- Suggested: bound the search to the function's own statement, for example by requiring ` AS $` before the next `\n--\n-- Name:` header, and panic naming the function otherwise. Optionally inline the migrator parameter.
+- Resolution history: 2026-10-18 S-R001 OPEN (optional).
+
+## S-R002 dispositions for S-F001 and S-F002
+Round [S-R002](agent-review-notes.md#s-r002--correction-recheck-of-batch-s-s-f001-s-f002--pass), digest `33ae9028d28d3047de936b2e9580ffe267bd0187dafe2092601d0cef51514552`.
+- **S-F001 — RESOLVED.** `budget_schema_tests::workflow_budget_schema_sealed_roots_exhaust_every_debit` (`budget_schema_tests.rs:209-304`) runs on a fresh schema.
+  - Both sealing branches (a revision-1 bundle and an undecodable bundle) are asserted `sealed_legacy` with NULL limits.
+  - Every resource's positive debit is `exhausted`, and usage is unchanged.
+  - The `frozen_v2` control grants.
+  - Root's decision to keep the sealing branch is recorded in TASK.
+- **S-F002 (optional) — RESOLVED.** `init_function_body` is bounded to its own statement and panics naming a function without a dollar-quoted body; a `should_panic` test pins this. Emulated against all 148 functions: 140 exact, 8 refused (`logs/S-R002/checks.log`). The vestigial parameter is removed.

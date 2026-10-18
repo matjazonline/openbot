@@ -40,14 +40,10 @@ mod lease_claim;
 pub mod mcp;
 pub mod message;
 mod persistence_bound;
-// Exact historical owner is compiled only for pre-episode migration fixtures.
 mod resources;
 mod rows;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-#[path = "action_reconciliation_upgrade_legacy_claim.rs"]
-mod upgrade_legacy_claim;
 mod wait_commit;
 mod waits;
 mod wakeups;

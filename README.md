@@ -423,9 +423,11 @@ LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebr
 ### Database Migrations
 
 Migrations are automatically executed on server startup via `sqlx::migrate!()`.
-The single baseline, `migrations/20260817000000_init_schema.sql`, includes the schema through
-2026-09-10 and requires an empty database. Reset databases that applied the previous migration
-history before starting this release; startup does not reset them or rewrite migration checksums.
+The single baseline, `migrations/20260817000000_init_schema.sql`, holds the whole schema (squashed
+again on 2026-10-18, through workflow phase 04) and requires an empty database. Pre-release, schema
+changes edit that file in place and databases are reset rather than upgraded: reset any database
+that applied an earlier migration history (`scripts/reset-db.sh --all` for the development and
+test databases); startup does not reset it or rewrite migration checksums.
 
 To run migrations manually with SQLx migration tracking:
 

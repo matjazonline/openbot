@@ -1,5 +1,6 @@
 //! A genuine finality-breach conflict row rejects UPDATE and DELETE through its own native
-//! immutable trigger (migration 20260930180000:122), leaving every public row unchanged.
+//! immutable trigger (`workflow_action_evidence_conflict_immutable` in the init schema), leaving
+//! every public row unchanged.
 use super::*;
 
 async fn reject(f: &AdmissionFixture, sql: &str, company: Uuid) {

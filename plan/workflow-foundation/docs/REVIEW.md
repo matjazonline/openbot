@@ -291,3 +291,35 @@ All three hashes were recomputed at start and at end. Inspection only.
 Root accepted 04.11 and the combined phase04 gate on R007 PASS for digest
 `e76ef46c…c2cf` (base `5c1de32`), digest independently recomputed. See TASK.md
 "04.11 ROOT ACCEPTED".
+
+## Batch S — migration squash (implement-opus-reviewed-2.1)
+
+### S-R001 — 2026-10-18 batch review of the migration squash — CHANGES REQUIRED
+**No PASS** for snapshot base `4b54485830495dfeb68d45c61c0d6d8dd684e4c5`, digest `0aeeca933e66244420f6b05b37d645cc79facbc2307890591b187d0f9ac43fa5` (recomputed). Requirements: the user's 2026-10-18 instruction "squash migrations", root AGENTS.md no-backward-compatibility, and phase 05 "Schema and data". Method: inspection plus read-only fixture queries; gate results are taken from the logs.
+
+[Round note](agent-review-notes.md#s-r001--batch-review-of-batch-s-migration-squash--changes-required); independent checks in `logs/S-R001/`.
+- Actionable:
+  - [S-F001](agent-review-findings.md#s-f001--the-removed-budget-replay-carried-the-only-assertion-of-the-sealed-root-debit-rule) **low**: the deleted budget replay test was the only assertion that a sealed root (a bundle that is not revision 2, or is malformed) has every positive debit `exhausted`. That rule is still live in the init schema. Add a fresh-schema test, or have root/user decide to remove the sealing branch in a reviewed phase-05 edit.
+- Optional:
+  - [S-F002](agent-review-findings.md#s-f002--init_function_body-reads-past-a-function-without-a-dollar-quoted-body-optional): `init_function_body` reads past functions without a dollar-quoted body. None is pinned, and the failure mode is a mismatch, not a false pass.
+- Accepted as reviewed:
+  - The equivalence proof. The full dump diff is empty. Both ledgers match the artifacts' checksums. A deparser-independent node-tree comparison shows only one OID-bearing `'{}'::citext[]` datum differing. The BETWEEN rewrite is correct.
+  - The stripped dump items.
+  - The dependents: CI, Dockerfile, `db.rs`, `.sqlx`, README, `reset-db.sh --all`, the harness script and the plans. No stale references remain.
+  - The fresh-ledger test, which also makes an additive migration fail red.
+  - The other six test removals.
+  - The helper and its six repins, which reproduce `prosrc` exactly.
+- Observation for the user: `src/adapters/persistence/AGENTS.md` §1 contradicts the squash instruction. Its lines 30 and 160 (additive and staged migrations) do too, and the proposed replacement does not cover them.
+- Next: A adds the S-F001 test (or records the root/user decision), runs focused `workflow_budget_schema` plus fmt/clippy/no-run, refreezes, and B rechecks S-F001 by ID.
+
+### S-R002 — 2026-10-18 correction recheck (S-F001, S-F002) — PASS
+**PASS** for snapshot base `4b54485830495dfeb68d45c61c0d6d8dd684e4c5`, digest `33ae9028d28d3047de936b2e9580ffe267bd0187dafe2092601d0cef51514552` (recomputed). The init schema is byte-identical to S-R001's, so the S-R001 equivalence acceptance carries over.
+
+[Round note](agent-review-notes.md#s-r002--correction-recheck-of-batch-s-s-f001-s-f002--pass); [dispositions](agent-review-findings.md#s-r002-dispositions-for-s-f001-and-s-f002); checks in `logs/S-R002/`.
+- S-F001: resolved. A fresh-schema test covers both sealing branches, the exhausted debits for every resource with usage unchanged, and a `frozen_v2` control.
+- S-F002: resolved. The helper is bounded to its own statement, with a `should_panic` pin.
+- The `migrated_own_database` change is an equivalent single-caller inlining with the future still boxed. No stack-budget rerun is needed.
+- Gate evidence: the `sr001-*` logs (focused 28 passed / 1 ignored; fmt, Clippy and no-run PASS) plus the S-R001 full gate for the unchanged remainder.
+- The network-isolated full-suite rerun is not needed for this PASS. It was still running at review time with no failure so far; a failure in it would reopen the batch.
+- The `src/adapters/persistence/AGENTS.md` conflict (§1 plus lines 30 and 160) remains open for the user.
+- No open Batch S findings.

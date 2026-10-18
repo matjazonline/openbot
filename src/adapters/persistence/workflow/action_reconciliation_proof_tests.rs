@@ -521,6 +521,3 @@ async fn workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_ori
         );
     }
 }
-
-#[path = "action_reconciliation_upgrade_tests.rs"]
-mod upgrade_tests;

@@ -26,6 +26,37 @@ use crate::application::use_cases::{
     user::UserPersistence,
 };
 
+/// The squashed init schema every fresh database applies (the only migration).
+const INIT_SCHEMA: &str = include_str!("../../../../migrations/20260817000000_init_schema.sql");
+
+/// The dollar-quoted body of public function `name` exactly as the init schema creates it,
+/// which is the text PostgreSQL stores as `prosrc`. Catalog pins compare against this, so a
+/// definition replaced outside the init schema shows up as a mismatch.
+fn init_function_body(name: &str) -> &'static str {
+    let start = INIT_SCHEMA
+        .find(&format!("CREATE FUNCTION public.{name}("))
+        .unwrap_or_else(|| panic!("the init schema defines {name}"));
+    // Only this function's own statement: pg_dump opens the next object with a `-- Name:` header,
+    // and a SQL-standard body has no dollar quote to find.
+    let statement = &INIT_SCHEMA[start..];
+    let statement = &statement[..statement.find("\n--\n-- Name: ").unwrap_or(statement.len())];
+    let quoted = statement
+        .find(" AS $")
+        .unwrap_or_else(|| panic!("{name} has no dollar-quoted body in the init schema"));
+    let quoted = &statement[quoted + 4..];
+    let tag = &quoted[..quoted[1..].find('$').expect("a closed dollar tag") + 2];
+    let body = &quoted[tag.len()..];
+    &body[..body.find(tag).expect("the body's closing tag")]
+}
+
+/// S-F002: a SQL-standard body has no dollar quote; the helper names the function rather than
+/// reading on into the next one.
+#[test]
+#[should_panic(expected = "valid_creation_provenance has no dollar-quoted body")]
+fn init_function_body_refuses_a_function_without_a_dollar_quoted_body() {
+    init_function_body("valid_creation_provenance");
+}
+
 // Deliberately permissive preflight: these tests prove the SQL owner performs
 // current authorization itself rather than trusting the service's earlier read.
 #[derive(Clone)]

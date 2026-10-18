@@ -30,18 +30,8 @@ pub(super) fn guard(catalog: &Value) {
         .split_once("$function$")
         .unwrap()
         .0;
-    // The latest definition: 04.11 adds the message branch ahead of the unchanged remote one.
-    let expected = include_str!("../../../../migrations/20261017120000_workflow_messaging.sql")
-        .split_once("CREATE OR REPLACE FUNCTION workflow_action_evidence_commit_guard()")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .0;
-    assert_eq!(actual, expected);
+    // 04.11 added the message branch ahead of the unchanged remote one.
+    assert_eq!(actual, init_function_body(GUARD));
 }
 pub(super) fn coverage_catalog(catalog: Value) -> Value {
     let mut catalog = production_catalog(catalog);

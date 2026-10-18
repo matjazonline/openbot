@@ -106,19 +106,10 @@ fn assert_before_owner(native: &Value) {
         .split_once("$function$")
         .unwrap()
         .0;
-    let migration =
-        include_str!("../../../../migrations/20260930181000_workflow_action_evidence_binding.sql");
-    let body = migration
-        .split_once("CREATE FUNCTION workflow_action_applied_request_guard()")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .1
-        .split_once("$$")
-        .unwrap()
-        .0;
-    assert_eq!(actual, body);
+    assert_eq!(
+        actual,
+        init_function_body("workflow_action_applied_request_guard")
+    );
 }
 
 pub(super) fn production(mut catalog: Value) -> Value {

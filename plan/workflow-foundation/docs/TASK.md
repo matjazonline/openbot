@@ -2085,3 +2085,305 @@ CI `pg_stat_statements` settings during the gate; root verified sysid 7697669855
 and stopped it (`pg_ctl -m fast stop`, data retained). No author/reviewer checks running.
 No commit, deployment, migration squash or phases 05+ by the workflow (the user made commit
 5c1de32 during implementation). Review rounds: 04.11-R002…R007 (R001 historical).
+
+## Phase 05 — 2026-10-18 — implement-opus-reviewed-2.1
+
+### Scope and authorization
+
+User instruction 2026-10-18: "use /implement-opus-reviewed-2.1 and continue RESUME.md
+(phase 05)"; "'an eligible company reviewer group' — limit to explicit reviewers";
+"squash migrations". Authorized: migration squash and phase 05 (05.1–05.4 + phase05
+gate). Not authorized: commits, deployment, production data, phases 06+.
+
+Product decisions (user): reviewers are **explicit only** — no reviewer group or
+group-membership model (consistent with 04.11 rejecting groups). Plan text in
+`05-human-decisions-and-waits.md` / EXPANSION 05.3 to be amended to match.
+Migrations are squashed into one init schema; no backward compatibility, databases reset.
+
+Original requirements: [Phase 05](../05-human-decisions-and-waits.md), EXPANSION rows
+05.1–05.4, accepted phase 04 contracts/briefs (approval seams, waits/effect waits,
+04.11 messaging for notifications), `AGENTS.md` (incl. NO_BACKWARD_COMPATIBILITY_NOTES
+for any new plan) and applicable `src/**/AGENTS.md`.
+
+Baseline: HEAD `4b54485` (user commit "workflow-foundation 4.x complete"; contains the
+accepted 04.11 state), clean worktree. Disk ~9 GiB free.
+
+### Batches (root proposal; A may refine in its gate with reasons)
+
+S. **Migration squash** — collapse all migrations into a single init schema; fresh
+   schema must be equivalent to pre-squash fresh schema (normalized dump diff); remove
+   or adapt tests/scripts/docs that depend on individual migration files or populated
+   upgrades; full suite. Accepted before phase 05 builds on it.
+05. **Human decisions and waits** — 05.1–05.4 with one architecture gate (schema,
+   concurrency, authorization, credentials) and one batch review, unless A justifies a
+   split at a stable contract; then phase05 gate.
+
+### Workers
+
+Root: Opus 5.5, effort not confirmed xhigh → thin coordinator. Reusing A
+`a4461afdf8d6050a9` and B `a4750bc4ff449a216` (opus / xhigh requested).
+
+### Batch S — migration squash — 2026-10-18 (A, implement-opus-reviewed-2.1)
+
+Baseline: HEAD `4b54485` with a clean worktree, apart from root's edits to this file. Logs are in
+`logs/S/`. No commit, deployment, production data or phase 06+ work.
+
+**Fixture.** The task fixture `/private/tmp/workflow0410-20261017` was restarted
+(`logs/S/pg-start.log`).
+- Identity verified: system identifier `7697669855432439122`, PG 18.6, role `workflow0410`,
+  CI's `pg_stat_statements` settings still in place.
+- Databases:
+  - `workflow0410_presquash`: fresh from HEAD's 56 migrations; kept as the equivalence baseline.
+  - `workflow0410_postsquash`: fresh from the squash.
+  - `workflow0410_test`: dropped, recreated and migrated (`logs/S/reset-test-db.log`).
+  - `workflow0410_fresh_test`: used by the gate.
+
+**Gate decision.** No architecture gate is needed: no choice here is non-mechanical or costly to
+unwind.
+- No data seeds. A fresh pre-squash database holds no row in any table
+  (`logs/S/presquash-nonempty.txt` is empty). The later migrations' data statements are backfills
+  over existing rows, or trigger bodies.
+- The `sqlx` ledger keeps version `20260817000000` ("init schema"). Its checksum changes, so a
+  database that applied the old history must be reset; that is the standing no-backward-
+  compatibility rule. Only the removed upgrade tests read migration versions.
+- No grants, roles, custom types, `SECURITY DEFINER` or new extensions (only the baseline's citext
+  and pg_stat_statements).
+
+**Method.** Squash by pg_dump, the same shape as the previous squashed baseline:
+1. `pg_dump --schema-only --no-owner --no-privileges --exclude-table=public._sqlx_migrations` of
+   the fresh pre-squash database (`logs/S/squash-source-dump.sql`).
+2. Remove only:
+   - pg_dump 18's psql `\restrict`/`\unrestrict` meta-commands, which are not SQL;
+   - the version banner;
+   - `SET transaction_timeout`;
+   - `set_config('search_path','')`, because sqlx records its unqualified ledger row in the same
+     session.
+3. Replace the dump banner with the baseline header.
+4. Write four CHECK constraints back in their source form, `octet_length(x) BETWEEN m AND n`:
+   `workflow_action_reconciliations_failure_code_check`,
+   `workflow_budget_receipts_reservation_key_check`, `workflow_definitions_title_check` and
+   `workflow_http_credentials_envelope_check`.
+   - pg_dump deparses BETWEEN as a nested `>= AND <=`. That re-parses as one flattened AND, which
+     is the same predicate but a different stored expression.
+   - With the source form back, the catalogs are identical.
+5. Delete the other 55 files. Input record: `presquash-head.txt`, `presquash-migrations.txt`,
+   `presquash-migrations.sha256`.
+
+**Equivalence proof** (`logs/S/equivalence.sh`, `equivalence.log`; also the `squash-equivalence`
+gate step). Fresh post-squash against fresh pre-squash:
+- Full `pg_dump --schema-only`, covering owners, ACLs, comments, functions, triggers, views,
+  sequences, extensions and the sqlx ledger table. It is normalized only for the random
+  `\restrict` key and the version banner. Result: empty diff, 14454 lines each.
+- Independent catalog fingerprint, 5868 entries. Result: empty diff. It covers:
+  - `pg_get_functiondef` and function comments;
+  - trigger definitions and enabled state;
+  - constraint definitions with their deferral and validation flags;
+  - index and view definitions;
+  - each relation's kind, persistence, ACL and comment;
+  - each column's type, nullability, default, identity, generation, comment and ACL;
+  - sequence parameters, extensions and versions, non-base types, default ACLs, and namespaces with
+    their ACLs.
+- Rows: none in either database.
+- Intended difference: the ledger holds 1 row instead of 56. No dropped-column slots existed
+  before the squash, so column numbering is unchanged.
+
+**Dependents adapted.**
+- Removed the populated-upgrade tests. The plan's rule forbids them, and their historical
+  migrations no longer exist.
+  - `action_reconciliation_upgrade_tests.rs` (3 tests), `action_reconciliation_upgrade_catalog_diagnostics.rs`,
+    and the test-only historical claim owner `action_reconciliation_upgrade_legacy_claim.rs` with
+    its module declaration.
+  - `workflow_budget_schema_retained_migration_preserves_exact_activations_and_seals`.
+  - `workflow_wakeup_migrations_reconcile_existing_terminal_and_queued_children`, with its
+    `remove_wakeup_schema`.
+- Added `test_support::tests::a_fresh_database_applies_only_the_init_schema`, which generalizes the
+  old fresh-ledger check. The fresh ledger is exactly the embedded init migration with its
+  checksum, a rerun applies nothing, and no table is seeded.
+- Six catalog pins read individual migration files: attribution, consumption identity, high bounds,
+  native attribution, native coverage and state witness. They now read the init schema through one
+  helper, `workflow::tests::init_function_body`, replacing four copies of the extraction code.
+- `test_support::own_database_with_migrations` is now private; only the upgrade tests called it
+  from outside.
+- Comments that named migration files are updated (conflict-immutable test, chronology fixture), and
+  so is the README "Database Migrations" section.
+- Checked and left unchanged, because they are generic:
+  - CI (`cargo sqlx migrate run`), `scripts/check.sh`, `scripts/reset-db.sh`, the transport-boundary
+    scripts and the Dockerfile;
+  - `scripts/tests/harness-query-plans.py`, whose regex still finds both functions in the new init;
+  - `.sqlx` (see the prepare/check gates) and `src/infra/db.rs`;
+  - `NO_BACKWARD_COMPATIBILITY_NOTES`, since no plan was added.
+- Historical records are left unchanged: the BRIEF, CONTRACT, EVIDENCE, EXPANSION and ADMISSION
+  history, and `docs/query-evidence/*` that cite past migration files.
+
+**Needs the user's approval (not applied).** `src/adapters/persistence/AGENTS.md` §1 "Migration"
+still says applied migrations are immutable and changes take a new follow-up migration. That
+contradicts the user's squash decision and the phase 05–10 plan text. It is an agent-instruction
+file, so I did not edit it on an agent's request. Proposed replacement for its first paragraph
+and the `NOT NULL` paragraph:
+
+> Pre-release, nothing is deployed and existing data is not preserved.
+> `migrations/20260817000000_init_schema.sql` is the only migration and holds the whole schema: a
+> schema change edits it in place, and the development and test databases are dropped and
+> recreated (`scripts/reset-db.sh --all`) rather than upgraded. Do not add follow-up migrations,
+> backfills, compatibility shims or populated-upgrade tests; verify against a freshly migrated
+> schema. State a column's `DEFAULT` in SQL when queries that predate the change read it.
+
+The apply-locally and `\d` confirmation steps that follow would stay as they are.
+
+**Checks.**
+- Focused (`logs/S/focused.log`): `a_fresh_database_applies_only_the_init_schema`,
+  `test_support::`, `workflow_budget_schema`, `workflow_wakeup` and `action_reconciliation`, with
+  every adapted catalog pin among them. Result: 272 passed, 0 failed.
+- Full gate (`logs/S/gates.sh`: the 04.11 combined gate commands plus `squash-equivalence`;
+  statuses in `logs/S/gate-status.log`, logs in `logs/S/gate-<name>.log`):
+
+| Gate | Result |
+|---|---|
+| fmt, diff, transport, credential-deploy | PASS |
+| offline check (all targets), strict Clippy | PASS |
+| fresh-schema (fresh vs reset fixture test DB) | PASS: empty diff |
+| squash-equivalence (pre vs post squash) | PASS: empty dump and fingerprint diffs |
+| sqlx-prepare, sqlx-check | PASS; `.sqlx/` unchanged |
+| no-run | PASS |
+| full suite (network-isolated, all targets) | PASS: 2668 passed (lib 2663 + 5), 0 failed, 22 ignored |
+| stack budget (2048 KiB) | PASS: 2663 passed, no overflow |
+| lease budget | PASS: 99 tests; `message.publish` max work 96 ms, `message.consume` 2 ms, `message.observe` 11 ms, all against their bounds; 92 injected events excluded; no threshold changed |
+| graph (`graft build`) | PASS |
+
+- The lib count is 6 lower than the R006 rerun (2669): 7 upgrade-path tests removed (3 upgrade, 2
+  catalog-diagnostic, 1 budget, 1 wakeup) and 1 fresh-ledger test added.
+- Not run: the CI frontend steps, the `queryid` probe and `stack-frames.sh`, as before.
+- Disk: 8.3 GiB free after the gate; no cleanup was needed.
+
+**Frozen.** `PATH=/private/tmp/workflow0410-tools:$PATH bash .claude/skills/implement-opus-reviewed-2.1/scripts/snapshot.sh plan/workflow-foundation/docs`
+(`logs/S/snapshot.txt`):
+- base `4b54485830495dfeb68d45c61c0d6d8dd684e4c5`
+- digest `0aeeca933e66244420f6b05b37d645cc79facbc2307890591b187d0f9ac43fa5`
+- 74 paths: the 55 deleted migrations, the rewritten init schema, README, and the test files
+  above (3 deleted).
+
+- Root (2026-10-18): batch S frozen by A at digest `0aeeca93…3fa5` (base 4b54485); sent
+  to B for review S-R001. Open user decision: amend `src/adapters/persistence/AGENTS.md`
+  §1 (migration immutability) per A's proposed text above — asked of the user; not
+  edited by agents.
+
+- 2026-10-18: B S-R001 — CHANGES REQUIRED: S-F001 (low, lost coverage of sealed-legacy
+  budget debit rule) blocking; S-F002 optional. Equivalence proof independently confirmed.
+  Root: keep the sealing branch; A adds the test. B observation: persistence AGENTS.md
+  lines 30, 160 and §1 all conflict with the squash — included in the user question.
+
+#### Batch S — S-R001 correction — 2026-10-18 (A)
+
+Input: S-R001 CHANGES REQUIRED for `0aeeca93…3fa5`. S-F001 is blocking; S-F002 is optional. The
+squash itself was accepted.
+
+- **S-F001.** Added `budget_schema_tests::workflow_budget_schema_sealed_roots_exhaust_every_debit`.
+  It runs on a fresh schema, with no migration replay or schema reconstruction.
+  - Two raw root runs are inserted beside the admitted one: one whose bundle has
+    `compiler_revision` `"1"`, and one whose bundle does not decode. Each gets
+    `workflow_root_budgets.provenance='sealed_legacy'` with NULL limits and zero usage.
+  - A positive debit for each of `activation`, `model_call` and `repetition` comes back
+    `exhausted`, and usage is unchanged.
+  - Control: the admitted current-revision root is `frozen_v2` with limits [2,2,2], and its
+    `model_call` debit is `granted` (usage becomes [0,1,0]).
+  - Root's decision, recorded: the sealing branch stays for now; it is not removed in batch S.
+- **S-F002, adopted.**
+  - `workflow::tests::init_function_body` now searches only the function's own statement (up to the
+    next pg_dump `-- Name:` header). It panics naming the function when there is no dollar-quoted
+    body, and a `should_panic` test pins this on `valid_creation_provenance`.
+  - The vestigial migrator parameter is gone: `test_support::migrated_own_database` runs
+    `sqlx::migrate!` itself.
+- AGENTS.md is still untouched; it waits for the user.
+
+Checks (logs in `logs/S/`):
+- Focused (`sr001-focused.log`): 28 passed, 0 failed, 1 ignored (the optional HydraDB adapter
+  test). It covers `workflow_budget_schema` (with the new test), the helper's `should_panic` test,
+  `a_fresh_database_applies_only_the_init_schema`, and every repinned catalog pin.
+- `sr001-checks-status.log`: fmt PASS, Clippy (all targets, `-D warnings`) PASS, no-run PASS.
+- `git diff --check` fails only on `agent-review-findings.md:1073`, a trailing space in the
+  reviewer-owned file. Excluding that file it passes (`sr001-diff-excluding-review-log.log`). I left
+  the file untouched.
+
+Refrozen (`logs/S/sr001-snapshot.txt`):
+- base `4b54485830495dfeb68d45c61c0d6d8dd684e4c5`
+- digest `33ae9028d28d3047de936b2e9580ffe267bd0187dafe2092601d0cef51514552`
+- 74 paths.
+
+- 2026-10-18: B S-R002 PASS for `33ae9028…4552` (S-F001, S-F002 resolved). Root awaits
+  A's network-isolated full-suite rerun (`logs/S/sr001-full-suite*`) before accepting S.
+
+Full suite after S-R001 (root request; shared test infrastructure changed; no project file
+edited). Command: `scripts/test-network-isolation.sh cargo test --locked --offline --all-targets`.
+Statuses are in `logs/S/sr001-full-suite-status.log`.
+
+| Run | Log | Result | Failed tests |
+|---|---|---|---|
+| 1 | `sr001-full-suite.log` | FAIL 101: 2663 passed, 2 failed, 22 ignored | `workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limited_entry` (entry 579 ms after a 335 ms deadline window); `workflow_mcp_refusals_and_protection_are_terminal_without_network` (`lease.claim` persistence bound elapsed) |
+| 2 | `sr001-full-suite-rerun.log` | FAIL 101: 2661 passed, 4 failed | `…bounds_128_prior_consuming_129_total_then_lost_refuses` (`lease.release` commit outcome unknown); `…proof_expiry_reservation_enter_and_successful_replay` (`action.reserve_remote` bound elapsed); `…eligibility_exhausted_pending_has_no_retired_attempt` (`action.reserve_remote` commit outcome unknown); `…eligibility_poison_codes_preserve_history` (count 0 vs 1 after a timed-out step) |
+| 3 | `sr001-full-suite-rerun2.log` | FAIL 101: 2662 passed, 3 failed | `…bounds_128_prior…`, `…proof_expiry_reservation…` (revision conflict after a timed-out step); `workflow_action_dispatch_resolution_adopted_reservation_refused_after_fence_loss` (`lease.claim` bound elapsed) |
+
+- **Isolation.** Every failed test passed when rerun alone against the same binary
+  (`sr001-full-suite-failures-rerun.log`): the run-1 pair 5/5, the run-2 four 3/3, the run-3 three
+  3/3; 11 runs, 0 failures.
+- **Failure family.** Every failure is a persistence-bound elapse, an ambiguous COMMIT ("commit
+  outcome unknown"), or an assertion that follows one, in heavy lease, dispatch or reconciliation
+  tests. The failing set differs from run to run, and no failing test touches the S-R001 changes:
+  the sealed-budget test, `init_function_body`, or `migrated_own_database`, whose migrator is the
+  same embedded `sqlx::migrate!` it received before.
+- **Earlier runs.** The same family failed the 04.10 stock gates (`logs/04.10/gate-stock.log`,
+  `resume-gate-stock.log`, including `bounds_128_prior…`). The batch S gate full suite on the
+  pre-correction tree passed at 05:58Z.
+- **Host conditions.**
+  - Load averages were about 3.6–5.9 during these runs (`sr001-full-suite-rerun*-load.log`).
+  - The reviewer's concurrent recheck and other agent sessions were running.
+  - Disk free was 7.2–7.7 GiB (97% used).
+  - No other database sessions were open between runs, and the fixture log shows only normal
+    forced-drop terminations and sub-20 ms checkpoints.
+- **Conclusion: no PASS is claimed for this tree's full suite.** The failures read as host-load
+  timing and match the known family, but this is not proven, because the pre-correction tree was
+  not rerun under the same load. A PASS needs a full-suite rerun on a quiet host: no concurrent
+  reviewer runs, and optionally the build cache cleared to recover disk.
+- Digest unchanged: `33ae9028…4552`.
+
+Quiet-host rerun and control (root request, 2026-10-18). Statuses with start and end load
+averages are in `logs/S/sr001-full-suite-status.log`.
+
+| Run | Tree | Log | Load (start → end) | Result |
+|---|---|---|---|---|
+| Quiet rerun | S-R001 (`33ae9028…4552`) | `sr001-full-suite-quiet.log` | 2.79 → 3.31 (1 min) | FAIL 101: 2661 passed, 4 failed, 22 ignored |
+| Control | pre-correction (`0aeeca93…3fa5`, verified before the run) | `sr001-full-suite-control.log` | 2.33 → 5.87 (1 min) | FAIL 101: 2656 passed, 7 failed, 22 ignored |
+
+- **Quiet-rerun failures** (same family):
+  - `…bounds_128_prior_consuming_129_total_then_lost_refuses` ("expected Pending provider's own
+    loss");
+  - three `workflow_action_dispatch_resolution_*` tests: `lapsed_reservation_stays_unknown`,
+    `stalled_reservation_adopted` and `adopted_reservation_refused_after_fence_loss` (a revision
+    conflict, or a reservation count of 0 after a lapsed bound).
+- **Control failures** (same family, on the tree whose gate passed at 05:58Z):
+  - `…siblings_128_and_129_snapshot_and_actual_recovery_never_truncate` (`lease.renew` commit
+    outcome unknown);
+  - four `…commit_applied_injected_*` tests (fixture lease lapsed between heartbeats; observer gate
+    timeout);
+  - `workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs` and
+    `workflow_message_publish_revocation_after_a_marker_stays_retryable` (`lease.claim` persistence
+    bound elapsed).
+- **Conclusion.** The pre-correction tree, which passed this suite earlier, now fails the same way.
+  So the failures come from the current host's state, not from the S-R001 change.
+- **Host state.** 10 CPUs and 16 GiB RAM, but swap is 4.47 of 5.12 GiB used (`vm.swapusage`), and
+  only 7.0 GiB of disk is free (97% used). The suite itself drives the load to about 6. Every
+  failure is in the persistence-bound and lease-timing family, and each test passes alone.
+- **Restore.** The control temporarily rewrote the three S-R001 files to their pre-correction text,
+  verified by digest. Afterwards the S-R001 copies were restored (saved outside the repo; sha256
+  `383afc52…`, `0af03b0d…`, `e1864194…`), and the digest was re-verified as `33ae9028…4552`. No
+  other source changed.
+- **Still not claimed:** a green full suite on this host in its current state. Recommendation for
+  root and the user: free memory and disk (close other sessions, clear regenerable build output),
+  then rerun once, or accept the earlier batch S gate pass plus this control evidence.
+
+- Root (2026-10-18): batch S full-suite not green on this host: quiet rerun 2661/4 and
+  control on the pre-correction tree 2656/7 (same lease/dispatch/reconciliation timing
+  family; all pass in isolation). Host under memory pressure (≈4.5 GiB swap used, 97%
+  disk). The S-R001 change is not the cause (the control fails the same way), but root does not accept a red
+  gate: S stays **not accepted** pending a green full run after the user frees host
+  resources. Meanwhile A starts phase 05 investigation and gate drafting only
+  (read-only; no source edits).
