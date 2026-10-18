@@ -33,12 +33,12 @@ steps:
     type: message.send
     with:
       content: {object: {body: {ref: /input/message}}}
-      destinations: {literal: [{kind: channel, id: support}]}
+      destinations: {literal: [{kind: channel, id: 00000000-0000-0000-0000-0000000000a1}]}
     routes: {success: $end}
   sales:
     type: message.send
     with:
       content: {object: {body: {ref: /input/message}}}
-      destinations: {literal: [{kind: channel, id: sales}]}
+      destinations: {literal: [{kind: channel, id: 00000000-0000-0000-0000-0000000000a2}]}
     routes: {success: $end}
 limits: {max_steps: 10, max_context_bytes: 65536}

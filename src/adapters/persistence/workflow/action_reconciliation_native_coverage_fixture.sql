@@ -71,7 +71,7 @@ BEGIN
             captured.candidate-ARRAY['id','actor_id','command_id','command_key','request_digest','coverage_digest',
                 'disposition','registration','verifier_version','provider','authoritative_reference','operation_signature',
                 'observed_at','verified_at','valid_until','created_at','grant_eligible','diagnostic',
-                'applied_request','applied_remote_entry_id'] THEN
+                'applied_request','applied_remote_entry_id','delivery_ordinal','delivery_id'] THEN
         RAISE EXCEPTION 'coverage omission exact identity';
     END IF;
     INSERT INTO fixture_native_coverage_attempts VALUES(NEW.company_id,configured.command_key,to_jsonb(NEW));

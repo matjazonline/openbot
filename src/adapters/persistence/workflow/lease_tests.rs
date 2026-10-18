@@ -727,7 +727,7 @@ async fn workflow_io_external_handler_has_no_transaction_and_returns_fence() {
 mod adversarial_tests;
 
 #[path = "lease_resolution_gate.rs"]
-mod resolution_gate;
+pub(in crate::adapters::persistence::workflow) mod resolution_gate;
 
 #[path = "lease_resolution_tests.rs"]
 mod resolution_tests;

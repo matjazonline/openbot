@@ -70,7 +70,13 @@ impl EvidenceVerifierRegistration {
             &action.contract,
             &action.target,
         )?;
-        Ok(self.company == action.scope.company && self.operation == expected.operation)
+        // A delivery subject is attested only by the registration for its own transport.
+        Ok(self.company == action.scope.company
+            && self.operation == expected.operation
+            && snapshot
+                .delivery
+                .as_ref()
+                .is_none_or(|delivery| delivery.transport == self.provider.as_str()))
     }
 }
 
@@ -82,6 +88,11 @@ pub enum AppliedEvidenceRequest {
     RemoteEntry(ActionRemoteEntryId),
     MarkerReservation,
     Unattributed,
+    /// The provider accepted the subject delivery's message at `accepted_at`; there is no
+    /// recovered output, because message receipts are derived in SQL (04.11-D3 §H.3).
+    Delivery {
+        accepted_at: DateTime<Utc>,
+    },
 }
 
 pub enum VerifiedDisposition {
@@ -214,15 +225,30 @@ impl VerifiedEvidence {
         {
             return Err(invalid());
         }
+        if snapshot
+            .delivery
+            .as_ref()
+            .is_some_and(|delivery| attestation.observed_at < delivery.request_started_at)
+        {
+            return Err(invalid());
+        }
         let applied_request = match &attestation.disposition {
             VerifiedDisposition::Applied { request, .. } => {
-                match request {
-                    AppliedEvidenceRequest::RemoteEntry(id)
+                match (request, &snapshot.delivery) {
+                    (AppliedEvidenceRequest::Delivery { accepted_at }, Some(_))
+                        if *accepted_at >= snapshot.marker_created_at
+                            && *accepted_at <= attestation.observed_at => {}
+                    (AppliedEvidenceRequest::Delivery { .. }, _) | (_, Some(_)) => {
+                        return Err(invalid());
+                    }
+                    (AppliedEvidenceRequest::RemoteEntry(id), None)
                         if !snapshot.entries.iter().any(|entry| entry.id == *id) =>
                     {
                         return Err(invalid());
                     }
-                    AppliedEvidenceRequest::MarkerReservation if !snapshot.entries.is_empty() => {
+                    (AppliedEvidenceRequest::MarkerReservation, None)
+                        if !snapshot.entries.is_empty() =>
+                    {
                         return Err(invalid());
                     }
                     _ => {}
@@ -304,6 +330,11 @@ fn classify(
     Option<ReconciliationBlockedReason>,
 ) {
     match disposition {
+        // Delivered truth carries no output: the consumer derives the message receipt.
+        VerifiedDisposition::Applied {
+            request: AppliedEvidenceRequest::Delivery { .. },
+            ..
+        } => (EffectiveEvidenceDisposition::Applied, None, None),
         VerifiedDisposition::Applied {
             recovered_result, ..
         } => {

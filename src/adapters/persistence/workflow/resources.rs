@@ -1,14 +1,18 @@
 use super::*;
 use crate::application::workflow::binding::{ResourceDirectory, ResourceStatus, validate_resource};
 
-/// HTTP connections and company MCP connections are the supported resource owners.
-/// Supported contracts are the currently approved operation names; a ready resource still
-/// grants nothing by itself.
+/// HTTP connections, company MCP connections and the company's built-in messaging resource
+/// (identified by the company itself) are the supported resource owners. Supported contracts
+/// are the currently approved operation names; a ready resource still grants nothing by itself.
 pub(super) async fn inspect_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     id: RuntimeResourceId,
 ) -> AppResult<Option<ResourceStatus>> {
+    if id.as_uuid() == company.as_uuid() {
+        // The caller already holds the company authority this resource is owned by.
+        return message::messaging_status(company).map(Some);
+    }
     if let Some(connection) = http::connection_on(tx, company, id.as_uuid()).await? {
         return http::status_on(tx, &connection).await.map(Some);
     }
@@ -41,6 +45,9 @@ pub(super) async fn check_readiness(
     let company = configuration.company_id();
     let definition = configuration.bundle().compiled().graph().definition();
     for tool in &configuration.bundle().snapshots().tools {
+        if authority::builtin_message_tool(tool)? {
+            continue;
+        }
         let Some(slot) = &tool.contract.connection else {
             http::registered_on(tx, company, tool).await?;
             continue;

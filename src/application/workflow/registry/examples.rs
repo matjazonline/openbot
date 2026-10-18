@@ -97,9 +97,11 @@ fn values(name: &str) -> Value {
         "tool.call" => json!({"tool":"lookup","arguments":{"key":"hello"}}),
         "mcp.call" => json!({"connection":"service","tool":"lookup","arguments":{"key":"hello"}}),
         "message.send" => {
-            json!({"content":{"body":"hello"},"destinations":[{"kind":"channel","id":"support"}]})
+            json!({"content":{"subject":"Hello","body":"hello"},"destinations":[{"kind":"channel","id":"00000000-0000-0000-0000-000000000004"}]})
         }
-        "message.reply" => json!({"content":{"body":"hello"},"source_message":"message-1"}),
+        "message.reply" => {
+            json!({"content":{"body":"hello"},"source_message":"00000000-0000-0000-0000-000000000005"})
+        }
         "workflow.call" | "flow.repeat" => json!({"input":{"text":"hello"}}),
         "wait.event" => {
             json!({"event":"review.completed","correlation":"request-1","deadline":deadline,"payload_schema":schema})

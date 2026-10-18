@@ -972,3 +972,83 @@ Common context: 2026-10-17; workflow `implement-opus-reviewed-2.1`; batch 04.11 
      - This matters only for `model_tool` executions with several message invocations, which are unreachable in phase 04.
      - Suggested: add `workflow_action_has_evidence_conflict` refusal to the publication transaction and to the workflow `begin_part` recheck, with a test, for parity with remote dispatch.
 - Resolution history: 2026-10-17 R005 OPEN (optional).
+
+# 04.11 — whole-batch and final integration review (04.11-R006)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging plus the combined phase-04 gate; whole-batch code/criteria/integration review; round [04.11-R006](agent-review-notes.md#0411-r006--whole-batch-code-criteria-and-final-phase-04-integration-review--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`, xhigh requested). Reviewed snapshot: base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`, digest `8891d74001e78bac6b65e0238c3d73ac25b92f3970178edb08f296417c75cabd`; effective decision D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`. These are implementation findings against an accepted decision. Inspection only.
+
+## 04.11-F015 — Unlisted departures from the decided outcome table and reply relay
+- Classification: actionable defect, **low**, correctness/decision conformance. It originates in the implementation, not in the gated decision.
+- Evidence:
+  1. **Row 2 classification.** D2 §5.1 row 2 decides that a routing or authority refusal in the publication transaction (actor demoted, capability revoked, recipient no longer a member, …) is Terminal `message.rejected` → FinalError, with no marker.
+     - In the code, authority is checked by `MessageDispatch::observe` and `publish` → `authorize_on` (`message_publish.rs:288-294, 388-390`), and the route recheck runs inside `publish_on` (`message_publish.rs:70-119,307`). Their errors return as `StepError::Dispatch` (`message_runtime.rs:131-151`).
+     - `action_step_failure` maps every `Dispatch(_)` to Retryable `message.unresolved` (`actions/failure.rs:67-70`). So a demoted actor or a revoked capability is retried until the attempt budget runs out, instead of terminating.
+     - It is safe: no marker exists, because the publication is one rolled-back transaction, and the retry cannot send. But it departs from the gated table and is missing from the 18 listed deviations.
+     - No test drives a step-level revocation before publication. Revocation is tested only at `begin_part` (`message_delivery_tests.rs:81-97`). Phase 04 Acceptance requires revocation coverage.
+  2. **Reply relay.** D2 §1.3 decides that an external `message.reply` "continues the source's recorded relay trace, as an agent reply does". `plan_email` gives every email, replies included, a fresh hop-0 trace from the sending channel (`message_runtime.rs:236-242`). Deviation 2 states the precedent but not that replies are included. The impact is limited (loop control for inter-channel sources), but it changes a decided behaviour.
+- Required correction: either
+  - conform: map pre-marker `observe`/`publish` refusals (NotFound/BadRequest, transaction rolled back, no marker) to Terminal `message.rejected`; continue the source's relay trace for replies; add a step-level revocation test asserting the Terminal outcome with zero markers and messages;
+  - or record both as reviewed decision amendments with justification, and test the chosen behaviour.
+- Instruction lesson: see the R006 candidate (diff the decision's outcome table and required tests before freezing).
+- Resolution history: 2026-10-18 R006 OPEN.
+- 2026-10-18 [04.11-R007](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass), digest `e76ef46c…c2cf`: **RESOLVED**. See [R007 dispositions](#r007-dispositions-for-0411-f015-to-f018).
+
+## 04.11-F016 — Tests required by the accepted decision are missing
+- Classification: actionable defect, **medium**, verification. Acceptance-blocking under root's rule that a required test cannot be waived as a known gap. Also AGENTS.md "When adding or changing a concurrency protocol, include a test with competing claimants".
+- Evidence: the TASK "Known gaps" list against the test inventory (R006 note). Missing tests the decision named explicitly:
+  1. **D4 §S F012.**
+     - "a breach (row 20), then every destination accepted, then the consumer writes the accepted receipt and the poll resumes" → no successor, wait `failed/evidence_conflict`, job `failed`, run `waiting/reconciliation`, uncertainty row, receipt retained;
+     - the same with a failed receipt.
+     - `workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen` covers only the conflict-while-pending path; the failed receipt there is consumed after the park.
+  2. **D2 §8.2 F005.** "a reply quoting each recipient's copy resolves to that recipient's message and thread" (the inbound path is unchanged, but the per-recipient `MessageCorrelation::Email` mapping is new), and "… Slack sources refused".
+  3. **D2 §8.2 F007.** "a delayed COMMIT past the captured expiry, and past the run deadline, rolls back everything". The guards exist (migration `:385-399`) but are untested.
+  4. **D3 §K F010 SQL-only negatives.**
+     - "a reopen from expired, non-final or foreign evidence": only double use and conflict are tested (`message_reconcile_tests.rs:406, 794`).
+     - "non-admin, cross-company and wrong-association actors are refused": wrong-association is missing.
+  5. **D3 §K competing races.** "competing settle, consumer and begin_part, and settle racing the workflow cancellation, all marked Injected". None exists. These are the new concurrency protocol's competing-claimant tests.
+  6. **D4 §S §L seam.** "A `MessageDelivery` reconciliation (`DeliveryReopened`) for an unknown delivery of such an execution reopens only the delivery, never the job". `workflow_message_recovery_model_tool_marker_never_reopens_its_job` covers only the receipt path.
+- Not required, or acceptable as recorded:
+  - step `message.approval_required`: unreachable, because `context().approval_required` is always false (`http_runtime.rs:62-74`) and the messaging current policy never requires approval;
+  - the explicit lock-count assertion: structurally bounded by `destination_count BETWEEN 1 AND 20` and ordinal 0–19; record that, or add a schema assertion;
+  - remote evidence with a delivery subject: impossible by the composite FK to message destinations.
+- Required correction: implement items 1–6, using `Injected`/`workflow_message_race_` for item 5. Rerun the affected focused areas, then the full suite, stack budget and lease budget (`message.*` operations stay required).
+- Instruction lesson: R006 candidate (pre-freeze diff of decision-required tests against the inventory).
+- Resolution history: 2026-10-18 R006 OPEN.
+- 2026-10-18 [04.11-R007](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass), digest `e76ef46c…c2cf`: **RESOLVED**. See [R007 dispositions](#r007-dispositions-for-0411-f015-to-f018).
+
+## 04.11-F017 — Expired-proof path commits on lease loss, and inspection is not wired (optional)
+- Classification: optional suggestion, **low**, robustness/diagnostics. Not blocking.
+- Evidence:
+  - `expire_reopened_part_on` (`delivery/queue.rs:701-746`) returns `Ok(LeaseLost)` after the part has already moved to `outcome_unknown`, if the fenced parent update affects no row. `begin_part` then **commits** that transaction (`queue.rs:52-55` of the diff). In practice this is unreachable: the parent was just locked `Live` in the same transaction, and `CURRENT_TIMESTAMP` is fixed for the transaction. But it breaks the "roll back rather than partially apply" pattern that `complete_part` follows.
+  - D3 §E listed `inspection` among the users of the shared receipt discovery; `inspection.rs` is unchanged.
+- Suggested: roll back on that `LeaseLost` branch, and either wire diagnostics or drop the claim from BRIEF-04.11.
+- Resolution history: 2026-10-18 R006 OPEN (optional).
+- 2026-10-18 [04.11-R007](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass), digest `e76ef46c…c2cf`: **RESOLVED** (A2 for inspection). See [R007 dispositions](#r007-dispositions-for-0411-f015-to-f018).
+
+## 04.11-F018 — Timing oracle and baseline evidence for the first-run failure (optional)
+- Classification: optional suggestion, **low**, verification hygiene. Not blocking.
+- Evidence:
+  - `workflow_failure_exhausted_expiry_routes_and_deadline_delay_rolls_back` (`recovery_tests.rs:320-345`) sets a 0.15 s run deadline, then runs a whole-state `snapshot` before `retire_expired_io`. Under suite load the deadline can pass first, which takes the deadline route (`Ok`) rather than hitting the delayed-commit guard. It failed once in the first full run and passed in 7 later runs.
+  - TASK says 04.11 "does not change … the delay trigger's path". In fact 04.11 changed `recovery::report` and added work to `maintenance::expire_on`.
+  - The persistence AGENTS.md baseline step (stash, rerun 3–4 times) was not done.
+- Suggested: record the window as a known load-sensitive oracle, and move the deadline update after `snapshot` (or derive it from the measured snapshot time) in a reviewed change; or record a stashed-baseline run.
+- Resolution history: 2026-10-18 R006 OPEN (optional).
+- 2026-10-18 [04.11-R007](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass), digest `e76ef46c…c2cf`: **ADDRESSED; residual accepted (optional)**. See [R007 dispositions](#r007-dispositions-for-0411-f015-to-f018).
+
+# 04.11 — correction recheck (04.11-R007)
+Common context: 2026-10-18; workflow `implement-opus-reviewed-2.1`; batch 04.11 plus the combined phase-04 gate; correction recheck; round [04.11-R007](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`, xhigh requested). Snapshot base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`, digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf`.
+
+## R007 dispositions for 04.11-F015 to F018
+- **04.11-F015 — RESOLVED.**
+  - Item 1: pre-marker authority and route refusals in `observe`/`publish_on` return `MessagePublication::Rejected`, mapped to Terminal `message.rejected` (`message_publish.rs:288-364, 415-423`; `message_runtime.rs:505`). With a marker they stay retryable. Tested by `workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker` and `…revocation_after_a_marker_stays_retryable`.
+  - Item 2: replies continue the source's recorded relay trace (`source_relay_on`, persistence `message.rs:431-457`, keyed by a UNIQUE row; `message_runtime.rs:362-371`), matching `dispatch.rs:1436-1446`. Tested by `…external_reply_continues_the_source_relay_trace` (recorded and unrecorded sources).
+- **04.11-F016 — RESOLVED.**
+  - Item 1: both receipted F012 variants (`…finality_breach_then_every_destination_final_vetoes_the_receipt`), with the uncertainty assertion under amendment A1.
+  - Item 2: per-recipient inbound resolution through `thread_for_message_keys`; Slack source refused.
+  - Item 3: delayed COMMIT past the captured fence expiry and past the run deadline rolls back every row, with COMMIT reached proven by a sequence.
+  - Item 4: SQL-only reopen from expired, non-final and foreign evidence, each isolated by a passing control; wrong-association actor refused.
+  - Item 5: four `Injected` real competing-claimant races (settle vs consumer; settle vs consumer vs `begin_part`; two settlements; settle vs cancellation).
+  - Item 6: `DeliveryReopened` on a `model_tool` execution reopens only the delivery.
+  - The lock-count assertion is recorded as structurally bounded.
+  - Focused areas, full suite (2674/0/22), stack (2669/0/22) and lease budget all pass per the `r006-*` logs.
+- **04.11-F017 (optional) — RESOLVED.** `begin_part` rolls back on the expired-proof `LeaseLost` branch (`delivery/queue.rs:206-216`). The inspection claim is withdrawn through the accepted amendment A2 (D3 §E).
+- **04.11-F018 (optional) — ADDRESSED; residual accepted.** The TASK diagnosis wording is corrected and the oracle recorded. Test hardening is left to a reviewed change, and the stashed-baseline rerun is explicitly reported as not run.

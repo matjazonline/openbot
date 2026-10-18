@@ -7,6 +7,7 @@
 
 pub(crate) mod cancellation;
 pub mod enqueue;
+pub(crate) mod evidence;
 pub mod queue;
 pub mod read;
 

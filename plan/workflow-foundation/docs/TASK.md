@@ -1655,7 +1655,7 @@ claim/episode/budget SQL for message rows, fair_polling/inspection.
 Next: A implements the cohesive 04.11 batch, then combined phase04 gate, freeze, B
 whole-batch review.
 
-### 04.11 implementation — 2026-10-17 (A, implement-opus-reviewed-2.1) — IN PROGRESS
+### 04.11 implementation — 2026-10-17 (A, implement-opus-reviewed-2.1)
 
 Effective decision: D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`
 (R005 PASS; root accepted). Optional R005 F014 handling:
@@ -1684,3 +1684,404 @@ Planned sub-batches (focused checks per D2 §8.1 / D3 §K / D4 §S areas):
 8. Tests.
 9. `lease-budget.sh`, BRIEF-04.11 and `NO_BACKWARD_COMPATIBILITY_NOTES`.
 10. Final gate.
+
+Implemented (A). All ten sub-batches. The migration was edited after its first apply,
+so the fixture test database was reset and re-migrated (no backward compatibility;
+`logs/04.11/migrate-reset.log`).
+
+Main surfaces:
+- Migration `20261017120000_workflow_messaging.sql`: vocabulary, the four message tables,
+  evidence delivery subjects, delivery provenance, admission/capture/aggregate/receipt/
+  state/wait guards, replaced dispatch and evidence commit guards, reconciliation guard,
+  effect-state view and fenced-completion guard (effect park).
+- Registry built-ins (`message.send`/`message.reply`, `InputCheck::Message`), trusted
+  snapshots in publication and binding readiness, the messaging resource in
+  `resources::inspect_on`.
+- Application: `workflow/message.rs` (+ `message_runtime.rs`), `WorkflowHandlerOutcome`
+  and `confirm_suspension` in supervision, `PollWork::MessageReceipt`,
+  `ActionFamily::Message`, `marker_owned_effect_kind` for message kinds, reconciliation
+  `ReconciliationTarget`, `DeliverySubject`, `AppliedEvidenceRequest::Delivery`,
+  `ReconciliationOutcome::DeliveryReopened`.
+- Persistence: `workflow/message.rs`, `message_publish.rs`, `message_receipts.rs`,
+  `action_reconciliation/delivery.rs`, `delivery/evidence.rs`
+  (`settle_unknown_delivery_on`), workflow cancellation in `delivery/cancellation.rs`,
+  `begin_part` rechecks, `complete_part` sending guard and reaper parent locks in
+  `delivery/queue.rs`, wait/poll/controls/maintenance/recovery wiring.
+- Composition: `src/adapters/workflow_message/mod.rs` (`MessageRuntime`).
+- `scripts/lease-budget.sh` (`message.publish`, `message.consume`, filters
+  `workflow_message_publish_`/`workflow_message_receipt_`; no threshold changed),
+  `BRIEF-04.11.md` (phase-06 obligation and trigger, `continue_on` divergence) and its
+  `NO_BACKWARD_COMPATIBILITY_NOTES` entry.
+
+Implementation details and deviations from the decision text (none changes a decided
+behavior):
+1. Purposes are `workflow_send` (initiates; refused by a reply-only binding) and
+   `workflow_reply` (allowed by one), rather than one workflow value. The accepted
+   delivery test now names both new-conversation purposes.
+2. Email composition uses the scheduled-delivery relay precedent (hop 0, the sending
+   channel); the predicted Message-ID derives from `invocation:<id>` and the destination.
+3. The delivery and part provenance guards apply only to workflow-linked deliveries;
+   other deliveries keep their existing transitions.
+4. `ReconciliationSnapshot` carries `delivery: Option<DeliverySubject>` beside the
+   unchanged remote `entries` instead of a `SubjectFacts` enum; `validate()` enforces that
+   exactly one applies and that it matches the command target.
+5. Applied delivery evidence carries `accepted_at` (for the finality-breach check in the
+   same settlement transaction) and no attested provider key; the provider key stays the
+   predicted Message-ID.
+6. The effect park writes its attempt/job close inside the publication transaction
+   (`park_on`). The accepted fenced-completion guard is replaced to admit exactly that
+   close (`effect_parked`, waiting effect wait); every other close is unchanged.
+7. A failed receipt completes the wait, takes `recovery::route_failure` and closes the
+   parked job `failed`, as retirement's final error does. A later resume of that
+   completed wait is refused (the wait no longer owns the step).
+8. The accepted-receipt resume completes through `prepare_io` (the step is an I/O step).
+9. A `Remote` target on a message marker (or the reverse) is the non-disclosing missing
+   subject (`marker_on` filters on the target's effect kind); D3 §H replaced D2's
+   `reconciliation.unsupported_effect`.
+10. An ambiguous publication COMMIT resolves by reading the frozen intent directly; the
+    dispatch `load_on` requires a live run actor and would never see a committed park.
+    The three-way race test found this.
+11. `authority::authorize_company` takes `&mut PgConnection` (all callers unchanged by
+    deref coercion) so `begin_part` can reuse it.
+12. HTTP and MCP runtimes keep their step logic in `run()` (a completed result) and wrap it
+    in `WorkflowHandlerOutcome`; existing tests call `run`.
+13. The SQL-only admission backstop serializes two writers whose first write is the marker
+    (54000 for the second). A writer that inserts its intent in the same transaction first
+    takes a foreign-key share lock on the execution, which the competitor's deferred
+    dispatch guard then needs `FOR UPDATE`; PostgreSQL aborts one with 40P01. Exactly one
+    still commits. This sharpens the D3 §A wording; no code change.
+14. Receipt discovery is one `CANDIDATES_SQL` branch that does not depend on
+    `execution.completed_at`; its `deadline` arm now requires an incomplete execution.
+    Indexes added for open actions per execution, action waits and run-scoped links.
+15. The remote evidence insert is the accepted 04.7 statement unchanged; only message
+    evidence adds the subject columns.
+16. `confirm_suspension` uses a 2 s statement bound (the trait has no policy argument).
+17. Accepted catalog pins updated for the deliberate D3/D4 replacements: the attribution
+    grammar/shape constraint texts, the dispatch and evidence commit guard sources (now the
+    messaging migration), the coverage RAISE line (27 → 39), the coverage fixture's column
+    exclusion, and the upgrade test's preserved-bytes check (added columns read NULL).
+    Fixtures and examples use UUID destinations and sources.
+18. Test infrastructure: `lease_resolution_gate.rs` gained `GatePool` and module-wide
+    visibility so the message race test can arm it.
+
+F014.1: the NULL `applied_request` alternative stays subject-neutral; the commit guard
+enforces effect kind ⇔ subject and message applied ⇔ `delivery`.
+F014.2: adopted; publication refuses a conflicted execution and workflow `begin_part`
+refuses with `evidence_conflict`.
+
+Known gaps (not covered by a dedicated test; behavior implemented):
+- inbound resolution of a recipient's reply to a workflow email (D2 §1.5 says the
+  inbound path is unchanged; not re-tested here);
+- Slack sources for `message.reply` (refused by the same rule as outbound sources);
+- a delayed COMMIT past the captured fence expiry or the run deadline (guards present);
+- wrong-association reconciliation actors (non-admin and cross-company are tested);
+- deliberate races of settlement against the consumer, `begin_part` and cancellation;
+- reopen-guard refusal for an expired proof and remote evidence carrying a delivery
+  subject (shape CHECK and foreign keys tested; conflict and double use tested);
+- the step-level `message.approval_required` (the built-in policy never requires
+  approval in phase 04);
+- the D4 §S F012 variant "breach, then every destination accepted" (the breach test
+  covers a pending sibling and the failed receipt that follows);
+- an explicit per-transaction lock-count assertion (bounded by the 20-destination CHECK).
+
+Focused checks (`logs/04.11/focused-checks.sh`, statuses `focused-status.log`): A 63,
+B 33, C 90, D 386, E 99, F 197, H 256 tests — all pass. The first run failed 14 accepted
+tests (A 1, D 12, E 1; H repeats D's 12) on the deliberate catalog and fixture changes of
+item 17. The rerun overwrote those logs; the failures are described here, not retained.
+
+Head note: commit `5c1de32` ("workflow-foundation 4.10, 4.11", author matjazonline,
+2026-10-17 20:24 UTC) landed during implementation and includes part of this work. A made
+no commit.
+Commit `5c1de32` contains all 53 files of the accepted 04.10 snapshot
+(`logs/04.10/post-gate-snapshot.txt`, base `8ce1fd4`) plus 26 files that only 04.11 touches.
+The 04.11 files already in the commit are:
+- the messaging migration;
+- `delivery/{cancellation,queue}.rs`;
+- workflow persistence `action_uncertainty`, `controls`, `lease`, `maintenance`,
+  `message{,_publish,_receipts}`, `polling{,_tests,_integration_tests}`,
+  `fairness_worker_tests`, `wait_commit` and `waits`;
+- application `lease`, `message{,_runtime}`, `polling`, `registry/{checks,schemas}`,
+  `supervise{,_tests}` and `waits`;
+- `domain/entities/transport/delivery.rs`.
+
+Shared 04.10 files changed by 04.11 (`authority.rs`, `recovery.rs`, `resources.rs`, the
+HTTP/MCP runtimes and adapters, the registry and `actions`) are also in the commit. The
+snapshot below is therefore relative to `5c1de32`: the full 04.11 change is that commit's
+04.11 content plus the listed working-tree delta.
+
+#### 04.11 final gate — 2026-10-17 (A)
+
+Scripts:
+- `logs/04.11/final-gates.sh`: statuses in `final-gate-status.log`, one log per gate at
+  `logs/04.11/final-gate-<name>.log`.
+- `logs/04.11/final-gates-rerun.sh`: statuses in `final-gate-rerun-status.log`.
+
+Environment:
+- Fixture: `127.0.0.1:55450`, database `workflow0410_test` (PG 18.6).
+- Variables: `SQLX_OFFLINE=true` except where a gate sets `false`, and `CARGO_BUILD_JOBS=4`.
+- Rust tests run under `scripts/test-network-isolation.sh` (loopback allowed; external
+  IPv4/IPv6 rejected).
+
+| Gate | Command | Result | Log |
+|---|---|---|---|
+| fmt | `cargo fmt --all -- --check` | PASS | `final-gate-fmt.log` |
+| diff | `git diff --check` | PASS | `final-gate-diff.log` |
+| transport | `scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh` | PASS | `final-gate-transport.log` |
+| credential-deploy | `scripts/tests/credential-key-rotation.sh && scripts/tests/deploy.sh` | PASS | `final-gate-credential-deploy.log` |
+| offline | `cargo check --locked --offline --all-targets` | PASS | `final-gate-offline.log` |
+| clippy | `cargo clippy --locked --offline --all-targets -- -D warnings` | PASS | `final-gate-clippy.log` |
+| fresh-schema | new `workflow0410_fresh_test`, `cargo sqlx migrate run` (`SQLX_OFFLINE=false`), `pg_dump -s` of fresh and fixture, `diff -u` | PASS: empty diff, 14454 lines each | `final-gate-fresh-schema.log`, `fresh-schema.sql`, `fixture-schema.sql` |
+| sqlx-prepare | `cargo sqlx prepare -- --locked --offline --all-targets` (`SQLX_OFFLINE=false`) | PASS | `final-gate-sqlx-prepare.log` |
+| sqlx-check | `cargo sqlx prepare --check -- --locked --offline --all-targets` (`SQLX_OFFLINE=false`) | PASS | `final-gate-sqlx-check.log` |
+| no-run | `cargo test --locked --offline --all-targets --no-run` | PASS | `final-gate-no-run.log` |
+| full-suite (1st) | `scripts/test-network-isolation.sh cargo test --locked --offline --all-targets` | FAIL 101: 2654 passed, 2 failed, 22 ignored | `final-gate-full-suite.log` |
+| stack-budget (1st) | `scripts/test-network-isolation.sh scripts/stack-budget.sh --offline` | FAIL 101, unrelated to stack: 2655 passed, 1 failed (same query-health test), no overflow | `final-gate-stack-budget.log` |
+| lease-budget | `scripts/test-network-isolation.sh scripts/lease-budget.sh --offline` | PASS: 97 tests, every op within bound | `final-gate-lease-budget.log` |
+| graph | `graft build` | PASS: 906 cards | `final-gate-graph.log` |
+| ci-stat-settings | `SHOW` track=`top`, track_utility=`off`, log_parameter_max_length(_on_error)=`0` | PASS | `final-gate-rerun-status.log` |
+| full-suite (rerun) | same as the first full-suite run | PASS: 2661 passed, 0 failed, 22 ignored (lib 2656 + other targets 5) | `final-gate-full-suite-rerun.log` |
+| stack-budget (rerun) | same as the first stack-budget run (2048 KiB) | PASS: 2656 passed, 0 failed, 22 ignored | `final-gate-stack-budget-rerun.log` |
+
+In the lease-budget table:
+- `message.publish`: 27 events, max work 19 ms against a 2000 ms bound.
+- `message.consume`: 53 events, max work 2 ms against a 2000 ms bound.
+- 92 injected events are excluded.
+- No threshold was changed.
+
+Diagnosis of the first-run failures (no source change; `logs/04.11/rerun-full-suite-failures.log`):
+- `database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading`
+  (`database_query_health.rs:272`, `!snapshot.utility_tracking`) is environmental.
+  - The fixture had `pg_stat_statements.track_utility=on` (the default), and CI sets it
+    `off` (`.github/workflows/ci.yml:80`, checked at line 91).
+  - The fixture now carries CI's settings via `ALTER SYSTEM` + `pg_reload_conf()`
+    (`logs/04.11/fixture-ci-stat-settings.log`): track `top`, track_utility `off`,
+    compute_query_id `on`, log_parameter_max_length(_on_error) `0`.
+  - The file is unchanged since before 04.10.
+- `recovery_tests::workflow_failure_exhausted_expiry_routes_and_deadline_delay_rolls_back`
+  (`recovery_tests.rs:337`, `result.is_err()`) is a load-sensitive timing window in an
+  accepted, unchanged test.
+  - The test gives the run a 0.15 s deadline, then takes a snapshot and calls
+    `retire_expired_io`.
+  - If the deadline passes before `retire_on` reads `clock_timestamp()`, retirement takes
+    the deadline route and returns `Ok` rather than meeting the delayed-commit guard.
+  - It passed 5 of 5 isolated runs (while the stack-budget run loaded the machine), in the
+    stack-budget run and in the full-suite rerun.
+  - Corrected in R006 (F018): 04.11 does change two functions near this path, though
+    neither moves the window. `recovery::report` now classifies message kinds as
+    marker-owned (this test's step kind is unaffected), and `maintenance::expire_on` runs
+    one added run-scoped `cancel_message_deliveries_on` statement, but only on the deadline
+    route, after the window is already lost. `retire_on`, the retirement guard and the delay
+    trigger are unchanged. No stashed-baseline rerun was done (see "04.11 R006 corrections").
+
+Checks not run:
+- CI frontend steps: npm install, generated CSS, Playwright browser protocol, SSE
+  navigation. 04.11 changes no frontend, CSS or SSE code.
+- The CI query-statistics `queryid` probe. The fixture settings were checked
+  (`ci-stat-settings`), but the probe query itself was not run.
+- `scripts/stack-frames.sh` (not needed: no overflow).
+
+The full required gate (D2 §8.3 as amended) passes after the rerun. Only the full suite
+and stack budget were rerun; no source changed between the first run and the rerun.
+
+#### 04.11 frozen for independent review — 2026-10-17 (A)
+
+`PATH=/private/tmp/workflow0410-tools:$PATH bash .claude/skills/implement-opus-reviewed-2.1/scripts/snapshot.sh plan/workflow-foundation/docs`
+(`logs/04.11/implementation-snapshot.txt`):
+- base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`
+- digest `8891d74001e78bac6b65e0238c3d73ac25b92f3970178edb08f296417c75cabd`
+- 51 files relative to the base; only `plan/workflow-foundation/docs` is excluded besides
+  the script's own `.agents`/`.claude`.
+
+Edits to TASK.md after the snapshot are excluded from it. A made no commit, deployment,
+migration squash or production change, and did no phase 05+ work. REVIEW.md and the
+agent-review files are untouched.
+
+- Root (2026-10-18): A reports 04.11 implemented and frozen: base `5c1de32` (user commit
+  made during implementation, not by A), digest `8891d740…cabd`. Combined gate rerun
+  green (full 2661/0/22 ignored; stack 2656/0; lease 97; schema/SQLx/clippy/fmt/graft).
+  Sent to B for whole-batch + final-integration review R006, including judgements on the
+  18 deviations, known untested gaps, first-run failure handling and gate-deferred areas.
+
+- 2026-10-18: B 04.11-R006 — CHANGES REQUIRED for `8891d740…cabd`. Blocking F016 (medium,
+  missing decision-named tests incl. races), F015 (low, two unlisted deviations:
+  revocation→Retryable not Terminal message.rejected; reply relay trace reset). Optional
+  F017, F018. Deviations do not reopen gate; first-run failure handling accepted;
+  gate-deferred areas sound. A assigned one correction round.
+
+### 04.11 R006 corrections — 2026-10-18 (A, implement-opus-reviewed-2.1)
+
+Input: R006 CHANGES REQUIRED for `8891d740…cabd` (F015 low, F016 medium; F017, F018
+optional). REVIEW.md and the agent-review files are untouched.
+
+Per-finding disposition:
+
+| Finding | Disposition | Where |
+|---|---|---|
+| F016.1 F012 variants | Added; no code defect. One test-wording amendment proposed (A1 below). | `message_reconcile_veto_tests.rs` `…finality_breach_then_every_destination_final_vetoes_the_receipt` (accepted and failed receipt) |
+| F016.2 F005 | Added: per-recipient inbound resolution and Slack-source refusal. | `message_thread_tests.rs` `…inbound_reply_resolves_each_recipients_copy`; `Source::Slack` in `…reply_refuses_sources_it_cannot_answer` |
+| F016.3 F007 | Added: delayed COMMIT past the captured fence expiry and past the run deadline. | `message_race_tests.rs` `workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back` |
+| F016.4 F010 SQL negatives and actor | Added: reopen from expired, non-final and foreign evidence; wrong-association actor. | `message_reconcile_veto_tests.rs` `…sql_reopen_refuses_expired_non_final_and_foreign_evidence`, `…wrong_association_actor_is_refused` |
+| F016.5 races | Added four real competing-claimant tests, all `Injected` with the `workflow_message_race_` prefix. | `message_reconcile_race_tests.rs` |
+| F016.6 §L seam | Added: `DeliveryReopened` on a `model_tool` execution reopens only the delivery. | `message_reconcile_veto_tests.rs` `…model_tool_delivery_reopen_never_reopens_the_job` |
+| F015.1 row 2 | Conformed (code); step-level revocation tests added. | `MessagePublication::Rejected`, `message_publish.rs` `rejected_on`, `message_runtime.rs`; `message_authority_tests.rs` |
+| F015.2 reply relay | Conformed (code); test added. | `message.rs` `source_relay_on`, `RouteTarget::ReplyEmail.relay`, `EmailPlan.relay`; `…external_reply_continues_the_source_relay_trace` |
+| F017 lease-lost rollback | Adopted. | `delivery/queue.rs` `begin_part` |
+| F017 inspection | Not wired; claim withdrawn (A2 below). | — |
+| F018 | TASK wording corrected; oracle recorded; no baseline (below). | TASK "04.11 final gate" diagnosis |
+
+Implementation notes:
+
+1. **F015.1.**
+   - `MessagePublication::Rejected(AppError)` is returned by `observe` and
+     `publish_on` when `authorize_on` or the route recheck refuses
+     (`NotFound`/`BadRequest`/`InvalidCredentials`) and the invocation has no marker (the
+     check runs in the same transaction).
+   - The step maps it like a preparation refusal: Terminal `message.rejected`,
+     `SafeToRetry`. The tool path returns the original error.
+   - With a marker, the error stays the retryable dispatch failure.
+   - A demotion already present before the step was, and still is, refused by the shared
+     request preparation (`http_runtime::facts` → `prelock_on`) as Terminal
+     `message.rejected`. The retry the review found applies to revocations landing after
+     preparation; the hooked tests place them at `observe` and at `publish`.
+2. **F015.2.**
+   - The recorded relay trace exists only in the source's inbound task payload
+     (`InboundTaskPayloadV1.hop_count`/`trace_channels`, one task per source message and
+     channel).
+   - `source_relay_on` reads it in route resolution, and `plan_email` continues it exactly
+     as the agent answer does (`dispatch.rs`: hop as recorded, trace as recorded, the
+     renderer adds the hop and the sending channel).
+   - A source with no recorded task starts a chain at hop 0, which is what an agent answer
+     to direct mail sends.
+   - A payload that does not decode is refused (`message.rejected`), not guessed.
+   - User email keeps the scheduled-delivery precedent (hop 0, trace = run channel).
+3. **F016.5 race harness.** A separate connection holds the run row `FOR UPDATE` until
+   every competitor is observed queued behind it (`resolution_gate::waiters`, transitive
+   over `pg_blocking_pids`), then releases it, so the competitors race for the real locks.
+   Assertions are order-independent:
+   - settle (applied) vs the consumer of the same action: one receipt, accepted, then the
+     step resumes;
+   - a reopening settle vs the consumer vs `begin_part` of an unsent sibling: each applies
+     once, with no consumer failure;
+   - two settlements from one revision: exactly one reopen;
+   - settle vs workflow cancellation: the revision loser refuses cleanly and its retry
+     converges on `dead_letter`/`workflow_cancelled`, with no provider request.
+4. **F016.3.** A deferred trigger named to fire before the dispatch guard sleeps past the
+   bound the guard reads. A sequence (not rolled back) proves the COMMIT was reached. The
+   COMMIT fails, and markers, action, destinations, deliveries, waits, messages and the
+   user thread are all absent.
+5. **F016.4.**
+   - A control insert that differs only in the refused fact passes the guard and is
+     stopped by one-use consumption (23505), so each 23514 isolates expiry, finality or
+     foreignness.
+   - Cross-run and cross-invocation evidence is additionally excluded by the composite
+     foreign keys.
+6. **Lock count.** Structurally bounded by the `destination_count BETWEEN 1 AND 20` and
+   ordinal 0–19 CHECKs; no separate assertion added.
+
+Proposed decision amendments, for the reviewer to judge (no gate reopened):
+
+- **A1 (D4 §S F012 wording).**
+  - The receipt variants' "an uncertainty row with `action.evidence_conflict`" cannot hold
+    for a receipted marker. D4 §M step 4's own writer `action_uncertainty::record` skips
+    receipted markers ("receipts retain precedence"). The accepted
+    `workflow_action_reconciliation_guard` raises 23514 for an observation of a marker
+    with a receipt.
+  - The tests assert what the decided writer produces:
+    - the first-uncertainty observation (`message.outcome_unknown`) is retained and no
+      new row is added;
+    - the `finality_breach` conflict row;
+    - `effect_state` `committed` with `evidence_conflict` true;
+    - the full park.
+  - The conflict-while-pending variant (no receipt) still records
+    `action.evidence_conflict` (`…finality_breach_vetoes_resume_and_reopen`).
+  - Proposed text: "the execution's uncertainty as recorded: a receipt-less marker gains
+    `action.evidence_conflict`; a receipted marker keeps its observations and shows the
+    conflict through the effect-state view".
+- **A2 (D3 §E).** No inspection surface consumes candidate discovery (`inspection.rs` is
+  the run-head reader). Discovery is shared by `polling::poll_work` and `fair_polling`,
+  and BRIEF-04.11 never claimed inspection. Proposed: drop "and `inspection`".
+
+F018:
+- The diagnosis wording is corrected in place under "04.11 final gate".
+- The window is a known load-sensitive oracle of an accepted test. The reviewer's
+  suggested fix (deadline after `snapshot`) would change an accepted test and is left for
+  a reviewed change.
+- No stashed-baseline rerun was done, so this is reported as not run. Stashing would
+  disturb the shared worktree that must be preserved, and a separate worktree at `8ce1fd4`
+  needs a full rebuild that exceeds the free disk margin.
+
+Focused checks (`logs/04.11/r006-focused-checks.sh`, same areas and filters as the first
+round; statuses in `r006-focused-status.log`, logs `r006-focused-<area>.log`):
+- A 63, B 36, C 91, D 386, E 100, F 199, H 267: all pass.
+- New-test iterations: `r006-new-tests-1.log` had 18 passing and 1 failing (the boundary
+  test first expected the pre-step demotion to reach `observe`; preparation refuses it,
+  so the test moved its revocation to the `observe` hook). `r006-new-tests-2.log`: 2/2.
+
+Final gate rerun (`logs/04.11/r006-final-gates.sh`, the same commands as
+`final-gates.sh`; statuses `r006-final-gate-status.log`, logs
+`r006-final-gate-<name>.log`; fixture still on CI's `pg_stat_statements` settings):
+
+| Gate | Result |
+|---|---|
+| fmt, diff, transport, credential-deploy | PASS |
+| offline (`cargo check --locked --offline --all-targets`) | PASS |
+| clippy (`-D warnings`, all targets) | PASS |
+| fresh-schema | PASS: empty diff, 14454 lines each (`r006-fresh-schema.sql`, `r006-fixture-schema.sql`); no migration changed in R006 |
+| sqlx-prepare, sqlx-check | PASS |
+| no-run | PASS |
+| full-suite (network-isolated, all targets) | PASS: 2674 passed (lib 2669 + 5), 0 failed, 22 ignored |
+| stack-budget (2048 KiB) | PASS: 2669 passed, 0 failed, 22 ignored, no overflow |
+| lease-budget | PASS: 99 tests; `message.publish` max work 21 ms, `message.consume` 2 ms, `message.observe` 11 ms; 92 injected events excluded; no threshold changed |
+| graph (`graft build`) | PASS |
+
+Not run, as before: the CI frontend steps, the `queryid` probe and `stack-frames.sh`.
+
+Changed in R006:
+- Source:
+  - `src/application/workflow/message.rs`
+  - `src/application/workflow/message_runtime.rs`
+  - `src/application/workflow/actions/failure.rs` (doc comment)
+  - `src/adapters/persistence/workflow/message_publish.rs`
+  - `src/adapters/persistence/workflow/message.rs`
+  - `src/adapters/persistence/delivery/queue.rs`
+- Tests:
+  - new: `message_authority_tests.rs`, `message_reconcile_veto_tests.rs`,
+    `message_reconcile_race_tests.rs`
+  - changed: `message_race_tests.rs`, `message_thread_tests.rs`,
+    `message_reconcile_tests.rs` and `message_tests.rs` (module registration)
+- Docs: `plan/workflow-foundation/BRIEF-04.11.md` (row 2 refusal and relay sentences), this
+  file.
+
+Refrozen with `PATH=/private/tmp/workflow0410-tools:$PATH bash .claude/skills/implement-opus-reviewed-2.1/scripts/snapshot.sh plan/workflow-foundation/docs`
+(`logs/04.11/r006-snapshot.txt`):
+- base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`
+- digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf`
+- 56 files; the five new to the delta are `delivery/queue.rs`, `actions/failure.rs` and
+  the three new test files.
+
+No commit, deployment, migration squash, production change or phase 05+ work.
+
+- Root (2026-10-18): A R006 corrections frozen at digest `e76ef46c…c2cf` (base 5c1de32);
+  full 2674/0/22, stack 2669/0, lease 99, static/SQLx/schema/graft green. Proposed
+  amendments A1 (F012 receipted-variant uncertainty assertion) and A2 (drop inspection
+  from D3 §E) sent with B recheck R007.
+
+### 04.11 ROOT ACCEPTED; phase04 combined gate complete — 2026-10-18
+
+B 04.11-R007 **PASS** for digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf`
+(base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`, exclusion `plan/workflow-foundation/docs`),
+covering the 04.11 whole batch and combined phase04 final integration. Effective decision
+D2+D3+D4 with reviewed amendments A1, A2. Root independently recomputed the digest
+(match) and read `logs/04.11/r006-final-gate-status.log`: offline, clippy, fresh-schema,
+SQLx prepare/check, no-run, full suite (2674/0/22 ignored, network-isolated), stack budget
+2048 KiB (2669/0), lease budget (99, no threshold change), graft — all PASS; fmt, diff,
+transport, credential/deploy PASS earlier in the same script. Findings F001–F018 resolved
+or optional-dispositioned; none open. **04.11 ACCEPTED; phase04 (04.1–04.11) complete.**
+
+Not run (explicit gaps): CI frontend/CSS/Playwright/SSE steps (no frontend change), CI
+`queryid` probe (settings only checked), `stack-frames.sh`, F018 stashed-baseline rerun
+(disk/worktree constraints). Task fixture `/private/tmp/workflow0410-20261017` changed to
+CI `pg_stat_statements` settings during the gate; root verified sysid 7697669855432439122
+and stopped it (`pg_ctl -m fast stop`, data retained). No author/reviewer checks running.
+No commit, deployment, migration squash or phases 05+ by the workflow (the user made commit
+5c1de32 during implementation). Review rounds: 04.11-R002…R007 (R001 historical).

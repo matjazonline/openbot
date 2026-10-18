@@ -206,7 +206,12 @@ impl DeliveryQueue for PostgresPersistence {
             WorkflowDeliveryAdmission::Proceed => {
                 if reopen_proof_expired_on(&mut tx, fence.row.as_uuid(), part_id.as_uuid()).await? {
                     let outcome = expire_reopened_part_on(&mut tx, fence, part_id).await?;
-                    tx.commit().await.map_err(AppError::from)?;
+                    // Roll back rather than partially apply, as `complete_part` does.
+                    if outcome == DeliveryOutcome::LeaseLost {
+                        tx.rollback().await.map_err(AppError::from)?;
+                    } else {
+                        tx.commit().await.map_err(AppError::from)?;
+                    }
                     return Ok(outcome);
                 }
             }

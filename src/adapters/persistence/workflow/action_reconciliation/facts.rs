@@ -22,22 +22,56 @@ pub(super) async fn insert_on(
         Some(AppliedEvidenceRequest::RemoteEntry(_)) => Some("remote_entry"),
         Some(AppliedEvidenceRequest::MarkerReservation) => Some("marker_reservation"),
         Some(AppliedEvidenceRequest::Unattributed) => Some("unattributed"),
+        Some(AppliedEvidenceRequest::Delivery { .. }) => Some("delivery"),
         None => None,
+    };
+    // A message proof names its one subject delivery and has no remote coverage rows; the
+    // remote insert is the accepted 04.7 statement, unchanged.
+    let subject = snapshot
+        .delivery
+        .as_ref()
+        .map(|subject| (i16::from(subject.ordinal), subject.delivery));
+    let (subject_columns, subject_values) = match subject {
+        Some(_) => (",delivery_ordinal,delivery_id", ",$26,$27"),
+        None => ("", ""),
     };
     let applied_entry = match evidence.applied_request() {
         Some(AppliedEvidenceRequest::RemoteEntry(entry)) => Some(entry.as_uuid()),
         _ => None,
     };
-    sqlx::query("INSERT INTO workflow_action_evidence(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,id,actor_id,command_id,command_key,request_digest,coverage_digest,disposition,registration,verifier_version,provider,authoritative_reference,operation_signature,observed_at,verified_at,valid_until,grant_eligible,diagnostic,applied_request,applied_remote_entry_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)")
-        .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid())
-        .bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid())
-        .bind(id.as_uuid()).bind(command.actor.user_id()).bind(command_id).bind(command.command_key.as_str())
-        .bind(evidence.request_digest().as_str()).bind(evidence.coverage_digest().as_str()).bind(disposition)
-        .bind(registration.map(|r| r.id().as_str())).bind(registration.map(|r| r.version().as_str()))
-        .bind(registration.map(|r| r.provider().as_str())).bind(evidence.authoritative_reference().map(|r| r.as_str()))
-        .bind(registration.map(|r| r.operation().as_str())).bind(evidence.observed_at()).bind(evidence.verified_at())
-        .bind(evidence.valid_until()).bind(disposition == "final_not_applied" && !already_final)
-        .bind(evidence.diagnostic()).bind(attribution).bind(applied_entry).execute(&mut **tx).await?;
+    let insert = format!(
+        "INSERT INTO workflow_action_evidence(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,id,actor_id,command_id,command_key,request_digest,coverage_digest,disposition,registration,verifier_version,provider,authoritative_reference,operation_signature,observed_at,verified_at,valid_until,grant_eligible,diagnostic,applied_request,applied_remote_entry_id{subject_columns}) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25{subject_values})"
+    );
+    let mut insert = sqlx::query(&insert)
+        .bind(command.scope.company.as_uuid())
+        .bind(command.scope.run.as_uuid())
+        .bind(command.scope.execution.as_uuid())
+        .bind(command.subject.invocation.as_uuid())
+        .bind(command.subject.argument_digest.as_str())
+        .bind(command.marker.as_uuid())
+        .bind(id.as_uuid())
+        .bind(command.actor.user_id())
+        .bind(command_id)
+        .bind(command.command_key.as_str())
+        .bind(evidence.request_digest().as_str())
+        .bind(evidence.coverage_digest().as_str())
+        .bind(disposition)
+        .bind(registration.map(|r| r.id().as_str()))
+        .bind(registration.map(|r| r.version().as_str()))
+        .bind(registration.map(|r| r.provider().as_str()))
+        .bind(evidence.authoritative_reference().map(|r| r.as_str()))
+        .bind(registration.map(|r| r.operation().as_str()))
+        .bind(evidence.observed_at())
+        .bind(evidence.verified_at())
+        .bind(evidence.valid_until())
+        .bind(disposition == "final_not_applied" && !already_final)
+        .bind(evidence.diagnostic())
+        .bind(attribution)
+        .bind(applied_entry);
+    if let Some((ordinal, delivery)) = subject {
+        insert = insert.bind(ordinal).bind(delivery);
+    }
+    insert.execute(&mut **tx).await?;
     for entry in &snapshot.entries {
         sqlx::query("INSERT INTO workflow_action_evidence_coverage(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,evidence_id,remote_entry_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)")
             .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid())

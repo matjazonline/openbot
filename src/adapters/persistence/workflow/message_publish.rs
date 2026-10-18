@@ -2,7 +2,7 @@
 //!
 //! Order: `authorize_on` locks (company/actor, fence, run, current owners, intent), conflict
 //! and replay checks, destination-owner locks in UUID order, the admission probe, then the
-//! `message` marker as the first write, every thread/message/delivery and linkage row, the
+//! `message` marker as the first write, the action row, every thread/message/delivery and linkage row, the
 //! atomic receipt (all in-app) or the effect park (a step with email). No provider I/O.
 use super::super::action_dispatch::{AuthorizedAction, PostgresActionDispatch, SqlLocalAction};
 use super::super::persistence_bound::{Attempt, End, Evidence, WriteBound};
@@ -271,7 +271,7 @@ async fn park_on(
     }
     sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='effect' WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
-    super::super::waits::audit(&mut **tx, scope, "wait_parked").await?;
+    super::super::waits::audit(tx, scope, "wait_parked").await?;
     Ok(())
 }
 
@@ -289,9 +289,14 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             action,
             current_policy,
             approval_required,
-        } = self
-            .authorize_on(tx, request, bound.server_timeout())
-            .await?;
+        } = match self.authorize_on(tx, request, bound.server_timeout()).await {
+            Ok(authorized) => authorized,
+            Err(error) => {
+                return Self::rejected_on(tx, request, error)
+                    .await
+                    .map(End::Rollback);
+            }
+        };
         if approval_required {
             return Ok(End::Rollback(MessagePublication::ApprovalRequired));
         }
@@ -304,7 +309,11 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
                 stored_on(tx, request, &action, Reader::Observe).await?,
             ));
         }
-        recheck_routes_on(tx, request.scope().company, plan).await?;
+        if let Err(error) = recheck_routes_on(tx, request.scope().company, plan).await {
+            return Self::rejected_on(tx, request, error)
+                .await
+                .map(End::Rollback);
+        }
         super::super::persistence_bound::locks_held();
         if admission_full_on(tx, request).await? {
             return Ok(End::Rollback(MessagePublication::ActionLimit));
@@ -313,9 +322,9 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
         // The probe above holds the attempt lock, so the SQL admission backstop cannot fire here;
         // it exists for SQL-only writers.
         Self::insert(tx, request, marker, "message", current_policy).await?;
-        write_destinations_on(tx, request, plan).await?;
         let wait = (origin == MessageOrigin::Step && plan.has_delivery()).then(Uuid::new_v4);
         insert_action_on(tx, request, marker, origin, wait, plan.destinations.len()).await?;
+        write_destinations_on(tx, request, plan).await?;
         lease::live_window(tx, request.fence, started)
             .await?
             .ok_or_else(conflict)?;
@@ -336,6 +345,24 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
         Ok(End::Commit(MessagePublication::Pending))
     }
 
+    /// D2 §5.1 row 2: a routing or authority refusal while this invocation has no marker is
+    /// Terminal `message.rejected` (the transaction rolls back, nothing was written). With a
+    /// marker, or for any other error, the error stays a retryable dispatch failure.
+    async fn rejected_on(
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        error: AppError,
+    ) -> AppResult<MessagePublication> {
+        let refusal = matches!(
+            error,
+            AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials
+        );
+        if refusal && !Self::existing(tx, request).await? {
+            return Ok(MessagePublication::Rejected(error));
+        }
+        Err(error)
+    }
+
     async fn resolve_on(
         &self,
         request: &ActionDispatchRequest,
@@ -348,15 +375,22 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             if !Self::existing(&mut tx, request).await? {
                 return Ok(None);
             }
-            let authority = Box::pin(super::super::action_authority::load_on(
-                &mut tx,
-                request.scope(),
-                &request.subject,
-                None,
-            ))
+            // Read-only evidence of this operation: the frozen intent itself, whatever state the
+            // park left the run in (a resolution never re-authorizes or writes).
+            let operation: Value = sqlx::query_scalar(
+                "SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 \
+                   AND execution_id=$3 AND id=$4 AND argument_digest=$5",
+            )
+            .bind(request.scope().company.as_uuid())
+            .bind(request.scope().run.as_uuid())
+            .bind(request.scope().execution.as_uuid())
+            .bind(request.subject.invocation.as_uuid())
+            .bind(request.subject.argument_digest.as_str())
+            .fetch_one(&mut *tx)
             .await?;
+            let action = FrozenAction::restore(operation)?;
             Ok(Some(
-                stored_on(&mut tx, request, &authority.action, Reader::Resolve).await?,
+                stored_on(&mut tx, request, &action, Reader::Resolve).await?,
             ))
         }
         .await;
@@ -378,9 +412,15 @@ impl<L: SqlLocalAction> MessageDispatch for PostgresActionDispatch<MessageAction
                 let mut conn = bound.acquire(self.persistence.pool()).await?;
                 let mut tx = bound.begin(&mut conn).await?;
                 let observed = async {
-                    let authorized = self
+                    let authorized = match self
                         .authorize_on(&mut tx, request, bound.server_timeout())
-                        .await?;
+                        .await
+                    {
+                        Ok(authorized) => authorized,
+                        Err(error) => {
+                            return Self::rejected_on(&mut tx, request, error).await.map(Some);
+                        }
+                    };
                     if super::super::action_uncertainty::conflicted_on(&mut tx, request.scope())
                         .await?
                     {

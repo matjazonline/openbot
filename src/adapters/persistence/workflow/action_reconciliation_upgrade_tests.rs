@@ -165,7 +165,23 @@ fn assert_history_preserved(before: &Value, after: &Value) {
                 assert!(after[table].as_array().unwrap().contains(row));
             }
         } else {
-            assert_eq!(rows, &after[table], "original bytes of {table}");
+            // A later migration may add nullable columns (04.11 delivery subjects): every
+            // original byte stays, and an added column reads NULL on historical rows.
+            let after_rows = after[table].as_array().unwrap();
+            assert_eq!(
+                rows.as_array().unwrap().len(),
+                after_rows.len(),
+                "rows of {table}"
+            );
+            for (original, upgraded) in rows.as_array().unwrap().iter().zip(after_rows) {
+                let mut upgraded = upgraded.as_object().unwrap().clone();
+                upgraded.retain(|key, value| original.get(key).is_some() || !value.is_null());
+                assert_eq!(
+                    original,
+                    &Value::Object(upgraded),
+                    "original bytes of {table}"
+                );
+            }
         }
     }
 }

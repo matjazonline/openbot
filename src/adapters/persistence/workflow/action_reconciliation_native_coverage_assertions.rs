@@ -30,17 +30,17 @@ pub(super) fn guard(catalog: &Value) {
         .split_once("$function$")
         .unwrap()
         .0;
-    let expected =
-        include_str!("../../../../migrations/20260930181000_workflow_action_evidence_binding.sql")
-            .split_once("CREATE OR REPLACE FUNCTION workflow_action_evidence_commit_guard()")
-            .unwrap()
-            .1
-            .split_once("$$")
-            .unwrap()
-            .1
-            .split_once("$$")
-            .unwrap()
-            .0;
+    // The latest definition: 04.11 adds the message branch ahead of the unchanged remote one.
+    let expected = include_str!("../../../../migrations/20261017120000_workflow_messaging.sql")
+        .split_once("CREATE OR REPLACE FUNCTION workflow_action_evidence_commit_guard()")
+        .unwrap()
+        .1
+        .split_once("$$")
+        .unwrap()
+        .1
+        .split_once("$$")
+        .unwrap()
+        .0;
     assert_eq!(actual, expected);
 }
 pub(super) fn coverage_catalog(catalog: Value) -> Value {
@@ -92,7 +92,7 @@ pub(super) fn coverage_transport(error: AppError, case: Case) -> (Envelope, Valu
         assert!(
             native
                 .context
-                .contains("workflow_action_evidence_commit_guard() line 27 at RAISE")
+                .contains("workflow_action_evidence_commit_guard() line 39 at RAISE")
         );
         assert!(
             native

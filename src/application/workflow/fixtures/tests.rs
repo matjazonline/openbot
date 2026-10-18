@@ -53,13 +53,13 @@ fn prepare(
     let params = if bundle.compiled().source() == Fixture::AutonomousResponse.source() {
         json!({})
     } else {
-        json!({"reviewer":"reviewer-1","deadline":"2030-01-01T00:00:00Z"})
+        json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","deadline":"2030-01-01T00:00:00Z"})
     };
     bundle
         .prepare_step_inputs(
             &step(id),
             &context(
-                &json!({"message":"Help","source_message":"message-1"}),
+                &json!({"message":"Help","source_message":"00000000-0000-0000-0000-0000000000c1"}),
                 &params,
                 outputs,
             ),

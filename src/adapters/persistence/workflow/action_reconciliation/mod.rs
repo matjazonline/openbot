@@ -1,5 +1,6 @@
 //! Company-first reconciliation snapshots restore parked/terminal frozen intent.
 //! Settlement and dispatch permission stay separate from this read boundary.
+mod delivery;
 mod facts;
 mod settlement;
 
@@ -110,23 +111,44 @@ impl<A: SqlReconciliationResources> ActionReconciliation for PostgresActionRecon
             tx.commit().await?;
             return Ok(recorded(action, refusal_result(outcome, head.revision)));
         }
-        let entries = entries_on(&mut tx, command).await?;
+        let (entries, delivery) = match command.target {
+            ReconciliationTarget::Remote => (entries_on(&mut tx, command).await?, None),
+            // Exactly one destination delivery that is outcome-unknown now; anything else is
+            // the same non-disclosing refusal as a missing subject.
+            ReconciliationTarget::MessageDelivery { .. } => {
+                match delivery::subject_on(&mut tx, command, delivery::Lock::Snapshot).await? {
+                    Some((subject, status)) if status == "outcome_unknown" => {
+                        (Vec::new(), Some(subject))
+                    }
+                    _ => return Err(missing()),
+                }
+            }
+        };
         let database_now = sqlx::query_scalar("SELECT clock_timestamp()")
             .fetch_one(&mut *tx)
             .await?;
-        let coverage_digest = ReconciliationSnapshot::coverage(
-            &action,
-            &command.subject,
-            command.marker,
-            marker_created_at,
-            &entries,
-        )?;
+        let coverage_digest = match &delivery {
+            None => ReconciliationSnapshot::coverage(
+                &action,
+                &command.subject,
+                command.marker,
+                marker_created_at,
+                &entries,
+            )?,
+            Some(subject) => ReconciliationSnapshot::delivery_coverage(
+                &action,
+                &command.subject,
+                command.marker,
+                subject,
+            )?,
+        };
         let snapshot = ReconciliationSnapshot {
             action,
             subject: command.subject.clone(),
             marker: command.marker,
             marker_created_at,
             entries,
+            delivery,
             revision: head.revision,
             database_now,
             coverage_digest,
@@ -213,9 +235,11 @@ async fn marker_on(
     tx: &mut Transaction<'_, Postgres>,
     command: &ReconcileActionCommand,
 ) -> AppResult<DateTime<Utc>> {
-    sqlx::query_scalar("SELECT created_at FROM workflow_action_dispatches WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND invocation_id=$4 AND argument_digest=$5 AND id=$6 AND effect_kind='remote' FOR SHARE")
+    // The target names the marker's effect kind; a mismatch is a missing subject.
+    sqlx::query_scalar("SELECT created_at FROM workflow_action_dispatches WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND invocation_id=$4 AND argument_digest=$5 AND id=$6 AND effect_kind=$7 FOR SHARE")
         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid())
         .bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid())
+        .bind(command.target.effect_kind())
         .fetch_optional(&mut **tx).await?.ok_or_else(missing)
 }
 

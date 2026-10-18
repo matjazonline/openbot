@@ -10,7 +10,7 @@ mod admission_source_tests;
 #[path = "batch_tests.rs"]
 mod batch_tests;
 #[path = "lease_tests.rs"]
-mod lease_tests;
+pub(in crate::adapters::persistence::workflow) mod lease_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};

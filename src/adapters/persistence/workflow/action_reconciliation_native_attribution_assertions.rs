@@ -56,14 +56,17 @@ pub(super) fn assert_owners(catalog: &[Value], native: &Value) {
                 assert_eq!(owner["type"], "c");
                 assert_eq!(
                     definition,
-                    "CHECK ((applied_request = ANY (ARRAY['remote_entry'::text, 'marker_reservation'::text, 'unattributed'::text])))"
+                    // 04.11-D4 §N adds the message `delivery` attribution.
+                    "CHECK ((applied_request = ANY (ARRAY['remote_entry'::text, 'marker_reservation'::text, 'unattributed'::text, 'delivery'::text])))"
                 );
             }
             SHAPE => {
                 assert_eq!(owner["type"], "c");
                 assert_eq!(
                     definition,
-                    "CHECK ((((applied_request IS NULL) AND (applied_remote_entry_id IS NULL)) OR ((disposition = 'applied'::text) AND (((applied_request = 'remote_entry'::text) AND (applied_remote_entry_id IS NOT NULL)) OR ((applied_request = ANY (ARRAY['marker_reservation'::text, 'unattributed'::text])) AND (applied_remote_entry_id IS NULL))))))"
+                    // 04.11-D4 §N: every remote alternative requires no delivery subject; message
+                    // applied evidence is `delivery` with one.
+                    "CHECK ((((applied_request IS NULL) AND (applied_remote_entry_id IS NULL)) OR ((disposition = 'applied'::text) AND (delivery_id IS NULL) AND (((applied_request = 'remote_entry'::text) AND (applied_remote_entry_id IS NOT NULL)) OR ((applied_request = ANY (ARRAY['marker_reservation'::text, 'unattributed'::text])) AND (applied_remote_entry_id IS NULL)))) OR ((disposition = 'applied'::text) AND (applied_request = 'delivery'::text) AND (applied_remote_entry_id IS NULL) AND (delivery_id IS NOT NULL))))"
                 );
             }
             _ => unreachable!(),

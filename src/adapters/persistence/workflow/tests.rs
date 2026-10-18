@@ -15,6 +15,8 @@ mod binding_tests;
 mod http_tests;
 #[path = "mcp_tests.rs"]
 mod mcp_tests;
+#[path = "message_tests.rs"]
+mod message_tests;
 #[path = "run_schema_tests.rs"]
 mod run_schema_tests;
 use crate::adapters::persistence::test_support::{OwnDatabase, own_database};

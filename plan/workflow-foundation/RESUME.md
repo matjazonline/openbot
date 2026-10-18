@@ -1,6 +1,19 @@
 # Workflow foundation resume
 
-## USER STOP — 2026-10-17 (current)
+## Accepted — 04.11 and phase04 complete, 2026-10-18 (current)
+
+**04.11 VERIFIED and root-accepted** under implement-opus-reviewed-2.1 after independent
+architecture gate (04.11-R005 PASS, decision D2+D3+D4 in `docs/logs/04.11/`) and
+whole-batch/final-integration review (04.11-R007 PASS). Digest
+`e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf` on base `5c1de32`
+(excluding `plan/workflow-foundation/docs`). Combined phase04 gate passed: full suite
+2674/0, stack budget 2669/0, lease budget 99, schema/SQLx/clippy/fmt/transport/graft.
+Gaps: CI frontend steps, queryid probe, stack-frames.sh, F018 baseline rerun not run.
+Fixture `/private/tmp/workflow0410-20261017` stopped, data retained. Records: latest
+[TASK](docs/TASK.md) / [REVIEW](docs/REVIEW.md) entries. Next: phase 05+ only under a new
+instruction; no commit, deployment or migration squash performed by the workflow.
+
+## USER STOP — 2026-10-17 (historical)
 
 **Stopped at a safe checkpoint.** Read the [current handoff](docs/HANDOFF-04.11-USER-STOP-20261017.md).
 04.10 is accepted (R005 PASS); 04.11-D1 architecture review is incomplete

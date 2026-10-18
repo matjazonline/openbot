@@ -46,6 +46,7 @@ impl ActionFamily {
 #[derive(Debug)]
 pub enum ActionStepOutcome<'a> {
     /// Failed before `dispatch_remote`: request, intent or (MCP) pre-reservation checks.
+    /// Messaging also reports a publication refused while no marker exists this way.
     Preparation(&'a AppError),
     /// `dispatch_remote` failed: reservation refusal, ambiguity, provider or post-entry error.
     Dispatch(&'a AppError),

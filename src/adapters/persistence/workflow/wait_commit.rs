@@ -116,12 +116,23 @@ async fn advance(
     let activation = activation::activate_on(db, scope)
         .await?
         .ok_or_else(invalid)?;
-    let (output, event) = match wake {
-        Wake::Timer => (json!({"deadline":activation.inputs["deadline"]}), None),
-        Wake::Event(event) => (event.payload.clone(), Some(event.id)),
-        Wake::Effect(result) => (result, None),
+    let (prepared, event) = match wake {
+        Wake::Timer => (
+            prepare(
+                binding.bundle(),
+                &activation,
+                json!({"deadline":activation.inputs["deadline"]}),
+            ),
+            None,
+        ),
+        Wake::Event(event) => (
+            prepare(binding.bundle(), &activation, event.payload.clone()),
+            Some(event.id),
+        ),
+        // A parked message step completes as the I/O step it is, with its receipt as output.
+        Wake::Effect(result) => (prepare_io(binding.bundle(), &activation, result), None),
     };
-    let completion = match prepare(binding.bundle(), &activation, output) {
+    let completion = match prepared {
         Ok(completion) => completion,
         Err(AppError::BadRequest(_)) => {
             return fail(db, scope, WaitFailureReason::InvalidOutput).await;

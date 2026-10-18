@@ -3,9 +3,7 @@ use crate::adapters::{
     persistence::credentials::{CredentialCipher, CredentialContext},
     workflow_http::{HttpDestinationPolicy, HttpRuntime},
 };
-use crate::application::workflow::{
-    actions::*, http::*, lease::*, polling::WorkflowStepKind,
-};
+use crate::application::workflow::{actions::*, http::*, lease::*, polling::WorkflowStepKind};
 use crate::domain::entities::correlation::CorrelationId;
 use secrecy::ExposeSecret;
 use secrecy::SecretString;

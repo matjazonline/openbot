@@ -25,11 +25,13 @@ set -uo pipefail
 
 BUDGET_PCT="${LEASE_BODY_BUDGET_PCT:-50}"
 # The lease suites proper (claims, renewals, releases, completions and recoveries), then the
-# action dispatch/receipt and budget suites that run on the same converted bound.
-read -r -a FILTERS <<<"${LEASE_BUDGET_FILTERS:-lease_tests::workflow_io lease_tests::completion_tests lease_tests::recovery_tests lease_tests::capacity_tests workflow_action_dispatch_ workflow_action_receipt_ workflow_budget_runtime_}"
+# action dispatch/receipt, budget and message publish/receipt suites that run on the same
+# converted bound. 04.11 added the message suites and their operations; no threshold changed.
+# Deliberate-delay message tests are named workflow_message_race_ and stay out of FILTERS.
+read -r -a FILTERS <<<"${LEASE_BUDGET_FILTERS:-lease_tests::workflow_io lease_tests::completion_tests lease_tests::recovery_tests lease_tests::capacity_tests workflow_action_dispatch_ workflow_action_receipt_ workflow_budget_runtime_ workflow_message_publish_ workflow_message_receipt_}"
 # Every converted write and read must be measured: a filter that drifts away from an
 # operation fails here instead of silently dropping its gate.
-REQUIRED_OPS="${LEASE_BUDGET_REQUIRED_OPS:-lease.claim lease.renew lease.release completion action.local action.reserve_remote action.enter_remote action.commit_remote action.return_authorized budget.reserve}"
+REQUIRED_OPS="${LEASE_BUDGET_REQUIRED_OPS:-lease.claim lease.renew lease.release completion action.local action.reserve_remote action.enter_remote action.commit_remote action.return_authorized budget.reserve message.publish message.consume}"
 # LEASE_BUDGET_RECORD keeps the per-event JSONL for diagnosis; otherwise it is temporary.
 if [[ -n "${LEASE_BUDGET_RECORD:-}" ]]; then
     record="$LEASE_BUDGET_RECORD"

@@ -37,6 +37,7 @@ pub(super) async fn command(
         scope: request.scope(),
         subject: request.subject.clone(),
         marker: ActionRemoteMarkerId::new(marker),
+        target: ReconciliationTarget::Remote,
         expected_revision: f
             .persistence()
             .head(request.scope().company, request.scope().run)

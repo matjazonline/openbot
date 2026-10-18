@@ -53,7 +53,7 @@ pub(crate) const fn cancellation_detail(reason: DeliveryCancellationReason) -> &
             "The workflow run that produced this delivery ended before it went out"
         }
         DeliveryCancellationReason::WorkflowRevoked => {
-            "The workflow's messaging authority was revoked before this delivery went out"
+            "The workflow messaging authority was revoked before this delivery went out"
         }
         DeliveryCancellationReason::RecipientRevoked => {
             "The recipient is no longer a member with the frozen address"

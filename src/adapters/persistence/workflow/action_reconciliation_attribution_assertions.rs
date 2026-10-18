@@ -12,8 +12,10 @@ struct NativeGuard {
 fn guard_definitions() -> [NativeGuard; 5] {
     let binding =
         include_str!("../../../../migrations/20260930181000_workflow_action_evidence_binding.sql");
-    let dispatch =
-        include_str!("../../../../migrations/20260930120000_workflow_action_dispatch.sql");
+    // 04.11 replaces the dispatch and evidence commit guards (message branches; the local and
+    // remote branches unchanged), so their latest definitions live in the messaging migration.
+    let messaging = include_str!("../../../../migrations/20261017120000_workflow_messaging.sql");
+    let dispatch = messaging;
     let observations = include_str!(
         "../../../../migrations/20260930183000_workflow_action_observation_guards.sql"
     );
@@ -35,7 +37,7 @@ fn guard_definitions() -> [NativeGuard; 5] {
         NativeGuard {
             name: "workflow_action_evidence_commit_guard",
             relation: "workflow_action_evidence",
-            migration: binding,
+            migration: messaging,
             timing: 5,
             deferred: true,
         },

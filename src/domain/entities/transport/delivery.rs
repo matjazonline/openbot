@@ -422,11 +422,15 @@ mod tests {
     }
 
     #[test]
-    fn a_reply_only_interface_carries_every_purpose_but_outreach() {
+    fn a_reply_only_interface_carries_every_purpose_but_new_conversations() {
+        // Outreach and a workflow send each open a conversation; a workflow reply answers one.
         for purpose in DeliveryPurpose::ALL {
             assert!(purpose.permitted_by(BindingDeliveryPolicy::ReplyAndInitiate));
             assert_eq!(
-                *purpose != DeliveryPurpose::Outreach,
+                !matches!(
+                    purpose,
+                    DeliveryPurpose::Outreach | DeliveryPurpose::WorkflowSend
+                ),
                 purpose.permitted_by(BindingDeliveryPolicy::ReplyOnly)
             );
         }

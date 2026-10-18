@@ -35,6 +35,22 @@ pub(super) async fn authorize_company(
     Ok(())
 }
 
+/// Built-in messaging has no registration: a snapshot naming it must be exactly the trusted
+/// built-in, and its current authority is the company's (04.11-D2 §1.6). `false` for every
+/// other tool, which keeps its registration or approval check.
+pub(super) fn builtin_message_tool(tool: &ToolSnapshot) -> AppResult<bool> {
+    use crate::application::workflow::message::{
+        is_builtin_message_tool, is_trusted_message_snapshot,
+    };
+    if !is_builtin_message_tool(tool.contract.name.as_str()) {
+        return Ok(false);
+    }
+    if !is_trusted_message_snapshot(tool)? {
+        return Err(missing());
+    }
+    Ok(true)
+}
+
 /// Tools must match a live HTTP registration or MCP approval for their slot kind.
 /// Agents, skills and profiles have no authoritative durable owner yet: persisting
 /// caller-supplied facts would turn frozen content into a grant (phase 06).
@@ -60,15 +76,7 @@ pub(super) async fn supported_publication(
         }
         let definition = current.compiled().graph().definition();
         for tool in &snapshots.tools {
-            // Built-in messaging has no registration: the snapshot must be exactly the trusted
-            // built-in, and its current authority is the company's (04.11-D2 §1.6).
-            use crate::application::workflow::message::{
-                is_builtin_message_tool, is_trusted_message_snapshot,
-            };
-            if is_builtin_message_tool(tool.contract.name.as_str()) {
-                if !is_trusted_message_snapshot(tool)? {
-                    return Err(missing());
-                }
+            if builtin_message_tool(tool)? {
                 continue;
             }
             let kind = match &tool.contract.connection {

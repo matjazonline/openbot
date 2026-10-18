@@ -172,6 +172,7 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/tenant-owned-execution-backends.md",
     "plan/workflow-foundation/README.md",
     "plan/workflow-foundation/BRIEF-04.10.md",
+    "plan/workflow-foundation/BRIEF-04.11.md",
     "plan/workflow-library/README.md",
     "plan/workflows/configurable-workflows-architecture.md",
     "plan/workflows/post-approval-workflow-execution.md",

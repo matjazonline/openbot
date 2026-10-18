@@ -51,7 +51,26 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
     }
 }
 
-fn messaging_status(company: CompanyId) -> AppResult<ResourceStatus> {
+/// Reconciliation of a message invocation records past truth under the company's current
+/// authority, which is what owns the messaging resource (04.11-D3 §H.1).
+#[async_trait]
+impl super::action_reconciliation::SqlReconciliationResources for MessageActionAuthority {
+    async fn lock_resource(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        actor: WorkflowActor,
+        frozen: &ActionRunAuthority,
+    ) -> AppResult<ResourceStatus> {
+        let company = frozen.action.scope().company;
+        if message_target(&frozen.action.request().target)? != company.as_uuid() {
+            return Err(missing());
+        }
+        super::authority::authorize_company(tx, company, actor).await?;
+        messaging_status(company)
+    }
+}
+
+pub(super) fn messaging_status(company: CompanyId) -> AppResult<ResourceStatus> {
     Ok(ResourceStatus {
         id: RuntimeResourceId::new(company.as_uuid()),
         company_id: company,
@@ -390,6 +409,7 @@ async fn reply_target_on(
     let sender_channel = channel_route_on(tx, company, channel)
         .await?
         .ok_or_else(|| refused("the source channel cannot send email"))?;
+    let relay = source_relay_on(tx, company, source, channel).await?;
     Ok(RouteTarget::ReplyEmail {
         source,
         thread,
@@ -402,7 +422,38 @@ async fn reply_target_on(
             .into_iter()
             .map(MessageId::from)
             .collect(),
+        relay,
     })
+}
+
+/// The relay trace the source arrived with, as its inbound task recorded it: the only place it
+/// is kept (`InboundTaskPayloadV1`). A payload that does not decode is refused, never guessed.
+async fn source_relay_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    source: CanonicalMessageId,
+    channel: Uuid,
+) -> AppResult<Option<SourceRelay>> {
+    use crate::application::transport::task_payload::InboundTaskPayload;
+    let payload: Option<Value> = sqlx::query_scalar(
+        "SELECT payload FROM background_tasks WHERE company_id=$1 AND source_message_uuid=$2 \
+           AND channel_id=$3 AND queue_kind='legacy'",
+    )
+    .bind(company.as_uuid())
+    .bind(source.as_uuid())
+    .bind(channel)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(payload) = payload else {
+        return Ok(None);
+    };
+    let payload = InboundTaskPayload::decode(&payload)
+        .map_err(|_| refused("the source's recorded relay trace cannot be read"))?;
+    let recorded = payload.identifiers();
+    Ok(Some(SourceRelay {
+        hop_count: recorded.hop_count,
+        trace_channels: recorded.trace_channels.to_vec(),
+    }))
 }
 
 /// Authoring selection of the trusted built-ins. Requires current owner/admin authority.

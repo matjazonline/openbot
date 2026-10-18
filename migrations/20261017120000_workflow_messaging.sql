@@ -430,6 +430,36 @@ BEGIN
 END
 $$;
 
+-- 11b. Fenced completion: a message step parked in its effect wait closes its job and attempt
+-- (EffectParked) without completing the execution (D2 3, D3 B). Every other close is unchanged.
+CREATE OR REPLACE FUNCTION check_workflow_fenced_completion() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.queue_kind = 'workflow' AND OLD.status = 'processing' AND NEW.status = 'completed' THEN
+        IF OLD.lock_expires_at IS NULL OR OLD.lock_expires_at <= clock_timestamp()
+            OR NOT EXISTS (
+                SELECT 1 FROM workflow_executions AS execution
+                JOIN workflow_runs AS run ON run.company_id = execution.company_id AND run.id = execution.run_id
+                JOIN task_attempts AS attempt ON attempt.task_id = NEW.id
+                    AND attempt.attempt_number = OLD.retry_count + 1
+                    AND attempt.worker_id = OLD.worker_id
+                    AND attempt.execution_generation = OLD.execution_generation
+                WHERE execution.company_id = NEW.company_id AND execution.id = NEW.workflow_execution_id
+                    AND attempt.status = 'completed' AND run.deadline > clock_timestamp()
+                    AND ((execution.completed_at IS NOT NULL AND execution.committed_route IS NOT NULL)
+                        OR (attempt.stop_reason = 'effect_parked' AND execution.completed_at IS NULL
+                            AND run.state = 'waiting' AND run.waiting_reason = 'effect'
+                            AND EXISTS (SELECT 1 FROM workflow_waits AS wait
+                                JOIN workflow_message_actions AS action ON action.company_id = wait.company_id
+                                    AND action.execution_id = wait.execution_id AND action.wait_id = wait.id
+                                WHERE wait.company_id = execution.company_id AND wait.execution_id = execution.id
+                                    AND wait.reason = 'effect' AND wait.state = 'waiting')))
+            ) THEN
+            RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514';
+        END IF;
+    END IF;
+    RETURN NULL;
+END $$;
+
 -- 12. Delivery provenance: delivered/dead_letter are final; outcome_unknown exits only by
 -- evidence; a reopened part re-enters unknown only by the expired-proof refusal (D3 C, D).
 CREATE FUNCTION workflow_message_delivery_transition_guard() RETURNS trigger LANGUAGE plpgsql AS $$

@@ -1826,3 +1826,115 @@
   - the claim/episode/budget SQL for message rows;
   - `fair_polling` and `inspection`.
 - Process feedback: the delta chain D2 → D3 → D4 kept each recheck narrow and verifiable. The D3→D4 round surfaced one latent defect that a check of the accepted subsystem's triggers caught: the `scheduled` outcome CHECK and the claim-episode binding. This reinforces the R004 candidate instruction (state the accepted invariants of an extended subsystem for the new kind). No new candidate.
+
+## 04.11-R006 — Whole-batch code, criteria and final phase-04 integration review — CHANGES REQUIRED
+- Identity: 2026-10-18; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging plus the combined phase-04 gate; stage whole-batch review and final integration review. Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested; effective effort not visible. Same reviewer and context as R002–R005. Records: [TASK](TASK.md) §§"04.11 implementation", "04.11 final gate", "04.11 frozen"; [REVIEW](REVIEW.md) §04.11.
+- Artifact:
+  - Base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`; digest `8891d74001e78bac6b65e0238c3d73ac25b92f3970178edb08f296417c75cabd`, recomputed with the skill script and the task `realpath` shim (match). Exclusion `plan/workflow-foundation/docs`.
+  - Effective decision: D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`.
+  - Scope separation:
+    - `git diff 8ce1fd4 5c1de32` has 79 files. 26 of them are 04.11-only, and 53 match the 04.10 manifest.
+    - I could not reproduce the 04.10 digest from the commit (8fb7…/f9bc… vs 2be42e3e). That is consistent with the post-acceptance administrative edits already recorded for RESUME/plan files.
+    - A grep shows the 04.10-manifest files in the commit also carry 04.11 hunks: `failure.rs` (message kinds marker-owned), registry `actions.rs`/`mod.rs`, `worker.rs` (`PollWork::MessageReceipt`), and `recovery.rs`. So "commit = 04.10 + 26 files" is not exact.
+    - I reviewed the message-related hunks of those shared files as 04.11 scope, plus the 26 commit files and the 51-file working-tree delta. Other 04.10 content was taken as accepted context.
+- Requirements: phase 04 "Action contract", "Execution and uncertainty" 1–7, "Provider-neutral messaging" and "Acceptance"; EXPANSION 04.11 and cross-point preservation; users/channels only; the accepted D2+D3+D4; AGENTS.md (CI parity, competing-claimant tests, raised-limit rule) and `src/**/AGENTS.md`.
+- Coverage (code read, with line-level checks):
+  - **Migration:** `migrations/20261017120000_workflow_messaging.sql` in full (640 lines): vocabulary, the four tables, evidence subject and shape, admission/capture/aggregate/state/receipt/effect-wait/dispatch/fenced-completion/provenance/event/reopen/evidence/reconciliation guards, and the effect-state view. Compared against the prior definitions of `check_workflow_fenced_completion` (`20260928141500`) and `workflow_action_evidence_commit_guard` (`20260930181000:127-151`).
+  - **Publication:** `message_publish.rs` in full (lock order, conflict refusal, replay, route recheck, admission probe, marker first, park, ambiguous resolution).
+  - **Application runtime:** `message_runtime.rs` in full (plan, compose, classification table, handler outcome mapping) and parts of persistence `message.rs` (preparation, routes, member lock).
+  - **Receipts:** `message_receipts.rs` in full (consumer, leading locks, cursor, poison, effect resume, conflict park, `confirm_suspension`, workflow `begin_part` admission, reopen proof).
+  - **Waits and supervision:** `wait_commit.rs`, `polling.rs` (paren depth of the extended WHERE verified by script; the OR is inside the AND group, so fair-polling and cursor filters still apply), `supervise.rs`, `recovery.rs`.
+  - **Delivery and reconciliation:** `delivery/queue.rs` (`begin_part` admission and expired proof, `complete_part` sending guard, reaper `ORDER BY id FOR UPDATE SKIP LOCKED`); `action_reconciliation/delivery.rs` and `settlement.rs` (no `continue_on` for message targets); reconciliation `contracts.rs` (target in a v2 request digest, `DeliverySubject`, delivery coverage).
+  - **Publication, controls and docs:** `authority.rs` (trusted built-in check), controls/maintenance cancellation calls, BRIEF-04.11 and `main.rs` NO_BC entry.
+  - **Tests:** every test inventoried by name across `message_{tests,sql_tests,thread_tests,delivery_tests,race_tests,reconcile_tests,recovery_tests}.rs`, plus application/registry unit tests. Key ones were read: recovery rows 5/6/14, the finality-breach and conflicted-execution tests, the admission backstop, the reopen double-use and conflict cases, the attribution shape and the model_tool seam.
+  - **Gate evidence:** `final-gate-status.log`, `final-gate-rerun-status.log`, `rerun-full-suite-failures.log`, `fixture-ci-stat-settings.log`, failure lines in `final-gate-full-suite.log`, result lines in the rerun and stack logs; CI steps `ci.yml:47-117`.
+- Checks run: digest recomputation and read-only SQL-text analysis only. No cargo build, test or fixture query; disk allowed one, but I preferred inspection per the instructions. Gate results are taken from the logs, not re-executed.
+- Lightly reviewed: the bodies of `settle_unknown_delivery_on`, `cancel_workflow_deliveries_on`, `reply_target_on`/`send_target_on`; the deviation-17 accepted-test pin edits (spot-checked only); `fair_polling.rs` beyond its use of `CANDIDATES_SQL`; HTTP/MCP `run()` wrapping (deviation 12).
+- Root Q1 — the 18 deviations: none reopens the gate.
+  - **6 (fenced-completion guard):** the original condition survives verbatim as one disjunct. The new disjunct admits only `stop_reason='effect_parked'` with an incomplete execution, run `waiting/effect`, a waiting effect wait linked to its action, the same lease-expiry and deadline checks, and `attempt.status='completed'`. It implements the decided park.
+  - **10 (ambiguous COMMIT read of the intent):** a read-only resolution of this operation's own outcome under run/execution/job locks. Replays on re-entry still go through `observe` → `authorize_on`. Within D2 §2.6.
+  - **13 (40P01):** the bound "at most 128 committed" still holds. The decided 54000 interleaving (intent committed first; marker is the first write, as on the Rust path) is the one tested. 40P01 arises only for an SQL-only writer that writes its intent in the same transaction, and exactly one commits.
+  - **1, 3–5, 7–9, 11, 12, 14–18:** implementation detail consistent with the text. Deviation 14's parenthesization was verified.
+  - **2** is understated: it also applies the hop-0 relay to *replies*, against D2 §1.3 (F015).
+  - The deviation list omits one behavioural departure from D2 §5.1 row 2 (F015).
+- Root Q2 — known gaps. Required by D2 §8.2, D3 §K or D4 §S, and therefore blocking (F016):
+  - the F012 variants "breach → every destination accepted → resume vetoed" and the failed-receipt variant;
+  - per-recipient inbound reply resolution, and Slack-source refusal;
+  - delayed COMMIT past the captured fence expiry and past the run deadline;
+  - SQL-only reopen from expired, non-final or foreign evidence;
+  - wrong-association actor;
+  - the competing settle-versus-consumer/`begin_part`/workflow-cancellation races (also the AGENTS.md competing-claimant rule);
+  - `DeliveryReopened` on a `model_tool` execution.
+
+  Not blocking:
+  - `message.approval_required`: unreachable, since `context().approval_required` is always false and messaging's current policy never requires approval.
+  - The explicit lock-count assertion: structurally bounded by CHECKs (`destination_count` 1–20, ordinal 0–19); replace it with a schema assertion or record why.
+  - Remote evidence with a delivery subject: impossible by the composite FK to message destinations.
+- Root Q3 — first-run failures: handled acceptably.
+  - **Query health:** aligning the task fixture with CI's `pg_stat_statements` settings (`ci.yml:80-91`) is correct and does not weaken a criterion. The test file is unchanged, the failure log is retained, and the full suite and stack budget were rerun green.
+  - **Timing test:** the accepted test is unchanged and passed 5/5 isolated plus two full parallel reruns. Caveats (optional F018):
+    - its 0.15 s deadline window spans a whole-state `snapshot`;
+    - the claim "04.11 does not change … the delay trigger's path" is imprecise, since `recovery::report` and `maintenance::expire_on` gained work;
+    - the persistence AGENTS.md baseline step (stash and rerun) was not done.
+- Root Q4 — areas deferred from the gate: sound.
+  - **`completion_job`:** unchanged. The park writes the close itself, `Parked` resume does nothing to the closed job, the failed and conflict paths close it `failed`, and the guard admits only the park shape.
+  - **Reconciliation Rust shapes:** sound. Target in a v2 digest; `DeliverySubject` coverage over every snapshot fact; remote fields unchanged.
+  - **Claim/episode/budget SQL:** sound. `DeliveryReopened` never writes `scheduled`/`scheduled_job_id`, so no episode binding fires, and budget eligibility does not read reconciliation rows.
+  - **fair_polling:** sound. It shares the corrected `CANDIDATES_SQL`.
+  - **inspection:** not wired to receipt discovery, contrary to the D3 §E text. Diagnostic only; optional F017.
+- Criteria verified sound in code (no finding):
+  - one canonical message, thread and delivery per destination, with the per-recipient predicted Message-ID recorded as `MessageCorrelation::Email`;
+  - classification matching D2 §1.3;
+  - `message.send` never writes into an existing thread;
+  - marker-first publication with no I/O in the transaction;
+  - admission at 128;
+  - DB-captured fence;
+  - the receipt result recomputed in SQL;
+  - the state guard as the SQL aggregate;
+  - an effect-wait deadline equal to the run deadline, with receipt/conflict-gated discovery;
+  - the conflict veto before reading the receipt (D4 §M);
+  - workflow `begin_part` refusing on revoked actor, recipient change, run end or conflict;
+  - the `complete_part` sending guard;
+  - reaper parent locks;
+  - outcome_unknown exits only by evidence (triggers);
+  - one-use reopen guarded by conflict and expiry;
+  - no `continue_on` for message targets;
+  - BRIEF-04.11 records the phase-06 obligation, trigger and divergence.
+- Outcome: **CHANGES REQUIRED — no PASS for `8891d740…cabd`.**
+  - Actionable: [04.11-F015](agent-review-findings.md#0411-f015--unlisted-departures-from-the-decided-outcome-table-and-reply-relay) (low), [04.11-F016](agent-review-findings.md#0411-f016--tests-required-by-the-accepted-decision-are-missing) (medium).
+  - Optional: [04.11-F017](agent-review-findings.md#0411-f017--expired-proof-path-commits-on-lease-loss-and-inspection-is-not-wired-optional) (low), [04.11-F018](agent-review-findings.md#0411-f018--timing-oracle-and-baseline-evidence-for-the-first-run-failure-optional) (low).
+  - Combined phase-04 gate: every CI-parity gate passed on rerun per the logs, with the frontend/CSS/Playwright/SSE steps and the queryid probe not run, as disclosed. This review does not repeat them. After corrections, rerun the affected focused areas plus the full suite, stack budget and lease budget, because tests change.
+- Process feedback:
+  - The known-gaps list in TASK made the required-test audit fast. Several of those gaps are tests the decision named explicitly, though. Candidate instruction (scope: authors in this plan): "Before freezing, diff the decision's required-test list against the test inventory, and either implement each item or record a reviewed amendment; a 'known gap' is not a substitute."
+  - The commit made during implementation blurred the 04.10/04.11 boundary. Candidate: "When a commit lands mid-batch, record which hunks of shared files belong to which batch."
+
+## 04.11-R007 — Correction recheck of the 04.11 batch (final 04.11 + combined phase-04 integration) — PASS
+- Identity: 2026-10-18; workflow `implement-opus-reviewed-2.1`; batch 04.11 messaging plus the combined phase-04 gate; correction recheck by finding ID. Reviewer B: Opus 5.5 (`claude-opus-5-5`), xhigh requested; effective effort not visible. Same reviewer and context as R002–R006. Records: [TASK](TASK.md) §"04.11 R006 corrections"; [REVIEW](REVIEW.md) §04.11.
+- Artifact: base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`; digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf`, recomputed with the skill script (match). Manifest `logs/04.11/r006-snapshot.txt`, 56 files. Effective decision: D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`, plus the amendments A1/A2 accepted below.
+- Scope:
+  - F015.1/.2, F016.1–6, F017, F018, by ID.
+  - Broadened to the contracts the corrections change: `MessagePublication::Rejected` and the `rejected_on` boundary; the reply relay sourced from the inbound task payload; the race harness.
+  - R006 evidence for unaffected code is reused. The migration is unchanged per the author and the identical fresh/fixture schema dumps (14454 lines).
+- Evidence inspected:
+  - **Publication:** `message_publish.rs:278-443` (`publish_on`, `rejected_on`, `observe`), `message_runtime.rs` (Rejected mapping at 505, tool path at 78, reply relay at 360-371), against the agent-answer precedent `use_cases/thread/dispatch.rs:1436-1446`.
+  - **Relay source:** persistence `message.rs:431-457` (`source_relay_on`); the lookup key is UNIQUE (`background_tasks_company_source_message_channel_key`, init schema 3765); an undecodable payload is refused.
+  - **Delivery queue:** `delivery/queue.rs:206-216` (rollback on `LeaseLost`).
+  - **New tests:** `message_reconcile_race_tests.rs:1-170` (harness and the first two races) and `message_reconcile_veto_tests.rs:45-160` (both receipted F012 variants), plus assertion lines of the reopen negatives, wrong-association actor and model_tool reopen seam. Also the delayed-COMMIT test (`message_race_tests.rs`: deferred `aa_delay_commit` trigger plus a non-transactional sequence, both bounds), the per-recipient inbound resolution test (`message_thread_tests.rs`, through the real `thread_for_message_keys`) and the authority tests' names in the lease log.
+  - **Docs:** BRIEF-04.11 lines 10-23.
+  - **Gate logs:** `r006-final-gate-status.log` (every gate PASS), `r006-focused-status.log` (A 63, B 36, C 91, D 386, E 100, F 199, H 267), result lines of the full suite (2669 + 5 passed, 0 failed, 22 ignored) and stack budget (2669/0/22), and the lease-budget table (`message.publish` 21 ms, `message.consume` 2 ms against 2000 ms; 92 injected events excluded).
+- Checks: digest recomputation only. No cargo build, test or fixture query; gate results are taken from the logs.
+- Dispositions (details in the findings log): F015 resolved; F016 resolved; F017 resolved (rollback adopted; the inspection claim withdrawn via A2); F018 addressed (wording corrected; oracle recorded; stashed baseline reported as not run). No new findings.
+- **Row-2 boundary: correct.**
+  - `rejected_on` returns Terminal `message.rejected` only for refusal-class errors (`NotFound`/`BadRequest`/`InvalidCredentials`) that leave the transaction usable, when the same transaction shows no marker for the invocation.
+  - With a marker, or any other error (fence loss is `Conflict`, SQL or lock errors are `Database`), it stays a retryable dispatch failure, which the shared predicate then decides.
+  - A refused publication has rolled back, so Terminal can never strand a written effect. A marker means the invocation may already own deliveries, so it must not be terminally failed by the handler.
+- **Race tests: real competing claimants as AGENTS.md requires.**
+  - Each competitor is a separate database transaction contending for the production locks (run `FOR UPDATE`/`FOR SHARE`, action, parents).
+  - A third connection holds the run row until every competitor is observed queued behind it (`pg_blocking_pids`, no sleeps), then releases them.
+  - The assertions are order-independent. Limitation: the realized order is decided by the PostgreSQL lock queue, so each run exercises an arbitrary, not exhaustive, interleaving.
+- **Amendments:**
+  - **A1: accepted as a reviewed amendment to D4 §S.** D4 §M step 4's writer `action_uncertainty::record` skips receipted markers. The accepted `workflow_action_reconciliation_guard` refuses an observation for a receipted invocation. In the receipted variants the first-uncertainty row already exists, and the table's PK is per invocation. So "an uncertainty row with `action.evidence_conflict`" was internally inconsistent for receipted markers. The substantive veto is asserted in full: no successor or output, wait `failed/evidence_conflict`, job `failed`, run `waiting/reconciliation`, receipt retained, a `finality_breach` conflict, `committed`+conflict, and `reopen_safe` false. The receipt-less variant still records `action.evidence_conflict`.
+  - **A2: accepted as a reviewed amendment to D3 §E** (drop "and `inspection`"). `inspection.rs` is a run-head reader and never consumes candidate discovery; discovery is shared by `poll_work` and `fair_polling`; no phase 04 criterion needs a diagnostic view of receipt work.
+- Outcome: **PASS for digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf`.** This is the 04.11 whole-batch review and the combined phase-04 final integration review, for the effective decision D2+D3+D4 with A1/A2.
+- Remaining disclosed limits: the CI frontend/CSS/Playwright/SSE steps and the `queryid` probe were not run (no frontend change); the stashed-baseline rerun for the F018 timing oracle was not run; F018's optional test hardening is left to a reviewed change.
+- Process feedback: the correction round was complete and finding-indexed, and every required test now maps to a named test. No new instruction candidate beyond R006's.

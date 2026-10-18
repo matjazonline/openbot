@@ -279,6 +279,9 @@ mod schema_tests;
 #[cfg(test)]
 mod review1_tests;
 
+#[cfg(test)]
+mod message_tests;
+
 fn validate_declarations(parsed: &ParsedWorkflow) -> Result<(), Diagnostic> {
     for (id, step) in &parsed.definition.steps {
         for field in ["output_schema", "data_schema", "payload_schema"] {

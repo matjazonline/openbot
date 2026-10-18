@@ -56,8 +56,18 @@ pub(super) async fn settle<A: SqlReconciliationResources>(
     let id = ActionEvidenceId::new(Uuid::new_v4());
     let command_id = Uuid::new_v4();
     facts::insert_on(&mut tx, command, snapshot, &evidence, id, command_id).await?;
-    let outcome = facts::truth_on(&mut tx, command, &evidence, id).await?;
-    let (outcome, scheduled_job) = continue_on(&mut tx, command, &head, outcome).await?;
+    let (outcome, scheduled_job) = match command.target {
+        ReconciliationTarget::Remote => {
+            let outcome = facts::truth_on(&mut tx, command, &evidence, id).await?;
+            continue_on(&mut tx, command, &head, outcome).await?
+        }
+        // Every message outcome returns before the continuation (04.11-D4 §R): the effect
+        // wait and the receipt consumer own step progression.
+        ReconciliationTarget::MessageDelivery { .. } => (
+            delivery::truth_on(&mut tx, command, snapshot, &evidence, id).await?,
+            None,
+        ),
+    };
     let audit: i64 = sqlx::query_scalar("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id,execution_id) SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'action_reconciled',$3,$4 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2 RETURNING sequence")
         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.actor.user_id())
         .bind(command.scope.execution.as_uuid()).fetch_one(&mut *tx).await?;
@@ -124,14 +134,24 @@ async fn refusal_on(
     if overflow_on(tx, command).await? {
         return Ok(Some(ReconciliationBlockedReason::BoundExceeded));
     }
-    let entries = entries_on(tx, command).await?;
-    let coverage = ReconciliationSnapshot::coverage(
-        action,
-        &command.subject,
-        command.marker,
-        marker_time,
-        &entries,
-    )?;
+    let coverage = match command.target {
+        ReconciliationTarget::Remote => {
+            let entries = entries_on(tx, command).await?;
+            Some(ReconciliationSnapshot::coverage(
+                action,
+                &command.subject,
+                command.marker,
+                marker_time,
+                &entries,
+            )?)
+        }
+        ReconciliationTarget::MessageDelivery { .. } => {
+            delivery::current_coverage_on(tx, command, action).await?
+        }
+    };
+    let Some(coverage) = coverage else {
+        return Ok(Some(ReconciliationBlockedReason::StaleSnapshot));
+    };
     if head.revision != snapshot.revision
         || head.revision != command.expected_revision
         || coverage != snapshot.coverage_digest

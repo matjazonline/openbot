@@ -259,3 +259,35 @@ All three hashes were recomputed at start and at end. Inspection only.
 - The renamed `DeliveryReopened` outcome (NULL `scheduled_job_id`) is required by the existing command CHECK and the claim-episode binding.
 - No open actionable 04.11 decision findings. Optional F014 (low): clarify the NULL shape alternative, and add conflict refusal at publication/`begin_part`.
 - This PASS does not cover implementation, tests, the combined phase 04 gate or the whole-batch review; all remain required. The lightly reviewed areas listed in R003–R005 are carried into the batch review.
+
+### 04.11-R006 — 2026-10-18 whole-batch code, criteria and final phase-04 integration review — CHANGES REQUIRED
+**No PASS** for snapshot base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`, digest `8891d74001e78bac6b65e0238c3d73ac25b92f3970178edb08f296417c75cabd` (recomputed). Effective decision D2+D3+D4. Inspection plus digest recomputation; gate results taken from the logs.
+
+[Round note](agent-review-notes.md#0411-r006--whole-batch-code-criteria-and-final-phase-04-integration-review--changes-required).
+- Actionable:
+  - [04.11-F016](agent-review-findings.md#0411-f016--tests-required-by-the-accepted-decision-are-missing) **medium**: tests required by D2 §8.2 / D3 §K / D4 §S are missing, including the F012 breach-then-all-accepted variant, per-recipient inbound reply resolution, delayed-COMMIT rollback, SQL-only reopen negatives, the competing settle races and the model_tool `DeliveryReopened` seam.
+  - [04.11-F015](agent-review-findings.md#0411-f015--unlisted-departures-from-the-decided-outcome-table-and-reply-relay) **low**: a pre-marker authority refusal becomes Retryable `message.unresolved` rather than the decided Terminal `message.rejected`, with no step-level revocation test; replies reset the relay trace against D2 §1.3.
+- Optional:
+  - [04.11-F017](agent-review-findings.md#0411-f017--expired-proof-path-commits-on-lease-loss-and-inspection-is-not-wired-optional): rollback on the expired-proof `LeaseLost` branch; inspection not wired.
+  - [04.11-F018](agent-review-findings.md#0411-f018--timing-oracle-and-baseline-evidence-for-the-first-run-failure-optional): timing oracle and baseline evidence.
+- Root judgements:
+  1. None of the 18 deviations reopens the gate. Specifically: the fenced-completion guard keeps the original disjunct and admits only the exact park; the ambiguous-COMMIT intent read is a read-only resolution with replays still authorized; 40P01 keeps the at-most-128 invariant, and the decided 54000 interleaving is tested. Deviation 2 understates the reply case (F015).
+  2. Most listed gaps are required tests and block (F016). The exceptions are `approval_required` (unreachable), the lock-count assertion (structurally bounded) and remote evidence with a subject (FK-impossible).
+  3. The first-run failures were handled acceptably: the fixture now matches CI `pg_stat_statements` settings, and the accepted timing test is unchanged and passed 7 times on rerun (optional F018 caveats).
+  4. The gate-deferred areas are sound: `completion_job`, the reconciliation Rust shapes, claim/episode/budget isolation and fair polling. Inspection is not wired (optional F017).
+- Next: A fixes F015 and F016 (F017/F018 optional), reruns the affected focused areas plus full suite/stack/lease, refreezes, and B rechecks those IDs.
+
+### 04.11-R007 — 2026-10-18 correction recheck (final 04.11 batch + combined phase-04 integration) — PASS
+**PASS** for snapshot base `5c1de32ecb3c1a7e59e1a60deb74ab5c42e755df`, digest `e76ef46c07965bb7b233d21813ac413efb6c5ad763e207ac3bc242168235c2cf` (recomputed). Effective decision: D2 `1dcd1a9e…3a44` + D3 `c462e4eb…8a89` + D4 `6bf5efcb…a276`, with accepted amendments A1 (D4 §S receipted-variant uncertainty assertion) and A2 (drop "and `inspection`" from D3 §E).
+
+[Round note](agent-review-notes.md#0411-r007--correction-recheck-of-the-0411-batch-final-0411--combined-phase-04-integration--pass); [dispositions](agent-review-findings.md#r007-dispositions-for-0411-f015-to-f018).
+- F015, F016 and F017: resolved. F018: addressed, with the optional residual accepted.
+- The row-2 boundary is correct: Terminal only for refusals with no marker; retryable with a marker or for other errors.
+- The race tests use real competing claimants (separate transactions on the production locks, released together).
+- Gate per `r006-*` logs: fmt, diff, transport, credential/deploy, offline, clippy, fresh schema, SQLx prepare/check, no-run, full suite 2674/0/22, stack 2669/0/22, lease budget 99 tests within bound, graft. Not run (disclosed): CI frontend/CSS/Playwright/SSE steps, the `queryid` probe, and the F018 stashed baseline.
+- No open actionable 04.11 findings. This PASS covers the 04.11 whole-batch review and the combined phase-04 final integration review at this digest.
+
+### 04.11 root acceptance — 2026-10-18
+Root accepted 04.11 and the combined phase04 gate on R007 PASS for digest
+`e76ef46c…c2cf` (base `5c1de32`), digest independently recomputed. See TASK.md
+"04.11 ROOT ACCEPTED".

@@ -13,7 +13,7 @@ use tokio::time::Instant;
 
 const GATE_KEY: i64 = 0x1ea5_e9a7;
 /// Only a hang guard: observations are the signal, a loaded host is measured, not failed.
-pub(super) const HANG_GUARD: Duration = Duration::from_secs(10);
+pub(in crate::adapters::persistence::workflow) const HANG_GUARD: Duration = Duration::from_secs(10);
 /// Polling granularity for backend observation, not a timing assumption.
 const POLL: Duration = Duration::from_millis(5);
 
@@ -22,14 +22,20 @@ pub(super) fn gated_policy() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(6)).unwrap()
 }
 
-pub(super) async fn connect(f: &AdmissionFixture) -> (PgConnection, i32) {
-    let mut conn = f
-        .persistence()
-        .pool()
-        .connect_options()
-        .connect()
-        .await
-        .unwrap();
+/// Any fixture whose database the gate can be armed on.
+pub(in crate::adapters::persistence::workflow) trait GatePool {
+    fn gate_pool(&self) -> &sqlx::PgPool;
+}
+impl GatePool for AdmissionFixture {
+    fn gate_pool(&self) -> &sqlx::PgPool {
+        self.persistence().pool()
+    }
+}
+
+pub(in crate::adapters::persistence::workflow) async fn connect(
+    f: &impl GatePool,
+) -> (PgConnection, i32) {
+    let mut conn = f.gate_pool().connect_options().connect().await.unwrap();
     let pid = sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(&mut conn)
         .await
@@ -39,7 +45,7 @@ pub(super) async fn connect(f: &AdmissionFixture) -> (PgConnection, i32) {
 
 /// Where the stall happens: in the deferred COMMIT, or in a row trigger of a later statement
 /// (whose own statement_timeout the arming trigger already cleared).
-pub(super) enum Stall<'a> {
+pub(in crate::adapters::persistence::workflow) enum Stall<'a> {
     Commit,
     Statement {
         table: &'a str,
@@ -48,7 +54,7 @@ pub(super) enum Stall<'a> {
     },
 }
 
-pub(super) enum Abort {
+pub(in crate::adapters::persistence::workflow) enum Abort {
     Nothing,
     /// Every transaction passing the gate, retries included.
     Every,
@@ -56,15 +62,15 @@ pub(super) enum Abort {
     Backend(i32),
 }
 
-pub(super) struct Gate {
+pub(in crate::adapters::persistence::workflow) struct Gate {
     conn: PgConnection,
-    pub(super) pid: i32,
+    pub(in crate::adapters::persistence::workflow) pid: i32,
 }
 
 impl Gate {
     /// Installs the gate on `table` for rows matching `when`, then holds it.
-    pub(super) async fn arm(
-        f: &AdmissionFixture,
+    pub(in crate::adapters::persistence::workflow) async fn arm(
+        f: &impl GatePool,
         table: &str,
         events: &str,
         when: &str,
@@ -89,7 +95,7 @@ impl Gate {
              CREATE TRIGGER lease_gate_arm BEFORE {events} ON {table} FOR EACH ROW WHEN ({when}) EXECUTE FUNCTION lease_gate_uncancellable(); \
              {blocking}"
         ))
-        .execute(f.persistence().pool())
+        .execute(f.gate_pool())
         .await
         .unwrap();
         let (mut conn, pid) = connect(f).await;
@@ -102,7 +108,10 @@ impl Gate {
     }
 
     /// Which stalled transactions abort instead of applying once released.
-    pub(super) async fn abort_on_release(&mut self, abort: Abort) {
+    pub(in crate::adapters::persistence::workflow) async fn abort_on_release(
+        &mut self,
+        abort: Abort,
+    ) {
         sqlx::query("DELETE FROM lease_gate_abort")
             .execute(&mut self.conn)
             .await
@@ -119,7 +128,7 @@ impl Gate {
             .unwrap();
     }
 
-    pub(super) async fn release(&mut self) {
+    pub(in crate::adapters::persistence::workflow) async fn release(&mut self) {
         let released: bool = sqlx::query_scalar("SELECT pg_advisory_unlock($1)")
             .bind(GATE_KEY)
             .fetch_one(&mut self.conn)
@@ -130,7 +139,7 @@ impl Gate {
 
     /// Takes the gate back. Lock waiters are granted in order, so this returns only after
     /// every transaction already stalled on the gate has committed or aborted.
-    pub(super) async fn retake(&mut self) {
+    pub(in crate::adapters::persistence::workflow) async fn retake(&mut self) {
         tokio::time::timeout(
             HANG_GUARD,
             sqlx::query("SELECT pg_advisory_lock($1)")
@@ -143,14 +152,14 @@ impl Gate {
     }
 
     /// Releases the gate and waits until everything stalled on it has finished.
-    pub(super) async fn drain(&mut self) {
+    pub(in crate::adapters::persistence::workflow) async fn drain(&mut self) {
         self.release().await;
         self.retake().await;
         self.release().await;
     }
 
     /// The backend stalled on this gate (its COMMIT or statement).
-    pub(super) async fn stalled(
+    pub(in crate::adapters::persistence::workflow) async fn stalled(
         &self,
         observer: &mut PgConnection,
         running: &[&dyn Fn() -> bool],
@@ -170,7 +179,7 @@ impl Gate {
 
 /// At least `n` backends in a heavyweight lock wait behind `blocker`, directly or queued
 /// behind another such waiter, in the order their statements started.
-pub(super) async fn waiters(
+pub(in crate::adapters::persistence::workflow) async fn waiters(
     observer: &mut PgConnection,
     blocker: i32,
     n: usize,
@@ -184,7 +193,7 @@ pub(super) async fn waiters(
 /// transaction began at least A/2 after the stalled one, i.e. after the attempt elapsed.
 /// A competitor that began with the stalled operation (and whose pooled connection the
 /// resolution may reuse once it gave up) cannot match.
-pub(super) async fn resolution_behind(
+pub(in crate::adapters::persistence::workflow) async fn resolution_behind(
     observer: &mut PgConnection,
     stalled: i32,
     policy: LeasePolicy,

@@ -84,6 +84,7 @@ async fn settle_rejected(setup: &McpSetup, claim: &ClaimedWorkflow, failure: Wor
         scope: request.scope,
         subject: intent.approval_subject(),
         marker: ActionRemoteMarkerId::new(marker),
+        target: ReconciliationTarget::Remote,
         expected_revision: p
             .head(request.scope.company, request.scope.run)
             .await

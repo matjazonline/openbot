@@ -75,6 +75,7 @@ where
                     StepError::Preparation(error) | StepError::Dispatch(error) => error,
                 })?;
         Ok(match publication {
+            MessagePublication::Rejected(error) => return Err(error),
             MessagePublication::Committed(receipt) => MessageObservation::Committed(receipt),
             MessagePublication::Pending
             | MessagePublication::Suspended(_)
@@ -186,8 +187,7 @@ where
                 RouteTarget::User { .. } | RouteTarget::ReplyEmail { .. } => {
                     self.plan_email(
                         request,
-                        kind,
-                        destination_id,
+                        (kind, destination_id),
                         target,
                         content,
                         routes,
@@ -204,8 +204,7 @@ where
     async fn plan_email(
         &self,
         request: &ActionRequest,
-        kind: DestinationKind,
-        destination_id: Uuid,
+        (kind, destination_id): (DestinationKind, Uuid),
         target: &RouteTarget,
         content: &CanonicalContent,
         routes: &MessageRoutes,
@@ -235,12 +234,7 @@ where
                     recipient_to: email.recipient.clone(),
                     recipients_cc: Vec::new(),
                     threading: email.threading.clone(),
-                    // The scheduled-delivery precedent: the sending channel starts the hop chain.
-                    relay: Some(EmailRelayTrace {
-                        source_channel_id: email.sender.id,
-                        hop_count: 0,
-                        trace_channels: vec![email.sender.id],
-                    }),
+                    relay: Some(email.relay.clone()),
                 }),
             })
             .await
@@ -305,6 +299,7 @@ struct EmailPlan {
     sender: ChannelRoute,
     recipient: EmailAddress,
     threading: EmailThreading,
+    relay: EmailRelayTrace,
     purpose: DeliveryPurpose,
     thread_id: Uuid,
     new_thread: Option<NewThread>,
@@ -327,6 +322,12 @@ impl EmailPlan {
                     sender: sender.clone(),
                     recipient: email.clone(),
                     threading: EmailThreading::Standalone,
+                    // The scheduled-delivery precedent: the sending channel starts the chain.
+                    relay: EmailRelayTrace {
+                        source_channel_id: sender.id,
+                        hop_count: 0,
+                        trace_channels: vec![sender.id],
+                    },
                     purpose: DeliveryPurpose::WorkflowSend,
                     thread_id,
                     new_thread: Some(NewThread {
@@ -350,12 +351,23 @@ impl EmailPlan {
                 recipient,
                 in_reply_to,
                 references,
+                relay,
             } => Ok(Self {
                 sender: sender.clone(),
                 recipient: recipient.clone(),
                 threading: EmailThreading::Received {
                     in_reply_to: in_reply_to.clone(),
                     references: references.clone(),
+                },
+                // The agent-answer precedent (`dispatch.rs`): the reply continues the trace the
+                // source arrived with; with none recorded it starts one, as direct mail does.
+                relay: EmailRelayTrace {
+                    source_channel_id: sender.id,
+                    hop_count: relay.as_ref().map_or(0, |relay| relay.hop_count),
+                    trace_channels: relay
+                        .as_ref()
+                        .map(|relay| relay.trace_channels.clone())
+                        .unwrap_or_default(),
                 },
                 purpose: DeliveryPurpose::WorkflowReply,
                 thread_id: *thread,
@@ -488,6 +500,13 @@ where
             }
             Ok(MessagePublication::Suspended(wait)) => {
                 return WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait });
+            }
+            // Refused before any marker: classified exactly as a preparation refusal.
+            Ok(MessagePublication::Rejected(error)) => {
+                return WorkflowHandlerOutcome::Completed(Err(action_step_failure(
+                    family,
+                    Outcome::Preparation(&error),
+                )));
             }
             Ok(MessagePublication::ApprovalRequired) => Outcome::ApprovalRequired,
             Ok(MessagePublication::ActionLimit) => Outcome::ActionLimit,

@@ -15,4 +15,5 @@ pub mod storage;
 pub mod response_schema;
 pub mod workflow_http;
 pub mod workflow_mcp;
+pub mod workflow_message;
 pub mod workflow_source;

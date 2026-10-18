@@ -258,12 +258,23 @@ pub enum RouteTarget {
         recipient: EmailAddress,
         in_reply_to: MessageId,
         references: Vec<MessageId>,
+        /// The relay trace recorded for the source, or `None` when nothing recorded one.
+        relay: Option<SourceRelay>,
     },
     ReplyInternal {
         source: CanonicalMessageId,
         thread: Uuid,
         channel: Uuid,
     },
+}
+
+/// The inter-channel relay trace recorded when the source arrived (its inbound task). An email
+/// reply continues it, as an agent answer does (04.11-D2 §1.3); a source with none recorded
+/// starts a chain, as an answer to direct mail does.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceRelay {
+    pub hop_count: u32,
+    pub trace_channels: Vec<Uuid>,
 }
 
 /// What publication must find unchanged under its locks.
@@ -358,6 +369,11 @@ pub enum MessagePublication {
     ActionLimit,
     /// A step re-entered an unresolved marker it cannot replay.
     PossibleDispatchExists,
+    /// A routing or authority refusal (`NotFound`/`BadRequest`/`InvalidCredentials`) while no
+    /// marker exists: the transaction rolled back and nothing was written, so the step fails
+    /// Terminal `message.rejected` (04.11-D2 §5.1 row 2). With a marker the same refusal stays
+    /// a retryable dispatch error.
+    Rejected(AppError),
 }
 
 #[async_trait]
@@ -420,3 +436,7 @@ pub(crate) fn tool_scope(fence: WorkflowFence) -> ActionScope {
         execution: fence.scope.execution,
     }
 }
+
+#[cfg(test)]
+#[path = "message_unit_tests.rs"]
+mod tests;

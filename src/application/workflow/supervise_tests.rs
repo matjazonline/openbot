@@ -370,9 +370,9 @@ async fn workflow_message_wait_supervisor_confirms_suspension_and_never_releases
         port.suspension = suspension;
         port.dropped.store(true, Ordering::SeqCst);
         let parked = async move {
-            WorkflowHandlerOutcome::Suspended(crate::application::workflow::lease::SuspendedWorkflow {
-                wait,
-            })
+            WorkflowHandlerOutcome::Suspended(
+                crate::application::workflow::lease::SuspendedWorkflow { wait },
+            )
         };
         let result = supervise_io(
             &port,
@@ -393,6 +393,9 @@ async fn workflow_message_wait_supervisor_confirms_suspension_and_never_releases
                 "{result:?}"
             ),
         }
-        assert_eq!(port.released.load(Ordering::SeqCst), 0);
+        // Only a proven park skips cleanup; an unproven one is released like any other stop
+        // (a release against a closed job changes nothing).
+        let released = usize::from(expected.is_some());
+        assert_eq!(port.released.load(Ordering::SeqCst), released);
     }
 }

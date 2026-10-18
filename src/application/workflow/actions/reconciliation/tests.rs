@@ -39,6 +39,7 @@ pub(super) fn fixture() -> (
         scope,
         subject: subject.clone(),
         marker: ActionRemoteMarkerId::new(Uuid::new_v4()),
+        target: ReconciliationTarget::Remote,
         expected_revision: RunRevision(7),
         command_key: IdempotencyKey::parse("reconcile").unwrap(),
         input: EvidenceInput::VerifiedReference {
@@ -57,6 +58,7 @@ pub(super) fn fixture() -> (
         marker: command.marker,
         marker_created_at,
         entries: vec![],
+        delivery: None,
         revision: command.expected_revision,
         database_now: now,
         coverage_digest,
