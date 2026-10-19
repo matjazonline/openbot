@@ -1,0 +1,112 @@
+ M assets/app.css
+ M migrations/20260817000000_init_schema.sql
+ M plan/workflow-foundation/02-workflow-language-and-publication.md
+ M plan/workflow-foundation/06-agent-context-memory-and-capabilities.md
+ M plan/workflow-foundation/RESUME.md
+ M plan/workflow-foundation/docs/REVIEW.md
+ M plan/workflow-foundation/docs/TASK.md
+ M plan/workflow-foundation/docs/agent-review-findings.md
+ M plan/workflow-foundation/docs/agent-review-notes.md
+ M src/adapters/harness/rig/execution.rs
+ M src/adapters/http/app_state.rs
+ M src/adapters/http/pages/company_settings.rs
+ M src/adapters/http/pages/mod.rs
+ M src/adapters/http/routes/mod.rs
+ M src/adapters/persistence/mod.rs
+ M src/adapters/persistence/task/harness_runs.rs
+ M src/adapters/persistence/task/harness_runs_tests.rs
+ M src/adapters/persistence/workflow/action_approval_http_tests.rs
+ M src/adapters/persistence/workflow/action_approval_sql_tests.rs
+ M src/adapters/persistence/workflow/action_dispatch.rs
+ M src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs
+ M src/adapters/persistence/workflow/action_reconciliation_commit_conflict_fixture.sql
+ M src/adapters/persistence/workflow/action_reconciliation_commit_final_fixture.sql
+ M src/adapters/persistence/workflow/action_reconciliation_commit_fixture.sql
+ M src/adapters/persistence/workflow/action_reconciliation_completion_race_assertions.rs
+ M src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs
+ M src/adapters/persistence/workflow/action_reconciliation_native_coverage_assertions.rs
+ M src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs
+ M src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql
+ M src/adapters/persistence/workflow/admission.rs
+ M src/adapters/persistence/workflow/admission_tests.rs
+ M src/adapters/persistence/workflow/admission_write.rs
+ M src/adapters/persistence/workflow/authority.rs
+ M src/adapters/persistence/workflow/batch.rs
+ M src/adapters/persistence/workflow/budget.rs
+ M src/adapters/persistence/workflow/budget_schema_tests.rs
+ M src/adapters/persistence/workflow/completion.rs
+ M src/adapters/persistence/workflow/completion_job.rs
+ M src/adapters/persistence/workflow/decision_approvals.rs
+ M src/adapters/persistence/workflow/decisions.rs
+ M src/adapters/persistence/workflow/http_runtime.rs
+ M src/adapters/persistence/workflow/http_test_support.rs
+ M src/adapters/persistence/workflow/job_auxiliary_fixtures.rs
+ M src/adapters/persistence/workflow/lease.rs
+ M src/adapters/persistence/workflow/lease_claim.rs
+ M src/adapters/persistence/workflow/lease_tests.rs
+ M src/adapters/persistence/workflow/maintenance.rs
+ M src/adapters/persistence/workflow/message_publish.rs
+ M src/adapters/persistence/workflow/mod.rs
+ M src/adapters/persistence/workflow/pending_recovery.rs
+ M src/adapters/persistence/workflow/recovery.rs
+ M src/adapters/persistence/workflow/wait_commit.rs
+ M src/adapters/persistence/workflow/waits.rs
+ M src/application/services/harness/runs/state.rs
+ M src/application/services/harness/runs/tests.rs
+ M src/application/services/mod.rs
+ M src/application/use_cases/thread/inter_channel_tests.rs
+ M src/application/use_cases/thread/rig_execution_tests.rs
+ M src/application/use_cases/thread/structured_response_tests.rs
+ M src/application/workflow/batch.rs
+ M src/application/workflow/compiler/budget_tests.rs
+ M src/application/workflow/compiler/compile.rs
+ M src/application/workflow/compiler/mod.rs
+ M src/application/workflow/compiler/wire.rs
+ M src/application/workflow/completion.rs
+ M src/application/workflow/fixtures/mod.rs
+ M src/application/workflow/mod.rs
+ M src/application/workflow/publication/mod.rs
+ M src/application/workflow/publication/preflight.rs
+ M src/application/workflow/publication/tests.rs
+ M src/application/workflow/publication/types.rs
+ M src/application/workflow/publication/validation.rs
+ M src/application/workflow/registry/actions.rs
+ M src/application/workflow/registry/families.rs
+ M src/application/workflow/registry/mod.rs
+ M src/application/workflow/registry/tests.rs
+ M src/domain/workflow/budget.rs
+ M src/domain/workflow/definition.rs
+ M src/domain/workflow/graph.rs
+ M src/domain/workflow/mod.rs
+ M src/domain/workflow/outcome.rs
+ M src/infra/setup.rs
+?? plan/workflow-foundation/docs/logs/06/
+?? src/adapters/http/pages/model_usage.rs
+?? src/adapters/http/routes/model_usage.rs
+?? src/adapters/persistence/harness_checkpoint.rs
+?? src/adapters/persistence/model_usage/
+?? src/adapters/persistence/task/harness_usage_authority_tests.rs
+?? src/adapters/persistence/task/harness_usage_tests.rs
+?? src/adapters/persistence/workflow/action_approval_continuation_tests.rs
+?? src/adapters/persistence/workflow/action_approval_review_tests.rs
+?? src/adapters/persistence/workflow/admission_token_tests.rs
+?? src/adapters/persistence/workflow/checkpoint_models.rs
+?? src/adapters/persistence/workflow/checkpoint_updates.rs
+?? src/adapters/persistence/workflow/checkpoints.rs
+?? src/adapters/persistence/workflow/decision_tokens.rs
+?? src/adapters/persistence/workflow/harness_checkpoint_update_tests.rs
+?? src/adapters/persistence/workflow/harness_model_owner_tests.rs
+?? src/adapters/persistence/workflow/harness_model_store_tests.rs
+?? src/adapters/persistence/workflow/harness_owner_tests.rs
+?? src/adapters/persistence/workflow/harness_store_tests.rs
+?? src/adapters/persistence/workflow/harness_token_atomic_tests.rs
+?? src/adapters/persistence/workflow/harness_token_refusal_tests.rs
+?? src/adapters/persistence/workflow/harness_token_scheduling_tests.rs
+?? src/adapters/persistence/workflow/harness_token_tests.rs
+?? src/adapters/persistence/workflow/model_usage_tests.rs
+?? src/adapters/persistence/workflow/token_budget.rs
+?? src/application/services/model_usage/
+?? src/application/use_cases/thread/model_usage_assertions.rs
+?? src/application/workflow/checkpoints.rs
+?? src/application/workflow/publication/capabilities.rs
+?? src/application/workflow/publication/capabilities_tests.rs

@@ -34,32 +34,7 @@ async fn structured_dispatch_preserves_json_and_exhaustion_has_no_publication() 
             vec!["{}", "not json", "{}"]
         };
         let count = answers.len();
-        let llm = scripted_scenario(
-            answers
-                .into_iter()
-                .enumerate()
-                .map(|(index, answer)| {
-                    ScriptedExchange::new(
-                        move |request| {
-                            if !request.body.to_string().contains("Draft 2020-12") {
-                                return Err("contract instructions");
-                            }
-                            if index > 0
-                                && request
-                                    .body
-                                    .get("tools")
-                                    .is_some_and(|v| v.as_array().is_none_or(|v| !v.is_empty()))
-                            {
-                                return Err("repair exposed tools");
-                            }
-                            Ok(())
-                        },
-                        ScriptedResponse::turn(LlmTurn::text(answer), 1),
-                    )
-                })
-                .collect(),
-        )
-        .await;
+        let llm = structured_scenario(answers).await;
         let fx = fixture_for_harness(pool.clone(), Some(&llm.base_url), HarnessKind::Rig).await;
         configure(&fx).await;
         let ingest = fx
@@ -92,6 +67,9 @@ async fn structured_dispatch_preserves_json_and_exhaustion_has_no_publication() 
                 .unwrap();
         let saved: RunCheckpoint = serde_json::from_value(saved).unwrap();
         assert_eq!(saved.repair_count(), count - 1);
+        super::model_usage_assertions::assert_projection(&fx, &saved).await;
+        assert!(saved.turns.iter().all(|turn| turn.input_tokens == 2
+            && turn.token_usage_source == crate::services::harness::runs::TokenUsageSource::Mixed));
         let messages: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM messages WHERE company_id=$1 AND role='agent'",
         )
@@ -390,4 +368,33 @@ async fn structured_scheduled_dispatch_delivers_the_validated_json_body() {
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await
         .unwrap();
+}
+
+async fn structured_scenario(answers: Vec<&str>) -> crate::services::test_support::ScriptedLlm {
+    scripted_scenario(
+        answers
+            .into_iter()
+            .enumerate()
+            .map(|(index, answer)| {
+                ScriptedExchange::new(
+                    move |request| {
+                        if !request.body.to_string().contains("Draft 2020-12") {
+                            return Err("contract instructions");
+                        }
+                        if index > 0
+                            && request
+                                .body
+                                .get("tools")
+                                .is_some_and(|v| v.as_array().is_none_or(|v| !v.is_empty()))
+                        {
+                            return Err("repair exposed tools");
+                        }
+                        Ok(())
+                    },
+                    super::model_usage_assertions::partial_response(answer),
+                )
+            })
+            .collect(),
+    )
+    .await
 }

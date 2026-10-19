@@ -42,6 +42,8 @@ impl BatchBudget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BatchDisposition {
+    /// Pending work was rescheduled without an attempt or immediate continuation.
+    Deferred,
     /// A deterministic failure was durably settled; poll any error successor.
     Failed,
     Completed,

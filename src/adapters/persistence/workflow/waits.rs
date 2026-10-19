@@ -187,7 +187,9 @@ async fn park_on(
     if !is_wait(db, scope, binding.bundle()).await? {
         return Ok(None);
     }
-    let Some(activation) = pending_recovery::activate(db, scope).await? else {
+    let pending_recovery::Pending::Ready(activation) =
+        pending_recovery::activate(db, scope).await?
+    else {
         return Ok(None);
     };
     let spec = match specification(binding.bundle(), &activation) {

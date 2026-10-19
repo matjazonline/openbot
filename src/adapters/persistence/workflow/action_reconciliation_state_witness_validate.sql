@@ -2,7 +2,7 @@ CREATE FUNCTION fixture_state_pending(company uuid,key text) RETURNS jsonb LANGU
     SELECT fixture_state_pending_base(company,key)||jsonb_build_object(
         'job',(SELECT to_jsonb(job) FROM background_tasks AS job WHERE job.company_id=config.company_id AND job.id=config.job_id),
         'execution',(SELECT to_jsonb(execution) FROM workflow_executions AS execution WHERE execution.company_id=config.company_id AND execution.id=config.execution_id),
-        'attempt',(SELECT to_jsonb(attempt) FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id AND job.retry_count=attempt.attempt_number WHERE job.company_id=config.company_id AND job.id=config.job_id),
+        'attempt',(SELECT to_jsonb(attempt) FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id AND job.attempt_ordinal-1=attempt.attempt_number WHERE job.company_id=config.company_id AND job.id=config.job_id),
         'states',COALESCE((SELECT jsonb_agg(to_jsonb(state)) FROM workflow_action_state_witnesses AS state WHERE state.company_id=config.company_id AND state.run_id=config.run_id AND state.transaction_id=COALESCE((SELECT saved.pending->>'xid' FROM fixture_state_witness AS saved WHERE saved.company_id=company AND saved.command_key=key),pg_current_xact_id()::text)::xid8),'[]'::jsonb),
         'schedules',COALESCE((SELECT jsonb_agg(to_jsonb(schedule)) FROM workflow_action_schedule_witnesses AS schedule WHERE schedule.company_id=config.company_id AND schedule.job_id=config.job_id AND schedule.transaction_id=COALESCE((SELECT saved.pending->>'xid' FROM fixture_state_witness AS saved WHERE saved.company_id=company AND saved.command_key=key),pg_current_xact_id()::text)::xid8),'[]'::jsonb),
         'available_proof',(SELECT to_jsonb(proof) FROM workflow_action_evidence AS proof WHERE proof.company_id=config.company_id AND proof.id=workflow_action_not_applied_available(config.company_id,(config.expected->'command'->>'invocation_id')::uuid,NULL)),
@@ -129,23 +129,23 @@ BEGIN
         'activated',execution.activated_at IS NOT NULL,'uncompleted',execution.completed_at IS NULL,'no_output',execution.committed_output IS NULL,
         'no_route',execution.committed_route IS NULL,'no_successor',execution.successor_execution_id IS NULL,'positive_attempt',task.retry_count>0,
         'remaining_attempts',task.retry_count<task.max_retries,'no_worker',task.worker_id IS NULL,'no_generation',task.execution_generation IS NULL,'no_lease',task.lock_expires_at IS NULL,
-        'attempt_scope',attempt.task_id=task.id AND attempt.attempt_number=task.retry_count,'attempt_failed',attempt.status='failed','attempt_finished',attempt.finished_at IS NOT NULL,
+        'attempt_scope',attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1,'attempt_failed',attempt.status='failed','attempt_finished',attempt.finished_at IS NOT NULL,
         'suitable_retirement',attempt.workflow_retirement IN ('live','expired'),'not_activation_poison',attempt.workflow_failure_code<>'workflow.activation_limit',
         'not_result_poison',attempt.workflow_failure_code<>'workflow.invalid_result','not_deadline_poison',attempt.workflow_failure_code<>'workflow.run_deadline',
         'not_budget_poison',attempt.workflow_failure_code<>'workflow.root_budget_exhausted','action_safe',workflow_action_retry_safe(config.company_id,execution.id) IS TRUE,
         'budget_link',link.company_id=owner.company_id AND link.run_id=owner.id AND link.root_run_id=budget.root_run_id,
-        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'frozen_v2',budget.provenance='frozen_v2',
+        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'frozen_v3',budget.provenance='frozen_v3',
         'budget_activations',usage.activations<=budget.activations,'budget_model',usage.model_calls<budget.model_calls,'budget_repetitions',usage.repetitions<=budget.repetitions,
         'no_exhausted_receipt',NOT EXISTS(SELECT 1 FROM workflow_budget_receipts WHERE company_id=config.company_id AND run_id=config.run_id AND disposition='exhausted'),
         'no_refusal',NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals WHERE company_id=config.company_id AND run_id=config.run_id AND execution_id=config.execution_id AND job_id=config.job_id),
         'non_child',(substring(admission.source_key FROM 4)::jsonb->>0)<>'child',
         'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.queue_kind='workflow' AND other.id<>config.job_id AND other.status IN ('pending','processing')),
-        'latest_attempt',NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=task.id AND later.attempt_number>task.retry_count),
+        'latest_attempt',NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=task.id AND later.attempt_number>task.attempt_ordinal-1),
         'running',owner.state='running','no_terminal_pointer',owner.terminal_execution_id IS NULL,
         'pending',task.status='pending','reopen_safe',workflow_action_reconciliation_reopen_safe(config.company_id,config.run_id,config.job_id)) INTO predicates
         FROM workflow_runs AS owner JOIN workflow_executions AS execution ON execution.company_id=owner.company_id AND execution.run_id=owner.id
         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
-        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
+        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
         JOIN workflow_run_budgets AS link ON link.company_id=owner.company_id AND link.run_id=owner.id
         JOIN workflow_root_budgets AS budget ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id
@@ -159,8 +159,8 @@ BEGIN
         OR state->>'transaction_id'<>pending->>'xid' OR state->>'company_id'<>config.company_id::text OR state->>'run_id'<>config.run_id::text
         OR pending->'schedules'->0->>'transaction_id'<>pending->>'xid' OR pending->'schedules'->0->>'company_id'<>config.company_id::text
         OR pending->'schedules'->0->>'run_id'<>config.run_id::text OR pending->'schedules'->0->>'execution_id'<>config.execution_id::text
-        OR pending->'schedules'->0->>'job_id'<>config.job_id::text OR pending->'schedules'->0->'retired_attempt'<>pending->'job'->'retry_count'
-        OR NOT (pending->'episode' @> jsonb_build_object('company_id',config.company_id,'run_id',config.run_id,'execution_id',config.execution_id,'job_id',config.job_id,'command_key',config.command_key,'retired_attempt',pending->'job'->'retry_count'))
+        OR pending->'schedules'->0->>'job_id'<>config.job_id::text OR pending->'schedules'->0->'retired_attempt'<>to_jsonb((pending->'job'->>'attempt_ordinal')::integer-1)
+        OR NOT (pending->'episode' @> jsonb_build_object('company_id',config.company_id,'run_id',config.run_id,'execution_id',config.execution_id,'job_id',config.job_id,'command_key',config.command_key,'retired_attempt',to_jsonb((pending->'job'->>'attempt_ordinal')::integer-1)))
         THEN RAISE EXCEPTION 'state authentic first OLD/schedule/episode scope invalid'; END IF;
     SELECT COALESCE(jsonb_agg(jsonb_build_object('command_key',command.command_key,'revision_equal',command.result_revision=owner.revision,
         'scope',evidence.run_id=command.run_id AND evidence.execution_id=command.execution_id AND evidence.invocation_id=command.invocation_id AND evidence.argument_digest=command.argument_digest AND evidence.dispatch_id=command.dispatch_id,

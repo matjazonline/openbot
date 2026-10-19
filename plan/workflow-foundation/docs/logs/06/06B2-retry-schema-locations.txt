@@ -1,0 +1,31 @@
+201:        IF NEW.retry_count<>OLD.retry_count OR NEW.max_retries<>OLD.max_retries
+225:                    AND attempt.attempt_number = OLD.retry_count + 1
+240:                            AND OLD.retry_count + 1 < OLD.max_retries
+251:        IF NEW.retry_count <> OLD.retry_count + 1 OR NEW.max_retries <> OLD.max_retries
+252:            OR NEW.retry_count >= NEW.max_retries
+260:                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.retry_count+1
+287:            AND attempt_number=OLD.retry_count+1 AND execution_generation=OLD.execution_generation
+289:        IF NOT FOUND OR retirement.workflow_retirement IS NULL OR NEW.retry_count<>OLD.retry_count+1
+293:                OR retirement.workflow_failure_class<>'retryable' OR NEW.retry_count>=NEW.max_retries
+2256:        retry_count, run_at, execution_generation, transitioned_at
+2263:        approval_id, outreach_id, NEW.retry_count, NEW.run_at,
+3022:            VALUES(OLD.company_id,run,OLD.workflow_execution_id,OLD.id,OLD.retry_count,pg_current_xact_id());
+3074:                AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=NEW.execution_id AND job.retry_count=NEW.retired_attempt
+3106:            AND job.retry_count=NEW.retired_attempt AND job.status='pending'
+3217:        AND NEW.retry_count=OLD.retry_count AND NEW.workflow_execution_id=OLD.workflow_execution_id THEN
+3220:                AND witness.retired_attempt=OLD.retry_count AND witness.transaction_id=pg_current_xact_id()
+3332:          AND job.retry_count+1=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+3532:            AND task.queue_kind='workflow' AND task.status='pending' AND task.retry_count=episode.retired_attempt
+3663:        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
+3669:            AND task.retry_count>0 AND task.retry_count<task.max_retries
+3708:            AND job.retry_count+1=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+3863:        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
+3870:            AND task.retry_count>0 AND task.retry_count<task.max_retries
+4014:        AND job.retry_count+1=marker.attempt_number AND job.lock_expires_at>clock_timestamp()
+4432:    retry_count integer DEFAULT 0 NOT NULL,
+4433:    max_retries integer DEFAULT 3 NOT NULL,
+4461:    CONSTRAINT background_tasks_max_retries_check CHECK ((max_retries > 0)),
+4466:    CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
+5934:    retry_count integer NOT NULL,
+5942:    CONSTRAINT task_status_events_retry_count_check CHECK ((retry_count >= 0)),
+9559:    ADD CONSTRAINT workflow_waits_company_id_run_id_execution_id_id_key UNIQUE (company_id, run_id, execution_id, id);

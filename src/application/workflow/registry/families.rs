@@ -35,7 +35,7 @@ impl Registration<'_> {
     fn schema_output(&mut self) -> Result<Contract, Diagnostic> {
         let schema = self.declared_schema("output_schema")?;
         let declaration = json!({"const":schema});
-        let result = match self.name() {
+        let mut result = match self.name() {
             "data.map" => contract(
                 json!({"value":embedded(schema.clone(),"mapped"),"output_schema":declaration}),
                 &["value", "output_schema"],
@@ -66,6 +66,9 @@ impl Registration<'_> {
             }
             _ => unreachable!("schema output family"),
         };
+        if self.name() == "agent.run" {
+            self.approval(&mut result)?;
+        }
         Ok(result)
     }
     fn decision(&mut self) -> Result<Contract, Diagnostic> {

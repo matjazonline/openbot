@@ -229,7 +229,7 @@ fn assert_pair(command: &ReconcileActionCommand, case: Case, staged: &Value, bef
         *audit,
         json!({"company_id":evidence["company_id"],"run_id":evidence["run_id"],"sequence":pair["audit_sequence"],
         "execution_id":evidence["execution_id"],"actor_id":evidence["actor_id"],"event_kind":"action_reconciled",
-        "created_at":audit["created_at"],"terminal_state":null,"terminal_execution_id":null})
+        "created_at":audit["created_at"],"terminal_state":null,"terminal_execution_id":null,"decision_id":null})
     );
     let previous = before["workflow_run_events"]
         .as_array()

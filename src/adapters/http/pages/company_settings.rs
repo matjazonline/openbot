@@ -483,7 +483,7 @@ pub fn company_create_pane_with_memory(
 fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
     format!(
         r##"
-                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-6">
                     <a href="/ui/channels?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{channels}</span>
                         <span class="text-[11px] font-normal opacity-60">Channels</span>
@@ -496,6 +496,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                         <span class="text-lg font-bold">{skills}</span>
                         <span class="text-[11px] font-normal opacity-60">Skills</span>
                     </a>
+                    <a href="/ui/companies/{company_id}/usage" class="btn btn-ghost h-auto flex-col gap-0 py-2">Model usage</a>
                     <a href="/ui/tasks?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{tasks_glyph}</span>
                         <span class="text-[11px] font-normal opacity-60">Tasks</span>

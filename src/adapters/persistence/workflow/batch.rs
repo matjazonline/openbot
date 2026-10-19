@@ -129,11 +129,19 @@ async fn run_steps(
                 continuation: Some(current),
             });
         }
-        let Some((activated, completion)) =
-            pending_recovery::prepare_pure(db, current, bundle, max_steps).await?
-        else {
-            return Ok(failed(current, completed));
-        };
+        let (activated, completion) =
+            match pending_recovery::prepare_pure(db, current, bundle, max_steps).await? {
+                pending_recovery::Pending::Ready(prepared) => prepared,
+                pending_recovery::Pending::Settled => return Ok(failed(current, completed)),
+                pending_recovery::Pending::Deferred => {
+                    return Ok(BatchResult {
+                        disposition: BatchDisposition::Deferred,
+                        completed,
+                        last: current,
+                        continuation: None,
+                    });
+                }
+            };
         let next = batch_commit::complete(
             db,
             current,

@@ -881,3 +881,6 @@ mod structured_response_tests;
 
 #[path = "simulation_tests.rs"]
 mod simulation_tests;
+
+#[path = "model_usage_assertions.rs"]
+mod model_usage_assertions;

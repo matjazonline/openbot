@@ -8,7 +8,30 @@ fn protected(origin: &str, entrance: Entrance) -> impl std::future::Future<Outpu
     protected_reviewers(origin, entrance, 1)
 }
 
-async fn protected_reviewers(origin: &str, entrance: Entrance, count: usize) -> Setup {
+fn protected_reviewers(
+    origin: &str,
+    entrance: Entrance,
+    count: usize,
+) -> impl std::future::Future<Output = Setup> + '_ {
+    protected_customized(origin, entrance, count, |_| {})
+}
+
+fn protected_customized<'a>(
+    origin: &'a str,
+    entrance: Entrance,
+    count: usize,
+    customize: impl FnOnce(&mut Value) + 'a,
+) -> impl std::future::Future<Output = Setup> + 'a {
+    protected_with_operation(origin, entrance, count, customize, None)
+}
+
+async fn protected_with_operation(
+    origin: &str,
+    entrance: Entrance,
+    count: usize,
+    customize: impl FnOnce(&mut Value),
+    additional: Option<TypeName>,
+) -> Setup {
     let mut fixture = Fixture::new().await;
     fixture.persistence = PostgresPersistence::with_credential_cipher(
         fixture.persistence.pool().clone(),
@@ -22,7 +45,7 @@ async fn protected_reviewers(origin: &str, entrance: Entrance, count: usize) -> 
     };
     let mut op = operation(fixture.target.company, name);
     op.approval_required = true;
-    let connection = fixture
+    let mut connection = fixture
         .persistence
         .register_http_operation(
             fixture.target.company,
@@ -33,6 +56,21 @@ async fn protected_reviewers(origin: &str, entrance: Entrance, count: usize) -> 
         )
         .await
         .unwrap();
+    if let Some(name) = &additional {
+        let mut extra = operation(fixture.target.company, name.as_str());
+        extra.approval_required = true;
+        connection = fixture
+            .persistence
+            .register_http_operation(
+                fixture.target.company,
+                fixture.target.actor,
+                connection.id,
+                connection.revision,
+                extra,
+            )
+            .await
+            .unwrap();
+    }
     let mut reviewers = vec![json!({"kind":"user","id":fixture.target.actor.user_id()})];
     for _ in 1..count {
         let id = super::super::message_tests::support::member(&fixture, "admin").await;
@@ -42,7 +80,15 @@ async fn protected_reviewers(origin: &str, entrance: Entrance, count: usize) -> 
         "reviewers":reviewers,
         "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()
     });
-    let version = Box::pin(published(&fixture, &connection, entrance, Some(approval))).await;
+    let version = Box::pin(published_with_operation(
+        &fixture,
+        &connection,
+        entrance,
+        Some(approval),
+        customize,
+        additional,
+    ))
+    .await;
     let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
     let claim = Box::pin(claimed(&fixture, target)).await;
     Setup {
@@ -236,7 +282,7 @@ async fn workflow_action_approval_park_with_sixteen_approvers_commits_within_bou
 }
 
 #[tokio::test]
-async fn workflow_action_approval_last_attempt_does_not_park() {
+async fn workflow_action_approval_last_failure_attempt_can_park_and_resume() {
     let setup = Box::pin(protected("http://127.0.0.1:1", Entrance::Http)).await;
     let p = &setup.fixture.persistence;
     sqlx::query("UPDATE background_tasks SET max_retries=retry_count+1 WHERE id=$1")
@@ -244,24 +290,27 @@ async fn workflow_action_approval_last_attempt_does_not_park() {
         .execute(p.pool())
         .await
         .unwrap();
-    let failure = Box::pin(actions(&setup).run(&setup.kind, &setup.claim))
-        .await
-        .completed_result()
-        .unwrap_err();
-    assert_eq!(failure.failure.code().as_str(), "http.approval_required");
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_decisions")
-        .fetch_one(p.pool())
+    parked(&setup).await;
+    let decision = view(&setup).await;
+    p.submit_decision(submission(&setup, &decision, "approve"))
         .await
         .unwrap();
-    assert_eq!(count, 0);
+    let counters: serde_json::Value = sqlx::query_scalar("SELECT jsonb_build_object('failures',retry_count,'continuations',continuation_count,'attempt',attempt_ordinal) FROM background_tasks WHERE id=$1")
+        .bind(setup.claim.fence.scope.job.0).fetch_one(p.pool()).await.unwrap();
     assert_eq!(
-        action_counts(&setup.fixture).await,
-        ActionCounts {
-            dispatches: 0,
-            entries: 0,
-            receipts: 0
-        }
+        counters,
+        json!({"failures":0,"continuations":1,"attempt":2})
     );
+    let next = p
+        .claim_io(
+            setup.claim.fence.scope,
+            WorkflowWorkerId(Uuid::new_v4()),
+            lease(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(next.fence.attempt.0, 2);
 }
 
 #[tokio::test]
@@ -276,7 +325,7 @@ async fn workflow_action_approval_reopen_without_submission_is_rejected() {
         .await
         .unwrap();
     sqlx::query(
-        "UPDATE background_tasks SET status='pending',retry_count=retry_count+1 WHERE id=$1",
+        "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1 WHERE id=$1",
     )
     .bind(setup.claim.fence.scope.job.0)
     .execute(&mut *tx)
@@ -436,7 +485,7 @@ async fn workflow_action_approval_submit_competes_with_expiry() {
         assert!(matches!(expired, WaitProgress::Refused));
         assert_eq!(
             state,
-            json!({"run":"running","job":"pending","retries":1,"wait":"completed","choice":"approve"})
+            json!({"run":"running","job":"pending","retries":0,"wait":"completed","choice":"approve"})
         );
     } else {
         assert!(matches!(submitted, Err(AppError::Conflict(_))));
@@ -461,3 +510,9 @@ mod resolution_tests;
 
 #[path = "action_approval_sql_tests.rs"]
 mod sql_tests;
+
+#[path = "action_approval_continuation_tests.rs"]
+mod continuation_tests;
+
+#[path = "action_approval_review_tests.rs"]
+mod review_tests;

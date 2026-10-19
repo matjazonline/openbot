@@ -68,6 +68,8 @@ pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> A
             .tools
             .iter()
             .map(|tool| tool.policy.capability.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect(),
         approval_required: false,
     }

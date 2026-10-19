@@ -14,7 +14,7 @@ async fn workflow_action_approval_digest_fk_rejects_each_mismatch() {
         .await
         .unwrap();
     let scope = setup.claim.fence.scope;
-    for field in ["argument", "operation", "invocation"] {
+    for field in ["argument", "operation", "invocation", "job", "attempt"] {
         let mut tx = p.pool().begin().await.unwrap();
         let wait = Uuid::new_v4();
         sqlx::query("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,notification_intent) VALUES($1,$2,$3,$4,'decision',clock_timestamp()+interval '1 minute',$5)")
@@ -35,12 +35,27 @@ async fn workflow_action_approval_digest_fk_rejects_each_mismatch() {
         } else {
             intent.approval_subject().invocation.as_uuid()
         };
-        let error=sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9)")
+        let job = if field == "job" {
+            Uuid::new_v4()
+        } else {
+            scope.job.0
+        };
+        let attempt = if field == "attempt" {
+            999
+        } else {
+            setup.claim.fence.attempt.0
+        };
+        sqlx::query("SET CONSTRAINTS workflow_decisions_company_id_execution_id_job_id_fkey, workflow_decisions_job_id_parked_attempt_number_fkey IMMEDIATE").execute(&mut *tx).await.unwrap();
+        let error=sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest,job_id,parked_attempt_number) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9,$10,$11)")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(Uuid::new_v4()).bind(wait)
-            .bind("0".repeat(64)).bind(invocation).bind(argument).bind(operation).execute(&mut *tx).await.unwrap_err();
+            .bind("0".repeat(64)).bind(invocation).bind(argument).bind(operation).bind(job).bind(attempt).execute(&mut *tx).await.unwrap_err();
         assert_eq!(
             error.as_database_error().unwrap().constraint(),
-            Some("workflow_decisions_action_identity"),
+            Some(match field {
+                "job" => "workflow_decisions_company_id_execution_id_job_id_fkey",
+                "attempt" => "workflow_decisions_job_id_parked_attempt_number_fkey",
+                _ => "workflow_decisions_action_identity",
+            }),
             "{field}: {error}"
         );
         tx.rollback().await.unwrap();
@@ -113,7 +128,7 @@ async fn workflow_action_approval_digest_cannot_authorize_changed_arguments() {
     };
     assert!(matches!(
         dispatch.reserve_remote(&request, None).await.unwrap(),
-        RemoteReservationResult::ApprovalRequired
+        RemoteReservationResult::ApprovalParked(_)
     ));
     assert_eq!(
         action_counts(&setup.fixture).await,
@@ -129,11 +144,11 @@ async fn workflow_action_approval_digest_cannot_authorize_changed_arguments() {
 enum ReopenCase {
     PriorApproval,
     Rejected,
-    WrongRetryCount,
+    WrongContinuationCount,
     Valid,
 }
 
-async fn submitted_on(db: &mut sqlx::PgConnection, setup: &Setup, choice: &str) {
+pub(super) async fn submitted_on(db: &mut sqlx::PgConnection, setup: &Setup, choice: &str) {
     let scope = setup.claim.fence.scope;
     sqlx::query("UPDATE workflow_decisions AS decision SET submitted_at=clock_timestamp(),submitted_by=reviewer.principal_id,command_key='guard-test',command_fingerprint=$2,choice=$3,feedback='',data='{}',revision=2 FROM workflow_decision_reviewers AS reviewer WHERE reviewer.decision_id=decision.id AND decision.execution_id=$1")
         .bind(scope.execution.as_uuid()).bind("0".repeat(64)).bind(choice).execute(&mut *db).await.unwrap();
@@ -151,7 +166,7 @@ async fn workflow_action_approval_reopen_checks_transaction_choice_and_accountin
     for case in [
         ReopenCase::PriorApproval,
         ReopenCase::Rejected,
-        ReopenCase::WrongRetryCount,
+        ReopenCase::WrongContinuationCount,
         ReopenCase::Valid,
     ] {
         let setup = Box::pin(protected("http://127.0.0.1:1", Entrance::Http)).await;
@@ -171,11 +186,11 @@ async fn workflow_action_approval_reopen_checks_transaction_choice_and_accountin
             .bind(setup.claim.fence.scope.execution.as_uuid()).fetch_one(&mut *tx).await.unwrap();
         assert_eq!(same_transaction, !matches!(case, ReopenCase::PriorApproval));
         let increment = match case {
-            ReopenCase::WrongRetryCount => 0,
+            ReopenCase::WrongContinuationCount => 0,
             _ => 1,
         };
         sqlx::query(
-            "UPDATE background_tasks SET status='pending',retry_count=retry_count+$2 WHERE id=$1",
+            "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+$2 WHERE id=$1",
         )
         .bind(setup.claim.fence.scope.job.0)
         .bind(increment)

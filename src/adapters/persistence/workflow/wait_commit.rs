@@ -53,7 +53,7 @@ pub(super) async fn resume_on(
         if wait.deadline > now {
             return Ok(WaitProgress::Pending);
         }
-        return Box::pin(decision_timed_out(db, scope)).await;
+        return Box::pin(decision_timed_out(db, scope, wait.id)).await;
     }
     let wake = if wait.reason == "effect" {
         // Explicit, before the generic event lookup (04.11-D2 §4.4, D4 §M).
@@ -102,15 +102,34 @@ enum Wake {
 async fn decision_timed_out(
     db: &mut PgConnection,
     scope: ActivationRequest,
+    wait: Uuid,
 ) -> AppResult<WaitProgress> {
-    sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND state='waiting'")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).execute(&mut *db).await?;
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
-    let approval: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2 AND subject_kind='action_approval')")
-        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
-    if approval {
-        decisions::approvals::fail(db, scope, "approval_expired").await?;
+    let token: Option<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_decisions WHERE company_id=$1 AND wait_id=$2 AND subject_kind='token_allowance'")
+        .bind(scope.company.as_uuid()).bind(wait).fetch_optional(&mut *db).await?;
+    if let Some(token) = token {
+        decisions::tokens::fail(
+            db,
+            scope,
+            crate::application::workflow::decisions::DecisionId(token),
+            "token_allowance_expired",
+        )
+        .await?;
+        return Ok(WaitProgress::Expired(CommitDisposition::Committed));
+    }
+    let approval: Option<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_decisions WHERE company_id=$1 AND wait_id=$2 AND subject_kind='action_approval'")
+        .bind(scope.company.as_uuid()).bind(wait).fetch_optional(&mut *db).await?;
+    if let Some(approval) = approval {
+        decisions::approvals::fail(
+            db,
+            scope,
+            crate::application::workflow::decisions::DecisionId(approval),
+            "approval_expired",
+        )
+        .await?;
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
     }
     waits::audit(db, scope, DECISION_TIMED_OUT).await?;

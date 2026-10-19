@@ -124,11 +124,32 @@ pub(super) async fn configured(
     .await
     .unwrap()
 }
-pub(super) async fn published(
+pub(super) fn published<'a>(
+    fixture: &'a Fixture,
+    connection: &'a HttpConnection,
+    entrance: Entrance,
+    approval: Option<Value>,
+) -> impl std::future::Future<Output = VersionId> + 'a {
+    published_customized(fixture, connection, entrance, approval, |_| {})
+}
+
+pub(super) fn published_customized<'a>(
+    fixture: &'a Fixture,
+    connection: &'a HttpConnection,
+    entrance: Entrance,
+    approval: Option<Value>,
+    customize: impl FnOnce(&mut Value) + 'a,
+) -> impl std::future::Future<Output = VersionId> + 'a {
+    published_with_operation(fixture, connection, entrance, approval, customize, None)
+}
+
+pub(super) async fn published_with_operation(
     fixture: &Fixture,
     connection: &HttpConnection,
     entrance: Entrance,
     approval: Option<Value>,
+    customize: impl FnOnce(&mut Value),
+    additional: Option<TypeName>,
 ) -> VersionId {
     let p = &fixture.persistence;
     let tool = matches!(entrance, Entrance::Tool);
@@ -145,7 +166,8 @@ pub(super) async fn published(
     if let Some(approval) = approval {
         source["steps"]["start"]["with"]["approval"] = json!({"literal":approval});
     }
-    let directory = http::HttpPublicationDirectory {
+    customize(&mut source);
+    let mut directory = http::HttpPublicationDirectory {
         persistence: p.clone(),
         selections: vec![http::HttpPublicationSelection {
             connection: connection.id,
@@ -157,6 +179,13 @@ pub(super) async fn published(
             operation: TypeName::parse(name).unwrap(),
         }],
     };
+    if let Some(operation) = additional {
+        directory.selections.push(http::HttpPublicationSelection {
+            connection: connection.id,
+            slot: None,
+            operation,
+        });
+    }
     let definitions =
         DefinitionService::new(Preflight, p.clone(), WorkflowSourceDecoder, directory);
     let mut draft = fixture.save(None);
@@ -242,10 +271,16 @@ pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> Claimed
         execution: ExecutionId::new(execution),
         job: crate::application::workflow::activation::WorkflowJobId(job),
     };
-    p.claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+    let claim = p
+        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
         .await
-        .unwrap()
-        .unwrap()
+        .unwrap();
+    if claim.is_none() {
+        let state: Value = sqlx::query_scalar("SELECT jsonb_build_object('run',run.state,'job',job.status,'failures',job.retry_count,'ordinal',job.attempt_ordinal,'continuations',job.continuation_count,'activated',execution.activated_at,'events',(SELECT jsonb_agg(event_kind) FROM workflow_run_events WHERE run_id=run.id)) FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.run_id=run.id JOIN background_tasks AS job ON job.workflow_execution_id=execution.id WHERE run.id=$1")
+            .bind(run.as_uuid()).fetch_one(p.pool()).await.unwrap();
+        panic!("claim missing: {state}");
+    }
+    claim.unwrap()
 }
 
 pub(super) async fn server(response: &'static str) -> (String, tokio::task::JoinHandle<String>) {

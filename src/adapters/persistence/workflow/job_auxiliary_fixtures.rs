@@ -20,10 +20,13 @@ pub(super) async fn insert_record(
     table: &str,
     record: &serde_json::Value,
 ) -> Result<(), sqlx::Error> {
+    let generated: Vec<String> = sqlx::query_scalar("SELECT attname::text FROM pg_attribute WHERE attrelid=$1::regclass AND attgenerated<>'' AND NOT attisdropped")
+        .bind(table).fetch_all(&mut *db).await?;
     let columns = record
         .as_object()
         .unwrap()
         .keys()
+        .filter(|key| !generated.contains(key))
         .map(|key| format!("\"{key}\""))
         .collect::<Vec<_>>()
         .join(", ");
@@ -185,7 +188,7 @@ async fn seed_harness(
     insert_record(
         db,
         "task_harness_runs",
-        &json!({"id":run,"company_id":company,"task_id":task,
+        &json!({"id":run,"company_id":company,"task_id":task,"owner_kind":"legacy",
         "agent_id":worker,"owner_principal_id":principal,"ownership_version":1,"schema_version":1,
         "revision":0,"state":"active","checkpoint":checkpoint}),
     )

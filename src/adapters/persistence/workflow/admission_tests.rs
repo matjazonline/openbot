@@ -7,12 +7,16 @@ mod admission_authority_tests;
 mod admission_history_tests;
 #[path = "admission_source_tests.rs"]
 mod admission_source_tests;
+#[path = "admission_token_tests.rs"]
+mod admission_token_tests;
 #[path = "batch_tests.rs"]
 mod batch_tests;
 #[path = "decision_tests.rs"]
 mod decision_tests;
 #[path = "lease_tests.rs"]
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
+#[path = "model_usage_tests.rs"]
+mod model_usage_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};
@@ -148,7 +152,7 @@ async fn workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline() {
         snapshot["revision"],
         json!(command.binding().revision().get())
     );
-    let limits = command
+    let limits = &command
         .binding()
         .bundle()
         .compiled()

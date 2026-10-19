@@ -5,8 +5,8 @@ use super::{
 };
 use crate::domain::workflow::{
     BudgetResource, ChoiceName, ExecutionLimits, OrderedRule, ResourceName, ResourceRequirement,
-    RootBudgetLimits, Routes, RuleCase, StepDefinition, StepId, TransitionTarget, TypeName,
-    VersionId, WorkflowDefinition, WorkflowId,
+    RootBudgetLimits, Routes, RuleCase, StepDefinition, StepId, TokenAllowance, TransitionTarget,
+    TypeName, VersionId, WorkflowDefinition, WorkflowId,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -305,6 +305,7 @@ pub(crate) fn parse_workflow(
             "parameter_schema",
             "output_schema",
             "resources",
+            "capability_ceiling",
             "entry",
             "steps",
             "limits",
@@ -347,6 +348,10 @@ pub(crate) fn parse_workflow(
             parameter_schema: Some(parameter_schema),
             output_schema: Some(output_schema),
             resources,
+            capability_ceiling: map
+                .get("capability_ceiling")
+                .map(|node| capability_ceiling(node))
+                .transpose()?,
             entry,
             steps: parsed_steps.steps,
             limits,
@@ -354,6 +359,47 @@ pub(crate) fn parse_workflow(
         controls: parsed_steps.controls,
         rules: parsed_steps.rules,
         locations: spans,
+    })
+}
+
+fn capability_ceiling(
+    node: &LocatedNode,
+) -> Result<crate::domain::workflow::CapabilityCeiling, Diagnostic> {
+    let path = "/capability_ceiling";
+    let map = fields(node, path, &["tools", "skills"])?;
+    let names = |field: &str| -> Result<Vec<TypeName>, Diagnostic> {
+        let at = child(path, field);
+        let values = sequence(required(&map, field, path, node)?, &at)?;
+        if values.len() > crate::application::workflow::registry::MAX_SELECTIONS {
+            return Err(Diagnostic::at(
+                "capability.limit",
+                "Too many capability names",
+                &at,
+                node.span,
+            ));
+        }
+        let mut unique = std::collections::BTreeSet::new();
+        values
+            .iter()
+            .enumerate()
+            .map(|(i, value)| {
+                let at = child(&at, &i.to_string());
+                let name = name(value, &at, |s| TypeName::parse(s).ok())?;
+                if !unique.insert(name.clone()) {
+                    return Err(Diagnostic::at(
+                        "capability.duplicate",
+                        "Duplicate capability name",
+                        &at,
+                        value.span,
+                    ));
+                }
+                Ok(name)
+            })
+            .collect()
+    };
+    Ok(crate::domain::workflow::CapabilityCeiling {
+        tools: names("tools")?,
+        skills: names("skills")?,
     })
 }
 
@@ -387,7 +433,11 @@ fn execution_limits(limits_node: &LocatedNode) -> Result<ExecutionLimits, Diagno
 
 fn root_budget_limits(node: &LocatedNode) -> Result<RootBudgetLimits, Diagnostic> {
     let path = "/limits/root_budget";
-    let values = fields(node, path, &["activations", "model_calls", "repetitions"])?;
+    let values = fields(
+        node,
+        path,
+        &["activations", "model_calls", "repetitions", "tokens"],
+    )?;
     let read = |field: &str, resource: BudgetResource| {
         positive_u32(
             required(&values, field, path, node)?,
@@ -395,12 +445,66 @@ fn root_budget_limits(node: &LocatedNode) -> Result<RootBudgetLimits, Diagnostic
             resource.maximum(),
         )
     };
-    RootBudgetLimits::new(
+    let limits = RootBudgetLimits::new(
         read("activations", BudgetResource::Activation)?,
         read("model_calls", BudgetResource::ModelCall)?,
         read("repetitions", BudgetResource::Repetition)?,
     )
-    .map_err(|_| Diagnostic::at("syntax.integer", "Invalid root budget", path, node.span))
+    .map_err(|_| Diagnostic::at("syntax.integer", "Invalid root budget", path, node.span))?;
+    match values.get("tokens") {
+        Some(tokens) => Ok(limits.with_tokens(token_allowance(tokens)?)),
+        None => Ok(limits),
+    }
+}
+
+fn token_allowance(node: &LocatedNode) -> Result<TokenAllowance, Diagnostic> {
+    let path = "/limits/root_budget/tokens";
+    let values = fields(node, path, &["max_tokens", "reviewers"])?;
+    let max_tokens = positive_u32(
+        required(&values, "max_tokens", path, node)?,
+        &child(path, "max_tokens"),
+        TokenAllowance::MAX_TOKENS,
+    )?;
+    let reviewer_path = child(path, "reviewers");
+    let reviewer_node = required(&values, "reviewers", path, node)?;
+    let items = sequence(reviewer_node, &reviewer_path)?;
+    if items.is_empty() || items.len() > TokenAllowance::MAX_REVIEWERS {
+        return Err(Diagnostic::at(
+            "budget.reviewers",
+            "Token allowance requires 1..16 distinct user reviewers",
+            &reviewer_path,
+            reviewer_node.span,
+        ));
+    }
+    let mut reviewers = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        let item_path = child(&reviewer_path, &index.to_string());
+        let fields = fields(item, &item_path, &["kind", "id"])?;
+        if scalar_string(
+            required(&fields, "kind", &item_path, item)?,
+            &child(&item_path, "kind"),
+        )? != "user"
+        {
+            return Err(Diagnostic::at(
+                "budget.reviewers",
+                "Token reviewers must be explicit users",
+                &item_path,
+                item.span,
+            ));
+        }
+        reviewers.push(uuid(
+            required(&fields, "id", &item_path, item)?,
+            &child(&item_path, "id"),
+        )?);
+    }
+    TokenAllowance::new(max_tokens, reviewers).map_err(|_| {
+        Diagnostic::at(
+            "budget.reviewers",
+            "Token allowance requires 1..16 distinct user reviewers",
+            &reviewer_path,
+            reviewer_node.span,
+        )
+    })
 }
 
 trait NumericNode {

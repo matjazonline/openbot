@@ -11,6 +11,7 @@ pub mod binding;
 pub mod budget;
 mod canonical;
 pub mod capacity;
+pub mod checkpoints;
 pub mod compiler;
 pub mod completion;
 mod contracts;

@@ -208,9 +208,9 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
 
 /// S-F001: the sealing branch of `insert_workflow_budget_link` and the debit rule of
 /// `debit_workflow_budget_receipt`, on a fresh schema. A root run whose stored bundle is not
-/// compiler revision 2, or does not decode, is `sealed_legacy` with no limits, and every positive
+/// the current compiler revision, or does not decode, is `sealed_legacy` with no limits, and every positive
 /// debit of it is `exhausted` without touching usage. The admitted current-revision root is
-/// `frozen_v2` and grants: the control.
+/// `frozen_v4` and grants: the control.
 #[tokio::test]
 async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
     let (f, admitted) = limited().await;
@@ -221,6 +221,10 @@ async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
         (
             "older compiler revision",
             "convert_to(jsonb_set(convert_from(source.bundle,'UTF8')::jsonb,'{compiler_revision}','\"1\"')::text,'UTF8')",
+        ),
+        (
+            "previous compiler revision",
+            "convert_to(jsonb_set(convert_from(source.bundle,'UTF8')::jsonb,'{compiler_revision}','3')::text,'UTF8')",
         ),
         ("malformed bundle", "convert_to('not a bundle','UTF8')"),
     ] {
@@ -288,7 +292,7 @@ async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
     // The control: the admitted current-revision root carries its frozen limits and grants.
     assert_eq!(
         budget(admitted.run).await.unwrap(),
-        json!({"provenance":"frozen_v2","limits":[2,2,2],"usage":[0,0,0]})
+        json!({"provenance":"frozen_v4","limits":[2,2,2],"usage":[0,0,0]})
     );
     assert_eq!(
         receipt(&mut db, admitted, "model_call", "frozen-call", 1)
@@ -301,4 +305,69 @@ async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
         budget(admitted.run).await.unwrap()["usage"],
         json!([0, 1, 0])
     );
+}
+
+#[tokio::test]
+async fn workflow_budget_current_compiler_admission_activates() {
+    use crate::application::workflow::activation::WorkflowActivation;
+    let (f, scope) = limited().await;
+    let activation = f.persistence().activate(scope).await.unwrap();
+    assert_eq!(activation.execution, scope.execution);
+    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from(run.bundle,'UTF8')::jsonb)->'compiler_revision','provenance',budget.provenance,'activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+    assert_eq!(
+        saved,
+        json!({"compiler":crate::application::workflow::compiler::SEMANTIC_REVISION,"provenance":"frozen_v4","activations":1})
+    );
+}
+
+#[tokio::test]
+async fn workflow_budget_token_policy_sql_shape_matches_compiler_contract() {
+    let (f, _) = limited().await;
+    let reviewer = json!({"kind":"user","id":Uuid::new_v4()});
+    let valid = json!({"max_tokens":2000,"reviewers":[reviewer.clone()]});
+    let mut cases = vec![
+        (valid.clone(), true),
+        (Value::Null, false),
+        (json!({}), false),
+    ];
+    for amount in [
+        json!(0),
+        json!(-1),
+        json!(1.5),
+        json!(1.0),
+        json!(2147483648u64),
+        json!("2000"),
+        Value::Null,
+    ] {
+        let mut policy = valid.clone();
+        policy["max_tokens"] = amount;
+        cases.push((policy, false));
+    }
+    for reviewers in [
+        json!([]),
+        json!([reviewer.clone(), reviewer.clone()]),
+        json!([{"kind":"agent","id":Uuid::new_v4()}]),
+        json!([{"kind":"user","id":"bad"}]),
+        json!([{"kind":"user"}]),
+        json!([{"kind":"user","id":Uuid::new_v4(),"extra":true}]),
+    ] {
+        let mut policy = valid.clone();
+        policy["reviewers"] = reviewers;
+        cases.push((policy, false));
+    }
+    let mut unknown = valid.clone();
+    unknown["money"] = json!(10);
+    cases.push((unknown, false));
+    let mut maximum = valid;
+    maximum["max_tokens"] = json!(2147483647);
+    cases.push((maximum, true));
+    for (policy, expected) in cases {
+        let accepted: bool = sqlx::query_scalar("SELECT valid_workflow_token_policy($1)")
+            .bind(&policy)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+        assert_eq!(accepted, expected, "{policy}");
+    }
 }

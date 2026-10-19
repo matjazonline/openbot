@@ -263,7 +263,8 @@ async fn audit_sql_pair(f: &AdmissionFixture, own: ActionScope, foreign: ActionS
             .unwrap();
         if execution == own.execution.as_uuid() {
             let row = insert_audit(&mut tx, &candidate, execution).await.unwrap();
-            assert_eq!(row.as_object().unwrap().len(), 9);
+            assert_eq!(row.as_object().unwrap().len(), 10);
+            assert!(row["decision_id"].is_null());
             assert!(row["terminal_state"].is_null());
             assert!(row["terminal_execution_id"].is_null());
             for (field, expected) in [

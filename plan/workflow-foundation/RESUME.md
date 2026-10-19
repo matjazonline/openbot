@@ -1,5 +1,161 @@
 # Workflow foundation resume
 
+## USER-REQUESTED STOP — 2026-10-19: native checkpoint updates
+
+User explicitly requested “write handoff and stop”. Stop is intentional; resume only on
+new user instruction. Continue with implement-astra-reviewed-2.1, root authors (no developer
+sub-agent), retained independent reviewer /root/reviewer_06. No whole06B2b source review
+or acceptance yet.06B2a and D4 revision2 remain accepted; D4 root-pause addendum revision3
+accepted under06-R013. Preserve all WIP, especially assets/app.css; no commits/deployments.
+
+**Read next:** docs/logs/06/HANDOFF-20261019-native-updates.md, then latest docs/TASK.md
+entries. Latest native harness40/0 PASS at stock2MiB/four threads in
+06B2b-checkpoint-updates-tests.log. Native tool/final mutation port and SQL progression
+checks now exist; settlement approval can finish without an extra model call. Received
+tool result survives sibling refusal; new preparation is refused by Rust and SQL.
+These latest SQL/source edits have focused tests only; static/SQLx checks must be refreshed.
+Prior scheduling gates passed fully for the preceding artifact, not this latest delta.
+Trusted preparation, shared Rig driver, effect/delivery waits and06B3/06C remain outstanding.
+No checks are running at handoff. Retained PostgreSQL cluster/evidence DBs remain untouched.
+
+
+## Phase06 / 06B2b root-pause scheduling — 2026-10-19 (current)
+
+Continue under implement-astra-reviewed-2.1; root authors, no developer child.
+User did not request a stop.06B2a/D4 revision2 remain accepted; D4 root-pause
+revision3 addendum accepted under06-R013, reviewer /root/reviewer_06 retained.
+06B2b remains unfinished and unreviewed. Token22/0 PASS at stock2MiB/four threads
+in06B2b-token-scheduling-tests-8.log. Pending I/O and pure work defer without debit;
+processing interruption consumes one failure, last retry terminalizes; denial,
+deadline, competing claims/no ancestor run lock, native approved-request repark,
+notification/approval commit rollback, SQL bypass and reviewer revocation proved.
+Pure activation now distinguishes Ready/Deferred/Settled and returns an explicit
+BatchDisposition::Deferred with no immediate continuation. Prior failed fixture and
+compile logs retained. Affected regressions/static/fresh migration/SQLx checks are
+running via docs/logs/06/06B2b-token-scheduling-gates-resume.sh; inspect logs before claiming.
+113 scheduling regressions passed; after hard-limit diagnostic preservation, budget-runtime9
+and action-uncertainty10 pass, offline all-target check54.19s passes. Strict Clippy/fresh
+migration/SQLx remain in progress. Initial Clippy Copy-clone failure was corrected.
+No full phase gate or whole06B2b source acceptance. Next finish remaining token
+adversarial coverage as needed, then trusted preparation/shared Rig driver/native
+checkpoint tool/final mutations/effect waits,06B3/06C and final full verification.
+Preserve all WIP/assets/app.css, PostgreSQL retained cluster and evidence databases.
+No commit/deploy or production reset authorization. Do not stop at internal checks.
+
+
+## Phase06 / 06B2b token protocol in progress — 2026-10-19 (current)
+
+Continue under implement-astra-reviewed-2.1, root authors per explicit no-developer-child
+instruction. No stop requested; do not end at internal test boundaries.06B2a and D4
+revision2 remain accepted;06B2b remains unfinished and unreviewed. New atomic model
+admission/settlement and token proposal/approval/denial/expiry plumbing are implemented
+as WIP. Native checkpoint tests19/0 passed, including four token lifecycle/replay tests.
+Root refusal now typed; activation/recovery/new effect entry/final completion check it,
+and SQL guards cover new effects/completion/reopen. Latest focused run initially3/3:
+SQL reopen guard incorrectly rejected a transient running state during terminal decision
+settlement; changed to deferred final-state check. Child test reused an admission key;
+corrected. Rerun06B2b-token-refusal-tests-2.log is in progress at this checkpoint.
+
+Next: finish token SQL/descendant/expiry/cancellation/repark/race/rollback proofs, then
+trusted preparation/shared Rig driver/effect waits. Whole06B2b review only after full
+cohesive implementation, followed by06B3/06C and final full gates. No full verification
+or operational native model handler claimed. TASK carries evidence; preserve WIP,
+assets/app.css, retained PostgreSQL and prior failed logs. No commits/deployments.
+
+
+## Phase06 / 06B2b active request ownership — 2026-10-19 (latest)
+
+Continue under implement-astra-reviewed-2.1, root authors per explicit user instruction
+(no developer sub-agent); fresh independent Astra/medium reviewer remains needed for
+whole06B2b. Existing06B2a and D4 revision2 acceptance remain intact. Native checkpoints
+now carry an exact active request/generation/worker/attempt slot with relational FK,
+SQL admission/settlement guards and ordered append-only model ledger. New claimed
+execution reservation releases a retired slot without refunding/deleting its request;
+a newer owner cannot settle the old request or admit its ID again.
+Three focused owner/race/recovery tests join nine prior native tests. Latest commands,
+results and progress artifact are in docs/TASK.md. No06B2b review or acceptance, full
+phase verification, provider-entry permit or operational native model handler claimed.
+Next: atomic request reservation/usage/root model-call debit, token proposal/approval/
+refusal/settlement, trusted preparation/shared Rig driver/effect waits, then06B3/06C.
+Preserve all WIP and retained PostgreSQL evidence. No commits/deployments/user stop.
+
+
+## Phase06 / 06B2b native checkpoint ownership/store — 2026-10-19 (latest)
+
+Continue under implement-astra-reviewed-2.1. User confirmed current root high in
+response to the Astra/high role question and reiterated no backward compatibility;
+use fresh/reset databases, no old-data support.06B2a and D4 revision2 remain accepted.
+Native task_harness_runs ownership now has disjoint legacy/workflow shapes, exact
+run/execution/job/attempt FKs, immutable preparation and live-fence SQL write checks.
+Application-owned WorkflowCheckpointStore implements native open/load and execution
+reservation using real WorkflowFence, current actor authority and bounded transactions.
+Shared decode/state validation is reused; native writes never project legacy invocations.
+Nine native schema/store/race/recovery/rollback tests and ten current-caller checkpoint
+regressions pass at stock2MiB. See latest TASK for final static/migration/SQLx results.
+
+This remains unfinished06B2b, NOT independently reviewed or accepted. The preparation
+payload is only a bounded immutable document at this storage boundary; trusted runtime
+preparation, frozen tool/target bindings and live capability checks still need wiring.
+Next: active model-request owner slot; atomic reservation/usage/root model-call debit;
+root token proposal/approval/refusal and settlement; shared Rig driver/effect waits;
+then06B3/06C and full phase verification. No operational native model handler is claimed.
+No commits/deployments or user stop. Preserve all prior WIP and retained PostgreSQL
+pre/post squash evidence. Fresh independent Astra/medium reviewer is still needed for
+the whole06B2b artifact; no reviewer was spawned for this internal implementation step.
+
+
+## Phase06 / 06B2b admission continuation — 2026-10-19 (latest)
+
+Continue under implement-astra-reviewed-2.1. User reconfirmed current root Astra/high.
+06B2a and D4 revision2 remain accepted. Fresh root and descendant admissions now check
+live owner/admin/person authority for the actual root token reviewers; children read
+inherited immutable policy without locking the root run. Saved admission replay creates
+no new work and retains its existing behavior. Focused admission22/0, locked offline
+all-target compilation and strict Clippy passed; latest TASK has schema/SQLx results.
+All prior WIP is preserved. Native checkpoint/store, token continuation/refusal, shared
+Rig driver and effect waits remain unfinished, as do06B3/06C and final phase verification.
+06B2b is not independently code-reviewed or accepted. No commits/deployments, no user
+stop request, and no new authorization needed. Historical reviewer handles are not live
+in this session; spawn a fresh independent Astra/medium reviewer when the batch is ready.
+
+
+## Phase06 / 06B2b implementation in progress — 2026-10-19
+
+Continue under implement-astra-reviewed-2.1; root remains user-confirmed Astra/high
+and independent reviewer /root/reviewer_06 is retained.06B2a is accepted.06-D4
+revision2 is root-accepted after06-R012; no architecture permission is pending.
+06B2b source changes are WIP, not code-reviewed or accepted. Shared checkpoints now
+retain bounded excess reported usage and stop on hard token overflow. Optional root
+token policy compiles/freezes with explicit reviewers; compiler4 and SQL admission
+match. Agent snapshots carry trusted UUIDs; agent.run reuses action approval inputs.
+The native workflow owner/checkpoint/driver, root token decisions and continuation,
+model-tool delivery waits,06B3/06C and final phase verification remain unfinished.
+See latest docs/TASK.md for checks and exact next work. Preserve all existing changes
+and task PostgreSQL evidence; no commits/deployments. No user stop was requested.
+
+
+## Phase06 resumed; usage requirements resolved — 2026-10-19 (current)
+
+User authorized phase06 continuation under implement-astra-reviewed-2.1 and confirmed
+root as Astra/high author.06A (pure frozen capability contract) is accepted after
+independent architecture06-R001 and whole-batch code06-R002 PASS. Ordered saved defaults,
+explicit profile replacement, workflow capability ceilings, requirement enforcement,
+trace-ready snapshots and pure current-revocation checks are implemented.96 focused
+tests, formatting, locked offline all-target compilation and strict Clippy passed.
+No operational agent handler or full phase06 completion is claimed.
+
+User resolved the budget choice: measure agent/workflow model calls and tokens, display
+analytics by provider/model or workflow, and calculate cost when an optional per-million
+provider/model price is configured. No monetary caps. An optional workflow token limit
+pauses automated progression for manual approval to continue, preserving usage and saved
+execution state. Continue06B architecture and implementation under these requirements;
+there is no pending budget-choice blocker.06B durable Rig/preparation and06C migration/
+alternate-runtime removal, plus final full verification, remain outstanding.
+Read latest [TASK](docs/TASK.md) and [REVIEW](docs/REVIEW.md) for exact accepted artifact,
+evidence, roles and next action. No DB started/reset, no commits/deployment. Preserve
+all current work and retained task PostgreSQL/pre/post squash evidence. This section
+supersedes older phase scope/status below.
+
 ## Phase05 verification complete — 2026-10-18 (current)
 
 05A and 05B passed independent review and their batch gates. Final corrected all-target

@@ -215,6 +215,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> ActionDispatch for PostgresAction
             let mut tx = bound.begin(&mut conn).await?;
             let dispatched: AppResult<End<_>> = async {
                 let AuthorizedAction { action, current_policy: policy, approval_required: protected } = self.authorize_on(&mut tx, request, bound.server_timeout()).await?;
+                token_budget::require_progression(&mut tx, request.fence.scope).await?;
                 if protected {
                     return Ok(match decisions::approvals::park(&mut tx, request, &action, self.decision_notices.as_ref()).await? {
                         Some(wait) => End::Commit(LocalDispatchResult::ApprovalParked(wait)),
@@ -436,6 +437,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         } = self
             .authorize_on(tx, request, bound.server_timeout())
             .await?;
+        token_budget::require_progression(tx, request.fence.scope).await?;
         if protected {
             return Ok(
                 match decisions::approvals::park(
@@ -563,6 +565,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> RemoteDispatch for PostgresAction
                     approval_required: protected,
                     ..
                 } = self.authorize_on(&mut tx, request, bound.server_timeout()).await?;
+                token_budget::require_progression(&mut tx, request.fence.scope).await?;
                 if protected {
                     return Err(missing());
                 }

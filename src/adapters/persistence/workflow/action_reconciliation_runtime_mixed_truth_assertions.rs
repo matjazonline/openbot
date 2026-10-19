@@ -119,6 +119,14 @@ pub(super) fn parked_fence(before: &Value, after: &Value, request: &ActionDispat
     let fence = request.fence;
     let job = by_id(after, "background_tasks", fence.scope.job.0);
     assert_eq!(job["status"], "failed");
+    assert_eq!(job["attempt_ordinal"], json!(fence.attempt.0 + 1));
+    assert_eq!(
+        job["retry_count"].as_i64().unwrap(),
+        by_id(before, "background_tasks", fence.scope.job.0)["retry_count"]
+            .as_i64()
+            .unwrap()
+            + 1
+    );
     for field in [
         "worker_id",
         "execution_generation",
@@ -154,6 +162,7 @@ pub(super) fn parked_fence(before: &Value, after: &Value, request: &ActionDispat
         &[
             "status",
             "retry_count",
+            "attempt_ordinal",
             "run_at",
             "updated_at",
             "worker_id",

@@ -79,6 +79,7 @@ fn job_inventory(h: &HeldTruth, before: &Value, after: &Value, status: &str) {
         &[
             "status",
             "retry_count",
+            "attempt_ordinal",
             "worker_id",
             "execution_generation",
             "locked_at",
@@ -95,6 +96,7 @@ fn job_inventory(h: &HeldTruth, before: &Value, after: &Value, status: &str) {
         h.request.fence.attempt.0 - 1
     };
     assert_eq!(job["retry_count"], json!(charged));
+    assert_eq!(job["attempt_ordinal"], json!(charged + 1));
     for field in [
         "worker_id",
         "execution_generation",

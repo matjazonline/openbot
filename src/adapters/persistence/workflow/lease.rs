@@ -15,6 +15,7 @@ pub(super) struct LeaseRun {
 pub(super) struct LeaseJob {
     pub status: String,
     pub retry_count: i32,
+    pub attempt_ordinal: i32,
     pub max_retries: i32,
     pub worker_id: Option<Uuid>,
     pub execution_generation: Option<Uuid>,
@@ -283,7 +284,7 @@ pub(super) async fn lock_scope(
     let Some(step_id) = step else {
         return Ok(None);
     };
-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,max_retries,worker_id,execution_generation,lock_expires_at,payload,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' FOR UPDATE")
+    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(step_id).fetch_optional(&mut *db).await?;
     let Some(job) = job else {
         return Ok(None);
@@ -308,7 +309,7 @@ pub(super) async fn lock_fence(
     Ok(job.status == "processing"
         && job.worker_id == Some(fence.worker.0)
         && job.execution_generation == Some(fence.generation.0)
-        && job.retry_count.checked_add(1) == Some(fence.attempt.0))
+        && job.attempt_ordinal == fence.attempt.0)
 }
 
 #[derive(sqlx::FromRow)]
@@ -321,7 +322,7 @@ pub(super) async fn live_window(
     fence: WorkflowFence,
     started: Instant,
 ) -> AppResult<Option<LeaseWindow>> {
-    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow' AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.retry_count+1=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
+    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow' AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).fetch_optional(db).await?;
     Ok(row
         .filter(|row| row.lease_seconds > 0.0 && row.run_seconds > 0.0)

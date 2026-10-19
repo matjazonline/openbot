@@ -58,6 +58,11 @@ lists. A supplied profile, whether static or referenced from classifier output, 
 selects tools and skills. Empty lists select none. Invalid selections or unresolved required
 references fail rather than falling back to the agent's broader defaults. See phase 6 for resolution.
 
+The optional top-level `capability_ceiling: {tools: [...], skills: [...]}` restricts agent
+selections across the workflow. Both lists are required when present; empty lists allow none.
+Omission adds no restriction. Names must be unique and each list is bounded by the registry's
+selection limit. The ceiling cannot grant a capability absent from the frozen agent.
+
 ## Publication and binding
 
 1. Support operator-supplied templates and company-owned copies. Template updates never change a

@@ -139,7 +139,7 @@ fn has_tool(name: &TypeName, snapshots: &DependencySnapshots) -> bool {
         == 1
 }
 
-fn check_selection(
+pub(super) fn check_selection(
     tools: &[TypeName],
     skills: &[TypeName],
     snapshots: &DependencySnapshots,
@@ -170,22 +170,10 @@ pub(super) fn validate_profile(
     compiled: &CompiledWorkflow,
     path: &str,
 ) -> Result<(), Diagnostic> {
-    if !value.is_object() {
-        return Ok(());
-    } // Named profiles were checked at publication.
-    let names = |field: &str| -> Result<Vec<TypeName>, String> {
-        value[field]
-            .as_array()
-            .ok_or_else(|| format!("Profile {field} must be an array"))?
-            .iter()
-            .map(|v| {
-                v.as_str()
-                    .and_then(|s| TypeName::parse(s).ok())
-                    .ok_or_else(|| format!("Profile {field} contains an invalid dependency name"))
-            })
-            .collect()
+    let check = || {
+        let selected = super::capabilities::profile(value, snapshots)?;
+        check_selection(&selected.tools, &selected.skills, snapshots)
     };
-    let check = || check_selection(&names("tools")?, &names("skills")?, snapshots);
     check().map_err(|message| error(compiled, path, "publication.selection", &message))
 }
 

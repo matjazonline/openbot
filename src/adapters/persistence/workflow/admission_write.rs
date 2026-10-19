@@ -37,7 +37,7 @@ async fn insert_run(db: &mut PgConnection, command: &PreparedAdmission) -> AppRe
         _ => None,
     };
     let (channel, thread) = binding_rows::association_columns(command.association());
-    let limits = command
+    let limits = &command
         .binding()
         .bundle()
         .compiled()

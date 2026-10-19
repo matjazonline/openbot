@@ -377,6 +377,11 @@ impl Execution<'_> {
             if let Some(output) = &self.checkpoint.final_output {
                 return Ok(output.clone());
             }
+            if self.checkpoint.state == RunState::BudgetExceeded {
+                return Err(AppError::Execution(
+                    crate::app_error::ExecutionFailure::Budget,
+                ));
+            }
             if self.checkpoint.state == RunState::InvalidOutput {
                 return Err(crate::services::response_contract::invalid_output());
             }

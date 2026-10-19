@@ -38,7 +38,8 @@ impl ContentHash {
 }
 
 /// Explicit settings only; no open provider configuration map that could capture
-/// credentials. Provider connections are runtime resources, not snapshot values.
+/// credentials. `(AgentSnapshot.company_id, provider)` is the existing company model
+/// connection key. Resolve its current secret at runtime without following agent defaults.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ModelSettings {
     pub provider: TypeName,
@@ -49,6 +50,8 @@ pub struct ModelSettings {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct AgentSnapshot {
     pub company_id: CompanyId,
+    /// Trusted identity for ownership checks and usage attribution; never model input.
+    pub agent_id: uuid::Uuid,
     pub key: AgentKey,
     pub instructions: String,
     pub model: ModelSettings,

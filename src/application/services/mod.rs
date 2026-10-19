@@ -30,3 +30,5 @@ pub mod test_support;
 pub mod tool_schema;
 
 pub mod response_contract;
+
+pub mod model_usage;

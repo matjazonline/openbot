@@ -110,6 +110,14 @@ impl SnapshotCheck<'_> {
 
     fn agent(&self, agent: &AgentSnapshot) -> Result<(), Diagnostic> {
         let name = agent.key.as_str();
+        if agent.agent_id.is_nil() {
+            return Err(self.error(
+                "agent",
+                name,
+                "publication.agent_identity",
+                "requires a trusted agent UUID",
+            ));
+        }
         self.text("agent", name, &agent.instructions)?;
         if agent.model.model.is_empty() || agent.model.model.len() > registry::MAX_IDENTIFIER {
             return Err(self.error(

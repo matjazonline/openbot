@@ -276,3 +276,76 @@ fn usage_replaces_each_reservation_once_and_retains_unknown_paid_calls_after_res
     assert_eq!(usage.unresolved_calls, 1);
     assert_eq!(usage.unreported_calls, 1);
 }
+
+#[test]
+fn received_usage_above_reservation_survives_and_charges_future_admission() {
+    let mut initial = run();
+    initial.policy.total_input_tokens = 250;
+    let request = reservation();
+    let reserved = initial.apply(Mutation::Reserve(request.clone())).unwrap().0;
+    let mut response = turn(&request, vec![]);
+    response.input_tokens = 151;
+    let saved = reserved.apply(Mutation::Model(response.clone())).unwrap().0;
+    assert_eq!(saved.state, RunState::Active);
+    assert_eq!(saved.turns[0].input_tokens, 151);
+    assert!(saved.apply(Mutation::Reserve(reservation())).is_err());
+    let restored: RunCheckpoint =
+        serde_json::from_value(serde_json::to_value(&saved).unwrap()).unwrap();
+    restored.validate().unwrap();
+    let (replayed, changed) = restored.apply(Mutation::Model(response)).unwrap();
+    assert!(!changed);
+    assert_eq!(replayed, saved);
+}
+
+#[test]
+fn hard_usage_overflow_retains_truth_and_prevents_tool_or_model_progression() {
+    for per_request in [false, true] {
+        let mut initial = run();
+        if per_request {
+            initial.policy.request_input_tokens = 100;
+        } else {
+            initial.policy.total_input_tokens = 100;
+        }
+        let request = reservation();
+        let reserved = initial.apply(Mutation::Reserve(request.clone())).unwrap().0;
+        let tool = call("never_execute");
+        let mut response = turn(&request, vec![tool.clone()]);
+        response.input_tokens = 101;
+        let saved = reserved.apply(Mutation::Model(response.clone())).unwrap().0;
+        assert_eq!(saved.state, RunState::BudgetExceeded);
+        assert_eq!(saved.turns[0], response);
+        saved.validate().unwrap();
+        assert!(saved.apply(Mutation::Prepare(tool.invocation_id)).is_err());
+        assert!(saved.apply(Mutation::Reserve(reservation())).is_err());
+        let mut forged = saved.clone();
+        forged.state = RunState::Active;
+        assert!(forged.validate().is_err());
+        assert!(!saved.apply(Mutation::Model(response)).unwrap().1);
+    }
+}
+
+#[test]
+fn malformed_provider_counter_is_rejected_without_partial_settlement() {
+    let request = reservation();
+    let reserved = run().apply(Mutation::Reserve(request.clone())).unwrap().0;
+    let mut response = turn(&request, vec![]);
+    response.output_tokens = i32::MAX as u64 + 1;
+    assert!(reserved.apply(Mutation::Model(response)).is_err());
+    assert!(reserved.turns.is_empty());
+    assert_eq!(reserved.state, RunState::Active);
+}
+
+#[test]
+fn terminal_usage_state_cannot_legitimize_over_admitted_reservations() {
+    let mut saved = run();
+    saved.policy.total_input_tokens = 100;
+    saved.reservations = vec![reservation(), reservation()];
+    for state in [
+        RunState::Active,
+        RunState::BudgetExceeded,
+        RunState::Superseded,
+    ] {
+        saved.state = state;
+        assert!(saved.validate().is_err());
+    }
+}

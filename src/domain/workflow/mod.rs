@@ -16,7 +16,9 @@ mod rule;
 mod state;
 mod transition;
 
-pub use budget::{BudgetCharge, BudgetLimitError, BudgetResource, RootBudgetLimits};
+pub use budget::{
+    BudgetCharge, BudgetLimitError, BudgetResource, RootBudgetLimits, TokenAllowance, TokenRefusal,
+};
 pub use causality::{
     ActionRef, CausalError, ChildCause, ExecutionRef, MessageEffectLink, RunCausality,
     StepCausality, TriggerRef, TriggerSource,
@@ -26,7 +28,8 @@ pub use context::{
     canonical_array_index, preflight_binding, resolve, resolve_inputs, validate_context_value,
 };
 pub use definition::{
-    ExecutionLimits, ResourceRequirement, Routes, StepDefinition, WorkflowDefinition,
+    CapabilityCeiling, ExecutionLimits, ResourceRequirement, Routes, StepDefinition,
+    WorkflowDefinition,
 };
 pub use evidence::*;
 pub use graph::{GraphError, ValidatedWorkflow, validate};

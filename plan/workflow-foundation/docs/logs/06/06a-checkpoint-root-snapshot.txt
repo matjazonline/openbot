@@ -1,0 +1,17 @@
+base:   5b4989ae0038a82f431db60a338b7f59d9bcf25c
+digest: 0e62290c896c341c9e6700bcef8cf3293fbd47e5cf3cc76fed020326c5b26f54
+files:
+  plan/workflow-foundation/02-workflow-language-and-publication.md
+  plan/workflow-foundation/06-agent-context-memory-and-capabilities.md
+  plan/workflow-foundation/RESUME.md
+  src/application/workflow/compiler/mod.rs
+  src/application/workflow/compiler/wire.rs
+  src/application/workflow/publication/capabilities.rs
+  src/application/workflow/publication/capabilities_tests.rs
+  src/application/workflow/publication/mod.rs
+  src/application/workflow/publication/tests.rs
+  src/application/workflow/publication/validation.rs
+  src/domain/workflow/definition.rs
+  src/domain/workflow/graph.rs
+  src/domain/workflow/mod.rs
+  src/domain/workflow/outcome.rs

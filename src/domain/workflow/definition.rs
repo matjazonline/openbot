@@ -17,9 +17,18 @@ pub struct WorkflowDefinition {
     /// Lifecycle admission/cancellation authorization is already enforced by
     /// the application service, which rejects nonempty unresolved requirements.
     pub resources: Vec<ResourceRequirement>,
+    /// Omission imposes no extra restriction; explicit empty lists allow none.
+    pub capability_ceiling: Option<CapabilityCeiling>,
     pub entry: StepId,
     pub steps: BTreeMap<StepId, StepDefinition>,
     pub limits: ExecutionLimits,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityCeiling {
+    pub tools: Vec<TypeName>,
+    pub skills: Vec<TypeName>,
 }
 
 /// A named resource slot and the compatible type/contract required by a step.
@@ -34,7 +43,7 @@ pub struct ResourceRequirement {
 
 pub const MAX_EXECUTION_STEPS: u32 = 100_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionLimits {
     /// Shared across descendants; admission freezes the root's allowance.
     pub root_budget: super::RootBudgetLimits,

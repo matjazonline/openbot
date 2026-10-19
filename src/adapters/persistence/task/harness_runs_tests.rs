@@ -18,6 +18,10 @@ use serde_json::json;
 
 #[path = "harness_receipt_tests.rs"]
 mod receipt_writes;
+#[path = "harness_usage_authority_tests.rs"]
+mod usage_authority;
+#[path = "harness_usage_tests.rs"]
+mod usage_writes;
 
 struct Fixture {
     persistence: PostgresPersistence,

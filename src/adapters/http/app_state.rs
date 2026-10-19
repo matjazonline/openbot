@@ -41,6 +41,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub model_usage: Arc<dyn crate::services::model_usage::ModelUsageStore>,
     pub task_counts: Arc<dyn crate::application::task_counts::TaskCountsReader>,
     pub db: PgPool,
     pub config: Arc<AppConfig>,
@@ -244,5 +245,11 @@ impl FromRef<AppState> for MailboxEvents {
 impl axum::extract::FromRef<AppState> for Arc<crate::use_cases::mcp::McpUseCases> {
     fn from_ref(state: &AppState) -> Self {
         state.mcp_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn crate::services::model_usage::ModelUsageStore> {
+    fn from_ref(state: &AppState) -> Self {
+        state.model_usage.clone()
     }
 }

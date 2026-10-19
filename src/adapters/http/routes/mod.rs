@@ -10,6 +10,7 @@ pub mod company_invite;
 pub mod health;
 mod live_updates;
 pub mod mcp;
+mod model_usage;
 pub mod monitoring;
 pub mod notifications;
 pub mod onboarding;
@@ -89,6 +90,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(attention::router())
         .merge(thread_handoffs::router())
         .merge(monitoring::router())
+        .merge(model_usage::router())
         .merge(notifications::router())
         .merge(onboarding::router())
         .merge(ui::router())

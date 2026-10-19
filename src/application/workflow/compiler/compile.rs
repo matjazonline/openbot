@@ -625,7 +625,7 @@ pub(crate) fn compile_resolved(
     )?;
     let steps = compile_steps(&parsed, descriptors)?;
     check_availability(&decoded, &parsed, &input, &params, &steps.outputs)?;
-    let representation = json!({
+    let mut representation = json!({
         "format": "workflow-compiled-v1",
         "definition": super::json_value(&decoded.root, "")?,
         "descriptors": steps.facts,
@@ -636,6 +636,12 @@ pub(crate) fn compile_resolved(
             "repetitions": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::Repetition),
         },
     });
+    if let Some(tokens) = parsed.definition.limits.root_budget.tokens() {
+        representation["root_budget"]["tokens"] = json!({
+            "max_tokens": tokens.max_tokens(),
+            "reviewers": tokens.reviewers().iter().map(|id| json!({"kind":"user","id":id})).collect::<Vec<_>>()
+        });
+    }
     let content_hash = identity(&decoded.source, &representation);
     Ok(CompiledWorkflow {
         source: decoded.source,

@@ -38,11 +38,60 @@ impl WorkflowAdmission for PostgresPersistence {
             }
         }
         verify_current(&mut tx, command).await?;
+        authorize_token_reviewers(&mut tx, command).await?;
         resources::check_readiness(&mut tx, command.binding()).await?;
         admission_write::create(&mut tx, command, &source).await?;
         tx.commit().await?;
         Ok(AdmissionResult::Created(command.proposed_run_id()))
     }
+}
+
+async fn authorize_token_reviewers(
+    db: &mut PgConnection,
+    command: &PreparedAdmission,
+) -> AppResult<()> {
+    for user in token_reviewers(db, command).await? {
+        let actor = WorkflowActor::authenticated(user).map_err(|_| invalid())?;
+        let reviewer = authority::authorize_reviewer_on(db, command.company_id(), actor).await?;
+        if !reviewer.privileged {
+            return Err(missing());
+        }
+    }
+    Ok(())
+}
+
+async fn token_reviewers(
+    db: &mut PgConnection,
+    command: &PreparedAdmission,
+) -> AppResult<Vec<Uuid>> {
+    // Read immutable root policy without locking the root run from a child.
+    // A child's local declaration never replaces its inherited root reviewers.
+    if let TriggerSource::Child { parent } = command.trigger().source() {
+        return sqlx::query_scalar(
+            "SELECT ARRAY(SELECT (reviewer->>'id')::uuid FROM \
+             jsonb_array_elements(COALESCE(budget.token_policy->'reviewers','[]'::jsonb)) AS reviewer) \
+             FROM workflow_run_budgets AS link JOIN workflow_root_budgets AS budget \
+               ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id \
+             WHERE link.company_id=$1 AND link.run_id=$2",
+        )
+        .bind(command.company_id().as_uuid())
+        .bind(parent.execution().run_id().as_uuid())
+        .fetch_optional(db)
+        .await?
+        .ok_or_else(missing);
+    }
+    let limits = &command
+        .binding()
+        .bundle()
+        .compiled()
+        .graph()
+        .definition()
+        .limits;
+    Ok(limits
+        .root_budget
+        .tokens()
+        .map(|policy| policy.reviewers().to_vec())
+        .unwrap_or_default())
 }
 
 async fn verify_current(

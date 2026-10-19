@@ -162,6 +162,19 @@ pub(super) async fn activate(
             "Workflow budget activation refused: job is no longer pending".into(),
         ));
     }
+    match token_budget::pending_gate(db, scope).await? {
+        token_budget::Progression::Open => {}
+        token_budget::Progression::AwaitingAllowance => return Ok(false),
+        token_budget::Progression::Refused(reason) => {
+            Box::pin(pending_recovery::settle(
+                db,
+                scope,
+                pending_recovery::PendingFailure::TokenRefused(reason),
+            ))
+            .await?;
+            return Ok(false);
+        }
+    }
     let result: String = sqlx::query_scalar("INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition) SELECT company_id,run_id,$3,root_run_id,'activation','activation',1,'granted' FROM workflow_run_budgets WHERE company_id=$1 AND run_id=$2 ON CONFLICT(company_id,run_id,execution_id,resource,reservation_key) DO UPDATE SET quantity=EXCLUDED.quantity RETURNING disposition")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
     // The shared usage lock can wait past the deadline. Propagation rolls back

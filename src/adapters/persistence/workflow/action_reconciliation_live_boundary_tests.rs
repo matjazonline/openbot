@@ -218,6 +218,7 @@ async fn retire_live(h: &HeldTruth, before: &Value, effect_count: i64) {
     let job = &after["background_tasks"][0];
     assert_eq!(job["status"], "failed");
     assert_eq!(job["retry_count"], json!(h.request.fence.attempt.0));
+    assert_eq!(job["attempt_ordinal"], json!(h.request.fence.attempt.0 + 1));
     for field in [
         "worker_id",
         "execution_generation",
@@ -233,6 +234,7 @@ async fn retire_live(h: &HeldTruth, before: &Value, effect_count: i64) {
         &[
             "status",
             "retry_count",
+            "attempt_ordinal",
             "worker_id",
             "execution_generation",
             "locked_at",

@@ -42,7 +42,7 @@ pub(super) async fn authorize_reviewer_on(
 /// FOR UPDATE here deadlocks completion holding a run against controls.
 /// Member/principal row locks
 /// prevent concurrent demotion/deletion until the workflow commit has finished.
-pub(super) async fn authorize_company(
+pub(crate) async fn authorize_company(
     db: &mut PgConnection,
     company: CompanyId,
     actor: WorkflowActor,

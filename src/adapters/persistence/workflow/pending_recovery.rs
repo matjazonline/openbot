@@ -9,6 +9,7 @@ pub(super) enum PendingFailure {
     ActivationLimit,
     AttemptsExhausted,
     RootBudgetExhausted,
+    TokenRefused(crate::domain::workflow::TokenRefusal),
     /// A listed decision reviewer cannot be assigned or given a provable notice. Never routed:
     /// a configuration failure is not presented as a business timeout (05-D2 §7.1, 05-D4 §2).
     ReviewerUnavailable,
@@ -21,9 +22,16 @@ impl PendingFailure {
             Self::ActivationLimit => "workflow.activation_limit",
             Self::AttemptsExhausted => "workflow.attempts_exhausted",
             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
+            Self::TokenRefused(reason) => reason.failure_code(),
             Self::ReviewerUnavailable => "decision.reviewer_unavailable",
         }
     }
+}
+
+pub(super) enum Pending<T> {
+    Ready(T),
+    Deferred,
+    Settled,
 }
 
 /// Call only after the run, execution and pending job have been locked and scoped.
@@ -31,18 +39,27 @@ impl PendingFailure {
 pub(super) async fn activate(
     db: &mut PgConnection,
     scope: ActivationRequest,
-) -> AppResult<Option<ActivatedExecution>> {
+) -> AppResult<Pending<ActivatedExecution>> {
+    match token_budget::pending_gate(db, scope).await? {
+        token_budget::Progression::Open => {}
+        token_budget::Progression::AwaitingAllowance => return Ok(Pending::Deferred),
+        token_budget::Progression::Refused(reason) => {
+            settle(db, scope, PendingFailure::TokenRefused(reason)).await?;
+            return Ok(Pending::Settled);
+        }
+    }
     let over: bool = sqlx::query_scalar("SELECT execution.activation > run.max_steps FROM workflow_executions AS execution JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND execution.id=$3")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
     if over {
         settle(db, scope, PendingFailure::ActivationLimit).await?;
-        return Ok(None);
+        return Ok(Pending::Settled);
     }
     match activation::activate_on(db, scope).await {
-        Ok(activation) => Ok(activation),
+        Ok(Some(activation)) => Ok(Pending::Ready(activation)),
+        Ok(None) => Ok(Pending::Settled),
         Err(AppError::BadRequest(_)) => {
             settle(db, scope, PendingFailure::InvalidInput).await?;
-            Ok(None)
+            Ok(Pending::Settled)
         }
         Err(error) => Err(error),
     }
@@ -53,6 +70,10 @@ pub(super) async fn settle(
     scope: ActivationRequest,
     failure: PendingFailure,
 ) -> AppResult<()> {
+    let failure = token_budget::refusal_on(db, scope)
+        .await?
+        .map(PendingFailure::TokenRefused)
+        .unwrap_or(failure);
     // Pre-activation failures cannot fabricate frozen inputs. Already activated
     // failures can take their immutable error edge through the one progression writer.
     let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
@@ -160,20 +181,22 @@ pub(super) async fn prepare_pure(
     bundle: &PublishedBundle,
     max_steps: i32,
 ) -> AppResult<
-    Option<(
+    Pending<(
         ActivatedExecution,
         crate::application::workflow::batch::PureCompletion,
     )>,
 > {
-    let Some(activated) = activate(db, scope).await? else {
-        return Ok(None);
+    let activated = match activate(db, scope).await? {
+        Pending::Ready(activated) => activated,
+        Pending::Deferred => return Ok(Pending::Deferred),
+        Pending::Settled => return Ok(Pending::Settled),
     };
     let completion = match crate::application::workflow::batch::execute_pure(bundle, &activated) {
         Ok(Some(completion)) => completion,
         // This call is pure validation: no database/provider error can enter here.
         Err(_) => {
             settle(db, scope, PendingFailure::InvalidOutput).await?;
-            return Ok(None);
+            return Ok(Pending::Settled);
         }
         Ok(None) => return Err(invalid()),
     };
@@ -181,7 +204,7 @@ pub(super) async fn prepare_pure(
         && activated.ordinal >= u64::try_from(max_steps).map_err(|_| invalid())?
     {
         settle(db, scope, PendingFailure::ActivationLimit).await?;
-        return Ok(None);
+        return Ok(Pending::Settled);
     }
-    Ok(Some((activated, completion)))
+    Ok(Pending::Ready((activated, completion)))
 }

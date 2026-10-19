@@ -124,7 +124,9 @@ async fn park_on(
         scope.run.as_uuid(),
     )
     .await?;
-    let Some(activation) = pending_recovery::activate(tx, scope).await? else {
+    let pending_recovery::Pending::Ready(activation) =
+        pending_recovery::activate(tx, scope).await?
+    else {
         return Ok(None);
     };
     if binding
@@ -285,6 +287,7 @@ struct DecisionHead {
 #[derive(sqlx::FromRow)]
 struct DecisionRow {
     subject_kind: String,
+    choice: Option<String>,
     revision: i64,
     proposal_digest: String,
     submitted_by: Option<Uuid>,
@@ -382,12 +385,14 @@ async fn submit_on(
         run,
         reviewer,
     } = lock_decision(tx, command.company, command.actor, command.decision).await?;
-    let wait = waits::row(tx, scope, waits::WaitSelection::Decision)
-        .await?
-        .ok_or_else(missing)?;
-    let row: DecisionRow = sqlx::query_as("SELECT subject_kind,revision,proposal_digest,submitted_by,command_key,command_fingerprint FROM workflow_decisions WHERE company_id=$1 AND id=$2 FOR UPDATE")
+    let wait = decision_wait(tx, scope, command.decision).await?;
+    let row: DecisionRow = sqlx::query_as("SELECT subject_kind,choice,revision,proposal_digest,submitted_by,command_key,command_fingerprint FROM workflow_decisions WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(command.decision.0).fetch_one(&mut **tx).await?;
-    if row.subject_kind == "action_approval" && !reviewer.privileged {
+    if matches!(
+        row.subject_kind.as_str(),
+        "action_approval" | "token_allowance"
+    ) && !reviewer.privileged
+    {
         return Err(missing());
     }
     let fingerprint = command.fingerprint()?;
@@ -399,7 +404,14 @@ async fn submit_on(
             Ok(DecisionSubmission {
                 disposition: DecisionDisposition::Replayed,
                 revision: row.revision,
-                successor: successor_of(tx, scope).await?,
+                successor: if row.subject_kind == "token_allowance"
+                    || (row.subject_kind == "action_approval"
+                        && row.choice.as_deref() == Some("approve"))
+                {
+                    None
+                } else {
+                    successor_of(tx, scope).await?
+                },
             })
         } else {
             Err(closed())
@@ -422,6 +434,9 @@ async fn submit_on(
     if command.expected_revision != row.revision || command.expected_artifact != row.proposal_digest
     {
         return Err(stale());
+    }
+    if row.subject_kind == "token_allowance" {
+        return tokens::submit(tx, scope, reviewer.principal, command, &fingerprint).await;
     }
     if row.subject_kind == "action_approval" {
         return approvals::submit(tx, scope, reviewer.principal, command, &fingerprint).await;
@@ -534,9 +549,7 @@ async fn comment_on(
             ))
         };
     }
-    let wait = waits::row(tx, scope, waits::WaitSelection::Decision)
-        .await?
-        .ok_or_else(missing)?;
+    let wait = decision_wait(tx, scope, command.decision).await?;
     if wait.state != "waiting" {
         return Err(closed());
     }
@@ -612,6 +625,14 @@ async fn read_on(
         artifact_digest: row.proposal_digest,
         proposal: if row.subject_kind == "action_approval" {
             approvals::view_proposal(tx, company, decision).await?
+        } else if row.subject_kind == "token_allowance" {
+            sqlx::query_scalar(
+                "SELECT token_proposal FROM workflow_decisions WHERE company_id=$1 AND id=$2",
+            )
+            .bind(company.as_uuid())
+            .bind(decision.0)
+            .fetch_one(&mut **tx)
+            .await?
         } else {
             row.proposal
         },
@@ -635,3 +656,15 @@ async fn read_on(
 
 #[path = "decision_approvals.rs"]
 pub(super) mod approvals;
+
+async fn decision_wait(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    decision: DecisionId,
+) -> AppResult<waits::WaitRow> {
+    sqlx::query_as("SELECT wait.id,wait.deadline,wait.reason,wait.state,wait.event_name,wait.correlation,wait.failure_code FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.id=$4 FOR UPDATE OF wait")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision.0).fetch_optional(db).await?.ok_or_else(missing)
+}
+
+#[path = "decision_tokens.rs"]
+pub(super) mod tokens;

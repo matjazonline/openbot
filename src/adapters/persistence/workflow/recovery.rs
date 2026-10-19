@@ -26,7 +26,7 @@ pub(super) async fn retire_on(
     let scope = fence.scope;
     let run = sqlx::query_as::<_, Snapshot>("SELECT binding_id,max_steps,deadline,clock_timestamp() AS now FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,max_retries,worker_id,execution_generation,lock_expires_at,payload,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
+    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
     let binding = admission_binding::read_saved_binding(
         db,
@@ -36,9 +36,28 @@ pub(super) async fn retire_on(
     )
     .await?;
     let graph = binding.bundle().compiled().graph();
-    let step = StepId::parse(job.step_id).map_err(|_| invalid())?;
+    let step = StepId::parse(job.step_id.clone()).map_err(|_| invalid())?;
     let definition = graph.definition().steps.get(&step).ok_or_else(invalid)?;
     let mut report = report(&reason, definition.step_type.as_str())?;
+    let token_gate = token_budget::progression_on(db, scope).await?;
+    let hard_limit = matches!(
+        reason,
+        Retirement::BudgetExhausted | Retirement::Interrupted(LeaseReleaseCause::ActivationLimit)
+    );
+    if let Some(code) = token_gate.failure_code()
+        && (!hard_limit || matches!(token_gate, token_budget::Progression::Refused(_)))
+    {
+        report.failure = StepFailure::new(
+            if token_gate == token_budget::Progression::AwaitingAllowance {
+                FailureClass::Retryable
+            } else {
+                FailureClass::Terminal
+            },
+            FailureCode::parse(code).map_err(|_| invalid())?,
+            None,
+        )
+        .map_err(|_| invalid())?;
+    }
     // One DB predicate owns historical action scheduling for Rust retirement,
     // deferred SQL retirement, and operator reopen. It never grants provider I/O.
     let action_safe: Option<bool> = sqlx::query_scalar("SELECT workflow_action_retry_safe($1,$2)")
@@ -53,27 +72,11 @@ pub(super) async fn retire_on(
             RetrySafety::EffectOutcomeUnknown
         };
     }
-    let attempts = AttemptBudget::new(
-        u32::try_from(fence.attempt.0).map_err(|_| invalid())?,
-        u32::try_from(job.max_retries).map_err(|_| invalid())?,
-    )
-    .map_err(|_| invalid())?;
-    let decision = RecoveryPolicy::default().decide(
-        &report.failure,
-        report.safety,
-        RecoverySnapshot {
-            attempts,
-            work_budget: if matches!(reason, Retirement::BudgetExhausted) {
-                RetryEligibility::Exhausted
-            } else {
-                RetryEligibility::Available
-            },
-            now: run.now,
-            deadline: run.deadline,
-        },
-    );
+    let decision = recovery_decision(&job, &run, &report, &reason)?;
     close_attempt(db, fence, &report, &reason).await?;
-    let routed = if decision == RecoveryDecision::FinalError {
+    let routed = if decision == RecoveryDecision::FinalError
+        && token_gate == token_budget::Progression::Open
+    {
         route_failure(db, scope, &run, graph, &step, &report.failure).await?
     } else {
         false
@@ -93,6 +96,34 @@ pub(super) async fn retire_on(
         .await?;
     }
     Ok(())
+}
+
+fn recovery_decision(
+    job: &LeaseJob,
+    run: &Snapshot,
+    report: &WorkflowFailure,
+    reason: &Retirement,
+) -> AppResult<RecoveryDecision> {
+    let attempts = AttemptBudget::new(
+        u32::try_from(job.retry_count.checked_add(1).ok_or_else(invalid)?)
+            .map_err(|_| invalid())?,
+        u32::try_from(job.max_retries).map_err(|_| invalid())?,
+    )
+    .map_err(|_| invalid())?;
+    Ok(RecoveryPolicy::default().decide(
+        &report.failure,
+        report.safety,
+        RecoverySnapshot {
+            attempts,
+            work_budget: if matches!(reason, Retirement::BudgetExhausted) {
+                RetryEligibility::Exhausted
+            } else {
+                RetryEligibility::Available
+            },
+            now: run.now,
+            deadline: run.deadline,
+        },
+    ))
 }
 
 fn report(reason: &Retirement, kind: &str) -> AppResult<WorkflowFailure> {
@@ -166,7 +197,7 @@ pub(super) async fn settle_run(
     sqlx::query("UPDATE workflow_runs SET state=$3,waiting_reason=$4,terminal_execution_id=CASE WHEN $3='failed' THEN $5 ELSE NULL END WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(state).bind(wait).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     // Attempt identity makes each debit independently observable without duplicating the ledger.
-    sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id,execution_id) SELECT company_id,id,(SELECT COALESCE(MAX(sequence),0)+1 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2), 'attempt_failed:' || (SELECT retry_count+1 FROM background_tasks WHERE id=$4),actor_id,$3 FROM workflow_runs WHERE company_id=$1 AND id=$2")
+    sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id,execution_id) SELECT company_id,id,(SELECT COALESCE(MAX(sequence),0)+1 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2), 'attempt_failed:' || (SELECT attempt_ordinal FROM background_tasks WHERE id=$4),actor_id,$3 FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).execute(db).await?;
     Ok(())
 }
@@ -181,7 +212,7 @@ async fn finish_job(
         RecoveryDecision::RetryAt(at) => Some(at),
         _ => None,
     };
-    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND retry_count+1=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
+    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND attempt_ordinal=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
         .bind(matches!(reason,Retirement::Expired)).bind(if retry_at.is_some(){"pending"}else{"failed"}).bind(retry_at).execute(db).await?;
     if changed.rows_affected() != 1 {

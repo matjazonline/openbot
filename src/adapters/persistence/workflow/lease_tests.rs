@@ -752,3 +752,6 @@ mod maintenance_tests;
 
 #[path = "control_tests.rs"]
 mod control_tests;
+
+#[path = "harness_owner_tests.rs"]
+mod harness_owner_tests;

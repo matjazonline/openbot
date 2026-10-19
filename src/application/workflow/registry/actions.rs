@@ -12,6 +12,11 @@ impl Registration<'_> {
             }
             _ => unreachable!("action family"),
         }?;
+        self.approval(&mut contract)?;
+        Ok(contract)
+    }
+
+    pub(super) fn approval(&mut self, contract: &mut Contract) -> Result<(), Diagnostic> {
         if let Some(binding) = self.parsed.definition.steps[self.id].inputs.get("approval") {
             if !static_approval_reviewers(binding) {
                 return Err(self.error(
@@ -26,7 +31,7 @@ impl Registration<'_> {
             json!({"reviewers":reviewers(),"deadline":text(MAX_DEADLINE)}),
             &["reviewers", "deadline"],
         );
-        Ok(contract)
+        Ok(())
     }
     fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
         let connection = self.literal("connection")?;

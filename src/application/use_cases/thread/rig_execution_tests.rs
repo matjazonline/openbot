@@ -138,6 +138,7 @@ async fn rig_resumes_a_saved_batch_after_approval_and_atomically_dispatches_once
     assert!(matches!(outcome, DispatchOutcome::Suspended));
     assert_eq!(requests.load(Ordering::SeqCst), 1);
     let parked = checkpoint(&fx, task_id).await;
+    super::model_usage_assertions::assert_projection(&fx, &parked).await;
     assert_eq!(parked.state, RunState::Waiting);
     assert_eq!(parked.turns[0].calls.len(), 4);
     assert_eq!(
@@ -178,6 +179,7 @@ async fn rig_resumes_a_saved_batch_after_approval_and_atomically_dispatches_once
     assert_eq!(llm.finish().await, Ok(2));
     assert!(matches!(outcome, DispatchOutcome::Replied(_)));
     let complete = checkpoint(&fx, task_id).await;
+    super::model_usage_assertions::assert_projection(&fx, &complete).await;
     assert_eq!(complete.run_id, parked.run_id);
     assert_eq!(complete.reservations.len(), 2);
     assert_eq!(complete.executions.len(), 2);
@@ -462,6 +464,7 @@ async fn provider_deadline_cancels_the_claim_and_recovery_keeps_the_unknown_rese
         Err(crate::app_error::AppError::Timeout(_))
     ));
     let interrupted = checkpoint(&fx, task_id).await;
+    super::model_usage_assertions::assert_projection(&fx, &interrupted).await;
     assert_eq!(interrupted.reservations.len(), 1);
     assert!(interrupted.turns.is_empty());
     assert!(interrupted.invocations.is_empty());
@@ -490,6 +493,7 @@ async fn provider_deadline_cancels_the_claim_and_recovery_keeps_the_unknown_rese
     assert!(matches!(result, DispatchOutcome::Replied(_)));
     assert_eq!(llm.finish().await, Ok(2));
     let recovered = checkpoint(&fx, task_id).await;
+    super::model_usage_assertions::assert_projection(&fx, &recovered).await;
     assert_eq!(recovered.run_id, interrupted.run_id);
     assert_eq!(recovered.reservations.len(), 2);
     assert_eq!(recovered.turns.len(), 1);

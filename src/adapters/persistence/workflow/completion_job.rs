@@ -54,7 +54,7 @@ async fn finish_fenced(db: &mut PgConnection, fence: WorkflowFence) -> AppResult
     .bind(scope.job.0)
     .fetch_one(&mut *db)
     .await?;
-    let closed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND retry_count+1=$6 AND lock_expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.deadline>clock_timestamp())")
+    let closed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.deadline>clock_timestamp())")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     let timely: bool = sqlx::query_scalar("SELECT $3>clock_timestamp() AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(expiry).fetch_one(db).await?;

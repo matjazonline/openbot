@@ -53,7 +53,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
         return Ok(None);
     };
     let scope = request.fence.scope;
-    let head: ParkHead = sqlx::query_as("SELECT execution.frozen_inputs AS inputs,execution.step_id,run.deadline,(job.retry_count+1<job.max_retries) AS remaining FROM workflow_executions AS execution JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=$1 AND execution.id=$2 AND job.id=$3")
+    let head: ParkHead = sqlx::query_as("SELECT execution.frozen_inputs AS inputs,execution.step_id,run.deadline,(job.continuation_count<63) AS remaining FROM workflow_executions AS execution JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=$1 AND execution.id=$2 AND job.id=$3")
         .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_one(&mut **tx).await?;
     let Some(config) = head.inputs.get("approval") else {
         return Ok(None);
@@ -65,9 +65,9 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     if !head.remaining || deadline <= waits::now(tx).await? {
         return Ok(None);
     }
-    // Approval cannot be requested again, nor after an effect might already exist.
-    let used: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2) OR EXISTS(SELECT 1 FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2)")
-        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut **tx).await?;
+    // One approval per immutable invocation; unrelated completed actions retain their history.
+    let used: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2 AND action_invocation_id=$3) OR EXISTS(SELECT 1 FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2 AND invocation_id=$3)")
+        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).bind(request.subject.invocation.as_uuid()).fetch_one(&mut **tx).await?;
     if used {
         return Ok(None);
     }
@@ -86,15 +86,15 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     let digest = hex_digest(&proposal(request.subject.invocation.as_uuid(), action))?;
     sqlx::query("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,notification_intent) VALUES($1,$2,$3,$4,'decision',$5,$6)")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).bind(deadline).bind(json!({"version":1,"kind":"wait_registered","wait_id":wait,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()})).execute(&mut **tx).await?;
-    sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision).bind(wait).bind(digest).bind(request.subject.invocation.as_uuid()).bind(action.argument_digest().as_str()).bind(action.operation_digest().as_str()).execute(&mut **tx).await?;
+    sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest,job_id,parked_attempt_number) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9,$10,$11)")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision).bind(wait).bind(digest).bind(request.subject.invocation.as_uuid()).bind(action.argument_digest().as_str()).bind(action.operation_digest().as_str()).bind(scope.job.0).bind(request.fence.attempt.0).execute(&mut **tx).await?;
     insert_reviewers(tx, scope.company, decision, &reviewers, &composed).await?;
     close_attempt(tx, request.fence).await?;
-    waits::audit(tx, scope, "action_approval_opened").await?;
+    audit(tx, scope, DecisionId(decision), "action_approval_opened").await?;
     Ok(Some(WaitId::new(wait)))
 }
 
-async fn approvers(
+pub(super) async fn approvers(
     db: &mut PgConnection,
     scope: ActivationRequest,
     users: &[Uuid],
@@ -119,11 +119,11 @@ fn proposal(invocation: Uuid, action: &FrozenAction) -> Value {
         "arguments":action.request().arguments,"argument_digest":action.argument_digest().as_str(),"operation_digest":action.operation_digest().as_str()})
 }
 
-async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+pub(super) async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
     let scope = fence.scope;
     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='approval_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).execute(&mut *db).await?;
-    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND retry_count+1=$6 AND retry_count+1<max_retries AND lock_expires_at>clock_timestamp()")
+    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND continuation_count<63 AND lock_expires_at>clock_timestamp()")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).execute(&mut *db).await?;
     if closed.rows_affected() != 1 || job.rows_affected() != 1 {
         return Err(closed_error());
@@ -142,7 +142,7 @@ pub(in crate::adapters::persistence::workflow) async fn parked(
     request: &ActionDispatchRequest,
 ) -> AppResult<Option<WaitId>> {
     let fence = request.fence;
-    let wait: Option<Uuid> = sqlx::query_scalar("SELECT decision.wait_id FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=$4 AND attempt.attempt_number=$5 WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.subject_kind='action_approval' AND decision.action_invocation_id=$8 AND decision.argument_digest=$9 AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked'")
+    let wait: Option<Uuid> = sqlx::query_scalar("SELECT decision.wait_id FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decision.job_id AND attempt.attempt_number=decision.parked_attempt_number WHERE decision.job_id=$4 AND decision.parked_attempt_number=$5 AND decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.subject_kind='action_approval' AND decision.action_invocation_id=$8 AND decision.argument_digest=$9 AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked'")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).fetch_optional(db).await?;
     Ok(wait.map(WaitId::new))
 }
@@ -164,30 +164,13 @@ pub(super) async fn submit(
     command: &SubmitDecision,
     fingerprint: &str,
 ) -> AppResult<DecisionSubmission> {
-    if !matches!(command.choice.as_str(), "approve" | "reject")
-        || command.data != json!({})
-        || command.feedback.chars().count() > crate::application::workflow::registry::MAX_TEXT
-    {
-        return Err(AppError::BadRequest(
-            "Invalid action approval submission".into(),
-        ));
-    }
-    sqlx::query("UPDATE workflow_decisions SET submitted_at=clock_timestamp(),submitted_by=$3,command_key=$4,command_fingerprint=$5,choice=$6,feedback=$7,data=$8,revision=revision+1 WHERE company_id=$1 AND id=$2 AND submitted_at IS NULL")
-        .bind(scope.company.as_uuid()).bind(command.decision.0).bind(principal).bind(command.command_key.as_str()).bind(fingerprint).bind(&command.choice).bind(&command.feedback).bind(&command.data).execute(&mut *db).await?;
-    sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp() WHERE company_id=$1 AND execution_id=$2 AND reason='decision' AND state='waiting'")
-        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
-    sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    record_choice(db, scope, principal, command, fingerprint).await?;
     let successor = if command.choice == "approve" {
-        let reopened = sqlx::query("UPDATE background_tasks SET status='pending',retry_count=retry_count+1,run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND status='completed' AND retry_count+1<max_retries")
-            .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
-        if reopened.rows_affected() != 1 {
-            return Err(closed_error());
-        }
-        waits::audit(db, scope, "action_approved").await?;
+        reopen_job(db, scope).await?;
+        audit(db, scope, command.decision, "action_approved").await?;
         None
     } else {
-        fail(db, scope, "approval_rejected").await?;
+        fail(db, scope, command.decision, "approval_rejected").await?;
         successor_of(db, scope).await?
     };
     Ok(DecisionSubmission {
@@ -200,10 +183,11 @@ pub(super) async fn submit(
 pub(in crate::adapters::persistence::workflow) async fn fail(
     db: &mut PgConnection,
     scope: ActivationRequest,
+    decision: DecisionId,
     reason: &str,
 ) -> AppResult<()> {
-    let operation: Value = sqlx::query_scalar("SELECT intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents AS intent ON intent.company_id=decision.company_id AND intent.id=decision.action_invocation_id WHERE decision.company_id=$1 AND decision.execution_id=$2 AND decision.subject_kind='action_approval'")
-        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
+    let operation: Value = sqlx::query_scalar("SELECT intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents AS intent ON intent.company_id=decision.company_id AND intent.id=decision.action_invocation_id WHERE decision.company_id=$1 AND decision.id=$2 AND decision.subject_kind='action_approval'")
+        .bind(scope.company.as_uuid()).bind(decision.0).fetch_one(&mut *db).await?;
     let action = FrozenAction::restore(operation)?;
     let (ActionTarget::Connection { resource_kind, .. }
     | ActionTarget::Local { resource_kind, .. }) = &action.request().target;
@@ -220,7 +204,7 @@ pub(in crate::adapters::persistence::workflow) async fn fail(
         None,
     )
     .map_err(|_| invalid())?;
-    waits::audit(db, scope, &code).await?;
+    audit(db, scope, decision, &code).await?;
     recovery::route_parked_failure(db, scope, &failure).await?;
     Ok(())
 }
@@ -230,6 +214,49 @@ pub(in crate::adapters::persistence::workflow) async fn confirm(
     fence: WorkflowFence,
     wait: WaitId,
 ) -> AppResult<bool> {
-    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=$4 AND attempt.attempt_number=$5 WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.wait_id=$8 AND decision.subject_kind='action_approval' AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked')")
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decision.job_id AND attempt.attempt_number=decision.parked_attempt_number WHERE decision.job_id=$4 AND decision.parked_attempt_number=$5 AND decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.wait_id=$8 AND decision.subject_kind='action_approval' AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked')")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).bind(wait.as_uuid()).fetch_one(persistence.pool()).await?)
+}
+
+pub(super) async fn audit(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    decision: DecisionId,
+    kind: &str,
+) -> AppResult<()> {
+    sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id,execution_id,decision_id) SELECT run.company_id,run.id,(SELECT COALESCE(MAX(event.sequence),0)+1 FROM workflow_run_events AS event WHERE event.company_id=$1 AND event.run_id=$2),$4,run.actor_id,$3,$5 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(kind).bind(decision.0).execute(db).await?;
+    Ok(())
+}
+
+// Shared choice commit; subject-specific approval and refusal remain with their owner.
+pub(super) async fn record_choice(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    principal: Uuid,
+    command: &SubmitDecision,
+    fingerprint: &str,
+) -> AppResult<()> {
+    if !matches!(command.choice.as_str(), "approve" | "reject")
+        || command.data != json!({})
+        || command.feedback.chars().count() > crate::application::workflow::registry::MAX_TEXT
+    {
+        return Err(AppError::BadRequest("Invalid approval submission".into()));
+    }
+    sqlx::query("UPDATE workflow_decisions SET submitted_at=clock_timestamp(),submitted_by=$3,command_key=$4,command_fingerprint=$5,choice=$6,feedback=$7,data=$8,revision=revision+1 WHERE company_id=$1 AND id=$2 AND submitted_at IS NULL")
+        .bind(scope.company.as_uuid()).bind(command.decision.0).bind(principal).bind(command.command_key.as_str()).bind(fingerprint).bind(&command.choice).bind(&command.feedback).bind(&command.data).execute(&mut *db).await?;
+    sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp() WHERE company_id=$1 AND id=(SELECT wait_id FROM workflow_decisions WHERE company_id=$1 AND id=$2) AND reason='decision' AND state='waiting'")
+        .bind(scope.company.as_uuid()).bind(command.decision.0).execute(&mut *db).await?;
+    sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    Ok(())
+}
+
+pub(super) async fn reopen_job(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<()> {
+    let reopened = sqlx::query("UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1,run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND status='completed' AND continuation_count<63")
+            .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+    if reopened.rows_affected() != 1 {
+        return Err(closed_error());
+    }
+    Ok(())
 }

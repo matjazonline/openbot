@@ -429,3 +429,55 @@ Artifact `b42023ba2177a20937e6aa0c14b4abf6dc6e41fcbcf2a89a6fa711370f6fd630`, bas
 **PASS** for `59fde0cfbc2a70abdd01614b15dedc6d5929c4e40aeec74d66fb41120983edba`, base `feefe3e060a851fd8860e4bacb90c11c7b284888`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshots match. [Round note](agent-review-notes.md#05-r012--final-phase05-delta-and-combined-integration-evidence--pass).
 
 The final test fixture preserves every timing/resource bound and strengthens the genuine lease-first negative control to require its specific causal rejection. Prior accepted production/integration review remains applicable. Corrected full all-target suite at 2 MiB: 2727 library + 5 binary passed, zero failed, 22 existing ignored; focused deadline2/0; lease118/0, maximum measured code-work35.7% against50%. Static/offline/Clippy/SQLx/graph gates pass; unchanged-schema migration/equality and transport/credential/deploy evidence reused. Earlier failed evidence remains recorded. No open findings. Root may accept phase05 after snapshot confirmation; deferred phase07/08 work remains outside acceptance, with no commits, deployment or phase06+ authorized.
+
+
+### 06-R001 — 06A capability contract architecture gate — PASS
+**PASS** for immutable [06-D1](logs/06/decision-D1.md), SHA-256 `c89927735e1f2d1c0fe23bfb898070f88bbd285cc5703defcb482be31aefba36`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`. [Round note](agent-review-notes.md#06-r001--06a-capability-contract-architecture-gate--pass). No findings. Ordered frozen defaults/profile replacement, explicit ceiling, requirements and pure revocation validation fit the existing publication contracts. Dependent 06A implementation may proceed; runtime policy, durable execution and legacy removal require later gates/reviews. No implementation or database verification claimed.
+
+
+### 06-R002 — Whole 06A capability contract batch — PASS
+**PASS** for `bf8b89c3a741c530a557ee3c7fd92ce4bb2c0628ce055ad0ba2e6e2d079faa6e`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`, sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#06-r002--whole-06a-capability-contract-batch--pass). Entire source/deliverable diff and new files inspected; no findings. Focused publication30/0, compiler32/0, registry34/0 and static gates inspected. No database verification claimed. Pure ordered frozen capability contract accepted by review; root snapshot confirmation precedes batch acceptance. 06B/06C and full phase06 verification remain outstanding.
+
+
+### 06-R003 — 06A resume checkpoint delta — PASS
+**PASS** for `0e62290c896c341c9e6700bcef8cf3293fbd47e5cf3cc76fed020326c5b26f54`, same base, sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#06-r003--06a-resume-checkpoint-delta--pass). Only RESUME status changed; diagnostic snapshot reproduces06-R002 for all other artifacts. Earlier technical review/evidence retained unchanged. No findings or new tests;06B/06C and full phase06 gate remain unfinished pending the monetary-budget choice.
+
+
+### 06-R004 — 06B1 usage/pricing architecture gate — PASS
+**PASS** for [06-D2](logs/06/decision-D2.md), SHA-256 `97861d07e9f19f275193575a7fb4981317c4ed593ca776e1d60e3687c42734c7`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`. [Round note](agent-review-notes.md#06-r004--06b1-usagepricing-architecture-gate--pass). No findings. Durable checkpoint projection, immutable settlement, exact provenance, authorized bounded analytics and optional current-rate estimates fit actual contracts and revised user requirements. Dependent06B1 implementation may proceed. Workflow token approval/checkpoint runtime requires separate06B2 gate; no source/test/DB verification claimed here.
+
+
+### 06-R005 — Whole 06B1 usage/pricing batch — CHANGES REQUIRED
+Artifact `7c438b4fe32fbff52d6d97428577af7551e0c33f74b600452ffae78e4c574a2f`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`, sole exclusion `plan/workflow-foundation/docs`; pre/post snapshot matches. [Round note](agent-review-notes.md#06-r005--whole-06b1-usagepricing-batch--changes-required). One open low finding [06-F001](agent-review-findings.md#06-f001--06b1-lacks-promised-production-usage-and-revocation-race-proof): missing promised production Rig→usage/repair/partial-response composition and usage-operation membership race proof. No implementation bypass identified; source/schema/UI and reported focused/static/browser gates otherwise reviewed.06B1 not yet accepted.
+
+
+### 06-R006 — 06B1 F001 correction recheck — PASS
+**PASS** for `4eabf1ca4939d6446eeb92baca22a82696496ecb0cca2beac1ddf3fb2eb44222`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`, sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#06-r006--06b1-f001-correction-recheck--pass); [F001 resolution](agent-review-findings.md#06-r006-disposition--06-f001-resolved). Production repair/partial-response/approval/deadline usage assertions and controlled report/price membership races close the missing verification. Usage13/0, final production9/0 and affected static/SQLx gates pass. Unchanged06-R005 technical/browser/schema evidence reused. No open findings; root snapshot confirmation precedes06B1 acceptance. Later06B2/B3/C and full phase06 verification remain pending.
+
+
+### 06-R007 — 06B2a successful approval continuation architecture gate — PASS
+**PASS** for [06-D3 revision1](logs/06/decision-D3.md), SHA-256 `c2ba112b23bf2839d34fab0b68d36101c3c2b87ac2c36351fc940d2a3f5debcc`. [Round note](agent-review-notes.md#06-r007--06b2a-successful-approval-continuation-architecture-gate--pass). No findings. Generated attempt identity with separate failure/continuation counters and exact decision/wait/parked-attempt/audit associations address actual ownership/history contracts. Existing implementation remains accepted06B1 digest `4eabf1ca4939d6446eeb92baca22a82696496ecb0cca2beac1ddf3fb2eb44222`; no dependent edits yet.06B2a may proceed; model runtime/token allowance and06B2b remain outside this gate.
+
+
+### 06-R008 — Whole06B2a successful continuation protocol — CHANGES REQUIRED
+Artifact `1d7e5545bb22655b22c40e14aac9f49e67f41af5683699a983b7e23deb4ce4d5`, same base/sole exclusion `plan/workflow-foundation/docs`; pre/post snapshot matches. [Round note](agent-review-notes.md#06-r008--whole06b2a-successful-continuation-protocol--changes-required). Open:06-F003 medium audit discriminator/uniqueness,06-F004 low approval replay result,06-F005 low promised operation identity and post-continuation reconciliation proofs. [Findings](agent-review-findings.md#06-f003--approval-audit-exemption-weakens-unrelated-event-kind-constraints). Earlier compiler/SQL admission defect06-F002 independently resolved with current-revision activation regression. Workflow765/0 and static/schema gates inspected;06B2a not accepted until corrections/recheck.
+
+
+### 06-R009 — 06B2a consolidated correction recheck — CODE PASS; broader gate pending
+**CODE PASS** for `92cde7ae8804f314f0eb6308a845de4c2d8efdf02be70432949a9ee6e051df46`, same base and sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#06-r009--06b2a-consolidated-correction-recheck--code-pass-broader-gate-pending). F003–F005 resolved; author-discovered shared capability duplication recorded resolved asF006. Focused approval32/0 and final static/schema/SQLx evidence pass. Both broad correction sweeps remain769/1 despite passing unchanged focused reruns, so required broad verification blocks batch acceptance. Root is running a frozen-source four-thread sweep preserving internal contention and all bounds; evidence-only recheck may close this gate if clean. No D4 review or phase06 completion claim.
+
+
+### 06-R010 — 06B2a broad-gate evidence-only recheck — PASS
+**PASS for the entire06B2a batch** at `92cde7ae8804f314f0eb6308a845de4c2d8efdf02be70432949a9ee6e051df46`, base `5b4989ae0038a82f431db60a338b7f59d9bcf25c`, sole exclusion `plan/workflow-foundation/docs`. [Round note](agent-review-notes.md#06-r010--06b2a-broad-gate-evidence-only-recheck--pass). Source unchanged from06-R009; clean complete workflow770/0 in392.30s at stock2MiB/four parallel libtest threads closes its broad gate. Actual contention, assertions and bounds unchanged; earlier failures preserved. No open findings. Root may accept after digest confirmation; D4 and final phase06 completion remain outside this pass.
+
+
+### 06-R011 — 06B2b D4 architecture gate — CHANGES REQUIRED
+**CHANGES REQUIRED** for06-D4 revision1, SHA-256 `ed282ae6c42f539546d1bd1fca0ce1557852a29ae41629aa70cd6933a2ae360b`. [Round note](agent-review-notes.md#06-r011--06b2b-d4-architecture-gate--changes-required). One medium open finding [06-F007](agent-review-findings.md#06-f007--d4-approval-time-reservation-conflicts-with-native-fence-and-recovery-ownership): define approval versus fresh worker reservation boundaries and distinguish new admission from replay/unresolved requests before provider entry. No dependent06B2b implementation approval. Accepted06B2a artifact remains unchanged; corrected decision requires recheck.
+
+
+### 06-R012 — D4 F007 architecture correction recheck — PASS
+**PASS** for06-D4 revision2, SHA-256 `ffb176f2446a21cefd438c289aa357f6144f3f3921747df2a3b44248afc848b2`. [Round note](agent-review-notes.md#06-r012--d4-f007-architecture-correction-recheck--pass); [F007 resolution](agent-review-findings.md#06-r012-disposition--06-f007-resolved). Approval only authorizes/reopens; fresh fenced admission owns charges and the sole provider-entry permit. Replay/uncertainty and retired-generation recovery preserve charges without re-entering old IDs. No remaining architecture findings. Dependent06B2b may proceed after root acceptance; required implementation/crash/race proofs remain outstanding. Accepted source digest unchanged.
+
+
+### 06-R013 — D4 revision3 root allowance scheduling architecture gate — PASS
+**PASS** for [06-D4 revision3 addendum](logs/06/decision-D4-root-pause-r3.md), SHA-256 `ab2be4fe23c66e31d53296a5d40629cb31a45b5516b3b80e208ac71f774fd3c7`. [Round note](agent-review-notes.md#06-r013--d4-revision3-root-allowance-scheduling-architecture-gate--pass); [finding disposition](agent-review-findings.md#06-r013-architecture-disposition--no-new-findings). B inspected actual pending/pure/I/O scheduling, historical effect safety, retirement debit/hard bounds and SQL progression/reopen seams. No findings. Five-second pending deferral plus bounded genuine processing retirement fits the existing owners while preserving exact native approval/reproposal behavior. Digest matches before/after. This accepts only the architecture extension; unfinished06B2b source, its concurrency/recovery proofs and final gates remain unaccepted.

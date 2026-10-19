@@ -3,6 +3,9 @@ use crate::adapters::workflow_source::decode;
 use crate::domain::workflow::{ResourceName, RunId, RunMetadata, TypeName};
 use uuid::Uuid;
 
+#[path = "capabilities_tests.rs"]
+mod capabilities_tests;
+
 #[path = "diagnostic_tests.rs"]
 mod diagnostic_tests;
 
@@ -17,6 +20,7 @@ fn source(kind: &str) -> Value {
 }
 fn agent() -> AgentSnapshot {
     AgentSnapshot {
+        agent_id: uuid::Uuid::from_u128(1),
         company_id: company(),
         key: AgentKey::parse("assistant").unwrap(),
         instructions: "Answer using the supplied context".into(),
@@ -467,4 +471,23 @@ fn workflow_publication_inline_ambiguous_tools_fail_static_and_dynamic() {
         .unwrap();
     assert_eq!(error.code, "publication.selection");
     assert!(error.message.contains("lookup is missing or ambiguous"));
+}
+
+#[test]
+fn workflow_publication_requires_and_hashes_trusted_agent_identity() {
+    let source = source("agent.run");
+    let original = build(&source, snapshots()).unwrap();
+    let mut changed = snapshots();
+    changed.agents[0].agent_id = Uuid::from_u128(2);
+    let replaced = build(&source, changed).unwrap();
+    assert_ne!(
+        original.content_hash().as_str(),
+        replaced.content_hash().as_str()
+    );
+    let mut invalid = snapshots();
+    invalid.agents[0].agent_id = Uuid::nil();
+    assert_eq!(
+        build(&source, invalid).err().unwrap().code,
+        "publication.agent_identity"
+    );
 }

@@ -62,6 +62,7 @@ impl RigExecutionPolicy {
 pub enum RunState {
     Active,
     InvalidOutput,
+    BudgetExceeded,
     Waiting,
     Completed,
     Superseded,
@@ -91,6 +92,7 @@ pub struct RunCheckpoint {
 }
 
 pub(crate) enum Mutation {
+    WorkflowTokenPause,
     InvalidOutput,
     Execution(ExecutionReservation),
     BindTools(String),
@@ -100,6 +102,12 @@ pub(crate) enum Mutation {
     Prepare(InvocationId),
     Result(InvocationId, Value),
     Final(AgentExecutionOutput),
+}
+
+#[derive(Clone, Copy, Default)]
+struct HardTokenTotals {
+    input: u64,
+    output: u64,
 }
 
 impl RunCheckpoint {
@@ -250,15 +258,44 @@ impl RunCheckpoint {
         Ok(())
     }
 
+    /// Hard safety accounting never refunds a reservation when reported usage is lower.
+    fn hard_token_totals(&self) -> Option<HardTokenTotals> {
+        self.reservations
+            .iter()
+            .try_fold(HardTokenTotals::default(), |sum, request| {
+                let turn = self
+                    .turns
+                    .iter()
+                    .find(|turn| turn.request_id == request.request_id);
+                Some(HardTokenTotals {
+                    input: sum
+                        .input
+                        .checked_add(turn.map_or(request.input_tokens, |turn| {
+                            request.input_tokens.max(turn.input_tokens)
+                        }))?,
+                    output: sum
+                        .output
+                        .checked_add(turn.map_or(request.output_tokens, |turn| {
+                            request.output_tokens.max(turn.output_tokens)
+                        }))?,
+                })
+            })
+    }
+
+    fn hard_token_budget_exceeded(&self) -> bool {
+        self.hard_token_totals().is_none_or(|total| {
+            total.input > self.policy.total_input_tokens
+                || total.output > self.policy.total_output_tokens
+        }) || self.turns.iter().any(|turn| {
+            turn.input_tokens > self.policy.request_input_tokens
+                || turn.output_tokens > self.policy.request_output_tokens
+        })
+    }
+
     fn validate_ledger(&self) -> AppResult<()> {
-        let input = self.reservations.iter().try_fold(0u64, |sum, reservation| {
-            sum.checked_add(reservation.input_tokens)
-        });
-        let output = self.reservations.iter().try_fold(0u64, |sum, reservation| {
-            sum.checked_add(reservation.output_tokens)
-        });
-        if input.is_none_or(|n| n > self.policy.total_input_tokens)
-            || output.is_none_or(|n| n > self.policy.total_output_tokens)
+        let exceeded = self.hard_token_budget_exceeded();
+        if (exceeded && !matches!(self.state, RunState::BudgetExceeded | RunState::Superseded))
+            || (self.state == RunState::BudgetExceeded && !exceeded)
             || (self.state == RunState::Waiting)
                 != (self.wait.is_some() || self.outreach_wait.is_some())
             || (self.wait.is_some() && self.outreach_wait.is_some())
@@ -268,7 +305,14 @@ impl RunCheckpoint {
         {
             return Err(invalid("Inconsistent checkpoint state or budget ledger"));
         }
+        self.validate_reservations()?;
+        self.validate_saved_turns()?;
+        self.validate_invocation_receipts()
+    }
+
+    fn validate_reservations(&self) -> AppResult<()> {
         let mut requests = std::collections::HashSet::new();
+        let mut total = HardTokenTotals::default();
         for reservation in &self.reservations {
             if !requests.insert(reservation.request_id.0)
                 || reservation.input_tokens == 0
@@ -278,21 +322,38 @@ impl RunCheckpoint {
             {
                 return Err(invalid("Invalid saved model reservation"));
             }
+            total.input = total
+                .input
+                .checked_add(reservation.input_tokens)
+                .ok_or_else(|| invalid("Invalid reservation total"))?;
+            total.output = total
+                .output
+                .checked_add(reservation.output_tokens)
+                .ok_or_else(|| invalid("Invalid reservation total"))?;
         }
+        if total.input > self.policy.total_input_tokens
+            || total.output > self.policy.total_output_tokens
+        {
+            return Err(invalid("Invalid reservation total"));
+        }
+        Ok(())
+    }
+
+    fn validate_saved_turns(&self) -> AppResult<()> {
         let mut turns = std::collections::HashSet::new();
         let mut calls = std::collections::HashSet::new();
         let mut call_count = 0;
         for turn in &self.turns {
-            let Some(reservation) = self
+            if !self
                 .reservations
                 .iter()
-                .find(|r| r.request_id == turn.request_id)
-            else {
+                .any(|r| r.request_id == turn.request_id)
+            {
                 return Err(invalid("Unreserved saved model response"));
-            };
+            }
             if !turns.insert(turn.request_id.0)
-                || turn.input_tokens > reservation.input_tokens
-                || turn.output_tokens > reservation.output_tokens
+                || turn.input_tokens > i32::MAX as u64
+                || turn.output_tokens > i32::MAX as u64
             {
                 return Err(invalid("Invalid saved response usage"));
             }
@@ -311,6 +372,10 @@ impl RunCheckpoint {
         if call_count > usize::from(self.policy.tool_calls) {
             return Err(invalid("Saved tool budget exhausted"));
         }
+        Ok(())
+    }
+
+    fn validate_invocation_receipts(&self) -> AppResult<()> {
         let mut receipts = std::collections::HashSet::new();
         for invocation in &self.invocations {
             let call = self
@@ -386,6 +451,10 @@ impl RunCheckpoint {
     pub(crate) fn apply(&self, mutation: Mutation) -> AppResult<(Self, bool)> {
         let mut next = self.clone();
         let changed = match mutation {
+            Mutation::WorkflowTokenPause => {
+                next.require_active()?;
+                true
+            }
             Mutation::InvalidOutput => {
                 if next.state == RunState::InvalidOutput {
                     false
@@ -454,18 +523,9 @@ impl RunCheckpoint {
         }
         self.require_active()?;
         self.validate_repair_reservation(&value)?;
-        let input = self
-            .reservations
-            .iter()
-            .try_fold(value.input_tokens, |sum, item| {
-                sum.checked_add(item.input_tokens)
-            });
-        let output = self
-            .reservations
-            .iter()
-            .try_fold(value.output_tokens, |sum, item| {
-                sum.checked_add(item.output_tokens)
-            });
+        let charged = self.hard_token_totals();
+        let input = charged.and_then(|total| total.input.checked_add(value.input_tokens));
+        let output = charged.and_then(|total| total.output.checked_add(value.output_tokens));
         if self.pending_call().is_some()
             || self.reservations.len() >= usize::from(self.policy.model_calls)
             || value.input_tokens == 0
@@ -529,8 +589,8 @@ impl RunCheckpoint {
             .filter(|saved| saved.request_id == value.request_id)
             .ok_or_else(|| invalid("Model response has no current reservation"))?;
         if self.pending_call().is_some()
-            || value.input_tokens > reservation.input_tokens
-            || value.output_tokens > reservation.output_tokens
+            || value.input_tokens > i32::MAX as u64
+            || value.output_tokens > i32::MAX as u64
             || self.invocations.len() + value.calls.len() > usize::from(self.policy.tool_calls)
         {
             return Err(invalid("Invalid or over-budget model response"));
@@ -552,7 +612,9 @@ impl RunCheckpoint {
         let exhausted = value.invalid_response.is_some()
             && self.repair_count() >= crate::services::response_contract::MAX_REPAIR_CALLS;
         self.turns.push(value);
-        if exhausted {
+        if self.hard_token_budget_exceeded() {
+            self.state = RunState::BudgetExceeded;
+        } else if exhausted {
             self.state = RunState::InvalidOutput;
         }
         Ok(true)

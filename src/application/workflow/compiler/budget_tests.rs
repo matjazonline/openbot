@@ -19,7 +19,7 @@ fn workflow_root_budget_compiler_freezes_defaults_and_authored_limits() {
     );
     let source = with_budget("{activations: 7, model_calls: 3, repetitions: 2}");
     let lower = compile_one(&source).unwrap();
-    let limits = lower.graph().definition().limits;
+    let limits = &lower.graph().definition().limits;
     assert_eq!(limits.max_steps, 20);
     assert_eq!(limits.max_context_bytes, 4096);
     assert_eq!(limits.root_budget, RootBudgetLimits::new(7, 3, 2).unwrap());
@@ -68,5 +68,45 @@ fn workflow_root_budget_compiler_boundary_and_invalid_values_are_located() {
         "{activations: 1, model_calls: 1, repetitions: 1, extra: 1}",
     ] {
         assert!(compile_one(&with_budget(malformed)).is_err());
+    }
+}
+
+#[test]
+fn workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_policy() {
+    let reviewer = uuid::Uuid::new_v4();
+    let budget = |tokens: &str| {
+        format!("{{activations: 7, model_calls: 3, repetitions: 2, tokens: {tokens}}}")
+    };
+    let tokens = format!("{{max_tokens: 2000, reviewers: [{{kind: user, id: '{reviewer}'}}]}}");
+    let compiled = compile_one(&with_budget(&budget(&tokens))).unwrap();
+    let policy = compiled
+        .graph()
+        .definition()
+        .limits
+        .root_budget
+        .tokens()
+        .unwrap();
+    assert_eq!(policy.max_tokens(), 2000);
+    assert_eq!(policy.reviewers(), &[reviewer]);
+    assert_eq!(
+        compiled.representation()["root_budget"]["tokens"],
+        json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+    );
+    for invalid in [
+        "null".to_owned(),
+        "{max_tokens: 1, reviewers: []}".to_owned(),
+        tokens.replace("2000", "0"),
+        tokens.replace("2000", "2147483648"),
+        tokens.replace("kind: user", "kind: agent"),
+        tokens.replace(&reviewer.to_string(), "bad-uuid"),
+        format!(
+            "{{max_tokens: 2, reviewers: [{{kind: user, id: '{reviewer}'}}, {{kind: user, id: '{reviewer}'}}]}}"
+        ),
+        tokens.replace("max_tokens:", "money:"),
+    ] {
+        assert!(
+            compile_one(&with_budget(&budget(&invalid))).is_err(),
+            "{invalid}"
+        );
     }
 }

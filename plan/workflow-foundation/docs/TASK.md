@@ -3105,3 +3105,902 @@ instruction. Preserve current worktree and all evidence.
 
 This continuation's reported graft savings total169586 tokens; no dollar estimate
 was supplied by those calls, so none is inferred.
+
+## Phase06 continuation — 2026-10-18
+
+User requests `implement-astra-reviewed-2.1` continuation from RESUME. Phase05 is
+accepted history. Authorized scope: phase06 in 06-agent-context-memory-and-capabilities.md,
+with README/EXPANSION obligations; phases07+ and deployment/commits remain out of scope.
+Starting HEAD 5b4989ae0038a82f431db60a338b7f59d9bcf25c; worktree initially clean.
+Preserve retained PostgreSQL and pre/post squash evidence databases (phase05 records).
+Root author setting Astra/high confirmed by user in this session. Reviewer will be
+Astra/medium, separate context; not spawned until first architecture review.
+Host context occupancy/compaction threshold unavailable; use durable records.
+Records: this TASK, REVIEW.md, agent-review-notes.md, agent-review-findings.md and
+logs/06 beneath this directory; preserve all existing entries. Freeze excludes only
+plan/workflow-foundation/docs. Root owns project writes and serialized fixture checks.
+
+Status: investigation only; no phase06 implementation or gate accepted.
+Trace identifies existing Rig checkpoint state machine and legacy-only HarnessRunStore
+persistence guard (task/harness_runs.rs:11-35). Workflow integration must use workflow
+fences, root budgets and ActionService rather than weaken that legacy guard.
+Batch boundaries and consequential decision gate are being developed from actual code.
+Per-batch verification: focused domain/application and relevant database races; fmt,
+offline all-target compilation and Clippy; changed SQL requires fresh task schema and
+SQLx prepare/check. Final phase06 gate: full database-backed all-target suite, stock-stack
+and lease budgets, fresh migrations/schema, SQLx, transport and graph refresh.
+No production reset, no compatibility/backfill or additive migrations: phase06 plan
+requires editing squashed init and recreating only identified development/test databases.
+Next: trace checkpoint/action/budget interfaces, record cohesive batches and D1 for B.
+
+06A/06B/06C dependency groups and proposed06A contract recorded in logs/06/decision-D1.md.
+06A owns the frozen capability contract (not operational handlers);06B owns durable
+execution/preparation;06C owns caller migration/removal and combined verification.
+Architecture gate06-D1 requested before dependent edits. Original phase06 criteria
+remain unchanged. No source/schema edits yet.
+Reviewer B handle: /root/reviewer_06, requested Astra/medium with fork_turns=none.
+06-D1 SHA256 c89927735e1f2d1c0fe23bfb898070f88bbd285cc5703defcb482be31aefba36.
+Call graph traced parse_workflow through compiler/publication/template consumers and
+prepare_step_inputs (ambiguous indexed method edges; tests/direct callers inspected).
+Compiler representation already embeds complete source definition, so ceiling enters
+hash/storage without a parallel metadata path. Remaining required docs were read;
+no phase06 fixture has been started yet.
+
+06-R001 architecture PASS checked against saved review notes and unchanged D1 digest;
+root accepts06A decision only. Implementation WIP: ceiling parser/domain field,
+semantic revision3, ordered pure resolver and current-revocation check, shared profile
+validation, eight focused acceptance tests and syntax documentation. Source/schema
+runtime not yet integrated;06B/06C outstanding. First compile failed on two incorrect
+AppError variant references and a test decoder argument; corrected to existing
+Conflict/NotFound and WorkflowSourceDecoder. Failed logs retained. First gate run
+started before those error corrections were complete; rerun after its termination.
+
+06A focused gate pass (before final added reference test): publication29/0,
+compiler32/0, registry34/0 at stock2MiB; all-target offline and strict Clippy PASS.
+Logs06a-gate-status.log. Final publication rerun in progress for added wired-reference
+coverage and bounded named-profile parse. No SQL changes or database activity.
+Source edits are now frozen pending final proof and independent whole-batch review.
+
+06B investigation: workflow RootBudgetLimits currently tracks activation/model-call/
+repetition counts; Rig RunCheckpoint already retains per-run input/output reservations
+(including uncertain model requests) with fixed ceilings. No model price configuration
+found. Root asked user whether monetary caps are in this phase or deferred in favor of
+durable token/model-call budgets; dependent monetary design remains pending answer.
+Legacy task_harness_runs has an explicit require_legacy_auxiliary_task trigger and
+principal/ownership-version provenance: do not relax those to admit workflow jobs.
+Reuse checkpoint state and Rig protocol under workflow-specific fences/ownership.
+
+###06A whole-batch review freeze
+Final publication30/0 at stock2MiB (06a-publication-final.log); compiler32/0,
+registry34/0, offline all-target, strict Clippy, final fmt/diff PASS. Total96 focused
+tests; no DB verification claimed. Nine new capability tests. Root audited diff.
+Base5b4989ae0038a82f431db60a338b7f59d9bcf25c, digest
+bf8b89c3a741c530a557ee3c7fd92ce4bb2c0628ce055ad0ba2e6e2d079faa6e;
+sole exclusion plan/workflow-foundation/docs. Manifest06a-review-snapshot.txt.
+Unmodified skill snapshot requires the already-established macOS wrapper:
+PATH=/private/tmp/workflow0410-tools:$PATH bash .agents/skills/implement-astra-reviewed-2.1/scripts/snapshot.sh plan/workflow-foundation/docs
+The first direct invocation failed on BSD realpath; no skill edit. Wrapper inspected.
+All project writes frozen; B owns review records. No fixture/check activity running.
+06B budget product question remains pending; research only, no dependent implementation.
+
+###06A ROOT ACCEPTED — 2026-10-18
+06-R002 independent whole-batch PASS matches root snapshot06a-root-snapshot.txt:
+base5b4989ae0038a82f431db60a338b7f59d9bcf25c,
+digest bf8b89c3a741c530a557ee3c7fd92ce4bb2c0628ce055ad0ba2e6e2d079faa6e,
+sole exclusion plan/workflow-foundation/docs.06-R001/002 notes and explicit passes
+persisted; no findings reported or open.96 focused tests and static gates pass.
+06A capability contract is accepted; phase06 is NOT complete.06B/06C, database-backed
+integration and full phase06 verification remain outstanding.
+
+Continuation checkpoint: awaiting the user's monetary-budget choice before06B's
+new root-budget/provider contract. The original plan says token/spend reservations;
+current system has no pricing configuration. Asked whether to enforce durable token
+and model-call budgets now and defer money, or add monetary caps with configured
+prices and refuse unpriced models. No deferral or monetary behavior is authorized
+by silence. Continue independent contract investigation if user replies in this turn;
+otherwise next action is resolve this choice, then record06B architecture decisions
+for independent review BEFORE dependent schema/runtime changes.
+
+Next investigation facts: workflow_runs has admission-created_at but no frozen
+history membership/cutoff record; context.load must not read later conversation state.
+MemoryProvider persists user/assistant conversation pairs through Hydradb/Hindsight;
+explicit memory.save facts need an idempotent provider contract, not inference from
+generated drafts. No06B source/schema edits performed. Relevant graph spans were
+traced; do not weaken legacy harness/task provenance to reuse its checkpoint machine.
+
+Resources: no PostgreSQL started or reset. Retained workflow0410 data and pre/post
+squash evidence untouched. All author checks finished; reviewer completed/idle.
+No commits, deployments or external messages. Root remains user-confirmed Astra/high,
+B /root/reviewer_06 remains Astra/medium with independent context. Preserve all WIP.
+
+Administrative checkpoint adds the current06A/remaining06 status to RESUME; no code
+changes after06-R002. Checkpoint artifact0e62290c896c341c9e6700bcef8cf3293fbd47e5cf3cc76fed020326c5b26f54
+(same base/exclusion) assigned for narrow B status/delta recheck, reusing substantive
+06-R002 evidence. Root graft calls reported aggregate2347325 estimated tokens saved;
+no dollar estimate supplied. The estimate compares whole covered files per query.
+
+06-R003 checkpoint delta PASS received; root recomputation matches
+0e62290c896c341c9e6700bcef8cf3293fbd47e5cf3cc76fed020326c5b26f54.
+Reviewer independently verified every non-RESUME artifact equals06-R002; substantive
+acceptance and all focused/static evidence remain valid. No findings. All workers
+completed/idle, no author checks or fixtures running. Await budget choice; phase06
+remains incomplete. No assumptions of user approval from elapsed time.
+
+## Phase06 resumed with revised usage requirements — 2026-10-19
+
+User resolves the pending decision and directs:
+- Measure agent and workflow model calls; display analytics grouped by model or workflow.
+- Measure tokens. If a per-million price is configured for a provider/model, display calculated cost.
+- Optional maximum tokens per workflow. On exceeding the allowance, stop automated progression
+  and request manual approval to continue.
+- No monetary caps.
+This supersedes the monetary-cap question/checkpoint; continuation is authorized.
+Root remains user-confirmed Astra/high author; reuse independent B /root/reviewer_06.
+Preserve accepted06A and all pre-existing WIP. Add usage/analytics/token-continuation contracts
+and their acceptance criteria to the06B architecture gate before dependent implementation.
+Pricing is display-only; unpriced models remain usable and show cost unavailable, not zero.
+Provider-reported usage and conservative unknown-call reservations must remain distinguishable.
+No commits/deployment or production reset. Root owns serialized fixture checks.
+
+Proposed06B1 architecture in logs/06/decision-D2.md: cohesive usage/pricing/analytics
+milestone first;06B2 workflow Rig/token approval,06B3 preparation,06C removal/finalgate.
+This is a dependency split for independently reviewable features, not a dropped criterion.
+Existing production AgentRunner sites attach durable store/claim context; direct Rig
+and alternate classifier entry coverage remains an explicit06C completion obligation.
+Root traced reserve_budget/submit_decision/RunCheckpoint (graph method edges ambiguous)
+and inspected exact persistence/decision consumers. No dependent implementation yet.
+
+### 06B1 implementation underway — 2026-10-19
+
+Root accepted architecture06-D2 after reviewer06-R004 PASS (decision SHA256
+97861d07e9f19f275193575a7fb4981317c4ed593ca776e1d60e3687c42734c7).
+Implementation WIP: model_usage_calls projection on durable Rig checkpoint writes,
+company model_prices with globally monotonic CAS revisions, bounded authorized
+reporting port/adapter and UI/JSON routes. No token continuation/runtime integration yet.
+Shared existing authorize_company is reused (visibility widened only), with company,
+member and principal locks held through reporting/pricing. No raw pool in routes.
+
+Retained PostgreSQL system7697669855432439122 verified stopped then started at
+/private/tmp/workflow0410-20261017, localhost55450. Only workflow0410_test reset;
+pre/post squash evidence and fresh_test preserved. Initial migration passed.
+First focused usage run:1PASS/2FAIL; assertions reached price/replay checks, then company
+cleanup failed due agent FK timing. Fault-injection test used a multi-statement prepared
+query. Corrections: match existing deferred harness agent FK; explicit company cascade;
+raw_sql for test-only trigger setup. Latest schema requires another reset before tests.
+Logs:06B1-migrate-1.log,06B1-check-1/2.log,06B1-usage-tests-1.log. No acceptance claim.
+Remaining: complete/report/HTTP/provenance/concurrency tests, focused/full batch gates,
+freeze and independent whole-batch review; then06B2 gate. No commits/deployment.
+
+### 06B1 focused verification and UI correction — 2026-10-19
+
+Focused stock2MiB run passed: usage12, harness_runs8 (overlaps4 usage tests), Rig52,
+publication30, compiler32, existing page159/0/1unchangedignored. Strict Clippy,
+locked offline all-target compilation, formatting and diff checks passed in
+06B1-focused-status.log. Earlier failed logs retained. Test5/focused usage include
+exact cost boundaries, missing/zero/current rates, revision races/deletion ABA,
+unknown/Mixed provenance, invalid settlement rollback and scoped reporting limits.
+
+Author audit added safe pricing-error feedback and further valid-foreign-ID SQL
+coverage. Browser first attempts exposed test-harness issues (hidden theme checkbox,
+navigation auto-wait) and showed base_layout does not include the mailbox field
+style tokens. New usage page now uses existing ui_layout, preserving shared focus
+styles, and has bounded scrolling. Latest usage tests + browser + affected static
+checks pending. No project artifact frozen/accepted yet.
+
+npm ci installed lockfile dependencies (no dependency edits); npm reported one
+existing high-severity advisory; no audit fix or dependency upgrade performed.
+Generated assets/app.css refreshed. Playwright Chromium installed for local browser
+proof. Opt-in MODEL_USAGE_BROWSER_FIXTURE_DIR exports the actual test renderer and
+shared scripts to /private/tmp/workflow06-usage-browser; no user data in that fixture.
+Browser commands/evidence in06/browser-check.cjs and06B1-browser-*.log.
+
+### 06B1 frozen for whole-batch review — 2026-10-19
+
+Base5b4989ae0038a82f431db60a338b7f59d9bcf25c; digest
+7c438b4fe32fbff52d6d97428577af7551e0c33f74b600452ffae78e4c574a2f.
+Exact exclusion:plan/workflow-foundation/docs. Manifest:06B1-snapshot.txt.
+Preserve accepted06A implementation and its evidence; this review owns06B1 changes
+and interaction with that frozen capability foundation. No source edits during review.
+
+Final author checks: usage12/0 in06B1-usage-audit.log, full focused counts above retained;
+latest audit changed only pure grouping construction, price rendering, safe error
+feedback and stronger foreign-provenance fixture. Strict all-target Clippy, locked
+offline all-target compile, fmt/diff, generated-CSS comparison and graph build PASS
+(06B1-final-status.log). Fresh migration/schema equality, SQLx prepare/check PASS with
+no .sqlx diff (06B1-schema-status.log). Both workflow0410_test/fresh_test recreated
+under identified task cluster; pre/post squash evidence untouched.
+Browser final PASS (06B1-browser-final.log): actual generated page/shared scripts,
+CSP, dark/light computed field radius8px and outline-offset-1px, native validation,
+visible pending feedback and submitted price fields. Earlier failed browser harness
+runs retained. No model provider network or deployment performed.
+
+Independent reviewer/root acceptance outstanding. PostgreSQL55450 remains running;
+no author check process remains. Next independent work: trace06B2 approval identities,
+attempt accounting and common Rig runtime boundaries; no dependent code until06B1 PASS.
+Final phase06 full verification still deferred until06B2/06B3/06C completion.
+
+### 06B1 correction round — 2026-10-19
+
+Whole-batch review06-R005 returned one low verification finding06-F001, no identified
+implementation bypass. Root is adding real ThreadUseCases/Rig projection/report assertions
+for structured repair with actual partial provider usage, approval resume, and unknown
+reservation recovery. New usage-specific report/price authorization races exercise both
+orders using controlled PostgreSQL blockers. Production/schema/UI code unchanged.
+First correction compile failed on test RunUsage field names; evidence retained in
+06B1-correction-authority.log. Source is unfrozen for test-only corrections; acceptance
+and06B2 remain pending. Root owns serialized checks; PostgreSQL55450 still running.
+
+06B1 corrections verified: usage13/0, production Rig3/0 and structured-response3/0;
+strict all-target Clippy, locked offline all-target check, SQLx prepare/check with no
+.sqlx diff, fmt/diff/graph PASS (06B1-correction-status.log). Final audit corrected a
+JSON assertion to unwrap the actual run_id column (rather than a nonexistent field);
+all9 production inter-channel tests then PASS at stock2MiB in
+06B1-correction-production-final.log. Reused unaffected static/SQLx/browser/schema
+results; no production/schema/UI changes. Initial test compiler failure retained.
+
+Source now frozen for correction recheck06-F001. Exact manifest
+logs/06/06B1-correction-snapshot.txt, same base and sole exclusion as06-R005.
+All author checks complete. PostgreSQL55450 remains running; root owns fixture.
+D3-draft is research only and not assigned for architecture approval yet.
+
+### 06B1 ROOT ACCEPTED — 2026-10-19
+
+Independent correction PASS06-R006 and resolved06-F001 match root snapshot
+logs/06/06B1-root-snapshot.txt: base5b4989ae0038a82f431db60a338b7f59d9bcf25c,
+digest4eabf1ca4939d6446eeb92baca22a82696496ecb0cca2beac1ddf3fb2eb44222,
+sole exclusion plan/workflow-foundation/docs. Review notes/disposition saved; no open
+findings. D2/06-R004 plus06-R005 unchanged evidence and06-R006 correction evidence
+cover the full batch. Usage/pricing analytics accepted; workflow runtime/token budgets,
+explicit preparation and caller migration/removal remain incomplete. No commits/deploy.
+
+### Proposed06B2a architecture gate —06-D3 revision1
+
+06B2 is split at the stable successful-continuation/history contract:06B2a makes
+existing action approval repeatable without failure-retry debit;06B2b then adds
+workflow Rig/checkpoint/action integration and token allowance approval using that
+protocol. This preserves all original06B2 requirements and06B3/06C order. Evidence:
+current one-decision-per-execution and retry_count-derived attempt fences prevent
+correct repeated tool or budget approvals; recovery/SQL witnesses need one coherent
+identity change, separately reviewable before model runtime work depends on it.
+
+Decision logs/06/decision-D3.md SHA256
+c2ba112b23bf2839d34fab0b68d36101c3c2b87ac2c36351fc940d2a3f5debcc.
+Original source artifact remains accepted06B1 digest4eabf1ca...b44222; no dependent
+source/schema edits. Root requests independent architecture review of this revision.
+Focused/new proof and broad workflow database gate specified in D3; full phase06 gate
+remains outstanding. New fixed continuation bound derives from existing64-run bound;
+no resource ceiling is raised. Existing action operation-digest dedup is preserved.
+
+06-D3 revision1 independently PASS06-R007; root reconfirmed decision SHA256
+c2ba112b23bf2839d34fab0b68d36101c3c2b87ac2c36351fc940d2a3f5debcc and saved notes.
+Root accepts architecture06B2a only; source/schema implementation begins now. No06B2b
+runtime/token architecture acceptance implied. No findings. Existing06A/06B1 retained.
+
+06B2a WIP: separate continuation_count/generated attempt_ordinal; live fences and
+retirement/reconciliation SQL use ordinal while failure budget uses retry_count.
+Exact approval→wait→parked-attempt associations, repeatable approval audit identity,
+and approval submission/timeout lookups implemented, not yet accepted. First offline
+all-target compile and fresh migration PASS; initial approval19 tests all failed on
+initial claim before new approval code.
+
+Root diagnosed an earlier06A integration defect: compiler revision3 was not recognized
+by insert_workflow_budget_link, which still checked revision2 and sealed all admitted
+current workflows. Evidence06B2a-claim-diagnostic.log. Corrected init to strict revision3
+and frozen_v3 provenance (no fallback), added actual admission→activation regression
+and prior-revision2 refusal. This correction is part of06B2a whole-batch review; prior
+06A pure tests did not cover SQL admission and its integration acceptance is reopened.
+D3 architecture unchanged. Reviewer informed, no intermediate review requested.
+Task database workflow0410_test reset/migrated twice; system ID confirmed7697669855432439122;
+fresh_test/pre/post squash evidence preserved. Approval rerun currently compiling.
+
+06B2a checkpoint: approval4 PASS22/0 at stock2MiB (06B2a-approval-4.log),
+including two real approved HTTP effects, stale approval replay, failure after two
+continuations,63-cycle ceiling, and immutable counter/history guards. Added later
+approval versus cancellation race and old-decision comment isolation. Expanded workflow
+suite attempts1/2 failed compilation on test imports only; corrected, attempt3 running
+(06B2a-workflow-3.log). Source remains unfrozen and unaccepted; additional recovery/SQL
+association proof, static/schema/SQLx gates and independent whole-batch review pending.
+
+Expanded workflow3 completed724PASS/38FAIL in378s. Failures classified from retained log:
+reconciliation fixture exact-audit JSON missing decision_id, whole-job retirement
+comparisons missing generated ordinal delta, state-witness SQL still frozen_v2,
+and one lease-resolution wall-clock lower-bound assertion. Corrected fixture expectations
+explicitly (decision_id null, exact ordinal debit, frozen_v3); no production guard weakened.
+Added later expiry/rejection identity and retryable failure after continuation tests;
+extended action identity FK matrix to wrong job/attempt. Approval5 compiling (test-only
+WorkflowFailure import needs correction); source remains unfrozen. Workflow3 new approval
+cancellation race and old-comment isolation both passed. Entire batch still unaccepted.
+
+06B2a workflow4 PASS765/0 at stock2MiB in403.14s. Includes full workflow DB families,
+current compiler admission regression, repeated approval failure accounting/history,
+competing cancellation, exact old-comment handling, later rejection/expiry audit identity,
+wrong job/attempt FK negatives, orphan wait and foreign-tenant audit rejection. Approval6
+preceding this final extra SQL test PASS26/0. First full workflow failure log retained;
+all37 schema-expectation failures corrected and lease lower-bound timing test passed
+unchanged in this complete rerun. Static and fresh schema/SQLx gates now running serially.
+
+### 06B2a frozen for whole-batch review
+
+All batch gates PASS: workflow4 765/0 stock2MiB, fmt, locked offline all-target check,
+strict all-target Clippy, fresh migration and schema equality, SQLx prepare/check (no
+.sqlx diff), git diff check and graft refresh. Commands in logs/06/06B2a-static.sh and
+06B2a-schema.sh; results in corresponding logs. PG55450 identified retained task fixture
+remains running; only workflow0410_fresh_test recreated, presquash/postsquash preserved.
+No bound raised, no commits/deployments. Full phase06 final gate remains outstanding.
+
+Artifact base5b4989ae0038a82f431db60a338b7f59d9bcf25c,
+digest1d7e5545bb22655b22c40e14aac9f49e67f41af5683699a983b7e23deb4ce4d5,
+sole exclusion plan/workflow-foundation/docs. Manifest logs/06/06B2a-snapshot.txt.
+Source frozen; request whole06B2a review against06-D3 revision1 and integration correction
+for06A compiler3 budget admission. Accepted06B1 unchanged except shared workflow integration.
+Reviewer /root/reviewer_06 retained; root owns all fixture/build checks. Next dependent
+batch06B2b not approved or implemented; research only in06B2b-investigation.md.
+
+### 06-R008 correction round in progress
+
+Review06-R008 saved06-F003 medium (audit discriminator/exemption),06-F004 low (old
+approval replay returns later successor),06-F005 low (identity/nonzero-continuation
+reopen evidence); prior compiler admission06-F002 independently resolved. Source unfrozen
+only after consolidated review finished. Corrected full approval event-kind/provenance
+shape and replay based on immutable saved approval choice. New review_tests cover
+ordinary/unbound audit SQL negatives and positive separate approvals, replay after a later
+rejection creates a successor with unchanged state, actual identical-operation receipt
+reuse with a new model call ID, same arguments/different registered target or operation,
+and continuation→terminal safe failure→operator retry with retired ordinal/schedule/state
+witness associations and preserved counters. SQL state-witness fixtures now use ordinal
+rather than failure debit for attempt identities. Full all-target offline check PASS.
+Identified PG system7697669855432439122; only workflow0410_test reset and migrated for
+new audit constraint. Focused correction approval tests running; no recheck requested yet.
+
+Correction approval1/2 each31PASS/1FAIL retained. First identity fixture attempted an
+unpublished alternate operation and was correctly refused; fixture now registers and
+publishes both operations before admission, using registered-tool targets. This exposed
+an actual shared-context bug: http_runtime::context projected one ceiling entry per tool,
+so two declared operations with the same capability caused freeze's duplicate-capability
+validator to reject a legitimate request. Derived ceiling now collects a BTreeSet; no
+capability is added. MCP/message use this shared context; broad workflow rerun required.
+Correction approval3 running. F003/F004 and nonzero-continuation operator witness cases
+passed in earlier focused runs. A transient fixture-edit syntax failure is retained in
+correction-check-2.log; it did not alter production semantics or test criteria.
+
+Correction approval3 PASS32/0. Broad correction workflow run769PASS/1FAIL in387.49s:
+control cancellation/completion race exceeded persistence commit deadline, no protocol
+assertion failure. Retained06B2a-correction-workflow.log. Unchanged focused race rerun
+PASS1/0 (three competing pairs),06B2a-correction-race-rerun.log. This alone does not
+establish a baseline or dismiss broad failure. Second complete workflow run now running
+at stock2MiB, followed serially by static/schema gates if successful; log
+06B2a-correction-workflow-2.log. No source or bound changed for this timeout.
+
+Second broad correction run769PASS/1FAIL in412.74s. Original cancellation/completion race
+passed in this run; new failure was action_dispatch_resolution_stalled_local_effect_once,
+a definite NotApplied persistence-bound timeout for its competing local dispatch (not
+an uncertain commit or protocol-state assertion). Both full logs retained. Unchanged
+focused stalled-dispatch rerun PASS1/0 in3.23s; previous focused cancellation race PASS1/0.
+All770 workflow tests passed across these runs, but neither correction full sweep was
+clean. Do not represent them as a clean full-suite pass or dismiss either as inherited
+flakiness. No limits, test assertions or source changed to clear these timeouts. Static,
+fresh schema and SQLx gates now running serially. Independent reviewer must assess this
+exact evidence; final phase06 full gate still outstanding.
+
+06B2b research expanded in logs/06/06B2b-investigation.md and decision-D4-draft.md.
+Draft only, no gate requested or dependent source edits. Shared-root token scope follows
+accepted06-D2; checkpoint model protocol reuse, native fence, frozen target identity,
+explicit token decisions and repeated message-delivery continuations are investigated.
+
+### 06B2a correction frozen for consolidated recheck
+
+Fmt, locked offline all-target check, strict Clippy, diff check and graft refresh PASS.
+Fresh migration/schema equality and SQLx prepare/check PASS; no.sqlx diff. Pipeline exit0.
+Only task workflow0410_fresh_test recreated; preserved pre/post squash evidence unchanged.
+Focused approval32/0, timeout reruns1/0 each; both769/1 broad outcomes explicitly retained
+above. No clean correction full-sweep claim; final phase06 full-suite gate remains.
+
+Base5b4989ae0038a82f431db60a338b7f59d9bcf25c; correction artifact
+92cde7ae8804f314f0eb6308a845de4c2d8efdf02be70432949a9ee6e051df46,
+sole exclusion plan/workflow-foundation/docs. Manifest06B2a-correction-snapshot.txt.
+Source frozen for one consolidated06-F003/F004/F005 recheck, including shared capability
+ceiling set projection correction and exact post-continuation state-witness SQL.
+Reviewer /root/reviewer_06 retained; root owns build/fixture serialization. Next06B2b
+still research/draft only, no dependent implementation or architecture acceptance.
+
+Reviewer provisional response: code corrections close06-F003/F004/F005, but broad clean
+verification remains required before root acceptance. Starting third broad run with four
+libtest threads (still parallel), preserving every internal competing claimant and all
+persistence/lease/stack bounds. This reduces fixture-level contention without serializing
+the suite or weakening a race assertion. Command matches earlier stock2MiB workflow filter
+plus -- --test-threads=4; log06B2a-correction-workflow-4threads.log. No source changes;
+artifact92cde7ae… remains frozen. Review record/pass and this gate are both pending.
+
+Clean correction broad gate PASS:06B2a-correction-workflow-4threads.log,770/0,
+392.30s, stock2MiB, four parallel libtest threads. Both earlier failing tests pass in
+this complete run. All internal competing claimants and resource bounds unchanged.
+Request evidence-only recheck of06-R009 broad gate; source remains92cde7ae… frozen.
+
+### 06B2a root-accepted; 06B2b architecture next
+
+Independent06-R010 full batch PASS confirms770/0 clean broad gate and prior06-R009
+correction code review. All06-F002–F006 resolved; no open findings. Root recomputed
+92cde7ae8804f314f0eb6308a845de4c2d8efdf02be70432949a9ee6e051df46 on base
+5b4989ae0038a82f431db60a338b7f59d9bcf25c, sole exclusion plan/workflow-foundation/docs;
+manifest06B2a-accepted-root-snapshot.txt. Root ACCEPTS06B2a. Static/fresh-schema/SQLx
+and focused evidence retained; earlier failed broad logs remain. No limits raised.
+Task PostgreSQL55450 running, pre/post squash evidence preserved, no checks running.
+
+Next architecture gate:06-D4 revision1,logs/06/decision-D4.md, SHA256
+ed282ae6c42f539546d1bd1fca0ce1557852a29ae41629aa70cd6933a2ae360b.
+Scope06B2b: common durable Rig loop with native workflow ownership, reused checkpoint
+storage, exact usage and root token allowance decisions, frozen capabilities/targets,
+sequential saved ActionService calls and repeated delivery waits. Original requirements
+remain phase06 plan plus accepted06-D2 and06-D3. No dependent implementation yet.
+Review role /root/reviewer_06 retained; root author/fixture owner.06B3/06C and final
+whole phase06 verification remain required. No commits or deployment authorized.
+
+06-R011 architecture CHANGES REQUIRED:06-F007 medium, ambiguous approval-time reservation
+versus native live-fence requirement/provider replay. No dependent edits. Revised06-D4
+revision2 specifies approval-only authorization/reopen, fresh-claim checkpoint admission,
+atomic request/usage/model-call debit, private one-use NewAdmission permission, same-
+generation active-request ownership slot, and conservative later-generation recovery that
+never resends an unresolved request ID. Adds crash/duplicate-claim/sibling-consumption/
+ambiguous-commit proof matrix. Prior revision retained asdecision-D4-revision1.md.
+Current decision-D4.md SHA256ffb176f2446a21cefd438c289aa357f6144f3f3921747df2a3b44248afc848b2.
+Request one consolidated06-F007 architecture recheck; accepted source92cde7ae… unchanged.
+
+### 06B2b D4 revision2 root acceptance
+
+Root independently confirmed decision SHA256
+ffb176f2446a21cefd438c289aa357f6144f3f3921747df2a3b44248afc848b2
+and persisted06-R012 PASS resolving06-F007. Root ACCEPTS06-D4 revision2.
+Implementation proceeds under that protocol; this is architecture acceptance only.
+First shared change retains bounded actual provider usage above reservations and
+terminally fences hard budget overflow before tools/output. Full06B2b review remains pending.
+
+### 06B2b implementation progress — shared usage truth and token configuration
+
+D4 implementation is WIP, not independently reviewed/accepted. Shared checkpoint now
+retains bounded reported usage above reservation, uses max(reserved,actual) for hard
+safety accounting, and persists BudgetExceeded before tools/final publication. Legacy
+open/driver reject that terminal state. Unit check11/0 (06B2b-checkpoint-unit.log),
+then fresh isolated database settlement/replay/reload check1/0 at stock2MiB
+(06B2b-checkpoint-db.log). The latter includes the HardTokenTotals named-struct cleanup.
+Database cluster system identifier reconfirmed7697669855432439122. No existing DB reset.
+
+Optional tokens {max_tokens,reviewers} added to RootBudgetLimits and compiler, with
+positive bounded integer and1..16 unique explicit users. Non-Copy limits now borrowed.
+Compiler revision4 and matching SQL frozen_v4 admission changed together; root stores
+immutable token_policy with SQL shape validation. Previous compiler revision3 regression
+updated. These configuration changes do NOT yet enforce workflow token approval:
+shared allowance state, token decisions/native checkpoint ownership/driver/effects remain
+unfinished. Initial all-target check found two ownership moves after removing Copy;
+both corrected by borrowing, follow-up checks pending. Keep failure log06B2b-config-check.log.
+No06B2b review requested; retain one consolidated batch review after implementation.
+
+Token configuration compiler test1/0 and focused budget suite27/0 PASS, stock2MiB,
+four parallel libtest threads (06B2b-token-config-unit.log,06B2b-budget-db.log).
+Budget suite includes competing claimants/cancellation/ambiguous receipt resolution,
+current compiler4 activation, previous3 sealing, and new SQL token-policy shape matrix.
+Fresh isolated test databases migrate the edited init successfully; main fixture DB
+has NOT been reset/migrated to the new checksum yet. Broader checks remain pending.
+
+AgentSnapshot now carries trusted agent_id; nil identity fails publication preflight.
+Existing model connection identity is composite(company_id,provider), not a connection
+UUID (company_model_connections); frozen company/model provider already carries this
+reference. Reuse that identity and resolve its current secret; do not invent a second
+connection registry or persist credentials. Actual runtime current ownership/grants and
+provider agreement checks remain required. This refines implementation of D4's existing
+connection-reference requirement without changing its ownership or replay protocol.
+
+All-target offline locked check PASS after token configuration and agent UUID changes
+(06B2b-config-check-2.log,46.85s). agent.run now reuses the existing registry action
+approval schema/static-reviewer/InputCheck logic via one helper; no duplicate policy.
+Added trusted UUID hash/nil tests and agent action-approval static policy test.
+First application test build found two ambiguous test-only str.as_ref calls; corrected
+without production changes (failed06B2b-application-unit.log retained). Split shared
+checkpoint ledger validation into synchronous reservation/state, turn and receipt
+helpers to preserve the repository function-size rule. Reviewer-array bound now
+checked before iteration. Follow-up application test log06B2b-application-unit-2.log.
+This is still one unfinished06B2b batch, not an intermediate review boundary.
+
+Application workflow tests PASS203/0 at stock2MiB (06B2b-application-unit-2.log).
+This covers compiler token configuration, publication UUID hashes/nil rejection,
+registry agent approval reuse, and existing workflow application contracts.
+Author audit retained a separate reservation-total invariant in checkpoint validation:
+BudgetExceeded/Superseded can retain excess actual usage, but cannot legitimize
+reservations that never fit hard admission limits. Added terminal malformed-ledger
+regression; focused follow-up06B2b-checkpoint-unit-2.log pending at this record.
+
+Final checks for current WIP segment: checkpoint12/0 PASS at stock2MiB
+(06B2b-checkpoint-unit-2.log); affected isolated DB settlement/replay1/0 PASS
+(06B2b-checkpoint-db-2.log); strict offline locked all-target Clippy PASS54.51s
+(06B2b-clippy.log); fmt/diff/graft PASS. No checks or reviewer work running.
+Current WIP snapshot13705122bb2e844704b9ac0c4789177ca796c0a47b5d89d25865f8b52acc85df
+on base5b4989ae0038a82f431db60a338b7f59d9bcf25c, sole exclusion
+plan/workflow-foundation/docs; manifest06B2b-progress-snapshot.txt. This is a progress
+snapshot, NOT independently reviewed or accepted. No full phase06 gate, schema equality
+or SQLx prepare/check claimed for this WIP. Current task database remains old checksum;
+all fresh-schema evidence here comes from isolated test databases. Cluster retained.
+Next: native owner/store and root live reviewer/allowance protocol under acceptedD4,
+then shared Rig driver/effect delivery integration and required protocol proof matrix.
+Detailed handoff: logs/06/06B2b-current-handoff.md. No new user authorization needed.
+
+### 06B2b resumed — current session
+
+User reconfirmed current root Astra/high authorship. Fresh independent Astra/medium
+reviewer will be started when the whole batch is ready or a changed architecture
+requires a gate; historical reviewer handles are not live-session evidence.
+Base remains5b4989ae0038a82f431db60a338b7f59d9bcf25c. All existing tracked/untracked
+work preserved, including assets/app.css. D4 revision2 and06B2a acceptance retained.
+Context capacity/compaction controls unavailable; using host defaults and checkpoints.
+Root owns all source writes and serialized fixture/build checks. Continue06B2b,
+then06B3/06C and required final phase gates; no commits/deployments.
+
+First resumed change validates configured root token reviewers with existing locked
+company/person/member authority before fresh admission. Saved replay is unchanged;
+children inherit the root policy rather than validating their unused local policy.
+Focused admission membership/revocation/replay proofs precede native owner work.
+Not a batch boundary or independent acceptance; D4 native checkpoint/driver remains WIP.
+
+Focused resumed admission gate:21/0 PASS at stock2MiB/four threads,
+06B2b-token-admission-2.log. First run1/1 retained: test expected UUID-only reviewers
+but stored wire policy correctly uses {kind:user,id}; expectation corrected.
+The latest refinement also validates inherited root reviewer authority on fresh child
+admission: it reads immutable budget policy through the parent's budget link without
+locking the root run. This supersedes the initial note's child-validation skip.
+Saved admission replay still returns before this fresh-admission check. New child proof
+and complete admission rerun are pending in06B2b-token-admission-3.log.
+Cluster identity7697669855432439122 rechecked; TCP localhost55450 is live (default /tmp
+socket is not the fixture socket). No cluster restart/reset performed.
+
+Admission refinement verification:22/0 PASS, stock2MiB/four threads,
+06B2b-token-admission-4.log. Includes fresh root denial after demotion, saved replay,
+exact frozen token-policy round trip, competing reviewer removal, missing person identity,
+and descendant inherited-root authority checks. Earlier21/1 child test log retained:
+its purported fresh request reused the canonical parent source and correctly replayed;
+corrected test uses a distinct descendant execution, without production changes.
+All-target locked offline check PASS46.48s; strict Clippy PASS55.23s.
+Commands are in06B2b-admission-gates.sh, with separate logs. Disposable schema metadata
+DB workflow06_admission_20261019_test is task-created; script cleans only that DB.
+Native owner/store, live token refusal/allowance, Rig driver/effect waits and the D4 proof
+matrix remain unfinished. No whole06B2b review requested or acceptance claimed; retain
+one consolidated review after implementation rather than an intermediate guard review.
+
+Resumed admission checks complete: fresh migration, SQLx prepare/check, fmt/diff and
+graft build PASS; no.sqlx diff. Disposable metadata DB removed by successful script
+trap. Retained cluster and all prior databases preserved. No checks/workers running.
+Progress artifact636581222a99b89ec81534637ffd6bf536b97385797d083af287573476762c2c
+on base5b4989ae0038a82f431db60a338b7f59d9bcf25c, sole exclusion
+plan/workflow-foundation/docs;06B2b-admission-progress-snapshot.txt. Snapshot uses the
+existing inspected /private/tmp/workflow0410-tools realpath wrapper; initial attempts
+without it failed on BSD realpath, without modifying skills or source.
+This is WIP evidence only, not whole-batch acceptance. No independent06B2b review or
+full phase verification claimed. Continue native owner/store under D4 revision2.
+
+### 06B2b native checkpoint continuation — 2026-10-19
+
+User confirmed current session high in response to Astra/high role confirmation;
+root authors, independent fresh Astra/medium B will review the complete batch.
+Base5b4989ae0038a82f431db60a338b7f59d9bcf25c; preserve all tracked/untracked WIP,
+including assets/app.css. Prior06B2a and D4 revision2 acceptance remain authoritative.
+Root owns writes and serialized builds/fixture checks. Context telemetry/compaction
+control unavailable; host defaults and durable records apply. No commits/deployments.
+Next implement native checkpoint ownership/store under D4, then token protocol,
+shared Rig driver/effect waits. Focused native schema/ownership/legacy isolation and
+competing-fence checks first; consolidated06B2b review after full batch, followed by
+06B3/06C and final required formatting/offline/migration/database/stack/lease gate.
+
+Native checkpoint WIP: task_harness_runs now has disjoint legacy/workflow ownership,
+exact tenant/run/execution/job/attempt FKs, frozen prepared document and a live-fence
+SQL guard with monotonic native revisions. Legacy invocation projection remains
+legacy-only; legacy checkpoint writes refuse before projecting if their row is absent.
+Fresh migration PASS on task-created workflow06_native_owner_20261019_test before
+latest identity-null tightening; this disposable DB needs recreation for SQLx checks.
+Owner DB tests4/0 PASS at stock2MiB/four threads (06B2b-native-owner-test-3.log),
+including competing creates, identity/scope, mutation/expiry, read isolation and
+legacy supersede/invocation isolation. Earlier test compile borrow failure retained.
+
+Added application-owned WorkflowCheckpointStore with real WorkflowFence open/load and
+execution reservation only; shared checkpoint decode/state mapping moved to
+persistence/harness_checkpoint.rs. Native writes do not project legacy invocations.
+Current authority is acquired before local run/fence and checkpoint locks; same existing
+WriteBound machinery and final live-lease recheck. Open lost acknowledgements can
+resolve only to AlreadyApplied; execution ambiguous writes return unresolved, no
+provider permission. Whole D4 protocol remains unfinished: active request ownership,
+model reserve/settlement/root allowance/refusal, trusted runtime preparation/tool
+binding and shared Rig driver/effect waits still required. This port is not an
+operational model handler and no06B2b acceptance/review is claimed.
+Initial all-target compile found Evidence variant and execution-reservation field
+mismatches; corrected using existing APIs. Native-store tests pending in
+06B2b-native-store-tests.log. Retained PostgreSQL system ID7697669855432439122
+confirmed; no preexisting database reset. Root retains author/resource ownership.
+
+User reiterated no backward compatibility; databases will be reset. No old-data
+support, upgrade path or compatibility layer is added. Existing task-harness checks
+cover current live callers of the shared checkpoint implementation until their06C
+replacement, not old schema/payload compatibility. Fresh migrated databases remain
+the verification model. Continue native workflow implementation.
+
+Native segment verification: final focused9/0 PASS at stock2MiB/four threads
+(06B2b-native-store-tests-4.log), including actual foreign-company agent FK rejection,
+competing opens/execution debit, revoked actor contention, new claim retaining prior
+checkpoint/usage-time debit, and deferred final-statement rollback. Shared existing
+current-caller harness10/0 PASS (06B2b-native-current-callers.log). No old-row decoder,
+backfill or upgrade test added; all database proofs use fresh isolated migrations.
+
+All-target locked offline check PASS46.10s; strict Clippy PASS57.36s; fresh init migration
+and SQLx prepare/check PASS, no.sqlx diff (06B2b-native-store-gates.sh and associated
+logs). Task-created metadata DB removed by successful trap. Latest test-only tenant
+case was added afterward; focused9/0 passed and final all-target Clippy is recorded in
+06B2b-native-store-clippy-final.log. Schema/production evidence is unchanged.
+Native execution lost-ack resolution now rereads the exact saved generation/allowance
+under current authority/fence and can return AlreadyApplied only; it grants no provider
+entry. This supersedes the earlier unresolved-only progress note. Named test fixture
+and separate store test file preserve navigation and tuple guidance.
+
+06B2b remains WIP, unreviewed and unaccepted. Full phase gates and schema equality are
+not claimed. No workers were spawned for this internal step. No user stop/commit/deploy.
+Next exact work: active request owner slot and model admission/settlement with shared
+root usage serialization, then root token decisions/refusal and trusted preparation/
+shared Rig driver/effect waits under accepted D4 revision2. Existing TASK/REVIEW findings
+and accepted earlier phases remain unchanged; all original WIP is preserved.
+
+Final segment Clippy PASS57.96s; fmt/diff/graft build PASS. Source is unchanged since
+focused9/0; final Clippy includes the last tenant test. Progress snapshot
+9354af1c5bb3acca5dbcd7085522ecfd6abcb87d1decceeca97286518b363b95 on
+base5b4989ae0038a82f431db60a338b7f59d9bcf25c, sole exclusion
+plan/workflow-foundation/docs, manifest06B2b-native-store-progress-snapshot.txt.
+Existing inspected realpath wrapper at/private/tmp/workflow0410-tools was used;
+no skill/source changes for portability. Snapshot is WIP evidence, not independent
+acceptance. No checks/workers running; task metadata DB absence confirmed. Retained
+PostgreSQL cluster and prior evidence databases remain untouched/running as inherited.
+
+### 06B2b model ownership continuation — 2026-10-19
+
+User requests continued implement-astra-reviewed-2.1 with no developer sub-agent;
+root authors under that explicit authorization. Actual root model/effort are not
+exposed as authoritative runtime metadata; historical Astra/high labels are not
+new runtime evidence. Independent Astra/medium reviewer will review the complete
+batch, or changed architecture if needed. No workers currently running.
+Base and preserved WIP remain as above. Accepted D4 revision2 governs this work.
+Root owns serialized source writes and fixture/build checks. Host compaction is
+unknown; durable checkpoints retained. No commit/deploy authorization.
+Trace completed for native checkpoint port, shared usage projection and root debit.
+Continue active request owner slot, atomic model admission/settlement, token
+continuation/refusal and runtime wiring. Focused competing admission/settlement,
+retired owner recovery and rollback tests precede consolidated batch review;
+final phase full-suite, stock stack, lease, formatting, offline compile, migrations
+and SQLx gates remain mandatory and outstanding.
+
+Active-slot implementation underway: exact request/generation/worker/attempt columns
+and attempt FK, native append-only reservation/turn guard, fresh-request and matching
+settlement transitions. Later claimed execution reservation clears the retired slot
+without removing ledger facts. First focused run failed2/2 on SQL operator precedence
+in the JSON containment guard; parenthesized JSON operands, preserving the failure
+log06B2b-model-owner-tests.log. Expanded native harness rerun includes new-generation
+recovery (06B2b-model-owner-tests-2.log). This is internal06B2b progress, no new batch
+acceptance/review and no provider-entry or token-continuation completion claim.
+
+Owner-slot test correction: second run10/2 exposed test-query name shadowing
+(`to_jsonb(checkpoint)` selected the checkpoint column, not the row alias), fixed
+by aliasing the row as harness. Production owner transitions passed. Third run12/0
+PASS at stock2MiB/four threads (06B2b-model-owner-tests-3.log). Subsequent author
+hardening enforces ordered single append rather than unordered JSON containment,
+requires initially empty native model ledgers, and rejects a late old response under
+a newer live fence. Recovery test covers that late-response refusal before release.
+Final segment gates are running under06B2b-model-owner-gates.sh; these results,
+not the earlier12/0, must validate the latest guard/helper extraction.
+
+Integration constraint for next work: native model reservation/settlement must set
+or clear all four model_* owner columns in the same checkpoint revision write.
+The current persist_on helper is execution-reservation-only and clears a slot only
+when a genuinely new claimed generation replaces its retired owner; do not use
+that helper unchanged for model mutation. Reservation and turn arrays now preserve
+exact saved prefixes, and each mutation adds one entry with its exact owner witness.
+No operational model admission API or provider-entry permission exists yet. Continue
+atomic shared usage/root debit and token pause/settlement underD4 before driver use.
+Retained PostgreSQL system identifier7697669855432439122 confirmed onlocalhost55450.
+
+Latest guard suite12/0 PASS at stock2MiB/four threads; offline all-target check
+PASS47.61s. Strict Clippy found two test-only explicit auto-dereferences. Removed
+those dereferences; prior logs retained with-before-test-cleanup suffix. Rerunning
+the segment gates, including fresh isolated migrations and SQLx metadata validation.
+No production behavior changed in that cleanup. All06B2b remains unreviewed WIP.
+
+Final active-owner segment verification PASS: native harness12/0 at stock2MiB,
+four libtest threads (06B2b-model-owner-tests-final.log); formatting/diff; locked
+offline all-target check46.97s; strict all-target Clippy54.50s; fresh init migration;
+SQLx prepare47.73s/check48.44s with no.sqlx diff; graft build. Commands and separate
+logs are retained in06B2b-model-owner-gates.sh. Earlier failed/intermediate evidence
+is preserved. Disposable metadata DBworkflow06_model_owner_20261019_test was removed
+by the successful trap; absence confirmed. Inherited cluster/evidence DBs preserved.
+No checks/workers remain running. No independent06B2b review or full phase gate,
+schema equality, native provider entry, or token continuation completion is claimed.
+
+Progress artifacte3bcae8fd1c4589107584edb3825eb95bca787e3b9f81040ccd5faede58b89aa
+on base5b4989ae0038a82f431db60a338b7f59d9bcf25c, sole exclusion
+plan/workflow-foundation/docs; manifest06B2b-model-owner-progress-snapshot.txt.
+Existing inspected realpath wrapper used; no skill changes. This is WIP evidence,
+not a frozen whole-batch review or acceptance. Three new owner protocol tests cover
+competing fresh writers, replacement/clear/re-entry refusal, exact settlement,
+late response under newer ownership, and retained unresolved reservation on recovery.
+Next work remains atomic model reservation/usage/root debit and token continuation,
+then shared driver/effect integration under acceptedD4. User authorization persists;
+no user stop, commit or deployment. RESUME points to this continuation boundary.
+
+### Continued without a user stop — 2026-10-19
+
+User challenged the unrequested stop at the previous verified segment. Root resumes
+under the existing authorization and will not treat internal check boundaries as
+completion. No author child requested; independent reviewer remains whole-batch B.
+Native checkpoint port now has fresh-only non-clone model admission, same-fence
+active-slot exclusion, exact replay/settlement, root usage serialization and atomic
+model-call receipt/checkpoint/usage writes. Shared usage projection derives actual
+workflow provenance from relational ownership. Ambiguous writes return no permit.
+Initial offline all-target check49.55s PASS; native model-store3/0 PASS stock2MiB/
+four threads (06B2b-model-admission-check.log and-tests.log). These are focused
+intermediate checks, not acceptance. Optional token gate currently refuses before
+reservation when initial allowance would be exceeded; durable token proposal/park,
+authorized extensions/refusal and settlement-triggered park are the next dependent
+edits before any runtime consumes this API. No native operational handler claimed.
+
+### 06B2b token protocol continuation — 2026-10-19
+
+Root continues under explicit no-author-child authorization; no independent reviewer
+started before the whole batch. Pending token all-target check passed47.98s
+(06B2b-token-protocol-check-2.log). Existing native harness15/0 passed on fresh
+migrations at stock2MiB/four threads (06B2b-token-base-tests.log). Added deferred
+SQL paused-pointer guard: exact decision/checkpoint association, approved consumption,
+exact reservation, unchanged paused content except execution reservations, and exact
+request preservation when reparking. Fresh lifecycle proof passes1/0
+(06B2b-token-lifecycle-tests-2.log): zero usage/debits at pause and approval, duplicate
+approval, real fresh claim, fingerprint substitution refusal and single admission.
+First lifecycle test compile failed on borrowed SubmitDecision; corrected to owned
+clone/value. Failed log retained. Expanded competing approval, rejection and excess
+settlement tests currently running in06B2b-token-lifecycle-tests-3.log.
+
+Still unfinished/unreviewed06B2b. Root refusal checks across activation/action/output/
+recovery remain missing. Audit identified settlement replay must retain refusal/pause
+outcomes (currently replay returns Saved too early); correct before driver integration.
+Trusted preparation/shared driver/effect waits and subsequent06B3/06C remain pending.
+No full verification, independent acceptance, operational native handler, commit or
+deployment claimed. Continue rather than treating this internal proof as a stop.
+
+Token lifecycle expanded3/0 PASS (06B2b-token-lifecycle-tests-3.log), then native
+harness19/0 PASS (06B2b-token-lifecycle-tests-4.log), all stock2MiB/four threads.
+Settlement replay now rechecks root policy, preserving refusal/review-unavailable
+rather than granting progression from saved truth. Added typed domain TokenRefusal;
+pending activation/recovery, fresh local/remote/message entry and completion check
+shared root policy. All-target offline check55.72s PASS before subsequent SQL/tests/
+helper extraction. Action authority/receipt settlement deliberately remains available
+for received truth; guards live at progression boundaries instead.
+
+First refusal tests3/3 (06B2b-token-refusal-tests.log): new SQL run-reopen guard blocked
+transient running during terminal reject/expiry; corrected to deferred final-state
+validation. Descendant fixture reused child idempotency key; now keyed per parent.
+Removed unused test import. Extracted synchronous recovery decision and boxed completion
+progression guard to keep touched functions bounded. Focused rerun currently in
+06B2b-token-refusal-tests-2.log. Still WIP, no independent review/full phase acceptance.
+
+### Proposed D4 revision3 root-pause addendum
+
+Native22/0 PASS (06B2b-token-refusal-tests-3.log). Affected regressions89/0 PASS:
+action dispatch22, activation budget9, action uncertainty10, completion14, decision34.
+First action regression21/1 preserved: token SQL guard intercepted invalid FK provenance
+with SELECT INTO STRICT; valid run budget links are immutable, so missing associations
+now defer to their actual composite FKs. Latest successful logs use the ordinary names;
+failed log has-before-fk-order-fix suffix. Strict Clippy found oversized Saved settlement
+payload; correction pending before rerun. No full verification/acceptance claimed.
+
+New architecture assumption requires review: rejecting a sibling's progression while
+shared usage awaits review must not poison its retry/error route. Proposed addendum
+logs/06/decision-D4-root-pause-r3.md specifies bounded existing pending scheduling and
+normal one-attempt interruption accounting, preserving hard bounds and exact native
+model pause protocol. Root will request an independent architecture review before edits
+dependent on this addition; independent token proof/Clippy corrections may continue.
+
+Independent architecture reviewer started as /root/reviewer_06, requested
+model gpt-6-astra/medium with fork_turns none, for proposed root-pause addendum
+SHA256 ab2be4fe23c66e31d53296a5d40629cb31a45b5516b3b80e208ac71f774fd3c7.
+Only architecture06-R013 requested; no source-batch review or acceptance.
+Dependent scheduling edits held pending review. Reviewer owns durable review notes,
+findings and REVIEW updates; root retains source/build/fixture ownership. Boxed the
+large settlement Saved payload; Clippy rerun06B2b-token-clippy-2.log in progress.
+Independent sibling repark/received-truth tests remain to add before runtime work.
+
+Root accepts D4 revision3 addendum after06-R013 explicit architecture PASS and matching
+independent SHA256 ab2be4fe23c66e31d53296a5d40629cb31a45b5516b3b80e208ac71f774fd3c7.
+No findings;06-F008 unused. This is decision acceptance only, not06B2b source acceptance.
+Strict offline locked all-target Clippy now PASS68s (06B2b-token-clippy-2.log) after
+boxing Saved settlement outcome. Additional sibling repark/received-truth tests running
+in06B2b-token-sibling-tests.log; then implement accepted pending root-pause scheduling.
+Reviewer handle retained idle for eventual whole-batch review.
+
+### Root-pause scheduling continuation — 2026-10-19
+
+Root continues after context handoff; user did not request a stop. Retained independent
+reviewer /root/reviewer_06 remains available; no source review requested yet. Accepted
+06-R013 governs pending scheduling. Added pending deferral/approval and processing
+interruption proofs: token11/0 PASS at stock2MiB/four threads in
+06B2b-token-scheduling-tests-2.log. Initial compile failed only on sibling fixture
+helper visibility; preserved06B2b-token-scheduling-tests.log, helper made pub(super).
+Pending tests compare the whole job except schedule/update timestamps, proving no
+claim/counter changes; processing test proves one failure debit and no further debit
+on due and repeated polls. Expanded final-attempt, deferred-denial and competing
+claim/no-ancestor-lock tests are running in06B2b-token-scheduling-tests-3.log.
+No full verification or06B2b source acceptance. Runtime integration still outstanding.
+
+Expanded token15/0 PASS in06B2b-token-scheduling-tests-4.log: final attempt fails
+without successor, deferred denial consumes no attempt, real competing deferred claims
+complete while ancestor run lock is held, and approved never-admitted request gets a
+fresh fence/reparks even when usage itself exceeds allowance. Earlier-3 log records
+only a test temporary-borrow compile error; fixed by retaining settled persistence.
+Pure-path audit found Option conflated deferral with settled failure. Pending activation
+now carries Ready/Deferred/Settled through pure preparation; BatchDisposition::Deferred
+reports scheduled work with no immediate continuation. Worker already relies on persisted
+poll eligibility, not this disposition. Added actual I/O→pure successor pause/resume
+and capped-deadline retirement proofs; current run is scheduling-tests-5.log.
+
+Token21/0 PASS stock2MiB/four threads in06B2b-token-scheduling-tests-7.log.
+Notification final-commit rollback, approval grant/reopen rollback, SQL proposal/
+allowance/pointer bypass rejection and competing reviewer revocation now covered.
+Pure pause/resume and deadline cap/expiry pass. Logs-5/-6 preserve fixture failures
+(wrong terminal route then invalid context.load output), corrected to the real
+output contract. Regression/static/migration/SQLx script06B2b-token-scheduling-gates.sh
+is running; it creates/drops only workflow06_token_scheduling_20261019_test and never
+resets retained databases. No full task verification or source review acceptance.
+
+Scheduling regressions113/0 PASS: batch15, poison12, activation budget9,
+completion14, wait19, decision34, action uncertainty10. Locked offline all-target
+check PASS50.07s. Clippy stopped on one test-only clone of Copy RigExecutionPolicy;
+removed clone, saved failed log as06B2b-scheduling-clippy-before-copy-fix.log.
+Fresh-schema/SQLx steps had not started. Author audit also found AwaitingAllowance
+could replace a hard budget/activation failure's code/class. Recovery now preserves
+those hard-limit diagnostics (permanent token refusal still has its exact code),
+while retaining no-error-routing and hard-bound decisions. Added real root model-call
+exhaustion while token gate is closed; token rerun in scheduling-tests-8.log pending.
+
+Token22/0 PASS in06B2b-token-scheduling-tests-8.log, including hard root model-call
+exhaustion while awaiting token approval: terminal hard-limit code preserved, no retry.
+Removed one unused test trait import afterward. Resuming affected budget-runtime/action-
+uncertainty, offline all-target check, strict Clippy and fresh migration/SQLx through
+06B2b-token-scheduling-gates-resume.sh. Earlier113 unchanged regression proofs retained;
+not rerunning all113 for this narrow report precedence fix. All06B2b still WIP.
+
+Next integration trace (not implemented): native tool/final mutations must use the shared
+RunCheckpoint::apply validator with real WorkflowFence ownership. Existing SQL token
+pointer guard currently allows clearing only alongside model admission; approved settlement
+must also allow guarded pending-tool/final progression without forcing a new model call.
+Never consume a reservation-stage approval that way. Received action truth remains separate
+from permission for new effects/output. Shared Rig Execution still owns legacy RunExecution,
+CompiledRun/ToolBridge; use D4's closed native/legacy bindings, one durable drive loop and
+frozen native preamble. response_preamble currently takes CompiledRun only to render its
+preamble; both direct and durable callers must remain correct when decoupled. Trusted
+preparation and tool target resolution remain outstanding, not supplied by today's generic
+immutable prepared Value. No native operational model handler is claimed.
+
+Scheduling segment gates PASS: resumed budget-runtime9/0 and action-uncertainty10/0;
+offline all-target check54.19s; strict all-target Clippy66s; fresh init migration;
+SQLx prepare55.20s/check53.41s, no.sqlx diff. Disposable metadata DB removed by
+successful trap, absence confirmed. Earlier113 regression proofs and22 token proofs
+remain the relevant coverage. Graft refresh running. No full phase/whole06B2b acceptance.
+Continuing native tool/final checkpoint mutation integration under accepted D4.
+
+Native checkpoint update WIP now implemented: application-owned closed update command
+(BindTools/PrepareInvocation/InvocationResult/FinalOutput/InvalidOutput), same authority/
+real fence/checkpoint transaction and shared Mutation validator. No model admission permit
+comes from mutation/replay/ambiguous acknowledgment. Active model slots block mutation;
+current execution-time reservation is required. Reservation-stage approval cannot be consumed
+by updates. Settlement-stage completed approval can be consumed with root-gated tool/final
+progression, without a new model call. SQL adds matching progression guard; received tool
+results remain writable after sibling refusal, without granting subsequent tool/output entry.
+No operational native handler or effect/delivery-wait association yet. Three new tests cover
+competing final writes after settlement approval, reservation-approval misuse, and received
+result retention/new preparation refusal (Rust and SQL). Expanded native harness run pending
+in06B2b-checkpoint-updates-tests.log. Prior SQLx evidence predates these new SQL edits; must
+refresh before claiming this segment verified. All changes remain unreviewed06B2b WIP.
+
+Expanded native harness40/0 PASS stock2MiB/four threads in
+06B2b-checkpoint-updates-tests.log. New final-after-settlement-approval path makes no
+new model call; competing writes apply once and replay saved final output. Reservation
+approval misuse rejects unchanged; active model blocks invalid-output mutation; received
+saved invocation result survives sibling refusal, but next preparation is refused in both
+Rust and SQL. New checkpoint SQL still needs SQLx/static follow-up with the next cohesive
+runtime segment; do not reuse earlier schema evidence as if it covered this delta.

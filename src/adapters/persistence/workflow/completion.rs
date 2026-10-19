@@ -103,34 +103,8 @@ pub(super) async fn complete_on(
     {
         return Ok(None);
     }
-    if action_uncertainty::conflicted_on(
-        db,
-        crate::application::workflow::actions::ActionScope {
-            company: scope.company,
-            run: scope.run,
-            execution: scope.execution,
-        },
-    )
-    .await?
-    {
-        let failure = crate::application::workflow::lease::WorkflowFailure {
-            failure: crate::domain::workflow::StepFailure::new(
-                crate::domain::workflow::FailureClass::Terminal,
-                crate::domain::workflow::FailureCode::parse("action.evidence_conflict")
-                    .map_err(|_| invalid())?,
-                None,
-            )
-            .map_err(|_| invalid())?,
-            safety: crate::domain::workflow::RetrySafety::EffectOutcomeUnknown,
-        };
-        recovery::retire_on(
-            db,
-            result.fence,
-            lease::Retirement::Interrupted(
-                crate::application::workflow::lease::LeaseReleaseCause::Classified(failure),
-            ),
-        )
-        .await?;
+    // Box the retirement boundary to keep the debug future stack bounded.
+    if !Box::pin(progression_allowed(db, result.fence)).await? {
         return Ok(None);
     }
     let binding = admission_binding::read_saved_binding(
@@ -170,6 +144,52 @@ pub(super) async fn complete_on(
         target: completion.target,
         successor,
     }))
+}
+
+async fn progression_allowed(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<bool> {
+    let scope = fence.scope;
+    if token_budget::progression_on(db, scope).await? != token_budget::Progression::Open {
+        Box::pin(recovery::retire_on(
+            db,
+            fence,
+            lease::Retirement::Interrupted(
+                crate::application::workflow::lease::LeaseReleaseCause::HandlerFailure,
+            ),
+        ))
+        .await?;
+        return Ok(false);
+    }
+    if action_uncertainty::conflicted_on(
+        db,
+        crate::application::workflow::actions::ActionScope {
+            company: scope.company,
+            run: scope.run,
+            execution: scope.execution,
+        },
+    )
+    .await?
+    {
+        let failure = crate::application::workflow::lease::WorkflowFailure {
+            failure: crate::domain::workflow::StepFailure::new(
+                crate::domain::workflow::FailureClass::Terminal,
+                crate::domain::workflow::FailureCode::parse("action.evidence_conflict")
+                    .map_err(|_| invalid())?,
+                None,
+            )
+            .map_err(|_| invalid())?,
+            safety: crate::domain::workflow::RetrySafety::EffectOutcomeUnknown,
+        };
+        recovery::retire_on(
+            db,
+            fence,
+            lease::Retirement::Interrupted(
+                crate::application::workflow::lease::LeaseReleaseCause::Classified(failure),
+            ),
+        )
+        .await?;
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 /// What an ambiguous completion left behind.

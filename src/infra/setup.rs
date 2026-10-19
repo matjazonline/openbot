@@ -334,6 +334,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     ));
 
     Ok(AppState {
+        model_usage: postgres_arc.clone(),
         task_counts: postgres_arc.clone(),
         db: postgres_arc.pool().clone(),
         mcp_use_cases,

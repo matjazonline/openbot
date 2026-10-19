@@ -198,7 +198,7 @@ BEGIN
                             AND witness.initial_state='waiting' AND witness.initial_waiting_reason='reconciliation')
                     AND receipt.result_revision=owner.revision AND audit.execution_id=receipt.execution_id
                     AND audit.actor_id=receipt.actor_id AND audit.event_kind='action_reconciled');
-        IF NEW.retry_count<>OLD.retry_count OR NEW.max_retries<>OLD.max_retries
+        IF NEW.retry_count<>OLD.retry_count OR NEW.continuation_count<>OLD.continuation_count OR NEW.max_retries<>OLD.max_retries
             OR NEW.workflow_execution_id<>OLD.workflow_execution_id OR NEW.id<>OLD.id
             OR owner.state<>'running' OR owner.terminal_execution_id IS NOT NULL
             OR NOT (ordinary OR reconciled)
@@ -217,12 +217,13 @@ CREATE FUNCTION public.check_workflow_fenced_completion() RETURNS trigger
     AS $$
 BEGIN
     IF OLD.queue_kind = 'workflow' AND OLD.status = 'processing' AND NEW.status = 'completed' THEN
-        IF OLD.lock_expires_at IS NULL OR OLD.lock_expires_at <= clock_timestamp()
+        IF NEW.retry_count<>OLD.retry_count OR NEW.continuation_count<>OLD.continuation_count
+            OR OLD.lock_expires_at IS NULL OR OLD.lock_expires_at <= clock_timestamp()
             OR NOT EXISTS (
                 SELECT 1 FROM workflow_executions AS execution
                 JOIN workflow_runs AS run ON run.company_id = execution.company_id AND run.id = execution.run_id
                 JOIN task_attempts AS attempt ON attempt.task_id = NEW.id
-                    AND attempt.attempt_number = OLD.retry_count + 1
+                    AND attempt.attempt_number = OLD.attempt_ordinal
                     AND attempt.worker_id = OLD.worker_id
                     AND attempt.execution_generation = OLD.execution_generation
                 WHERE execution.company_id = NEW.company_id AND execution.id = NEW.workflow_execution_id
@@ -237,19 +238,20 @@ BEGIN
                                     AND wait.reason = 'effect' AND wait.state = 'waiting'))
                         OR (attempt.stop_reason='approval_parked' AND execution.completed_at IS NULL
                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='decision'
-                            AND OLD.retry_count + 1 < OLD.max_retries
+                            AND OLD.continuation_count < 63
                             AND EXISTS (SELECT 1 FROM workflow_decisions AS decision
                                 JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
                                 WHERE decision.company_id=execution.company_id AND decision.execution_id=execution.id
-                                    AND decision.subject_kind='action_approval' AND decision.submitted_at IS NULL
+                                    AND decision.subject_kind IN ('action_approval','token_allowance') AND decision.submitted_at IS NULL
+                                    AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
                                     AND wait.reason='decision' AND wait.state='waiting')))
             ) THEN
             RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514';
         END IF;
     END IF;
     IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
-        IF NEW.retry_count <> OLD.retry_count + 1 OR NEW.max_retries <> OLD.max_retries
-            OR NEW.retry_count >= NEW.max_retries
+        IF NEW.retry_count <> OLD.retry_count OR NEW.max_retries <> OLD.max_retries
+            OR NEW.continuation_count <> OLD.continuation_count + 1 OR NEW.continuation_count > 63
             OR (NEW.company_id,NEW.workflow_execution_id) IS DISTINCT FROM (OLD.company_id,OLD.workflow_execution_id)
             OR NEW.worker_id IS NOT NULL OR NEW.execution_generation IS NOT NULL OR NEW.lock_expires_at IS NOT NULL
             OR NOT EXISTS (
@@ -257,12 +259,14 @@ BEGIN
                 JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
                 JOIN workflow_decisions AS decision ON decision.company_id=execution.company_id AND decision.execution_id=execution.id
                 JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
-                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.retry_count+1
+                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
                 WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
                     AND execution.completed_at IS NULL AND execution.committed_route IS NULL
                     AND run.state='running' AND run.deadline>clock_timestamp()
                     AND attempt.status='completed' AND attempt.stop_reason='approval_parked'
-                    AND decision.subject_kind='action_approval' AND decision.choice='approve'
+                    AND decision.subject_kind IN ('action_approval','token_allowance') AND decision.choice='approve'
+                    AND (decision.subject_kind<>'token_allowance' OR NOT EXISTS(SELECT 1 FROM workflow_run_budgets AS link JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id) WHERE link.company_id=decision.company_id AND link.run_id=decision.run_id AND usage.token_refusal IS NOT NULL))
+                    AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
                     AND decision.submitted_xact=pg_current_xact_id()
                     AND wait.reason='decision' AND wait.state='completed'
             ) THEN
@@ -284,9 +288,10 @@ DECLARE retirement task_attempts%ROWTYPE;
 BEGIN
     IF OLD.queue_kind='workflow' AND OLD.status='processing' AND NEW.status IN ('pending','failed') THEN
         SELECT * INTO retirement FROM task_attempts WHERE task_id=OLD.id
-            AND attempt_number=OLD.retry_count+1 AND execution_generation=OLD.execution_generation
+            AND attempt_number=OLD.attempt_ordinal AND execution_generation=OLD.execution_generation
             AND worker_id=OLD.worker_id AND status='failed';
         IF NOT FOUND OR retirement.workflow_retirement IS NULL OR NEW.retry_count<>OLD.retry_count+1
+            OR NEW.continuation_count<>OLD.continuation_count
             OR (retirement.workflow_retirement='live' AND OLD.lock_expires_at<=clock_timestamp())
             OR (retirement.workflow_retirement='expired' AND OLD.lock_expires_at>clock_timestamp())
             OR (NEW.status='pending' AND (retirement.workflow_retry_safety<>'safe'
@@ -479,7 +484,7 @@ BEGIN
         WHERE company_id=NEW.company_id AND root_run_id=NEW.root_run_id;
     consumed=CASE NEW.resource WHEN 'activation' THEN usage.activations WHEN 'model_call' THEN usage.model_calls ELSE usage.repetitions END;
     ceiling=CASE NEW.resource WHEN 'activation' THEN budget.activations WHEN 'model_call' THEN budget.model_calls ELSE budget.repetitions END;
-    NEW.disposition=CASE WHEN budget.provenance='frozen_v2' AND NEW.quantity>0
+    NEW.disposition=CASE WHEN budget.provenance='frozen_v4' AND NEW.quantity>0
         AND consumed<=ceiling::bigint-NEW.quantity THEN 'granted' ELSE 'exhausted' END;
     IF NEW.disposition='granted' THEN
         UPDATE workflow_root_budget_usage SET
@@ -975,7 +980,7 @@ BEGIN
         -- not become executable or receive defaults through this SQL boundary.
         BEGIN
             stored=convert_from(NEW.bundle,'UTF8')::jsonb;
-            IF stored->>'compiler_revision'='2' THEN
+            IF stored->>'compiler_revision'='4' THEN
                 SELECT version->'compiled'->'root_budget' INTO limits
                     FROM jsonb_array_elements(stored->'versions') AS version
                     WHERE version->>'version'=stored->>'root';
@@ -983,9 +988,9 @@ BEGIN
         EXCEPTION WHEN data_exception THEN
             limits=NULL;
         END;
-        INSERT INTO workflow_root_budgets(company_id,root_run_id,provenance,activations,model_calls,repetitions)
-            VALUES(NEW.company_id,root,CASE WHEN limits IS NULL THEN 'sealed_legacy' ELSE 'frozen_v2' END,
-                (limits->>'activations')::integer,(limits->>'model_calls')::integer,(limits->>'repetitions')::integer);
+        INSERT INTO workflow_root_budgets(company_id,root_run_id,provenance,activations,model_calls,repetitions,token_policy)
+            VALUES(NEW.company_id,root,CASE WHEN limits IS NULL THEN 'sealed_legacy' ELSE 'frozen_v4' END,
+                (limits->>'activations')::integer,(limits->>'model_calls')::integer,(limits->>'repetitions')::integer,limits->'tokens');
         INSERT INTO workflow_root_budget_usage(company_id,root_run_id) VALUES(NEW.company_id,root);
     END IF;
     INSERT INTO workflow_run_budgets(company_id,run_id,root_run_id,parent_run_id)
@@ -1903,7 +1908,7 @@ CREATE FUNCTION public.preserve_workflow_budget_usage() RETURNS trigger
     AS $$
 BEGIN
     IF TG_OP='INSERT' THEN
-        IF NEW.activations<>0 OR NEW.model_calls<>0 OR NEW.repetitions<>0 THEN
+        IF NEW.activations<>0 OR NEW.model_calls<>0 OR NEW.repetitions<>0 OR NEW.authorized_tokens<>0 OR NEW.token_refusal IS NOT NULL THEN
             RAISE EXCEPTION 'New workflow budget usage starts at zero' USING ERRCODE='23514';
         END IF;
         RETURN NEW;
@@ -1916,6 +1921,8 @@ BEGIN
     END IF;
     IF (NEW.company_id,NEW.root_run_id) IS DISTINCT FROM (OLD.company_id,OLD.root_run_id)
         OR NEW.activations<OLD.activations OR NEW.model_calls<OLD.model_calls OR NEW.repetitions<OLD.repetitions
+        OR NEW.authorized_tokens<OLD.authorized_tokens
+        OR (OLD.token_refusal IS NOT NULL AND NEW.token_refusal IS DISTINCT FROM OLD.token_refusal)
         OR (NEW IS DISTINCT FROM OLD AND pg_trigger_depth()<2) THEN
         RAISE EXCEPTION 'Workflow budget usage changes require a receipt' USING ERRCODE='23514';
     END IF;
@@ -2397,6 +2404,122 @@ BEGIN
 END;
 $$;
 
+
+--
+-- Native checkpoints share serialization with legacy runs, never legacy queue authority.
+CREATE FUNCTION public.require_harness_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' AND
+        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,
+            NEW.owner_principal_id,NEW.ownership_version,NEW.workflow_run_id,
+            NEW.workflow_execution_id,NEW.workflow_prepared)
+        IS DISTINCT FROM
+        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,
+            OLD.owner_principal_id,OLD.ownership_version,OLD.workflow_run_id,
+            OLD.workflow_execution_id,OLD.workflow_prepared) THEN
+        RAISE EXCEPTION 'harness owner and prepared inputs are immutable' USING ERRCODE='23514';
+    END IF;
+    IF NEW.owner_kind = 'legacy' THEN
+        IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
+            WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id AND task.queue_kind='legacy') THEN
+            RAISE EXCEPTION 'legacy harness requires legacy task' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF NEW.owner_kind <> 'workflow' THEN
+        RAISE EXCEPTION 'unknown harness owner' USING ERRCODE='23514';
+    END IF;
+    IF NEW.checkpoint->>'run_id' IS DISTINCT FROM NEW.id::text
+        OR NEW.checkpoint->'identity'->>'company_id' IS DISTINCT FROM NEW.company_id::text
+        OR NEW.checkpoint->'identity'->>'task_id' IS DISTINCT FROM NEW.task_id::text
+        OR NEW.checkpoint->'identity'->>'agent_id' IS DISTINCT FROM NEW.agent_id::text THEN
+        RAISE EXCEPTION 'native checkpoint identity is required' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP = 'UPDATE' THEN
+        IF NEW.revision <> OLD.revision + 1
+            OR NEW.checkpoint->'identity' IS DISTINCT FROM OLD.checkpoint->'identity'
+            OR NEW.checkpoint->'policy' IS DISTINCT FROM OLD.checkpoint->'policy' THEN
+            RAISE EXCEPTION 'native checkpoint revision or identity changed' USING ERRCODE='23514';
+        END IF;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.background_tasks AS job
+        JOIN public.workflow_executions AS execution
+            ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+        JOIN public.workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id
+            AND attempt.attempt_number=NEW.workflow_attempt
+            AND attempt.execution_generation=NEW.workflow_generation
+            AND attempt.worker_id=NEW.workflow_worker_id AND attempt.status='processing'
+        WHERE job.company_id=NEW.company_id AND job.id=NEW.task_id AND job.queue_kind='workflow'
+            AND execution.id=NEW.workflow_execution_id AND run.id=NEW.workflow_run_id
+            AND job.status='processing' AND job.worker_id=NEW.workflow_worker_id
+            AND job.execution_generation=NEW.workflow_generation AND job.attempt_ordinal=NEW.workflow_attempt
+            AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
+            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
+    ) THEN
+        RAISE EXCEPTION 'native checkpoint requires live workflow fence' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- Model ownership is separate from the most recent checkpoint writer.
+CREATE FUNCTION public.guard_harness_model_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+    IF TG_OP='INSERT' AND (jsonb_array_length(NEW.checkpoint->'reservations')<>0
+        OR jsonb_array_length(NEW.checkpoint->'turns')<>0 OR NEW.model_request_id IS NOT NULL) THEN
+        RAISE EXCEPTION 'native checkpoint must begin without model work' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.checkpoint->'reservations' IS DISTINCT FROM OLD.checkpoint->'reservations'
+        AND (jsonb_array_length(NEW.checkpoint->'reservations')=jsonb_array_length(OLD.checkpoint->'reservations')+1
+            AND (NEW.checkpoint->'reservations') - jsonb_array_length(OLD.checkpoint->'reservations') = OLD.checkpoint->'reservations'
+            AND NEW.model_request_id IS NOT NULL AND OLD.model_request_id IS NULL
+            AND NEW.checkpoint->'reservations'->-1->>'request_id'=NEW.model_request_id::text) IS NOT TRUE THEN
+        RAISE EXCEPTION 'new model reservation requires fresh active ownership' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.checkpoint->'turns' IS DISTINCT FROM OLD.checkpoint->'turns'
+        AND (jsonb_array_length(NEW.checkpoint->'turns')=jsonb_array_length(OLD.checkpoint->'turns')+1
+            AND (NEW.checkpoint->'turns') - jsonb_array_length(OLD.checkpoint->'turns') = OLD.checkpoint->'turns'
+            AND OLD.model_request_id IS NOT NULL AND NEW.model_request_id IS NULL
+            AND NEW.checkpoint->'turns'->-1->>'request_id'=OLD.model_request_id::text
+            AND ROW(OLD.model_generation,OLD.model_worker_id,OLD.model_attempt)
+                = ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)) IS NOT TRUE THEN
+        RAISE EXCEPTION 'model settlement requires exact admitting owner' USING ERRCODE='23514';
+    END IF;
+    IF NEW.model_request_id IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.checkpoint->'reservations') AS reservation
+            WHERE reservation->>'request_id'=NEW.model_request_id::text)
+            OR EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.checkpoint->'turns') AS turn
+                WHERE turn->>'request_id'=NEW.model_request_id::text) THEN
+            RAISE EXCEPTION 'active model owner requires unresolved reservation' USING ERRCODE='23514';
+        END IF;
+        IF TG_OP='INSERT' OR ROW(NEW.model_request_id,NEW.model_generation,NEW.model_worker_id,NEW.model_attempt)
+            IS DISTINCT FROM ROW(OLD.model_request_id,OLD.model_generation,OLD.model_worker_id,OLD.model_attempt) THEN
+            IF ROW(NEW.model_generation,NEW.model_worker_id,NEW.model_attempt)
+                IS DISTINCT FROM ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)
+                OR (TG_OP='UPDATE' AND EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(OLD.checkpoint->'reservations') AS reservation
+                    WHERE reservation->>'request_id'=NEW.model_request_id::text)) THEN
+                RAISE EXCEPTION 'model admission requires fresh request and current fence' USING ERRCODE='23514';
+            END IF;
+        END IF;
+    END IF;
+    IF TG_OP='UPDATE' AND OLD.model_request_id IS NOT NULL
+        AND ROW(NEW.model_request_id,NEW.model_generation,NEW.model_worker_id,NEW.model_attempt)
+            IS DISTINCT FROM ROW(OLD.model_request_id,OLD.model_generation,OLD.model_worker_id,OLD.model_attempt)
+        AND NOT (NEW.model_request_id IS NULL AND (
+            (ROW(OLD.model_generation,OLD.model_worker_id,OLD.model_attempt)
+                = ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)
+                AND EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.checkpoint->'turns') AS turn
+                    WHERE turn->>'request_id'=OLD.model_request_id::text))
+            OR (NEW.workflow_generation<>OLD.model_generation AND NEW.workflow_attempt>OLD.model_attempt))) THEN
+        RAISE EXCEPTION 'active model owner must settle or retire before replacement' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
 
 --
 -- Name: require_legacy_auxiliary_task(); Type: FUNCTION; Schema: public; Owner: -
@@ -3019,7 +3142,7 @@ BEGIN
         SELECT execution.run_id INTO run FROM workflow_executions AS execution
             WHERE execution.company_id=OLD.company_id AND execution.id=OLD.workflow_execution_id;
         INSERT INTO workflow_action_schedule_witnesses(company_id,run_id,execution_id,job_id,retired_attempt,transaction_id)
-            VALUES(OLD.company_id,run,OLD.workflow_execution_id,OLD.id,OLD.retry_count,pg_current_xact_id());
+            VALUES(OLD.company_id,run,OLD.workflow_execution_id,OLD.id,OLD.attempt_ordinal-1,pg_current_xact_id());
     END IF;
     RETURN NEW;
 END $$;
@@ -3071,7 +3194,7 @@ BEGIN
                     AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS DISTINCT FROM false)
                     OR (owner.state='waiting' AND owner.waiting_reason='reconciliation' AND owner.terminal_execution_id IS NULL
                         AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS FALSE))
-                AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=NEW.execution_id AND job.retry_count=NEW.retired_attempt
+                AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=NEW.execution_id AND job.attempt_ordinal-1=NEW.retired_attempt
                 AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL
                 AND step.activated_at IS NOT NULL AND step.completed_at IS NULL
                 AND audit.execution_id=NEW.execution_id AND audit.event_kind='workflow.root_budget_exhausted'
@@ -3103,7 +3226,7 @@ BEGIN
             AND command.run_id=NEW.run_id AND command.execution_id=NEW.execution_id AND command.scheduled_job_id=NEW.job_id
             AND command.outcome->>'kind'='scheduled' AND command.result_revision=owner.revision
             AND state.initial_state='waiting' AND state.initial_waiting_reason='reconciliation'
-            AND job.retry_count=NEW.retired_attempt AND job.status='pending'
+            AND job.attempt_ordinal-1=NEW.retired_attempt AND job.status='pending'
             AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL
             AND attempt.status='failed' AND attempt.finished_at IS NOT NULL
             AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=NEW.job_id AND later.attempt_number>NEW.retired_attempt))
@@ -3217,7 +3340,7 @@ BEGIN
         AND NEW.retry_count=OLD.retry_count AND NEW.workflow_execution_id=OLD.workflow_execution_id THEN
         UPDATE workflow_action_claim_retirement_witnesses AS witness SET retirement_confirmed=true
             WHERE witness.company_id=OLD.company_id AND witness.job_id=OLD.id AND witness.execution_id=OLD.workflow_execution_id
-                AND witness.retired_attempt=OLD.retry_count AND witness.transaction_id=pg_current_xact_id()
+                AND witness.retired_attempt=OLD.attempt_ordinal-1 AND witness.transaction_id=pg_current_xact_id()
                 AND workflow_action_pending_claim_episode(witness.company_id,witness.run_id,witness.execution_id,witness.job_id)=witness.command_key;
     END IF;
     RETURN NEW;
@@ -3329,7 +3452,7 @@ BEGIN
           AND execution.id=NEW.execution_id AND execution.completed_at IS NULL
           AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
           AND job.worker_id=NEW.worker_id AND job.execution_generation=NEW.execution_generation
-          AND job.retry_count+1=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+          AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
           AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
           AND attempt.execution_generation=NEW.execution_generation AND attempt.status='processing'
     ) THEN RAISE EXCEPTION 'workflow action dispatch lost live fence'; END IF;
@@ -3529,7 +3652,7 @@ CREATE FUNCTION public.workflow_action_pending_claim_episode(company uuid, run u
         JOIN background_tasks AS task ON task.company_id=episode.company_id AND task.id=episode.job_id
         JOIN workflow_executions AS step ON step.company_id=episode.company_id AND step.run_id=episode.run_id AND step.id=episode.execution_id
         WHERE episode.company_id=company AND episode.run_id=run AND episode.execution_id=execution AND episode.job_id=job
-            AND task.queue_kind='workflow' AND task.status='pending' AND task.retry_count=episode.retired_attempt
+            AND task.queue_kind='workflow' AND task.status='pending' AND task.attempt_ordinal-1=episode.retired_attempt
             AND task.worker_id IS NULL AND task.execution_generation IS NULL AND task.lock_expires_at IS NULL
             AND step.activated_at IS NOT NULL AND step.completed_at IS NULL
             AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=job AND later.attempt_number>episode.retired_attempt)
@@ -3619,7 +3742,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_budget_eligible(company uu
     SELECT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
         JOIN workflow_root_budgets AS budget ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id
         JOIN workflow_root_budget_usage AS usage ON usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id
-        WHERE link.company_id=company AND link.run_id=run AND budget.provenance='frozen_v2'
+        WHERE link.company_id=company AND link.run_id=run AND budget.provenance='frozen_v4'
             AND usage.activations<=budget.activations AND usage.model_calls<budget.model_calls
             AND usage.repetitions<=budget.repetitions
             AND NOT EXISTS(SELECT 1 FROM workflow_budget_receipts AS receipt
@@ -3660,7 +3783,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_reopen_safe(company uuid, 
     SELECT EXISTS(SELECT 1 FROM workflow_runs AS owner
         JOIN workflow_executions AS execution ON execution.company_id=owner.company_id AND execution.run_id=owner.id
         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
-        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
+        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
         WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
             AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
@@ -3705,7 +3828,7 @@ BEGIN
             AND execution.id=NEW.execution_id AND execution.completed_at IS NULL
             AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
             AND job.worker_id=NEW.worker_id AND job.execution_generation=NEW.execution_generation
-            AND job.retry_count+1=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+            AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
             AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
             AND attempt.execution_generation=NEW.execution_generation AND attempt.status='processing')
     THEN RAISE EXCEPTION 'workflow action remote entry lost live fence'; END IF;
@@ -3860,7 +3983,7 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
         SELECT 1 FROM workflow_runs AS owner
         JOIN workflow_executions AS execution ON execution.company_id=owner.company_id AND execution.run_id=owner.id
         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
-        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
+        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
         WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
             AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
@@ -3907,10 +4030,8 @@ CREATE FUNCTION public.workflow_decision_immutable() RETURNS trigger
 BEGIN
     -- The only transition: one submission recorded once, bumping the revision (05-D2 §5.1).
     IF OLD.submitted_at IS NULL AND NEW.submitted_at IS NOT NULL AND NEW.revision = OLD.revision + 1
-        AND (NEW.company_id, NEW.run_id, NEW.execution_id, NEW.id, NEW.wait_id, NEW.subject_kind,
-             NEW.proposal_digest, NEW.created_at, NEW.action_invocation_id, NEW.argument_digest, NEW.operation_digest)
-            IS NOT DISTINCT FROM (OLD.company_id, OLD.run_id, OLD.execution_id, OLD.id, OLD.wait_id,
-             OLD.subject_kind, OLD.proposal_digest, OLD.created_at, OLD.action_invocation_id, OLD.argument_digest, OLD.operation_digest) THEN
+        AND (to_jsonb(NEW)-ARRAY['submitted_at','submitted_by','submitted_xact','command_key','command_fingerprint','choice','feedback','data','revision'])
+            IS NOT DISTINCT FROM (to_jsonb(OLD)-ARRAY['submitted_at','submitted_by','submitted_xact','command_key','command_fingerprint','choice','feedback','data','revision']) THEN
         RETURN NEW;
     END IF;
     RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514';
@@ -4011,7 +4132,7 @@ BEGIN
         AND marker.id=NEW.dispatch_id AND marker.effect_kind='message'
         AND job.status='processing' AND job.worker_id=marker.worker_id
         AND job.execution_generation=marker.execution_generation
-        AND job.retry_count+1=marker.attempt_number AND job.lock_expires_at>clock_timestamp()
+        AND job.attempt_ordinal=marker.attempt_number AND job.lock_expires_at>clock_timestamp()
         AND attempt.status='processing' AND attempt.worker_id=marker.worker_id
         AND attempt.execution_generation=marker.execution_generation;
     IF captured IS NULL THEN
@@ -4430,6 +4551,8 @@ CREATE TABLE public.background_tasks (
     status text DEFAULT 'pending'::text NOT NULL,
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     retry_count integer DEFAULT 0 NOT NULL,
+    continuation_count smallint DEFAULT 0 NOT NULL,
+    attempt_ordinal integer GENERATED ALWAYS AS (retry_count + continuation_count + 1) STORED,
     max_retries integer DEFAULT 3 NOT NULL,
     last_error text,
     worker_id uuid,
@@ -4464,6 +4587,7 @@ CREATE TABLE public.background_tasks (
     CONSTRAINT background_tasks_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
     CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = ANY (ARRAY['legacy'::text, 'workflow'::text]))),
     CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
+    CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND 63 AND (queue_kind='workflow' OR continuation_count=0)),
     CONSTRAINT background_tasks_single_source_check CHECK (((source_message_uuid IS NULL) OR (source_schedule_run_id IS NULL))),
     CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text]))),
     CONSTRAINT background_tasks_transition_actor_kind_check CHECK (((transition_actor_kind IS NULL) OR (transition_actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text])))),
@@ -5762,8 +5886,20 @@ CREATE TABLE public.task_harness_runs (
     company_id uuid NOT NULL,
     task_id uuid NOT NULL,
     agent_id uuid NOT NULL,
-    owner_principal_id uuid NOT NULL,
-    ownership_version bigint NOT NULL,
+    owner_kind text NOT NULL DEFAULT 'legacy',
+    owner_principal_id uuid,
+    ownership_version bigint,
+    workflow_run_id uuid,
+    workflow_execution_id uuid,
+    workflow_generation uuid,
+    workflow_worker_id uuid,
+    workflow_attempt integer,
+    workflow_prepared jsonb,
+    model_blocked_decision uuid,
+    model_request_id uuid,
+    model_generation uuid,
+    model_worker_id uuid,
+    model_attempt integer,
     schema_version smallint NOT NULL,
     revision bigint NOT NULL,
     state text NOT NULL,
@@ -5771,6 +5907,22 @@ CREATE TABLE public.task_harness_runs (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     final_output_consumed_at timestamp with time zone,
+    CONSTRAINT task_harness_runs_token_owner CHECK (model_blocked_decision IS NULL OR owner_kind='workflow'),
+    CONSTRAINT task_harness_runs_model_owner_shape CHECK (
+        num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=0
+        OR (owner_kind='workflow'
+            AND num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=4
+            AND model_attempt>0)),
+    CONSTRAINT task_harness_runs_owner_shape CHECK (
+        (owner_kind = 'legacy' AND owner_principal_id IS NOT NULL AND ownership_version IS NOT NULL
+            AND num_nonnulls(workflow_run_id,workflow_execution_id,workflow_generation,
+                workflow_worker_id,workflow_attempt,workflow_prepared) = 0)
+        OR (owner_kind = 'workflow' AND owner_principal_id IS NULL AND ownership_version IS NULL
+            AND num_nonnulls(workflow_run_id,workflow_execution_id,workflow_generation,
+                workflow_worker_id,workflow_attempt,workflow_prepared) = 6
+            AND workflow_attempt > 0 AND final_output_consumed_at IS NULL
+            AND jsonb_typeof(workflow_prepared) = 'object'
+            AND octet_length(workflow_prepared::text) <= 2097152)),
     CONSTRAINT task_harness_runs_check CHECK ((((checkpoint ->> 'schema_version'::text))::integer = schema_version)),
     CONSTRAINT task_harness_runs_check1 CHECK ((((checkpoint ->> 'revision'::text))::bigint = revision)),
     CONSTRAINT task_harness_runs_check2 CHECK (((checkpoint ->> 'state'::text) = state)),
@@ -5792,7 +5944,7 @@ CASE
 END AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"[*]?(@."repair" != null)."repair"'::jsonpath)) <= 2)), false)),
     CONSTRAINT task_harness_runs_revision_check CHECK ((revision >= 0)),
     CONSTRAINT task_harness_runs_schema_version_check CHECK ((schema_version = 1)),
-    CONSTRAINT task_harness_runs_state_check CHECK ((state = ANY (ARRAY['active'::text, 'waiting'::text, 'completed'::text, 'superseded'::text, 'invalid_output'::text])))
+    CONSTRAINT task_harness_runs_state_check CHECK ((state = ANY (ARRAY['active'::text, 'waiting'::text, 'completed'::text, 'superseded'::text, 'invalid_output'::text, 'budget_exceeded'::text])))
 );
 
 
@@ -6762,7 +6914,14 @@ CREATE TABLE public.workflow_decisions (
     execution_id uuid NOT NULL,
     id uuid NOT NULL,
     wait_id uuid NOT NULL,
+    checkpoint_id uuid,
+    checkpoint_revision bigint,
+    token_request_id uuid,
+    token_stage text,
+    token_proposal jsonb,
     subject_kind text NOT NULL,
+    job_id uuid,
+    parked_attempt_number integer,
     action_invocation_id uuid,
     argument_digest text,
     operation_digest text,
@@ -6784,7 +6943,15 @@ CREATE TABLE public.workflow_decisions (
     CONSTRAINT workflow_decisions_data_check CHECK (((data IS NULL) OR (octet_length((data)::text) <= 1048576))),
     CONSTRAINT workflow_decisions_feedback_check CHECK (((feedback IS NULL) OR (octet_length(feedback) <= 65536))),
     CONSTRAINT workflow_decisions_proposal_digest_check CHECK ((proposal_digest ~ '^[0-9a-f]{64}$'::text)),
-    CONSTRAINT workflow_decisions_subject_kind_check CHECK ((subject_kind='business' AND action_invocation_id IS NULL AND argument_digest IS NULL AND operation_digest IS NULL) OR (subject_kind='action_approval' AND action_invocation_id IS NOT NULL AND argument_digest IS NOT NULL AND operation_digest IS NOT NULL)),
+    CONSTRAINT workflow_decisions_subject_kind_check CHECK (
+        (subject_kind IN ('business','action_approval')
+            AND num_nonnulls(checkpoint_id,checkpoint_revision,token_request_id,token_stage,token_proposal)=0
+            AND ((subject_kind='business' AND num_nonnulls(job_id,parked_attempt_number,action_invocation_id,argument_digest,operation_digest)=0)
+                OR (subject_kind='action_approval' AND num_nonnulls(job_id,parked_attempt_number,action_invocation_id,argument_digest,operation_digest)=5 AND parked_attempt_number>0)))
+        OR (subject_kind='token_allowance' AND num_nonnulls(checkpoint_id,checkpoint_revision,token_request_id,token_stage,token_proposal,job_id,parked_attempt_number)=7
+            AND num_nonnulls(action_invocation_id,argument_digest,operation_digest)=0
+            AND checkpoint_revision>=0 AND parked_attempt_number>0 AND token_stage IN ('reservation','settlement')
+            AND jsonb_typeof(token_proposal)='object' AND octet_length(token_proposal::text)<=8192)),
     CONSTRAINT workflow_decisions_submission_xact CHECK ((submitted_at IS NULL) = (submitted_xact IS NULL))
 );
 
@@ -7090,6 +7257,8 @@ CREATE TABLE public.workflow_poll_workers (
 --
 
 CREATE TABLE public.workflow_root_budget_usage (
+    authorized_tokens bigint NOT NULL DEFAULT 0 CHECK (authorized_tokens>=0),
+    token_refusal text CHECK (token_refusal IN ('rejected','expired','cancelled')),
     company_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
     activations bigint DEFAULT 0 NOT NULL,
@@ -7105,6 +7274,35 @@ CREATE TABLE public.workflow_root_budget_usage (
 -- Name: workflow_root_budgets; Type: TABLE; Schema: public; Owner: -
 --
 
+-- Frozen optional token allowance; current reviewer authority is checked at admission/use.
+CREATE FUNCTION public.valid_workflow_token_policy(policy jsonb) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+DECLARE reviewer jsonb; seen uuid[] = '{}'; reviewer_id uuid; amount bigint;
+BEGIN
+    IF jsonb_typeof(policy) IS DISTINCT FROM 'object'
+       OR NOT policy ?& ARRAY['max_tokens','reviewers']
+       OR policy - ARRAY['max_tokens','reviewers'] <> '{}'::jsonb
+       OR jsonb_typeof(policy->'max_tokens') IS DISTINCT FROM 'number'
+       OR policy->>'max_tokens' !~ '^[0-9]+$'
+       OR jsonb_typeof(policy->'reviewers') IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+    amount=(policy->>'max_tokens')::bigint;
+    IF amount<1 OR amount>2147483647 OR (policy->>'max_tokens')::numeric<>amount
+       OR jsonb_array_length(policy->'reviewers') NOT BETWEEN 1 AND 16 THEN RETURN false; END IF;
+    FOR reviewer IN SELECT value FROM jsonb_array_elements(policy->'reviewers') LOOP
+        IF jsonb_typeof(reviewer) IS DISTINCT FROM 'object'
+           OR reviewer->>'kind' IS DISTINCT FROM 'user'
+           OR NOT reviewer ?& ARRAY['kind','id']
+           OR reviewer - ARRAY['kind','id'] <> '{}'::jsonb
+           OR jsonb_typeof(reviewer->'id') IS DISTINCT FROM 'string' THEN RETURN false; END IF;
+        reviewer_id=(reviewer->>'id')::uuid;
+        IF reviewer_id=ANY(seen) THEN RETURN false; END IF;
+        seen=array_append(seen,reviewer_id);
+    END LOOP;
+    RETURN true;
+EXCEPTION WHEN data_exception THEN RETURN false;
+END $$;
+
 CREATE TABLE public.workflow_root_budgets (
     company_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
@@ -7112,8 +7310,10 @@ CREATE TABLE public.workflow_root_budgets (
     activations integer,
     model_calls integer,
     repetitions integer,
-    CONSTRAINT workflow_root_budgets_check CHECK ((((provenance = 'sealed_legacy'::text) AND (activations IS NULL) AND (model_calls IS NULL) AND (repetitions IS NULL)) OR ((provenance = 'frozen_v2'::text) AND (activations IS NOT NULL) AND ((activations >= 1) AND (activations <= 100000)) AND (model_calls IS NOT NULL) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND (repetitions IS NOT NULL) AND ((repetitions >= 1) AND (repetitions <= 1000))))),
-    CONSTRAINT workflow_root_budgets_provenance_check CHECK ((provenance = ANY (ARRAY['frozen_v2'::text, 'sealed_legacy'::text])))
+    token_policy jsonb,
+    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR (provenance='frozen_v4' AND public.valid_workflow_token_policy(token_policy))),
+    CONSTRAINT workflow_root_budgets_check CHECK ((((provenance = 'sealed_legacy'::text) AND (activations IS NULL) AND (model_calls IS NULL) AND (repetitions IS NULL)) OR ((provenance = 'frozen_v4'::text) AND (activations IS NOT NULL) AND ((activations >= 1) AND (activations <= 100000)) AND (model_calls IS NOT NULL) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND (repetitions IS NOT NULL) AND ((repetitions >= 1) AND (repetitions <= 1000))))),
+    CONSTRAINT workflow_root_budgets_provenance_check CHECK ((provenance = ANY (ARRAY['frozen_v4'::text, 'sealed_legacy'::text])))
 );
 
 
@@ -7136,6 +7336,7 @@ CREATE TABLE public.workflow_run_budgets (
 
 CREATE TABLE public.workflow_run_events (
     company_id uuid NOT NULL,
+    decision_id uuid,
     run_id uuid NOT NULL,
     sequence bigint NOT NULL,
     event_kind text NOT NULL,
@@ -9169,8 +9370,10 @@ ALTER TABLE ONLY public.workflow_decision_reviewers
 -- Name: workflow_decisions workflow_decision_execution; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_decisions
-    ADD CONSTRAINT workflow_decision_execution UNIQUE (company_id, run_id, execution_id);
+CREATE UNIQUE INDEX workflow_decision_execution ON public.workflow_decisions(company_id,run_id,execution_id) WHERE subject_kind='business';
+CREATE UNIQUE INDEX workflow_decision_action ON public.workflow_decisions(company_id,run_id,execution_id,action_invocation_id) WHERE subject_kind='action_approval';
+ALTER TABLE ONLY public.workflow_decisions ADD UNIQUE(company_id,run_id,execution_id,id);
+ALTER TABLE ONLY public.workflow_decisions ADD UNIQUE(company_id,wait_id);
 
 
 --
@@ -9545,8 +9748,7 @@ ALTER TABLE ONLY public.workflow_wait_events
 -- Name: workflow_waits workflow_wait_execution; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_waits
-    ADD CONSTRAINT workflow_wait_execution UNIQUE (company_id, run_id, execution_id, reason);
+CREATE UNIQUE INDEX workflow_wait_execution ON public.workflow_waits(company_id,run_id,execution_id,reason) WHERE reason<>'decision';
 
 CREATE UNIQUE INDEX workflow_wait_one_active ON public.workflow_waits(company_id,run_id,execution_id) WHERE state='waiting';
 
@@ -10401,7 +10603,7 @@ CREATE INDEX workflow_wait_event_unconsumed ON public.workflow_wait_events USING
 -- Name: workflow_run_event_execution_kind; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX workflow_run_event_execution_kind ON public.workflow_run_events USING btree (company_id, run_id, execution_id, event_kind) WHERE (event_kind <> 'action_reconciled'::text);
+CREATE UNIQUE INDEX workflow_run_event_execution_kind ON public.workflow_run_events USING btree (company_id, run_id, execution_id, event_kind) WHERE (event_kind <> 'action_reconciled'::text AND decision_id IS NULL);
 
 
 --
@@ -10814,7 +11016,13 @@ CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.t
 -- Name: task_harness_runs require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
+CREATE TRIGGER guard_harness_model_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_harness_model_owner();
+
+CREATE TRIGGER require_harness_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs
+    FOR EACH ROW EXECUTE FUNCTION public.require_harness_owner();
+CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_harness_invocations
+    FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
 
 
 --
@@ -14231,3 +14439,437 @@ ALTER TABLE public.workflow_action_intents ADD CONSTRAINT workflow_action_approv
 ALTER TABLE public.workflow_decisions ADD CONSTRAINT workflow_decisions_action_identity
     FOREIGN KEY(company_id,run_id,execution_id,action_invocation_id,argument_digest,operation_digest)
     REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest);
+
+
+-- Payload-free model usage; reservation and settlement commit with the execution checkpoint.
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_usage_version_identity
+    UNIQUE(company_id, id, workflow_id, version_id);
+CREATE TABLE public.model_usage_calls (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    request_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    workflow_id uuid,
+    version_id uuid,
+    run_id uuid,
+    execution_id uuid,
+    root_run_id uuid,
+    provider text NOT NULL CHECK (octet_length(provider) BETWEEN 1 AND 128 AND provider = lower(btrim(provider))),
+    model text NOT NULL CHECK (octet_length(model) BETWEEN 1 AND 256 AND model = btrim(model)),
+    requested_at timestamptz NOT NULL DEFAULT statement_timestamp(),
+    reserved_input bigint NOT NULL CHECK (reserved_input BETWEEN 0 AND 2147483647),
+    reserved_output bigint NOT NULL CHECK (reserved_output BETWEEN 0 AND 2147483647),
+    input_tokens bigint CHECK (input_tokens BETWEEN 0 AND 2147483647),
+    output_tokens bigint CHECK (output_tokens BETWEEN 0 AND 2147483647),
+    usage_source text CHECK (usage_source IN ('reported', 'estimated', 'mixed')),
+    settled_at timestamptz,
+    PRIMARY KEY(company_id, request_id),
+    CHECK (reserved_input + reserved_output > 0),
+    CHECK ((input_tokens IS NULL AND output_tokens IS NULL AND usage_source IS NULL AND settled_at IS NULL)
+        OR (input_tokens IS NOT NULL AND output_tokens IS NOT NULL AND usage_source IS NOT NULL AND settled_at IS NOT NULL)),
+    CHECK (settled_at IS NULL OR settled_at >= requested_at),
+    CHECK (num_nonnulls(workflow_id, version_id, run_id, execution_id, root_run_id) IN (0,5)),
+    FOREIGN KEY(company_id, task_id) REFERENCES public.background_tasks(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id, agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id, run_id, workflow_id, version_id)
+        REFERENCES public.workflow_runs(company_id,id,workflow_id,version_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id, run_id, execution_id)
+        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id, execution_id, task_id)
+        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id, run_id, root_run_id)
+        REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id) ON DELETE CASCADE
+);
+CREATE INDEX model_usage_company_time ON public.model_usage_calls(company_id,requested_at,request_id);
+CREATE FUNCTION public.guard_model_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (to_jsonb(NEW) - ARRAY['input_tokens','output_tokens','usage_source','settled_at'])
+        IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['input_tokens','output_tokens','usage_source','settled_at'])
+        OR (OLD.settled_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
+        RAISE EXCEPTION 'model usage identity and settled usage are immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER model_usage_immutable BEFORE UPDATE ON public.model_usage_calls
+    FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_update();
+
+CREATE SEQUENCE public.model_price_revision;
+CREATE TABLE public.model_prices (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    provider text NOT NULL CHECK (octet_length(provider) BETWEEN 1 AND 128 AND provider = lower(btrim(provider))),
+    model text NOT NULL CHECK (octet_length(model) BETWEEN 1 AND 256 AND model = btrim(model)),
+    input_micro_usd_per_million bigint NOT NULL CHECK (input_micro_usd_per_million BETWEEN 0 AND 1000000000000),
+    output_micro_usd_per_million bigint NOT NULL CHECK (output_micro_usd_per_million BETWEEN 0 AND 1000000000000),
+    revision bigint NOT NULL DEFAULT nextval('public.model_price_revision') CHECK (revision > 0),
+    PRIMARY KEY(company_id,provider,model)
+);
+
+CREATE FUNCTION public.guard_model_usage_task() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
+        WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id
+          AND ((NEW.run_id IS NULL AND task.queue_kind='legacy')
+            OR (NEW.run_id IS NOT NULL AND task.queue_kind='workflow' AND task.workflow_execution_id=NEW.execution_id))) THEN
+        RAISE EXCEPTION 'model usage requires exact task provenance' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER model_usage_task_scope BEFORE INSERT ON public.model_usage_calls
+    FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_task();
+
+
+-- Successful approval continuations have their own bounded debit and immutable subject.
+ALTER TABLE public.workflow_decisions
+    ADD FOREIGN KEY(company_id,execution_id,job_id)
+        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) DEFERRABLE INITIALLY DEFERRED,
+    ADD FOREIGN KEY(job_id,parked_attempt_number)
+        REFERENCES public.task_attempts(task_id,attempt_number) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_events
+    ADD FOREIGN KEY(company_id,run_id,execution_id,decision_id)
+        REFERENCES public.workflow_decisions(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED,
+    ADD CHECK (decision_id IS NULL OR execution_id IS NOT NULL),
+    ADD CONSTRAINT workflow_approval_event_kind CHECK ((decision_id IS NOT NULL) =
+        (event_kind IN ('action_approval_opened','action_approved','token_allowance_opened','token_allowance_approved','token_allowance_rejected','token_allowance_expired',
+            'http.approval_rejected','http.approval_expired',
+            'mcp.approval_rejected','mcp.approval_expired',
+            'message.approval_rejected','message.approval_expired')));
+CREATE UNIQUE INDEX workflow_approval_event_identity ON public.workflow_run_events(company_id,run_id,decision_id,event_kind) WHERE decision_id IS NOT NULL;
+
+CREATE FUNCTION public.workflow_continuation_counter_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='INSERT' THEN
+        IF NEW.continuation_count<>0 THEN
+            RAISE EXCEPTION 'workflow continuation must begin at zero' USING ERRCODE='23514';
+        END IF;
+    ELSIF NEW.continuation_count<>OLD.continuation_count AND NOT (
+        OLD.queue_kind='workflow' AND NEW.queue_kind='workflow'
+        AND OLD.status='completed' AND NEW.status='pending'
+        AND NEW.continuation_count=OLD.continuation_count+1
+        AND NEW.retry_count=OLD.retry_count) THEN
+        RAISE EXCEPTION 'workflow continuation requires an approval reopen' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_continuation_counter_guard BEFORE INSERT OR UPDATE ON public.background_tasks
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_continuation_counter_guard();
+
+CREATE FUNCTION public.workflow_decision_wait_pair_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM workflow_waits WHERE company_id=NEW.company_id AND id=NEW.id AND reason='decision')
+        AND NOT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=NEW.company_id AND wait_id=NEW.id) THEN
+        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_decision_wait_pair_guard AFTER INSERT OR UPDATE ON public.workflow_waits
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_wait_pair_guard();
+
+CREATE FUNCTION public.workflow_approval_audit_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP<>'INSERT' AND OLD.decision_id IS NOT NULL THEN
+        IF TG_OP='DELETE' AND pg_trigger_depth()>1
+            AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+        THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'workflow approval audit is append-only' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+    IF TG_OP='UPDATE' AND NEW.decision_id IS NOT NULL THEN
+        RAISE EXCEPTION 'workflow event cannot become an approval audit' USING ERRCODE='23514';
+    END IF;
+    IF NEW.decision_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM workflow_decisions
+        WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND execution_id=NEW.execution_id
+            AND id=NEW.decision_id AND ((subject_kind='action_approval' AND NEW.event_kind NOT LIKE 'token_allowance_%') OR (subject_kind='token_allowance' AND NEW.event_kind LIKE 'token_allowance_%'))) THEN
+        RAISE EXCEPTION 'workflow approval audit requires its exact decision' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_approval_audit_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_events
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_approval_audit_guard();
+
+CREATE FUNCTION public.workflow_decision_wait_delete_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM workflow_waits WHERE company_id=OLD.company_id AND id=OLD.wait_id)
+        AND NOT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=OLD.company_id AND wait_id=OLD.wait_id) THEN
+        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_decision_wait_delete_guard AFTER DELETE ON public.workflow_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_wait_delete_guard();
+
+-- Native checkpoint owner relationships are exact, tenant-scoped and retained across claims.
+CREATE UNIQUE INDEX task_harness_runs_workflow_execution
+    ON public.task_harness_runs(company_id,workflow_execution_id) WHERE owner_kind='workflow';
+ALTER TABLE public.task_harness_runs
+    ADD FOREIGN KEY(company_id,workflow_run_id,workflow_execution_id)
+        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    ADD FOREIGN KEY(company_id,workflow_execution_id,task_id)
+        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) ON DELETE CASCADE,
+    ADD FOREIGN KEY(task_id,workflow_attempt,workflow_generation,workflow_worker_id)
+        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id),
+    ADD FOREIGN KEY(task_id,model_attempt,model_generation,model_worker_id)
+        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id);
+
+
+-- Root token authorization is a decision fact, never an independent per-call ledger.
+ALTER TABLE public.workflow_decisions
+    ADD FOREIGN KEY(company_id,job_id,checkpoint_id) REFERENCES public.task_harness_runs(company_id,task_id,id);
+ALTER TABLE public.task_harness_runs
+    ADD FOREIGN KEY(company_id,workflow_run_id,workflow_execution_id,model_blocked_decision)
+        REFERENCES public.workflow_decisions(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE FUNCTION public.apply_workflow_token_decision() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE root uuid;
+BEGIN
+    IF NEW.subject_kind<>'token_allowance' THEN RETURN NEW; END IF;
+    SELECT root_run_id INTO STRICT root FROM workflow_run_budgets WHERE company_id=NEW.company_id AND run_id=NEW.run_id;
+    IF NEW.choice='approve' THEN
+        UPDATE workflow_root_budget_usage SET authorized_tokens=GREATEST(authorized_tokens,(NEW.token_proposal->>'proposed_allowance')::bigint)
+            WHERE company_id=NEW.company_id AND root_run_id=root AND token_refusal IS NULL;
+        IF NOT FOUND THEN RAISE EXCEPTION 'root token continuation already refused' USING ERRCODE='23514'; END IF;
+    ELSIF NEW.choice='reject' THEN
+        UPDATE workflow_root_budget_usage SET token_refusal=COALESCE(token_refusal,'rejected') WHERE company_id=NEW.company_id AND root_run_id=root;
+    ELSE RAISE EXCEPTION 'invalid token decision choice' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER apply_workflow_token_decision AFTER UPDATE ON public.workflow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.apply_workflow_token_decision();
+
+CREATE FUNCTION public.refuse_expired_workflow_tokens() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.state='waiting' AND NEW.state IN ('expired','cancelled') THEN
+        UPDATE workflow_root_budget_usage AS usage SET token_refusal=COALESCE(usage.token_refusal,NEW.state)
+        FROM workflow_run_budgets AS link, workflow_decisions AS decision
+        WHERE decision.company_id=NEW.company_id AND decision.wait_id=NEW.id AND decision.subject_kind='token_allowance'
+            AND link.company_id=decision.company_id AND link.run_id=decision.run_id
+            AND usage.company_id=link.company_id AND usage.root_run_id=link.root_run_id;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER refuse_expired_workflow_tokens AFTER UPDATE ON public.workflow_waits
+    FOR EACH ROW EXECUTE FUNCTION public.refuse_expired_workflow_tokens();
+
+CREATE FUNCTION public.valid_workflow_token_proposal(proposal jsonb, stage text, request uuid) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE field text; amount bigint; original bigint; previous bigint; proposed bigint;
+BEGIN
+    IF jsonb_typeof(proposal) IS DISTINCT FROM 'object'
+        OR NOT proposal ?& ARRAY['original_allowance','old_allowance','proposed_allowance','usage','request']
+        OR proposal-ARRAY['original_allowance','old_allowance','proposed_allowance','usage','request']<>'{}'::jsonb
+        OR jsonb_typeof(proposal->'usage') IS DISTINCT FROM 'object'
+        OR NOT (proposal->'usage') ?& ARRAY['reported','estimated','mixed','unconfirmed']
+        OR (proposal->'usage')-ARRAY['reported','estimated','mixed','unconfirmed']<>'{}'::jsonb THEN RETURN false; END IF;
+    FOREACH field IN ARRAY ARRAY['original_allowance','old_allowance','proposed_allowance'] LOOP
+        IF jsonb_typeof(proposal->field) IS DISTINCT FROM 'number' OR proposal->>field !~ '^[0-9]+$' THEN RETURN false; END IF;
+        amount=(proposal->>field)::bigint;
+        IF amount<=0 THEN RETURN false; END IF;
+    END LOOP;
+    original=(proposal->>'original_allowance')::bigint;
+    previous=(proposal->>'old_allowance')::bigint;
+    proposed=(proposal->>'proposed_allowance')::bigint;
+    IF original>2147483647 OR previous<original OR proposed<previous OR proposed-previous<original THEN RETURN false; END IF;
+    FOREACH field IN ARRAY ARRAY['reported','estimated','mixed','unconfirmed'] LOOP
+        IF jsonb_typeof(proposal->'usage'->field) IS DISTINCT FROM 'number' OR proposal->'usage'->>field !~ '^[0-9]+$' THEN RETURN false; END IF;
+        amount=(proposal->'usage'->>field)::bigint;
+        IF amount<0 OR amount>4294967294000 THEN RETURN false; END IF;
+    END LOOP;
+    IF stage='settlement' THEN RETURN proposal->'request'='null'::jsonb; END IF;
+    IF stage<>'reservation' OR jsonb_typeof(proposal->'request') IS DISTINCT FROM 'object'
+        OR proposal->'request'->>'fingerprint' IS NULL OR proposal->'request'->>'fingerprint' !~ '^[0-9a-f]{64}$'
+        OR proposal->'request'->'reservation'->>'request_id' IS DISTINCT FROM request::text THEN RETURN false; END IF;
+    FOREACH field IN ARRAY ARRAY['input_tokens','output_tokens'] LOOP
+        IF jsonb_typeof(proposal->'request'->'reservation'->field) IS DISTINCT FROM 'number'
+            OR proposal->'request'->'reservation'->>field !~ '^[0-9]+$' THEN RETURN false; END IF;
+        amount=(proposal->'request'->'reservation'->>field)::bigint;
+        IF amount<1 OR amount>2147483647 THEN RETURN false; END IF;
+    END LOOP;
+    RETURN true;
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END $$;
+ALTER TABLE public.workflow_decisions ADD CONSTRAINT workflow_token_proposal_shape
+    CHECK (subject_kind<>'token_allowance' OR public.valid_workflow_token_proposal(token_proposal,token_stage,token_request_id));
+
+CREATE FUNCTION public.guard_workflow_token_proposal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE root uuid; policy jsonb; allowance bigint; refused text; observed jsonb; needed bigint;
+BEGIN
+    IF NEW.subject_kind<>'token_allowance' THEN RETURN NEW; END IF;
+    IF NOT public.valid_workflow_token_proposal(NEW.token_proposal,NEW.token_stage,NEW.token_request_id) THEN
+        RAISE EXCEPTION 'invalid token proposal' USING ERRCODE='23514'; END IF;
+    SELECT usage.root_run_id,budget.token_policy,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint),usage.token_refusal
+        INTO STRICT root,policy,allowance,refused FROM workflow_run_budgets AS link
+        JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
+        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+        WHERE link.company_id=NEW.company_id AND link.run_id=NEW.run_id FOR UPDATE OF usage;
+    IF policy IS NULL OR refused IS NOT NULL OR (NEW.token_proposal->>'original_allowance')::bigint<>(policy->>'max_tokens')::bigint
+        OR (NEW.token_proposal->>'old_allowance')::bigint<>allowance THEN
+        RAISE EXCEPTION 'token proposal does not match current root allowance' USING ERRCODE='23514'; END IF;
+    SELECT jsonb_build_object(
+        'reported',COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='reported'),0),
+        'estimated',COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='estimated'),0),
+        'mixed',COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='mixed'),0),
+        'unconfirmed',COALESCE(sum(reserved_input+reserved_output) FILTER(WHERE settled_at IS NULL),0))
+        INTO observed FROM model_usage_calls WHERE company_id=NEW.company_id AND root_run_id=root;
+    needed=CASE WHEN NEW.token_stage='reservation' THEN (NEW.token_proposal->'request'->'reservation'->>'input_tokens')::bigint
+        +(NEW.token_proposal->'request'->'reservation'->>'output_tokens')::bigint ELSE 0 END;
+    IF NEW.token_proposal->'usage' IS DISTINCT FROM observed
+        OR (NEW.token_proposal->>'proposed_allowance')::bigint<needed+(observed->>'reported')::bigint
+            +(observed->>'estimated')::bigint+(observed->>'mixed')::bigint+(observed->>'unconfirmed')::bigint THEN
+        RAISE EXCEPTION 'token proposal does not cover observed usage' USING ERRCODE='23514'; END IF;
+    IF NOT EXISTS(SELECT 1 FROM task_harness_runs AS checkpoint JOIN background_tasks AS job ON job.company_id=checkpoint.company_id AND job.id=checkpoint.task_id
+        WHERE checkpoint.company_id=NEW.company_id AND checkpoint.id=NEW.checkpoint_id AND checkpoint.workflow_run_id=NEW.run_id
+            AND checkpoint.workflow_execution_id=NEW.execution_id AND checkpoint.task_id=NEW.job_id AND checkpoint.revision=NEW.checkpoint_revision
+            AND checkpoint.model_blocked_decision=NEW.id AND checkpoint.model_request_id IS NULL AND checkpoint.state='active'
+            AND job.status='processing' AND job.attempt_ordinal=NEW.parked_attempt_number AND job.lock_expires_at>clock_timestamp()
+            AND job.worker_id=checkpoint.workflow_worker_id AND job.execution_generation=checkpoint.workflow_generation
+            AND ((NEW.token_stage='settlement' AND EXISTS(SELECT 1 FROM jsonb_array_elements(checkpoint.checkpoint->'turns') AS turn WHERE turn->>'request_id'=NEW.token_request_id::text))
+                OR (NEW.token_stage='reservation' AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(checkpoint.checkpoint->'reservations') AS reservation WHERE reservation->>'request_id'=NEW.token_request_id::text)))) THEN
+        RAISE EXCEPTION 'token proposal requires its exact live checkpoint' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_workflow_token_proposal BEFORE INSERT ON public.workflow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_token_proposal();
+
+-- The deferred association permits checkpoint-first parking, but never an
+-- arbitrary pointer, an unapproved consumption, or substitution of a request.
+CREATE FUNCTION public.guard_harness_token_pause() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE prior public.workflow_decisions%ROWTYPE; next_decision public.workflow_decisions%ROWTYPE;
+BEGIN
+    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+    IF TG_OP='INSERT' THEN
+        IF NEW.model_blocked_decision IS NOT NULL THEN
+            RAISE EXCEPTION 'new checkpoint cannot inherit token approval' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF OLD.model_blocked_decision IS NOT DISTINCT FROM NEW.model_blocked_decision THEN
+        IF OLD.model_blocked_decision IS NOT NULL AND
+            (NEW.checkpoint-'revision'-'executions' IS DISTINCT FROM OLD.checkpoint-'revision'-'executions') THEN
+            RAISE EXCEPTION 'paused checkpoint may only reserve execution time' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF OLD.model_blocked_decision IS NOT NULL THEN
+        SELECT * INTO STRICT prior FROM public.workflow_decisions AS decision
+            WHERE decision.company_id=OLD.company_id AND decision.id=OLD.model_blocked_decision;
+        IF prior.choice IS DISTINCT FROM 'approve' OR NOT EXISTS (
+            SELECT 1 FROM public.workflow_waits AS wait WHERE wait.company_id=prior.company_id
+                AND wait.id=prior.wait_id AND wait.state='completed') THEN
+            RAISE EXCEPTION 'token pause requires completed approval' USING ERRCODE='23514';
+        END IF;
+        IF NEW.model_blocked_decision IS NULL AND prior.token_stage='reservation'
+            AND (NEW.model_request_id IS NULL
+                OR NEW.checkpoint->'reservations'->-1 IS DISTINCT FROM prior.token_proposal->'request'->'reservation') THEN
+            RAISE EXCEPTION 'token approval consumption requires exact model reservation' USING ERRCODE='23514';
+        END IF;
+        IF NEW.model_blocked_decision IS NULL AND prior.token_stage='settlement' THEN
+            PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.workflow_run_id);
+        END IF;
+    END IF;
+    IF NEW.model_blocked_decision IS NOT NULL THEN
+        SELECT * INTO STRICT next_decision FROM public.workflow_decisions AS decision
+            WHERE decision.company_id=NEW.company_id AND decision.id=NEW.model_blocked_decision;
+        IF next_decision.subject_kind<>'token_allowance'
+            OR ROW(next_decision.run_id,next_decision.execution_id,next_decision.job_id,next_decision.checkpoint_id,next_decision.checkpoint_revision)
+                IS DISTINCT FROM ROW(NEW.workflow_run_id,NEW.workflow_execution_id,NEW.task_id,NEW.id,NEW.revision)
+            OR NEW.model_request_id IS NOT NULL
+            OR NEW.checkpoint-'revision' IS DISTINCT FROM OLD.checkpoint-'revision'
+            OR (OLD.model_blocked_decision IS NOT NULL AND prior.token_stage='reservation'
+                AND next_decision.token_proposal->'request' IS DISTINCT FROM prior.token_proposal->'request') THEN
+            RAISE EXCEPTION 'token pause requires exact saved proposal' USING ERRCODE='23514';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER guard_harness_token_pause AFTER INSERT OR UPDATE ON public.task_harness_runs
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_harness_token_pause();
+
+CREATE FUNCTION public.require_workflow_token_progression(company uuid, run uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE refused text; allowance bigint; observed numeric;
+BEGIN
+    SELECT usage.token_refusal,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint)
+        INTO refused,allowance FROM workflow_run_budgets AS link
+        JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
+        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+        WHERE link.company_id=company AND link.run_id=run FOR UPDATE OF usage;
+    -- Invalid associations remain the composite foreign keys' responsibility.
+    -- Every valid run creates its immutable budget link in its insert trigger.
+    IF NOT FOUND THEN RETURN; END IF;
+    IF refused IS NOT NULL THEN
+        RAISE EXCEPTION 'workflow token continuation refused: %',refused USING ERRCODE='23514';
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
+        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+        WHERE link.company_id=company AND link.run_id=run AND budget.token_policy IS NOT NULL) THEN RETURN; END IF;
+    SELECT COALESCE(sum(CASE WHEN call.settled_at IS NULL THEN call.reserved_input+call.reserved_output
+        ELSE call.input_tokens+call.output_tokens END),0) INTO observed FROM model_usage_calls AS call
+        JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.root_run_id=call.root_run_id
+        WHERE link.company_id=company AND link.run_id=run;
+    IF observed>allowance THEN
+        RAISE EXCEPTION 'workflow token approval required' USING ERRCODE='23514';
+    END IF;
+END $$;
+
+CREATE FUNCTION public.guard_workflow_token_progression() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.run_id);
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_workflow_token_dispatch BEFORE INSERT ON public.workflow_action_dispatches
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_token_progression();
+CREATE TRIGGER guard_workflow_token_remote_entry BEFORE INSERT ON public.workflow_action_remote_entries
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_token_progression();
+CREATE TRIGGER guard_workflow_token_completion BEFORE UPDATE OF completed_at ON public.workflow_executions
+    FOR EACH ROW WHEN (OLD.completed_at IS NULL AND NEW.completed_at IS NOT NULL)
+    EXECUTE FUNCTION public.guard_workflow_token_progression();
+
+CREATE FUNCTION public.guard_harness_token_admission() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.workflow_run_id);
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_harness_token_admission BEFORE UPDATE OF model_request_id ON public.task_harness_runs
+    FOR EACH ROW WHEN (NEW.owner_kind='workflow' AND OLD.model_request_id IS NULL AND NEW.model_request_id IS NOT NULL)
+    EXECUTE FUNCTION public.guard_harness_token_admission();
+
+CREATE FUNCTION public.guard_harness_workflow_progression() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE progresses boolean;
+BEGIN
+    progresses = jsonb_array_length(NEW.checkpoint->'invocations')>jsonb_array_length(OLD.checkpoint->'invocations')
+        OR NEW.checkpoint->'final_output' IS DISTINCT FROM OLD.checkpoint->'final_output'
+        OR NEW.checkpoint->'tool_catalogue_fingerprint' IS DISTINCT FROM OLD.checkpoint->'tool_catalogue_fingerprint';
+    IF NEW.model_request_id IS NOT NULL AND
+        (NEW.checkpoint->'invocations' IS DISTINCT FROM OLD.checkpoint->'invocations'
+            OR NEW.checkpoint->'final_output' IS DISTINCT FROM OLD.checkpoint->'final_output'
+            OR NEW.checkpoint->'tool_catalogue_fingerprint' IS DISTINCT FROM OLD.checkpoint->'tool_catalogue_fingerprint'
+            OR NEW.state IS DISTINCT FROM OLD.state) THEN
+        RAISE EXCEPTION 'active model request prevents checkpoint progression' USING ERRCODE='23514';
+    END IF;
+    IF progresses THEN
+        IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.checkpoint->'executions') AS execution
+            WHERE execution->>'generation'=NEW.workflow_generation::text) THEN
+            RAISE EXCEPTION 'checkpoint progression requires execution reservation' USING ERRCODE='23514';
+        END IF;
+        PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.workflow_run_id);
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_harness_workflow_progression BEFORE UPDATE ON public.task_harness_runs
+    FOR EACH ROW WHEN (NEW.owner_kind='workflow')
+    EXECUTE FUNCTION public.guard_harness_workflow_progression();
+
+CREATE FUNCTION public.guard_workflow_token_reopen() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    -- Wait completion temporarily marks the owner running before its rejection
+    -- or expiry handler closes it. Only the committed state grants progression.
+    IF EXISTS(SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
+        AND run.id=NEW.id AND run.state IN ('queued','running')) THEN
+        PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.id);
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER guard_workflow_token_reopen AFTER UPDATE ON public.workflow_runs
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW WHEN (OLD.state NOT IN ('queued','running') AND NEW.state IN ('queued','running'))
+    EXECUTE FUNCTION public.guard_workflow_token_reopen();

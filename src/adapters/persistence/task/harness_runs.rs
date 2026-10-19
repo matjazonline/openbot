@@ -1,5 +1,6 @@
 //! All worker mutations lock task -> run -> invocation. Never hold these locks over provider I/O.
 use super::super::PostgresPersistence;
+use super::super::harness_checkpoint::{decode, state_name};
 use crate::{
     app_error::{AppError, AppResult},
     services::harness::{AgentExecutionOutput, runs::*},
@@ -46,31 +47,6 @@ pub(super) async fn load_on(
     value.map(decode).transpose()
 }
 
-fn decode(value: serde_json::Value) -> AppResult<RunCheckpoint> {
-    let run: RunCheckpoint = serde_json::from_value(value)
-        .map_err(|_| AppError::BadRequest("Malformed harness checkpoint".into()))?;
-    run.validate()?;
-    if let Some(output) = &run.final_output
-        && let Some(response) = &output.structured
-    {
-        response.verify(
-            &output.content,
-            &crate::adapters::response_schema::JsonResponseValidator,
-        )?;
-    }
-    Ok(run)
-}
-
-fn state_name(state: &RunState) -> &'static str {
-    match state {
-        RunState::Active => "active",
-        RunState::InvalidOutput => "invalid_output",
-        RunState::Waiting => "waiting",
-        RunState::Completed => "completed",
-        RunState::Superseded => "superseded",
-    }
-}
-
 pub(super) async fn persist_checkpoint_on(
     tx: &mut PgConnection,
     company_id: Uuid,
@@ -80,11 +56,17 @@ pub(super) async fn persist_checkpoint_on(
 ) -> AppResult<()> {
     let checkpoint =
         serde_json::to_value(run).map_err(|_| AppError::BadRequest("Invalid checkpoint".into()))?;
-    sqlx::query(
-        "UPDATE task_harness_runs SET revision = $4, state = $5, checkpoint = $6, updated_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND task_id = $2 AND id = $3",
+    let changed = sqlx::query(
+        "UPDATE task_harness_runs SET revision = $4, state = $5, checkpoint = $6, updated_at = CURRENT_TIMESTAMP WHERE owner_kind = 'legacy' AND company_id = $1 AND task_id = $2 AND id = $3",
     ).bind(company_id).bind(task_id).bind(run.run_id.0)
     .bind(i64::try_from(run.revision.0).map_err(|_| AppError::Conflict("Checkpoint revision exhausted".into()))?)
-    .bind(state_name(&run.state)).bind(checkpoint).execute(&mut *tx).await?;
+    .bind(state_name(&run.state)).bind(checkpoint).execute(&mut *tx).await?.rows_affected();
+    if changed != 1 {
+        return Err(AppError::Execution(
+            crate::app_error::ExecutionFailure::OwnershipLost,
+        ));
+    }
+    super::super::model_usage::persist_checkpoint_usage_on(tx, previous, run).await?;
     persist_changed_invocations_on(tx, company_id, task_id, previous, run).await?;
     Ok(())
 }
@@ -258,6 +240,11 @@ impl HarnessRunStore for PostgresPersistence {
         .bind(request.lease.ownership_version as i64).fetch_optional(&mut *tx).await?;
         if let Some(value) = existing {
             let saved = decode(value)?;
+            if saved.state == RunState::BudgetExceeded {
+                return Err(AppError::Execution(
+                    crate::app_error::ExecutionFailure::Budget,
+                ));
+            }
             if saved.state == RunState::InvalidOutput {
                 return Err(crate::services::response_contract::invalid_output());
             }

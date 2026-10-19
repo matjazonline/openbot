@@ -35,7 +35,7 @@ pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
 /// reviewer rows and notice deliveries are written by one park transaction.
-pub const MAX_REVIEWERS: usize = 16;
+pub const MAX_REVIEWERS: usize = crate::domain::workflow::TokenAllowance::MAX_REVIEWERS;
 /// Destinations of one `message.send`: the established per-commit fan-out bound
 /// (`transport::ingress::MAX_THREAD_ASSOCIATIONS`). One send writes at most this many threads,
 /// messages and deliveries in one transaction, and a receipt locks at most this many parents.

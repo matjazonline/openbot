@@ -27,6 +27,7 @@ pub mod inbound_event;
 pub mod integration;
 mod legacy_task;
 pub mod memory;
+pub(crate) mod model_usage;
 pub mod notification;
 pub mod participant;
 pub mod response_review;
@@ -390,3 +391,5 @@ mod agent_harness_tests;
 pub mod mcp;
 #[cfg(test)]
 mod mcp_tests;
+
+mod harness_checkpoint;

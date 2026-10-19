@@ -71,6 +71,8 @@ Resolve capabilities as follows:
 3. Apply the agent's grants, any explicit workflow capability ceiling, and current company policy.
    An omitted workflow ceiling adds no restriction to the agent defaults; it does not mean an
    empty grant. Neither a profile nor default inheritance can add unauthorized tools or skills.
+   Declare the ceiling at the workflow top level as
+   `capability_ceiling: {tools: [...], skills: [...]}`; both lists are required when present.
 4. Validate selected skill requirements against the effective tools. Fail with an actionable error
    if a required tool is absent instead of silently changing the procedure or granting that tool.
 
@@ -101,8 +103,29 @@ capability profile is required for this step.
 
 Record selection source (`agent_defaults` or `profile`), any selected profile, skill snapshots,
 effective tool IDs, model settings, and actual context sources in the run trace. Credentials never
-appear in these records. Apply token/spend reservations
-before model calls and retain uncertain provider usage reservations across recovery.
+appear in these records. Apply token and model-call reservations before model calls and retain
+uncertain provider usage reservations across recovery. There are no monetary caps.
+
+## Usage analytics and token continuation — user revision, 2026-10-19
+
+Measure agent and workflow model calls and tokens, including retries and structured-output repair.
+Display analytics grouped by provider/model or workflow, with agent and workflow-run attribution.
+Keep provider-reported usage distinct from estimates and unresolved reservations; missing usage
+must not silently become zero or be reported as measured tokens.
+
+Optional provider/model prices per million tokens enable displayed cost calculations. Prices are
+for analytics only, never permission to run a model. Unpriced models remain usable; their cost is
+unavailable, not zero. No monetary cap or monetary approval threshold is required.
+
+A workflow may optionally set a maximum token allowance. Exhaustion pauses automated progression
+and creates a manual approval to continue; it is not an ordinary retry or an automatic allowance
+reset. Approval must be authorized and durable, retain cumulative usage, and resume saved state
+without repeating completed model calls or effects. Denial, cancellation and deadline expiry must
+leave no runnable continuation. Existing bounded model-call and execution safety limits remain.
+
+Verify analytics attribution and pricing arithmetic, missing prices/usage, duplicate settlement,
+uncertain provider usage, threshold behavior, and competing approval/cancellation/resumption.
+These user requirements supersede the previous monetary-cap decision question.
 
 ## Acceptance
 

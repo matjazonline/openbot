@@ -103,6 +103,7 @@ mod tests {
             VersionId::new(Uuid::new_v4()),
             DependencySnapshots {
                 agents: vec![AgentSnapshot {
+                    agent_id: uuid::Uuid::from_u128(1),
                     company_id: company,
                     key: AgentKey::parse("reviewer").unwrap(),
                     instructions: "Review".into(),

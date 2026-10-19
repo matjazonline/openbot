@@ -1,6 +1,7 @@
 //! Pure construction of immutable publication content. The lifecycle command must
 //! authorize and load company-owned snapshots through its ports before calling this
 //! builder. These values are not grants, credentials, or a production publish command.
+mod capabilities;
 mod dependencies;
 mod preflight;
 mod storage;
@@ -10,6 +11,7 @@ mod validation;
 use super::compiler::{self, CompiledWorkflow, DecodedSource, Diagnostic, PreparedInputs};
 use super::registry::{self, CatalogueFacts};
 use crate::domain::workflow::{CompanyId, Context, StepId, VersionId};
+pub use capabilities::{ResolvedAgent, SelectionSource};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;

@@ -55,7 +55,9 @@ pub(super) async fn claim_on(
         return Ok(None);
     }
     // Box the activation boundary to keep debug/test stacks at stock 2 MiB.
-    let Some(activation) = Box::pin(pending_recovery::activate(db, scope)).await? else {
+    let pending_recovery::Pending::Ready(activation) =
+        Box::pin(pending_recovery::activate(db, scope)).await?
+    else {
         return Ok(None);
     };
     if !fairness::available(db, scope, worker).await? {
@@ -65,7 +67,7 @@ pub(super) async fn claim_on(
         scope,
         worker,
         generation,
-        attempt: WorkflowAttempt(job.retry_count.checked_add(1).ok_or_else(invalid)?),
+        attempt: WorkflowAttempt(job.attempt_ordinal),
     };
     install(db, fence, policy).await?;
     let window = live_window(db, fence, bound.started())
@@ -149,7 +151,7 @@ pub(super) async fn recover_expired(
         scope,
         worker: WorkflowWorkerId(job.worker_id.ok_or_else(invalid)?),
         generation: WorkflowGeneration(job.execution_generation.ok_or_else(invalid)?),
-        attempt: WorkflowAttempt(job.retry_count.checked_add(1).ok_or_else(invalid)?),
+        attempt: WorkflowAttempt(job.attempt_ordinal),
     };
     retire(db, fence, policy, Retirement::Expired).await?;
     // Retirement establishes positive engine-owned delay. Even an ancient expired

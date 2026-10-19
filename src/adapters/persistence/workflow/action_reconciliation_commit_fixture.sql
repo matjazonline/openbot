@@ -136,7 +136,7 @@ BEGIN
     PERFORM fixture_commit_require(to_jsonb(audit)=jsonb_build_object('company_id',candidate.company_id,
         'run_id',candidate.run_id,'sequence',candidate.audit_sequence,'actor_id',candidate.actor_id,
         'execution_id',candidate.execution_id,'event_kind','action_reconciled','created_at',transaction_timestamp(),
-        'terminal_state',NULL,'terminal_execution_id',NULL),'exact actor audit');
+        'terminal_state',NULL,'terminal_execution_id',NULL,'decision_id',NULL),'exact actor audit');
     PERFORM fixture_commit_require(candidate.audit_sequence=1+COALESCE((SELECT max((value->>'sequence')::bigint)
         FROM jsonb_array_elements(config.baseline->'workflow_run_events') WHERE value->>'run_id'=candidate.run_id::text),0),'next audit sequence');
     SELECT * INTO STRICT owner FROM workflow_runs WHERE company_id=candidate.company_id AND id=candidate.run_id;
