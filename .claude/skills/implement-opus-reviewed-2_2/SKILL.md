@@ -289,4 +289,6 @@ clean up only its disposable resources. Preserve unmerged worktrees, changes and
 review evidence; never stop another phase's workers or clean up its databases,
 ports or caches. Report completed scope, independent review rounds (with note IDs),
 verification, and remaining gaps. Save resumable state if blocked; never call
-unverified work complete.
+unverified work complete. When implementation is complete, end the report by
+asking whether the user wants the full test suite run, naming the repository's
+suite command when known. Only ask; do not run it.
