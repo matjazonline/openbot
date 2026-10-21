@@ -16,7 +16,6 @@ use axum::{
     routing::get,
 };
 use axum_extra::extract::Form;
-use serde::Deserialize;
 use uuid::Uuid;
 
 pub fn router() -> Router<AppState> {
@@ -40,10 +39,6 @@ pub fn router() -> Router<AppState> {
         .route(
             "/ui/companies/{company}/mcp-connections/{id}/delete",
             axum::routing::post(delete),
-        )
-        .route(
-            "/ui/companies/{company}/agents/{agent}/mcp-selection",
-            get(selection).post(select),
         )
         .layer(DefaultBodyLimit::max(128 * 1024))
 }
@@ -111,14 +106,12 @@ async fn detail_page(
     message: Option<&str>,
 ) -> AppResult<Html<String>> {
     let current = s.get(user, company, id).await?;
-    let usage = s.selecting_agents(user, company, id).await?;
     Ok(Html(mcp::shell(
         "MCP server",
         company,
         &mcp::detail(
             company,
             &current,
-            &usage,
             draft.unwrap_or(&DefinitionDraft::stored(&current)),
         ),
         message,
@@ -244,57 +237,4 @@ async fn delete(
                 .into_response(),
         ),
     }
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SelectionForm {
-    expected_revision: i64,
-    #[serde(default)]
-    mcp_connection_ids: Vec<Uuid>,
-}
-async fn selection(
-    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
-    user: AuthenticatedUser,
-    Path((company, agent)): Path<(Uuid, Uuid)>,
-) -> AppResult<Html<String>> {
-    let selection = s.selection(user.id, company, agent).await?;
-    let catalog = s.list(user.id, company).await?;
-    Ok(Html(mcp::shell(
-        "Agent MCP servers",
-        company,
-        &mcp::selection(company, &selection, &catalog, None),
-        None,
-    )))
-}
-async fn select(
-    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
-    user: AuthenticatedUser,
-    Path((company, agent)): Path<(Uuid, Uuid)>,
-    Form(body): Form<SelectionForm>,
-) -> AppResult<Html<String>> {
-    let mut current = s.selection(user.id, company, agent).await?;
-    let catalog = s.list(user.id, company).await?;
-    current.revision = body.expected_revision;
-    let result = s
-        .select(
-            user.id,
-            current.clone(),
-            Some(body.mcp_connection_ids.clone()),
-        )
-        .await;
-    let (selection, message) = match result {
-        Ok(v) => (v, "Selections saved".into()),
-        Err(e) => (current, feedback(&e)),
-    };
-    Ok(Html(mcp::shell(
-        "Agent MCP servers",
-        company,
-        &mcp::selection(
-            company,
-            &selection,
-            &catalog,
-            Some(&body.mcp_connection_ids),
-        ),
-        Some(&message),
-    )))
 }

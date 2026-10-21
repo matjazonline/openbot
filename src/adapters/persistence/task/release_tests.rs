@@ -20,7 +20,6 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
 use crate::entities::company_member::CompanyAccessRole;
 use crate::entities::creation::CreationProvenance;
-use crate::entities::harness::HarnessKind;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
@@ -109,7 +108,6 @@ async fn release_fixture(persistence: &PostgresPersistence, label: &str) -> Rele
             name: "Release Agent".to_string(),
             slug: format!("{label}-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(HarnessKind::AiAgents),
             ..AgentWrite::default()
         },
     )

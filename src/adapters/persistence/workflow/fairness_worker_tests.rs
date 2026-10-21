@@ -36,7 +36,7 @@ impl Drop for Invocation<'_> {
 #[async_trait]
 impl WorkflowHandler for Gated {
     fn supports(&self, kind: &WorkflowStepKind) -> bool {
-        let supported = kind.0 == "context.load";
+        let supported = kind.0 == "context.history";
         if !supported {
             self.unsupported_seen.fetch_add(1, Ordering::SeqCst);
         }
@@ -64,7 +64,7 @@ impl WorkflowHandler for Gated {
                 };
                 self.started.send(company).await.unwrap();
                 self.gates[&company].acquire().await.unwrap().forget();
-                Ok(json!({"items":[],"token_count":0}))
+                Ok(json!({"items":[],"token_count":0,"omitted":0}))
             }
             .await,
         )
@@ -213,8 +213,8 @@ impl WorkflowHandler for Selective {
             async {
                 assert_eq!(kind, &self.kind);
                 self.calls.fetch_add(1, Ordering::SeqCst);
-                Ok(if kind.0 == "context.load" {
-                    json!({"items":[],"token_count":0})
+                Ok(if kind.0 == "context.history" {
+                    json!({"items":[],"token_count":0,"omitted":0})
                 } else {
                     json!({"items":[]})
                 })
@@ -240,9 +240,9 @@ async fn workflow_fairness_complementary_workers_reach_actual_supported_dispatch
         AdmissionFixture::with_binding(BindingFixture::from_fixture(memory, source).await).await;
     let b = admit(&memory, "memory").await;
     let names = if a.company.as_uuid() < b.company.as_uuid() {
-        ["memory.load", "context.load"]
+        ["memory.load", "context.history"]
     } else {
-        ["context.load", "memory.load"]
+        ["context.history", "memory.load"]
     };
     let handlers = names.map(|name| Selective {
         kind: WorkflowStepKind(name.into()),
@@ -304,7 +304,7 @@ async fn workflow_fairness_worker_stops_full_page_at_first_denied_demand() {
         admit(&quiet, &format!("quiet-{i}")).await;
     }
     let h = Selective {
-        kind: WorkflowStepKind("context.load".into()),
+        kind: WorkflowStepKind("context.history".into()),
         calls: AtomicUsize::new(0),
     };
     let w = worker();

@@ -8,10 +8,10 @@
 //! Adding a second harness means implementing [`AgentHarness`] under `src/adapters/harness/` and
 //! registering it. It does not mean editing the runner, the capability spec, or this module.
 //!
-//! [`TextClassifier`] sits beside it and deliberately does not extend it: the spam guardrail and
-//! the system-prompt generator want one classified answer against a company credential, not an
-//! agent, and `src/application/AGENTS.md` says to split a broad trait rather than add optional
-//! methods to one.
+//! [`TextClassifier`] sits beside it and deliberately does not extend it: the system-prompt
+//! generator wants one completion against a company credential, not an agent, and
+//! `src/application/AGENTS.md` says to split a broad trait rather than add optional methods to
+//! one.
 //!
 //! # Why the ports live here
 //!
@@ -21,22 +21,18 @@
 //!
 //! [`AgentCapabilitySpec`]: crate::entities::harness::AgentCapabilitySpec
 
-pub mod approvals;
 pub mod classifier;
 pub mod context;
-pub mod mcp;
 pub mod ports;
 pub mod redaction;
 pub mod registry;
 pub mod runs;
 
-pub use approvals::{AgentApprovalHandler, InternalDelegationPolicy};
 pub use classifier::{ClassificationRequest, TextClassifier};
 pub use ports::{
-    AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun, ApprovalAsk,
-    ApprovalTrigger, ApprovalVerdict, EXECUTION_DIAGNOSTICS_KEY, HarnessApprovals, HarnessToolHost,
-    HarnessTrace, NativeToolDeclaration, NativeToolSafety, ToolInvocation,
-    ToolInvocationDisposition, ToolTraceOutcome, ToolTraceRecord, ToolTraceSource,
+    AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun,
+    EXECUTION_DIAGNOSTICS_KEY, HarnessTrace, ToolInvocation, ToolInvocationDisposition,
+    ToolTraceOutcome, ToolTraceRecord, ToolTraceSource,
 };
 pub use redaction::sanitize_text;
 pub use registry::{HarnessRegistrationError, HarnessRegistry, UnsupportedHarness};

@@ -36,7 +36,7 @@ pub trait WorkflowCompletion: Send + Sync {
 pub fn is_io_kind(kind: &str) -> bool {
     matches!(
         kind,
-        "context.load"
+        "context.history"
             | "memory.load"
             | "memory.save"
             | "ai.classify"

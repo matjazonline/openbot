@@ -116,69 +116,8 @@ async fn replace_grants(
         .bind(company).bind(id).bind(&names).execute(&mut **tx).await?;
     Ok(())
 }
-/// Called after tentative changes, before commit. Error rolls the whole operation back.
-async fn validate_effective_grants(
-    tx: &mut Transaction<'_, Postgres>,
-    company: Uuid,
-) -> AppResult<()> {
-    let invalid_agent: bool = sqlx::query_scalar("SELECT EXISTS(
-        SELECT selection.agent_id FROM agent_mcp_selections AS selection
-        JOIN agents AS agent ON agent.company_id = selection.company_id AND agent.id = selection.agent_id
-        JOIN company_mcp_connections AS connection ON connection.company_id = selection.company_id AND connection.id = selection.connection_id
-        JOIN company_mcp_tool_grants AS grant_row ON grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id
-        WHERE selection.company_id = $1 AND connection.enabled AND connection.deleted_at IS NULL
-        GROUP BY selection.agent_id, agent.harness_kind HAVING count(*) > $2 OR agent.harness_kind <> 'rig')")
-        .bind(company).bind(MAX_EFFECTIVE_MCP_TOOLS as i64).fetch_one(&mut **tx).await?;
-    if invalid_agent {
-        return Err(invalid(
-            "Enabled MCP grants require Rig and at most 32 effective tools per agent",
-        ));
-    }
-    Ok(())
-}
-async fn selection_on(
-    db: &mut PgConnection,
-    company: Uuid,
-    agent: Uuid,
-) -> AppResult<AgentMcpSelection> {
-    // One statement gives the revision and its set the same MVCC snapshot, without locking
-    // the company row on every runtime read. Writers still serialize and compare revisions.
-    let (revision, ids): (i64, Vec<Uuid>) = sqlx::query_as(
-        r#"SELECT COALESCE(revision.revision, 1),
-                  ARRAY(SELECT selection.connection_id FROM agent_mcp_selections AS selection
-                        WHERE selection.company_id = agent.company_id AND selection.agent_id = agent.id
-                        ORDER BY selection.connection_id)
-           FROM agents AS agent
-           LEFT JOIN agent_mcp_selection_revisions AS revision
-             ON revision.company_id = agent.company_id AND revision.agent_id = agent.id
-           WHERE agent.company_id = $1 AND agent.id = $2"#,
-    ).bind(company).bind(agent).fetch_optional(db).await?.ok_or_else(conflict)?;
-    Ok(AgentMcpSelection {
-        company_id: company,
-        agent_id: agent,
-        revision,
-        connection_ids: ids,
-    })
-}
-
 #[async_trait]
 impl McpPersistence for PostgresPersistence {
-    async fn mcp_selecting_agents(
-        &self,
-        company_id: Uuid,
-        connection_id: Uuid,
-    ) -> AppResult<Vec<McpSelectingAgent>> {
-        let rows = sqlx::query_as::<_, (Uuid, String)>("SELECT agent.id, agent.name FROM agents AS agent JOIN agent_mcp_selections AS selection ON selection.company_id = agent.company_id AND selection.agent_id = agent.id WHERE selection.company_id = $1 AND selection.connection_id = $2 ORDER BY agent.id LIMIT 1001")
-            .bind(company_id).bind(connection_id).fetch_all(&self.pool).await?;
-        if rows.len() > 1000 {
-            return Err(invalid("MCP usage list exceeds 1000 agents"));
-        }
-        Ok(rows
-            .into_iter()
-            .map(|(id, name)| McpSelectingAgent { id, name })
-            .collect())
-    }
-
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>> {
         let rows = sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.deleted_at IS NULL ORDER BY connection.slug LIMIT 65"))
             .bind(company_id).fetch_all(&self.pool).await?;
@@ -192,8 +131,8 @@ impl McpPersistence for PostgresPersistence {
         company_id: Uuid,
         connection_ids: &[Uuid],
     ) -> AppResult<Vec<CompanyMcpConnection>> {
-        if connection_ids.len() > MAX_MCP_SELECTIONS {
-            return Err(invalid("An agent may select at most 8 MCP connections"));
+        if connection_ids.len() > MAX_MCP_CONNECTIONS {
+            return Err(invalid("Too many MCP connections requested"));
         }
         if connection_ids.is_empty() {
             return Ok(Vec::new());
@@ -258,7 +197,6 @@ impl McpPersistence for PostgresPersistence {
             .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str()).bind(write.enabled).bind(write.auth.as_str())
             .bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).bind(i64::from(rebind)).execute(&mut *tx).await?;
         replace_grants(&mut tx, company_id, id, &write.tool_grants).await?;
-        validate_effective_grants(&mut tx, company_id).await?;
         let result = get_connection(&mut tx, company_id, id).await?;
         tx.commit().await?;
         Ok(result)
@@ -293,61 +231,6 @@ impl McpPersistence for PostgresPersistence {
         .await?;
         tx.commit().await?;
         Ok(())
-    }
-    async fn agent_mcp_selection(
-        &self,
-        company_id: Uuid,
-        agent_id: Uuid,
-    ) -> AppResult<AgentMcpSelection> {
-        selection_on(&mut *self.pool.acquire().await?, company_id, agent_id).await
-    }
-    async fn replace_agent_mcp_selection(
-        &self,
-        selection: AgentMcpSelection,
-        connection_ids: Option<Vec<Uuid>>,
-    ) -> AppResult<AgentMcpSelection> {
-        let mut tx = self.pool.begin().await?;
-        lock_company(&mut tx, selection.company_id).await?;
-        sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM agents WHERE company_id = $1 AND id = $2 FOR UPDATE",
-        )
-        .bind(selection.company_id)
-        .bind(selection.agent_id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(conflict)?;
-        let old = selection_on(&mut tx, selection.company_id, selection.agent_id).await?;
-        if old.revision != selection.revision {
-            return Err(conflict());
-        }
-        let Some(mut ids) = connection_ids else {
-            tx.commit().await?;
-            return Ok(old);
-        };
-        if ids.len() > MAX_MCP_SELECTIONS {
-            return Err(invalid("An agent may select at most 8 MCP connections"));
-        }
-        ids.sort_unstable();
-        ids.dedup();
-        for id in &ids {
-            let connection = get_connection(&mut tx, selection.company_id, *id).await?;
-            if !connection.enabled && !old.connection_ids.contains(id) {
-                return Err(invalid("New MCP selections must be enabled"));
-            }
-        }
-        sqlx::query("DELETE FROM agent_mcp_selections WHERE company_id = $1 AND agent_id = $2")
-            .bind(selection.company_id)
-            .bind(selection.agent_id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("INSERT INTO agent_mcp_selections (company_id, agent_id, connection_id) SELECT $1, $2, unnest($3::uuid[])")
-            .bind(selection.company_id).bind(selection.agent_id).bind(&ids).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO agent_mcp_selection_revisions (company_id, agent_id, revision) VALUES ($1, $2, 2) ON CONFLICT (company_id, agent_id) DO UPDATE SET revision = agent_mcp_selection_revisions.revision + 1")
-            .bind(selection.company_id).bind(selection.agent_id).execute(&mut *tx).await?;
-        validate_effective_grants(&mut tx, selection.company_id).await?;
-        let result = selection_on(&mut tx, selection.company_id, selection.agent_id).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 

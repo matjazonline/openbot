@@ -4004,3 +4004,831 @@ approval misuse rejects unchanged; active model blocks invalid-output mutation; 
 saved invocation result survives sibling refusal, but next preparation is refused in both
 Rust and SQL. New checkpoint SQL still needs SQLx/static follow-up with the next cohesive
 runtime segment; do not reuse earlier schema evidence as if it covered this delta.
+
+## Phase06 / 06B2b resumed under implement-opus-reviewed-2.1 — 2026-10-19
+
+User instructed continuation with implement-opus-reviewed-2.1. Effective settings showed
+Opus/high; user chose to switch root to xhigh and confirmed "xhigh set" in chat (settings.json
+still reads high, so the source is the user's statement). Root therefore authors (A) with no
+developer sub-agent, per the user's answer. Reviewer B: fresh Opus 5.5/xhigh general-purpose
+agent (never a fork), spawned only when whole 06B2b is frozen; historical /root/reviewer_06 is
+not live in this session. CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=75 is set in settings.local.json.
+Starting HEAD is now 76fe99c ("workflow-foundation 06 tmp"), which the user committed with
+all prior WIP; worktree was clean at resume. Records: this TASK, REVIEW, agent-review-notes,
+agent-review-findings, logs/06. No commits/deployments/production resets authorized.
+Retained PostgreSQL /private/tmp/workflow0410-20261017 port55450 is running (not restarted).
+Next: step 1 of HANDOFF-20261019-native-updates.md (mutation coverage audit, static/SQLx
+refresh), then trusted preparation, shared Rig driver bindings, effect waits, whole review.
+
+Native checkpoint-update delta static refresh PASS (docs/logs/06/06B2b-native-updates-gates.sh,
+HEAD 76fe99c, clean tree): fmt, diff-check, locked offline all-target check 53.55s, strict
+all-target Clippy, fresh init migration on disposable workflow06_native_updates_20261019_test
+(dropped by trap), SQLx prepare and prepare --check 56.01s, no .sqlx diff. The earlier native
+harness 40/0 run (06B2b-checkpoint-updates-tests.log) covers this same source. Remaining 06B2b
+runtime work is decomposed in docs/logs/06/06B2b-runtime-plan.md (R1 shared driver bindings,
+R2 trusted preparation, R3 native agent.run handler, R4 ActionService tool dispatch, R5
+message delivery effect waits), all under accepted D4; no new gate. Starting R1.
+
+### 06B2b R1–R4 progress and blocking ownership finding — 2026-10-19
+
+Implemented (uncommitted, unreviewed WIP on HEAD 76fe99c):
+- R1 shared driver: rig/execution.rs `Execution` is one drive loop over closed
+  `Binding::{Legacy, Workflow}`; legacy edges moved into `LegacyBinding` unchanged in
+  behaviour; `Driven::{Completed, Suspended(Option<WaitId>)}`; canonical request
+  fingerprint (provider, model, full CompletionRequest; no credentials);
+  final_response::response_preamble now takes rendered base text (direct.rs updated).
+- R2 application/workflow/agent.rs: `PreparedAgent` (frozen selection, provider-safe
+  declarations `.`→`__` with collision/length refusal, target consistency, delimited
+  context prompt, frozen preamble with skill text, output contract, policy capped by
+  max_output_tokens, checkpoint spec), ports `AgentPreparation`, `AgentToolDispatch`.
+  persistence/workflow/agent_preparation.rs prepares under actor lock from frozen inputs
+  and resolves HTTP registered connection / MCP slot / trusted message targets.
+- Store: `blocked_workflow_model` read; authority-class `current_on` (agent row owned by
+  company FOR SHARE; company model connection still offers frozen model FOR SHARE) runs
+  inside model admission (before local locks) and every PrepareInvocation (incl. replay).
+  Native test fixture prepared doc now carries a real selection and model connection.
+- R3 rig/workflow.rs `WorkflowBinding` + `WorkflowAgentRuntime` (WorkflowHandler for
+  agent.run): prepare → open → execution reservation → BindTools → blocked request reuse
+  → shared drive; typed agent.* failure codes. R4 adapters/workflow_agent
+  `AgentActionTools` maps HTTP/MCP/message direct-tool observations (message Pending is
+  still unmapped pending R5 delivery waits).
+- Tests: agent preparation unit 2/2 PASS (06B2b-agent-runtime-tests-2.log). The two
+  DB end-to-end tests FAIL at publication: see finding below.
+
+Blocking finding (evidence): `authority::supported_publication` refuses every bundle with
+agent/skill/profile snapshots ("Workflow dependency authority is not available"; comment:
+"Agents, skills and profiles have no authoritative durable owner yet ... (phase 06)").
+`agents.granted_tool_ids` accepts only the static legacy `CatalogueTool` ids, so it cannot
+hold workflow tool grants; there is no agent publication directory. Therefore no agent.run
+workflow can currently be published, and current tool/skill revocation has no source.
+Interim narrowing: admission-time `current_on` checks agent ownership and model connection
+only; tool revocation stays enforced by ActionService at dispatch. A durable owner for agent
+workflow capabilities is a schema/authorization decision (new gate D5) — asking the user.
+
+### User capability-ownership decisions and proposed 06-D5 — 2026-10-19
+
+User's words (chat): "workflow has steps and step can also be tool call. Step can be agent
+run which can have tools ..." then "ok maybe would be better to define tools/skills on
+agent". On the D5 outline: "1.1 agent has list of tools like crm.lookup,... and check if we
+can remove legacy catalogue"; "yes legacy catalogue can go but we need to repurpose tools
+already developed in our code (not libraries) to work as agent workflow tools"; skill
+legacy tool steps may be removed; skills are defined on the agent; "yes add tools on
+skill"; "we don't need ability to narrow agent's capabilities at step - we make sure agent
+can not have added capabilities from its definition/config". Confirmations: freeze at
+publication "keep"; remove workflow capability_ceiling "yes remove if we don't use";
+legacy removal in 06C/08 and new fields now "ok". Root answered that agent tools stay named
+registered operations/approved MCP tools/message builtins (generic http.request remains a
+workflow step) and that MCP keeps its contract-checked protocol; user did not object.
+These supersede the phase06 plan's capability_profile/profile/ceiling text.
+
+Proposed architecture gate docs/logs/06/decision-D5.md revision1, SHA256 a5ef1a3f7a3c57495a0b58f495c2ad431c250615ebd43a4445bfd61a784cdb4a.
+06C obligations added: remove ai-agents builtins catalogue and skill tool steps with the
+legacy runtime; repurpose list_company_agents (read) and create_agent_channel (effect,
+approval) as built-in workflow tools; request_approval replaced by workflow approvals;
+outreach_and_await_quorum → phase07; transfer_or_release_task obsolete with legacy queue.
+No D5-dependent implementation until the gate passes. Reviewer B (fresh Opus/xhigh,
+general-purpose, not fork) is being spawned for this gate.
+
+R1/R2 regression evidence (06B2b-r1-regressions.sh, stock 2 MiB, four threads, current WIP):
+rig adapter 52/0, legacy harness_runs 10/0, native workflow_harness_ 40/0 (including the
+fixture now carrying a real selection + model connection, so admission/preparation run the
+new authority check), model_usage 14/0. Thread suite first showed 112/5: the five tests use
+the retained shared DB directly, which predates the edited init migration
+(VersionMismatch 20260817000000) — fixture, not code. Rerun on fresh disposable
+workflow06_r1_thread_20261019_test (06B2b-r1-thread-fresh.sh, dropped by trap): 117/0.
+Retained workflow0410_test untouched. Reviewer B (Opus/xhigh, fresh) is reviewing D5.
+
+R5 design trace (implements accepted D4 "Sequential saved effects and delivery waits";
+not yet implemented; no new decision):
+- Today `publish_on` (message_publish.rs) creates an effect wait and parks only for
+  origin=step with delivery; model_tool returns Pending, and `call_tool` collapses
+  Suspended/Pending/PossibleDispatchExists into `MessageObservation::Pending`.
+  `workflow_message_actions_check` forbids wait_id unless origin='step'.
+- Uniques: `workflow_wait_execution` (company,run,execution,reason) WHERE reason<>'decision'
+  allows one effect wait per execution ever → must exclude model-tool effect waits (or
+  scope by invocation); `workflow_wait_one_active` keeps one active wait.
+- Effect resume (wait_commit.rs `Wake::Effect`) completes the step; for model_tool it must
+  instead complete the wait, set run running and reopen the job (pending,
+  continuation_count+1). `check_workflow` completed→pending guard (init SQL ~251) accepts
+  only approval/token decisions submitted in this xact; needs a delivery witness: exact
+  model_tool action with this wait, accepted/failed receipt present, parked attempt =
+  OLD.attempt_ordinal with stop_reason effect_parked, wait completed in this xact.
+- Plan: allow wait_id for model_tool; record parked attempt on the action; new
+  MessageObservation::DeliveryParked(wait) → AgentToolObservation::Parked; resume via
+  receipt replay (call_tool on the same invocation observes the committed receipt).
+
+### 06-D5 revision2 after 06-R014 CHANGES REQUIRED — 2026-10-19
+
+Reviewer B (fresh Opus/xhigh) note 06-R014: CHANGES REQUIRED, findings 06-F008 (high,
+publish equality would run in supported_publication at binding/admission/replay), F009
+(runtime-selected agents), F010 (directory composition/dedup/resolution parity), F011
+(writers wipe new columns), F012 (skill identity; required-tool edits treated as revocation),
+F013 (preparation current_on after run lock; replay-after-dispatch ownership), F014
+(verification gaps), optional F015. Revision2 (decision-D5.md, SHA256 eed25e4a5f367ccfd8333039455402d8bea59a4274b361854a398a1a5e084934; revision1 kept
+as decision-D5-revision1.md) addresses each: publish-only equality on the new root bundle,
+supported_publication keeps tool checks only; finite agent universe incl. enum refs; single
+capture merge keyed (name,slot) with SQL-owner-identical resolution; Option-preserving
+writers and agent-row lock for skill links; skill_id snapshots, slug TypeName, canonical
+order, no required-tools revocation; prepare_agent drops current_on, replay-after-dispatch
+truth stays with ActionService; expanded verification. User mid-turn: "we don't need
+existing legacy behaviour after we implement workflows" → Binding::Legacy is temporary and
+removed with the last legacy caller (06C/08); recorded in D5 decision 4. Recheck requested.
+
+### 06-D5 accepted; R5 in progress — 2026-10-19
+
+Root accepts architecture gate 06-D5 revision2 (decision-D5.md SHA256
+eed25e4a5f367ccfd8333039455402d8bea59a4274b361854a398a1a5e084934) after independent recheck
+06-R015 PASS (06-F008…F014 resolved; F015 partly adopted). Optional 06-F016 for
+implementation: finite agent universe needs a new pure compiler function and the parsed
+definition in capture; decision.agent-only agents still capture tools (fail-closed, keep);
+bundle-level skill order across agents; HTTP capture rule stricter than publish re-verify
+(fail-closed). WIP must still change to revision2: prepare_agent must drop current_on, and
+capability_profile/profiles/ceiling removal is not yet done. D5 implementation is next after
+R5 messaging fixes.
+
+R5 (D4 delivery waits) WIP: init SQL drops workflow_message_actions origin/wait check,
+workflow_wait_execution excludes effect, workflow_message_actions_wait becomes unique,
+completed→pending reopen guard accepts a model_tool delivery continuation (exact action
+marker attempt = parked attempt, completed effect wait, receipt, effect_parked attempt).
+publish_on parks both origins on delivery; stored_on Resolve returns Suspended for both;
+MessageObservation::DeliveryParked; wait_commit continue_delivery (complete wait, run
+running, reopen_job, WaitProgress::Continued); waits::row skips completed model-tool waits.
+Library compiles. workflow_message 52/6 (06B2b-r5-message-1.log): six tests encode the old
+"model tool never parks/reopens" behaviour or use model-tool fixtures; being updated.
+R5 test triage: all six failures are "workflow message park lost its fence" — each test
+publishes several model-tool deliveries (or a delivery then more calls) inside ONE claimed
+attempt (message_tests: receipt page nine actions, poison stall, wait cancel late truth;
+recovery: existing marker never republished, model-tool marker never reopens; reconcile
+veto: model-tool delivery reopen never reopens). Under accepted D4 each model-tool delivery
+parks the job, so the second call in that attempt correctly loses its fence; the old
+assertions (MessageObservation::Pending, "never reopens its job") encode the superseded
+behaviour. Next: rewrite them to the sequential park → receipt → continue_delivery →
+reclaim model (and keep their original intent: paging/poison/cancel/recovery/veto), plus
+new SQL tests: reopen guard refuses old wait for later attempt, refuses without receipt,
+step-origin effect still completes the step. Then D5 implementation (see accepted D5).
+
+R5 implementation progress (2026-10-20): dispatch SQL guard no longer limits parks to step
+origin and now requires every message with deliveries to park; workflow_run_events gains
+`wait_id` (FK to the exact wait, shape check: only wait_parked/wait_completed, execution
+required, no decision) with `workflow_run_event_wait_kind` unique and the execution-kind
+unique excluding wait-bound rows (D4 wait-bound audit identity); effect park and delivery
+continuation audit through `waits::audit_wait`. Superseded tests rewritten to D4 semantics:
+nine sequential model-tool deliveries park/continue (9 actions accepted, 9 completed waits,
+continuation_count 9, earlier call replays its receipt, no republish); dead delivery
+continues the agent job with failure receipt, no retry debit, no successor; reconciliation
+delivery reopen keeps the job parked until a settled receipt continues it once; poison test
+uses one parked delivery; cancel test uses two step destinations; exact audit fixtures and
+pinned reopen error text updated. Results: workflow_message 58/0 (06B2b-r5-message-5.log);
+wait 19/0, decision 34/0, completion 14/0, batch 15/0, poison 12/0, native harness 40/0
+(06B2b-r5-regressions.sh); workflow_action_ 354/11 then the 7 fixed reruns 7/0
+(06B2b-r5-action-fixes.log); 4 first_old_* reconciliation tests fail with
+`frozen_v3: false` (budget provenance) — HEAD baseline running in a scratch worktree to
+classify. workflow_agent_ e2e 2/2 still fail at publication until D5 implementation.
+
+D5 implementation progress (2026-10-20): removed workflow capability_ceiling (domain
+definition, compiler wire top-level key now rejected as unknown), registry
+profiles/CapabilityProfile/capability_profile input/ProfileSelection metadata and
+ai.classify profile-enum support; CONTRACT_REVISION workflow-catalogue-v1.4; compiler
+SEMANTIC_REVISION 5 with SQL admission provenance frozen_v5 and compiler_revision '5'
+(previous revision rejected, no fallback). publication: resolver returns exactly the
+agent's saved tools/skills (validated with check_selection), SelectionSource/profile code
+removed, SkillSnapshot.skill_id added; supported_publication keeps tool checks only.
+prepare_agent no longer calls current_on (F013). Pre-existing HEAD failure found and fixed:
+action_reconciliation_state_witness_validate.sql still expected 'frozen_v3' (HEAD baseline
+06B2b-head-baseline-first-old.log 0/4) → now frozen_v5. Library compiles. Next: schema
+(agents.workflow_tools, skills.required_tools, shape fn), writers (Option preserve),
+agent publication capture + publish-only equality, runtime current_on tools/skills, tests.
+D5 schema/writers WIP (2026-10-20): init SQL adds public.valid_workflow_type_names(text[])
+(TypeName grammar, ≤128 bytes, unique, ≤32), agents.workflow_tools and skills.required_tools
+(DEFAULT '{}', shape checks). AgentWrite.workflow_tools / SkillWrite.required_tools are
+Option (None keeps stored value; INSERT COALESCE to '{}', UPDATE COALESCE(new, stored));
+library skill copy keeps source.required_tools via INSERT…SELECT; HTTP agent routes pass
+None (UI is phase 09). In progress: fixing remaining literal constructions (agent_library,
+ui_agents, use_cases/agent.rs:443, skill_library, agent_channel, use_cases/skill.rs:360
+SkillSnapshot.skill_id) and rewriting publication/registry tests that used profiles/ceiling
+(capabilities_tests, diagnostic_tests, publication tests, registry profile_tests/review1/
+runtime tests, agent_tests). Then: agent publication capture/equality, runtime current_on.
+D5 focused results (06B2b-d5-focused.sh on fresh disposable workflow06_d5_focused_20261020_test,
+dropped by trap): compiler 33/0, use_cases agent 13/0 and skill 10/0, persistence skill 16/0
+and agent 13/0, native harness 40/0, budget 27/0, **workflow_agent_ 4/4** (scripted Rig
+provider agent.run e2e: saved HTTP tool dispatched once via ActionService, final output
+"done", replay without provider/effect calls, revoked model connection refused before
+provider entry). Registry/publication first 30/1, 27/1 (tests encoding removed profile
+behaviour); rewritten (profile-only classifier refused; ambiguous agent tool fails
+publication) → registry+publication 59/0 (06B2b-d5-registry-publication-2.log).
+Remaining D5: AgentPublicationDirectory capture (DB-derived snapshots, finite agent universe,
+tool merge/dedup, MCP/HTTP/message grant resolution), publish-only SQL equality
+(agent_publication::verify_on in definitions.rs publish), runtime current_on tools/skill_id
+checks, writer preserve/round-trip and SQL shape parity tests, competing edit/relink and
+revocation-race tests; then R5 e2e with a message tool, final gates, whole-batch review.
+
+D5 capture/equality/runtime implemented (2026-10-20, WIP unreviewed):
+- publication::agent_universe (literal key or /params/<name> with finite string enum;
+  otherwise refused) — pure, uses compiler::parse_workflow.
+- persistence/workflow/agent_publication.rs: derive_on (one row→snapshot mapping: agent
+  slug/system_prompt/explicit provider+model/Rig default max output/workflow_tools; skills by
+  position then id, prompt-only text, legacy tool steps refused, slug must be TypeName;
+  model connection must offer model), verify_on (publish-only exact equality for every
+  agent snapshot and the skill set, FOR SHARE), AgentPublicationDirectory<D> (wraps step
+  directories, merges granted tools: reuse unique captured snapshot, trusted message
+  builtin, else single ready HTTP registration; conflicting skill names refused).
+  definitions.rs publish calls verify_on after supported_publication.
+- runtime current_on also requires frozen tools ⊆ agents.workflow_tools and every frozen
+  skill_id still linked (FOR SHARE agent row); native fixture prepared doc updated.
+Proof: 06B2b-d5-agent.sh fresh DB → workflow_agent_ + workflow_harness_ 46/0, including
+forged agent snapshot refused at publish, post-publication agent edit (prompt + extra tool)
+neither blocks nor changes the frozen run, removed tool grant → agent.rejected with zero
+usage rows/provider calls. Remaining D5 proofs: writer preserve round-trip, TypeName↔SQL
+shape parity, agent_universe unit cases, capture refusals (missing model, legacy skill,
+bad slug, unregistered/ambiguous grant), skill unlink revocation, competing publish vs agent
+edit and revocation vs admission races; then R5 e2e with message.send tool, gates, review.
+D5 additional proofs PASS (fresh DB, 06B2b-d5-agent.sh): workflow_agent_ + harness 50/0 —
+writer preserve round-trip (unrelated agent/skill saves keep workflow_tools/required_tools;
+Some([]) clears), SQL shape ↔ TypeName parity (14 names incl. digit-leading, dots, non-ASCII,
+128/129 bytes; duplicates; 33 entries), competing revocation committed while admission
+waits on the agent row → agent.rejected, zero usage/provider calls; capture refuses agent
+without model and unregistered grant. Pure agent_universe (literal, finite param enum,
+open param and input refs refused) and capabilities suite 6/0. Not yet: competing publish
+vs agent edit race test, skill-unlink runtime revocation test, legacy tool-step/bad slug
+capture tests (implemented paths, untested). Next: R5 e2e with message.send agent tool,
+then static/SQLx gates, whole-batch review.
+
+R5 + D5 end-to-end proof (2026-10-20): message_agent_tests.rs — native agent.run (agent with
+workflow_tools [message.send], published through AgentPublicationDirectory over the message
+directory) calls message__send with a user email destination: handler returns
+Suspended(delivery wait), run waiting/effect; delivered → receipt consumed → resume_wait
+Continued → fresh claim → driver replays the saved call, reads the committed receipt, second
+model turn answers "sent". Provider calls 2, one action/destination, wait completed,
+continuation_count 1, retry_count 0. With workflow_message suite: 59/0
+(06B2b-r5-agent-e2e.sh, fresh DB dropped). Additional D5: skill unlink → agent.rejected,
+legacy tool-step skill refused at capture (asserted via setup panic — weaker form), publish
+racing a concurrent agent edit fails; D5 agent suite 53/0.
+agent.run joins marker_owned_effect_kind (D4: all agent effects pass ActionService; interrupted
+attempt without marker → SafeToRetry, unresolved model reservation stays charged); kind test
+updated. Production HttpRuntime/McpRuntime/MessageRuntime gain `with_approvals(..., notices)`
+(new() = None, unchanged) because the direct-tool dispatcher had no decision notices, so a
+protected agent tool could never park (found by the new e2e, previously failing closed as
+agent.rejected). New D4 proof: protected HTTP agent tool parks for approval with zero
+dispatches, approve → continuation claim → single dispatch, model answers, retry_count 0.
+06B2b-d5-agent.sh: 55/0. cargo fmt applied.
+
+### 06B2b frozen for whole-batch review — 2026-10-20
+
+Batch gates (06B2b-batch-gates.sh, fresh DB workflow06_batch_20261020_test dropped): fmt,
+diff-check, offline all-target check, fresh init migration, SQLx prepare/check (no .sqlx
+diff) PASS; strict Clippy first FAILED (large Admitted variant; needless struct update) →
+fixed (Box<RunCheckpoint>, fixture) → PASS (06B2b-recheck-clippy.log). Tests: workflow_
+989/2, rig 52/0, thread 117/0, harness_runs 10/0, model_usage 14/0, application::workflow
+197/0. The 2 workflow_job_auxiliary failures pre-exist at HEAD (baseline
+06B2b-head-baseline-job-auxiliary.log 1/2 failed): native owner guard's legacy branch lacked
+the shared constraint name → restored CONSTRAINT='legacy_auxiliary_task_queue_kind'; the
+update matrix now asserts the stronger immutable-owner refusal for task_harness_runs.
+Recheck (06B2b-batch-recheck.sh, fresh DB): job/agent/harness/rig 152/0, fmt PASS.
+Frozen artifact: base 76fe99c, digest 6ea98c7ff7ea6f6ff35c3f7dc8005a6cade246da0179b53690aa60f78a02afa8
+(excludes plan/workflow-foundation/docs; file list 06B2b-batch-snapshot.txt). Known coverage
+gaps disclosed to review: MCP agent tool e2e, token approval through the driver (store-level
+tests only), two approval cycles in one run, dynamic-agent capture e2e.
+
+### 06-R016 correction round — 2026-10-20
+
+06-R016 (whole 06B2b batch, digest 6ea98c7f…) returned CHANGES REQUIRED: 06-F017, F018,
+F019 (medium), F020 (low), optional F021. Root authors corrections (Opus 5.5 xhigh, user
+statement "xhigh set"); retained Reviewer B handle `a9387720a47e21d5f`.
+
+- **06-F017 fixed.** Target kind comes from the slot's declared resource kind, never from
+  the presence of a slot: `agent_preparation.rs:131` maps a slot tool to MCP only when
+  `resources::slot_kind(definition, slot) == Some("mcp")` (and the slot is bound), else
+  the HTTP registration; capture `agent_publication.rs:284 granted_tool` reuses a captured
+  snapshot only when it has no slot or an MCP slot, and refuses a slot-bound HTTP step
+  selection granted to the agent ("Agent tool … conflicts with another tool of the same
+  name in this workflow"). Test: `workflow_agent_capture_refuses_slot_bound_http_grant`
+  (same operation as slot-bound direct step and agent grant → publish refused).
+- **06-F018 fixed.** `decision_approvals.rs:219 confirm` accepts `subject_kind IN
+  ('action_approval','token_allowance')` with the same exact fence/wait/job/parked-attempt
+  witness. Proof through `supervise_io`: reservation- and settlement-stage token parks both
+  return `SupervisedResult::Suspended(wait)`; a random wait and an earlier wait under a
+  later fence are not confirmed (`workflow_agent_run_settlement_pause_and_second_pause_
+  resume_exact_requests`, `workflow_agent_run_token_denial_never_enters_the_provider`).
+- **06-F020 fixed.** Init SQL: deferred constraint trigger
+  `workflow_model_tool_wait_continuation` (`init_schema.sql:11816`, guard fn at 4347):
+  completing a model-tool delivery wait requires, at commit, the execution still open (no
+  completion, no committed route) and its job pending again — i.e. only the delivery
+  continuation, never a step completion. Step uniqueness kept with unique partial index
+  `workflow_message_step_one_wait` (company, execution) WHERE origin='step' AND wait_id NOT
+  NULL (`:10632`). Negative tests: completing the parked agent's wait without continuing the
+  job fails at commit ("model-tool delivery only continues its agent job", in
+  `workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt`); a second
+  step-origin effect wait for one execution is refused by that index
+  (`workflow_message_sql_step_execution_keeps_one_effect_wait`, capture trigger disabled only
+  inside the rolled-back transaction so the index is the refusing object).
+- **06-F019 fixed except (a) sibling-at-driver.** Proof map (driver = `WorkflowAgentRuntime`
+  over the real Rig protocol and scripted provider; request IDs and settlement from
+  `model_usage_calls`; effects from `workflow_action_dispatches`/receipts):
+  (a) token pause → approval → fresh claim consuming the blocked request
+  (`blocked_workflow_model` + `WorkflowBinding::reservation`):
+  `workflow_agent_run_token_pause_resumes_with_the_saved_request` (admitted request id =
+  approved `token_request_id`, 1 provider call); settlement-stage pause, approval, fresh
+  claim runs the saved tool call with no model call, re-parks at reservation stage because
+  actual usage exceeds the extended allowance, second approval admits that exact request:
+  `…settlement_pause_and_second_pause_resume_exact_requests` (2 provider calls, 1 HTTP
+  effect, decisions [settlement→request0, reservation→request1], retry 0); denial:
+  `…token_denial_never_enters_the_provider` (no claim, run failed, 0 usage/calls). Sibling
+  consumption between approval and claim remains store-level
+  (`workflow_harness_token_sibling_usage_reparks_exact_request_without_debit`); the driver
+  re-park path on a fresh claim is the one proven above. Disclosed, not driver-tested.
+  (b) restart after each boundary: reservation before I/O (provider unreachable) →
+  `…reservation_without_provider_io_retries_with_a_new_request` (old request unsettled and
+  charged, new id settled, provider 1, retry 1); provider entry before settlement (barrier,
+  driver dropped) → `…restart_after_provider_entry_charges_a_new_request` (2 exchanges,
+  distinct ids, first unsettled, retry 1); after settlement → the settlement-pause test and
+  approval tests (saved turn reused, no model call); after receipt (driver dropped at the
+  next provider entry) → `…restart_after_receipt_reuses_the_saved_effect` (HTTP 1, provider
+  3, ledger [settled, unsettled, settled], dispatch 1, retry 1).
+  (c) `…two_approval_cycles_dispatch_each_call_once`. (d)
+  `…refuses_model_invented_tool_without_dispatch`. (e) `…repairs_invalid_output_once` and
+  `…invalid_output_after_repairs_is_terminal` (3 charged tool-free calls →
+  agent.invalid_output terminal). (f) `…refuses_rebound_tool_target`. (g) duplicate driver
+  on the same fence after a crash mid-effect gets `PossibleDispatchExists` →
+  `agent.effect_unknown` terminal; lease expiry then reconciles (reconciliation row, no
+  claimable retry): `…crash_during_effect_is_indeterminate_and_reconciled`; a sent call with
+  no answer fails terminally (HTTP provider reports BadRequest → `agent.rejected`) and the
+  shared `workflow_action_retry_safe` predicate reconciles instead of retrying:
+  `…unanswered_effect_is_terminal_and_reconciled`. (h) `workflow_agent_mcp_tool_dispatches_
+  once_through_the_bound_slot` (mcp_agent_tests.rs: agent grant resolves through the bound
+  MCP slot; server 1 call with the model's arguments and the slot credential; no credential
+  in model input; replay without model/MCP calls; counts 1/1/1). (i)
+  `workflow_agent_run_dynamic_selection_runs_the_bound_agent` (parameter enum
+  [sales,support] captures both agents in the stored bundle; binding param support runs only
+  the support agent; usage charged to it).
+- **06-F021**: (2) adopted earlier (`agent.rs:99` escapes `</` in delimited context); (3)
+  adopted (`derive_on(…, Rows::{Read,Shared})` replaces the bool); (1) not adopted —
+  `NewModelAdmission::committed` lives in `application`, and `pub(in …)` cannot name the
+  adapter store; the permit stays non-clone/consume-once with `pub(crate)` construction;
+  (4) deferred to 06C (agent deletion/retention once legacy agent rows are removed).
+
+Focused evidence (fresh disposable DBs, dropped by trap): 06B2b-f019-driver.sh agent driver
+suite 29/0 then new tests 1/0 and 3/0; 06B2b-d5-agent.sh (workflow_agent_, workflow_harness_,
+workflow_message, workflow_job_) 172/0 at RUST_MIN_STACK 2 MiB; fmt and strict Clippy
+all-targets PASS (06B2b-f019-clippy.log). New files: agent_recovery_tests.rs (child of
+agent_runtime_tests), mcp_agent_tests.rs (child of mcp_tests). Correction gates
+(06B2b-r016-gates.sh) running on the final tree; results below.
+
+Correction gates PASS on the final tree (06B2b-r016-gates.sh, fresh disposable
+workflow06_r016_20261020_test dropped by trap, RUST_MIN_STACK 2 MiB): fmt, git diff --check,
+offline all-target check, strict Clippy all-targets, fresh init migration, SQLx prepare and
+prepare --check (no .sqlx diff); tests workflow_ 1008/0, adapters::harness::rig 52/0,
+application::use_cases::thread 117/0, adapters::persistence::task::harness_runs 10/0,
+model_usage 14/0, application::workflow 197/0 (logs 06B2b-r016-*.log).
+**Frozen for correction recheck:** base 76fe99c, digest
+d9ea9e59570ffd34142fc18c7d6542ad5e2ca93ba7ee4755e85110ab544b2ef3 (excludes
+plan/workflow-foundation/docs; 93 files, 06B2b-r016-snapshot.txt). Recheck requested from
+retained Reviewer B by finding ID (06-F017…F021).
+
+### 06B2b ROOT ACCEPTED — 2026-10-20
+
+Independent Reviewer B (`a9387720a47e21d5f`, Opus 5.5) correction recheck **06-R017 PASS**
+for digest d9ea9e59570ffd34142fc18c7d6542ad5e2ca93ba7ee4755e85110ab544b2ef3 (base 76fe99c),
+matched before and after the recheck and again by root afterwards. 06-F017, F018, F019, F020
+resolved; F019(a) sibling-at-driver gap accepted (same driver re-park branch proven by the
+second-pause test); F021 (2)(3) adopted, (1) declined with accepted reason, (4) deferred to
+06C. New optional 06-F022: split `agent_runtime_tests.rs` (1043 lines) — to be done at the
+start of 06B3 (test-only move, reviewed with 06B3). B's independent run on its own fresh DB
+(workflow06_review_r017_test, dropped): workflow_agent_ + workflow_harness_ +
+workflow_message_ 130/0. Root's correction gates PASS (above). Outstanding for the phase end:
+combined integration review (B noted token internals, root-pause scheduling and R5 test
+bodies were only lightly reviewed), full phase06 stack/lease/all-target gate.
+
+Next: 06B3 (context.load/memory.load/memory.save/ai.classify/decision.agent preparation
+steps), then 06C (caller migration and legacy removal per D5), then the final phase06 gate.
+
+### 06B3 started — user scope decisions and proposed gate 06-D6 — 2026-10-20
+
+Optional 06-F022 done first (test-only): six approval/driver tests moved from
+agent_runtime_tests.rs (now 787 lines) to new agent_driver_tests.rs (child `driver`); agent
+suite 31/0 on a fresh DB (06B2b-f019-driver.sh). Phase plan 06 "Skills and capability
+profiles" annotated as superseded by 06-D5 (doc only).
+
+Survey (Explore agent, read-only): the five preparation kinds have registry/compiler contracts
+only; no production workflow worker exists (WorkflowWorker test-only; wiring is 06C/08);
+ai.classify has no model source; memory providers ingest conversation pairs without ids;
+message-triggered thread runs freeze history in workflow_history_members with no reader.
+
+User (chat, 2026-10-20), after "these should be regular steps that are added to workflow
+before agent run?" was answered yes (ordinary steps wired by refs; decision.agent is a branch):
+"1. as recommended" (ai.classify gets an `agent` input, that agent's model and instructions,
+no tools); "2. don't implement memory now"; "3. don't implement memory now"; "4. rename
+context.load to context.history, thread history as described" (history frozen at admission,
+bounded by max_tokens).
+
+Proposed architecture gate 06-D6 (logs/06/decision-D6.md): context.history contract/reader,
+ai.classify agent input, one durable driver for agent.run/ai.classify/decision.agent with
+tool-free ModelStep, current_on by prepared capabilities, recovery classification, memory
+deferred, revision bumps. Requested from retained Reviewer B before dependent code.
+06-R018 (gate review of D6 rev1, SHA 064dbff7…): CHANGES REQUIRED — 06-F023 (history items lose
+audience/entry kind), 06-F024 (max_tokens can exceed the run's result byte cap → terminal
+invalid_result), optional 06-F025. Revision2 (decision-D6.md SHA
+e80a5201f60e1b37abf4bf4faef8b3695d19928e05563af3f6e8098775dd497d; rev1 kept as
+decision-D6-revision1.md): typed audience/entry_kind/at per item (nothing dropped beyond
+internal notes); budget = min(max_tokens, claim max_result_bytes envelope) applied at run time,
+stop at first non-fitting item, triggering message included; F025 adopted: single
+effect_free_kind predicate; memory publication refusal not adopted now, recorded as a 06C
+worker-wiring obligation; phase plan memory acceptance marked deferred. Recheck requested.
+06-D6 revision2 ACCEPTED by root (06-R019 PASS, SHA e80a5201…497d, no new findings). Reviewer
+note for implementation review: the effect_free_kind unit test must keep memory.save and every
+action kind outside the effect-free set. 06B3 implementation starts (order: registry rename +
+contracts + revisions; publication for ai.classify; effect_free_kind; ModelStep preparation and
+current_on by prepared capabilities; Rig supports; WorkflowHistoryRuntime; fixtures; tests).
+
+### 06B3 implementation (06-D6 rev2) — 2026-10-20
+
+- Registry (`registry/{mod,families,schemas,examples,help,metadata}.rs`): `context.load` renamed
+  `context.history` (mechanical rename across src; no alias); contract `{max_tokens}` →
+  `{items: history_item[0..256], token_count, omitted}`, `history_item` =
+  `{message_id, at, role, audience, entry_kind, author, subject, body, truncated}`;
+  `ai.classify` requires `agent`; help notes of the four executed kinds describe behaviour
+  (registry help test now asserts "Execution unavailable" only for unexecuted kinds);
+  `ModelStep::{AgentRun, Classify, Decide}` is the one model-kind list (publication agent
+  universe/validation/`prepare_step_inputs`, preparation, runtime `supports`).
+  CONTRACT_REVISION workflow-catalogue-v1.5; compiler SEMANTIC_REVISION 6; SQL admission
+  revision `compiler_revision='6'` and provenance `frozen_v6` (init SQL and 3 test files).
+- Preparation: `ResolvedAgent::model_only()` (narrowing: clears agent tools/skills and
+  resolved tools/skills); `PreparedAgent::new(selection, inputs, PreparedStep::{AgentRun
+  {targets}, Classify, Decide {choices}})` records `step`; Classify/Decide refuse any selection
+  with tools or skills; Decide response schema `{choice: enum(compiled route order, deduped),
+  data: data_schema}`. Persistence `prepare_agent` reads the claimed step's kind from the frozen
+  graph and Decide choices from `Routes::Choices`; `current_on` unchanged (it reads the
+  prepared selection, empty for Classify/Decide). Rig `WorkflowAgentRuntime::supports` = any
+  `ModelStep`.
+- Recovery: `actions::effect_free_kind` (+ `retry_safe_without_marker`) replaces the lists in
+  `recovery.rs report` and `pending_recovery.rs unknown_effect`; unit test over every
+  registry kind keeps memory.save, workflow.call, flow.repeat (and action kinds outside the
+  effect-free set).
+- `context.history`: `application/workflow/history.rs` (pure `select`, `WorkflowHistory`
+  port, `WorkflowHistoryRuntime` handler, failure mapping BadRequest→Terminal
+  `context.invalid_history`, else Retryable `context.unavailable`); persistence
+  `history_reader.rs` (one read in the claim tx after `runtime::facts`/`frozen_inputs`: frozen
+  members joined to thread_messages/messages/principals, internal notes excluded, newest 256,
+  texts cut in SQL one character past 16384, eligible count).
+- Fixture `triage-routing.yaml` gains `agent: assistant` (+ agent snapshots); test outputs of
+  context steps gain `"omitted":0`.
+- Tests: history_tests.rs (pure: suffix, stop at first non-fitting, result-cap boundary at and
+  one byte under, newest too large, char truncation, failure classes);
+  history_reader_tests.rs (DB: snapshot with exact role/audience/entry_kind, triggering message
+  included, internal note and post-admission message excluded, token_count, output accepted by
+  the compiled step contract; bounded by result cap and max_tokens; non-thread run empty;
+  cross-run isolation); agent_tests.rs (model steps prepare tool-free; unnarrowed selection
+  refused; decision schema; empty choices refused); capabilities_tests.rs (ai.classify agent
+  universe/capture/missing agent); registry tests (context.load refused, sources refused,
+  max_tokens bound); agent_model_step_tests.rs (scripted provider: classify label + tool-free
+  request + usage attribution; undeclared label repaired then terminal; decision.agent
+  invented route repaired, declared choice accepted by compiled contract; tool removal and
+  skill unlink do not block classify and skill text never reaches it; model revocation →
+  agent.rejected with 0 provider calls; token pause through supervise_io → approval → fresh
+  claim; crash after provider entry → new charged request, retry 1).
+- Optional 06-F022 done (agent_driver_tests.rs split).
+Focused results: application::workflow 206/0 (06B3-application-3.log); DB:
+workflow_context_history 3/0, classify/decision/model_steps 6/0 (06B3-focused.log on fresh
+disposable DBs); strict Clippy all-targets PASS (06B3-clippy.log). Batch gates running
+(06B3-batch-gates.sh).
+06B3 batch gates PASS (06B3-batch-gates.sh, fresh disposable workflow06_b3_batch_20261020_test
+dropped by trap, RUST_MIN_STACK 2 MiB): fmt, diff-check, offline all-target check, strict
+Clippy, fresh init migration, SQLx prepare/check (no .sqlx diff); workflow_ 1026/0, rig 52/0,
+thread 117/0, harness_runs 10/0, model_usage 14/0, application::workflow 207/0.
+**Frozen for whole-batch review:** base 76fe99c, digest
+b64957f986c172239336b34593bb1de360a501a5e9c6158f01e9fa3821b1fb99 (excludes
+plan/workflow-foundation/docs; 151 files, 06B3-batch-snapshot.txt). Accepted 06B2b digest
+d9ea9e59… is the prior state; 06B3 delta = registry/compiler/publication/agent/recovery/
+history/fixture changes listed above plus the test-only 06-F022 split. Review requested from
+Reviewer B.
+
+### 06-R020 correction round — 2026-10-20
+
+06-R020 (whole 06B3 batch, digest b64957f9…): CHANGES REQUIRED — 06-F026 (low), optional
+06-F027.
+- **06-F026 fixed.** Decide's response contract is now the compiled step output contract
+  (`CompiledWorkflow::step_output_schema`, the schema completion validates; one place):
+  `PreparedStep::Decide { contract }`, the hand-built `decision_schema` and the persistence
+  choice loop are removed. Running the new test exposed the actual root cause: the shared
+  schema resource check `services::tool_schema::check_resources` resolved every local `#…`
+  pointer against the document root, ignoring nested `$id` resources, while the jsonschema
+  validator and the workflow compiler (`schema_budget.rs:61`) re-root at `$id`. It now
+  re-roots at a nested `$id` (budgets unchanged). Tests:
+  `workflow_decision_agent_data_schema_local_references_resolve` (scripted provider,
+  `$defs`/`$ref` data schema, output accepted by the compiled contract, referenced bound
+  enforced) and `schema_local_references_resolve_inside_their_nested_resource` (unit; without
+  the `$id` boundary the same pointer is refused). Unit test for Decide uses the contract
+  verbatim.
+- **06-F027 (optional):** (1) adopted — the reader counts eligible members without bodies
+  and joins messages only for the newest 256; (3) adopted in part — NotFound/
+  InvalidCredentials (run/actor authority refusal) now map to Terminal `context.rejected`,
+  as model steps treat them; the reader keeps `runtime::facts` (run `FOR UPDATE` + actor
+  prelock) like every I/O step, so D6's "takes no locks beyond its read" is corrected here:
+  it takes the standard claim locks and no others. (2) not adopted — `select` re-serializes
+  per candidate but is bounded by ≤256 items and the run's result cap; an incremental exact
+  size would duplicate serde's encoding rules.
+Focused: DB workflow_context_history + classify + decision + model_steps + workflow_agent_
+41/0; application::workflow 207/0 (06B3-application-4.log); schema units 10/0
+(06B3-schema-unit.log). Correction gates PASS (06B3-r020-gates.sh, fresh disposable
+workflow06_b3_r020_20261020_test dropped by trap): fmt, diff-check, offline check, strict
+Clippy, fresh migration, SQLx prepare/check (no diff); workflow_ 1027/0, rig 52/0, thread
+117/0, harness_runs 10/0, model_usage 14/0, application::workflow 207/0.
+**Frozen for correction recheck:** base 76fe99c, digest
+afbb5ffb62f5e9cf019323611f2133cc6ae6f24644dda2104acc6ac42f2c3717 (153 files,
+06B3-r020-snapshot.txt). Recheck requested from Reviewer B.
+
+### 06B3 ROOT ACCEPTED — 2026-10-20
+
+Independent Reviewer B (`a9387720a47e21d5f`, Opus 5.5) correction recheck **06-R021 PASS** for
+digest afbb5ffb62f5e9cf019323611f2133cc6ae6f24644dda2104acc6ac42f2c3717 (base 76fe99c),
+matched before/after the recheck and again by root. 06-F026 resolved (compiled decision
+contract; shared `tool_schema` check re-roots local refs at nested `$id`, judged safe:
+budgets/depth unchanged, cycles still refused, absolute/anchor refs still refused); 06-F027
+(1)(3) adopted, (2) declined with accepted reason. B's own run on a fresh DB
+(workflow06_review_r021_test, dropped): 147/0. Root gates PASS (06B3-r020-gates.log).
+Outstanding for phase06: 06C, combined integration review, full phase06 gate.
+
+### 06C scope — user decisions (chat, 2026-10-20)
+
+Root asked "so this phase is complete?" → no: 06C, final phase06 gate and combined review
+remain. Root proposed (1) remove ai-agents runtime in 06C, (2) keep legacy catalogue/skill
+tool steps/AgentRunner for phase 08, (3) wire the production workflow worker in 08,
+(4) then final gate + combined review. User: "1. yes remove / 2. do what's simpler - we don't
+run the app yet / 3. do what's simpler - we don't run the app yet / 4. ok".
+Root interpretation (stated to the user): 06C removes the ai-agents runtime completely
+(dependency, adapter, HarnessKind::AiAgents, selector/config; guardrail and prompt generator
+move to Rig) AND deletes the legacy tool catalogue, executable skill tool steps,
+granted_tool_ids and agent_mcp_selections now (live breakage irrelevant: app not running),
+repurposing list_company_agents and create_agent_channel as built-in workflow agent tools per
+D5; production worker wiring and refusal of unhandled step kinds move to phase 08 (no work
+now). Then final phase06 gate and combined integration review.
+06C survey (Explore, read-only) recorded the blast radius: ai-agents crate/adapter/HarnessKind
+selector (config, onboarding/runtime pages, agent forms/routes, agents.harness_kind column,
+CHECK and two guard triggers), TextClassifier only implemented by ai-agents (callers: spam
+guardrail via AgentRunner, prompt generator); legacy catalogue (tool_catalogue.rs, rig
+builtins via ai_agents tools, NativeToolHost, granted_tool_ids validation/UI/schema,
+agent_mcp_selections tables/routes/UI), SkillInstruction::Tool consumers, five native tools.
+User (chat, 2026-10-20), on root's question whether create_agent_channel and
+list_company_agents wait for phase 08 (their semantics are the old channel/delegation model
+that 08 replaces): "1. yes build it in 08 / 2. also in 08". 06C = removal + a Rig
+TextClassifier; no new contract, so no architecture gate; whole-batch review after gates.
+Plan: (1) Rig TextClassifier, wire setup; (2) remove catalogue/native tools/skill tool
+steps/MCP selections from the legacy Rig binding, runner, use cases, persistence, routes,
+pages, schema; (3) remove ai-agents crate/adapter, HarnessKind selection surfaces and the
+harness_kind column; (4) tests and docs (.env.example, README, docs/*).
+06C routine decision (root): remove HarnessKind::AiAgents and every selection surface (config
+`default_agent_harness`, onboarding/runtime settings UI, agent form/API/library fields,
+agents.harness_kind column + CHECK + guard triggers); keep the then single-value internal
+HarnessKind (persisted in Rig checkpoint identity) and the one-entry HarnessRegistry until the
+legacy AgentRunner they serve is deleted in phase 08 (recorded 08 cleanup obligation).
+SkillInstruction keeps its JSON tag shape with only `Prompt { text }`.
+06C step 1 done: `adapters/harness/rig/classifier.rs` RigTextClassifier (ProviderRegistry +
+one tool-free completion; trusted endpoint override for tests only) with 2 unit tests.
+06C progress checkpoint (WIP, library not yet compiling): deleted ai_agents adapter dir, rig
+builtins.rs, services {native_tools, approval_tool, outreach_tool, task_ownership_tool,
+agent_directory_tool, agent_channel_tool, mcp_runtime}, services/harness/{approvals,
+approvals_tests, mcp}.rs, persistence task/mcp_journal.rs and persistence/agent_channel.rs,
+domain tool_catalogue.rs (git rm, staged deletions; no commit). Rig ToolBridge is now
+resource-only (`ToolBridge::new().with_resources`); CompiledRun::compile(spec, context);
+RigHarness::{new, with_providers}(…, capabilities) without MCP; deployment_registry without
+MCP and without AiAgents; harness ports lost HarnessApprovals/ApprovalAsk/Trigger/Verdict/
+HarnessToolHost/NativeToolDeclaration/NativeToolSafety and AgentRun.{approvals,tool_host};
+HarnessRunStore lost mcp_journal; AgentRunner lost native tool builders/fields and
+approval_use_cases; setup uses RigTextClassifier; skills prompt-only (domain + tests);
+outreach result JSON inlined in task/operations.rs; routes/mcp.rs local schema_fingerprint.
+Remaining: use_cases agent/builtin library grants + native_tool_policy; thread mod/dispatch
+wiring; pages/routes (agent settings, skills, skill library, MCP selection, harness select,
+onboarding/runtime settings, JS); MCP selection domain/use cases/persistence; harness_kind
+selection; schema (agents.granted_tool_ids/native_tool_policy/harness_kind + checks/triggers,
+valid_tool_id_array, agent_mcp_selection(s/_revisions), agent_channel_provisions +
+require_legacy_provision_task, guard_agent_mcp_harness, guard_active_agent_harness_change);
+Cargo ai-agents dependency; tests; docs.
+06C implementation complete (2026-10-20, root author A; pending gates/suite + B review):
+- Library: agent use case/persistence/routes/pages/onboarding/library/JS lost harness_kind,
+  granted_tool_ids, native_tool_policy (AgentJsonPayload deny_unknown_fields now rejects them);
+  config is always canonical Rig (`parse_config_form(input)`); AppConfig.default_agent_harness,
+  DEFAULT_AGENT_HARNESS parser and infra/config_harness_tests.rs removed;
+  `deployment_registry(capabilities)`; PostgresPersistence lost default_agent_harness;
+  ResolvedAgentCapabilities lost native_tool_policy/default_harness; ResponseContract
+  require_harness removed. Thread dispatch lost agent_directory/agent_channel/outreach tool
+  wiring (ApprovalUseCases kept on ThreadUseCases: task_worker quorum-timeout/maintenance still
+  use it). Rig: skills prompt-only (templates: user_input/context/steps[i].result), tool trace
+  approval hook, template.rs, BeginRemote/SavedMcpInvocation/SavedInvocation.mcp,
+  ToolStopReason::ApprovalContextRequired removed; ToolBridge: Default. Built-in Agent Builder
+  no longer grants tools; its prompt ends with a specification for the user to create (08
+  restores creation). Agent MCP selections removed end to end (domain AgentMcpSelection,
+  use case select/selection/selecting_agents, persistence selection_on/validate_effective_grants/
+  replace_agent_mcp_selection/mcp_selecting_agents, API+UI routes, page, settings link);
+  mcp_connections_by_ids bound is MAX_MCP_CONNECTIONS (MAX_MCP_SELECTIONS removed).
+- Schema (init migration, in place): dropped agents.harness_kind/granted_tool_ids/
+  native_tool_policy + their CHECKs; agents_response_contract no longer mentions harness_kind;
+  dropped valid_tool_id_array, agent_mcp_selections, agent_mcp_selection_revisions,
+  agent_channel_provisions (+FKs/pkeys/trigger require_legacy_provision_task),
+  guard_agent_mcp_harness, guard_active_agent_harness_change and lock_task_agent_harnesses
+  (functions + triggers; 23 pg_dump blocks). Routine decision: the response-contract half of
+  guard_active_agent_harness_change is dropped with it — a legacy run whose contract changed
+  after preparation already fails closed in Rig `authorization()` ("Capabilities changed").
+- Cargo: removed ai-agents, minijinja (only template.rs), schemars (unused directly; remains
+  transitive via rig); Cargo.lock updated offline (only removals + one windows-core list line).
+- Tests: deleted tools_{capability,provider,trace}_tests, mcp_flow/mcp_durable tests,
+  agent_harness{,_query}_tests (replaced by persistence/agent_config_tests.rs: retired
+  columns/tables absent, canonical Rig config + omission, contract round trip), legacy
+  approval-handler/outreach-approval/skill-and-grant/selection tests; rewrote tools_tests
+  (resource-only bridge), agent_runner/mod_tests (no ai-agents), skills tests (prompt-only),
+  agent API/form tests, MCP tests, params/agent/skill/harness registry tests; thread
+  test_support harness_registry is an empty registry (in-memory fixtures have no capability/
+  checkpoint store); inter_channel/external_reply fixtures use deployment_registry (real Rig).
+  dependency_tests now guards the application layer against naming the `rig` crate.
+- Docs: .env.example (DEFAULT_AGENT_HARNESS and unread ENABLE_AI_AGENTS_OBSERVABILITY removed),
+  README, docs/{rig,rig-verification,deploy,custom_tools,inter_channel_agent_communication,
+  system_addresses}.md, rig/README.md.
+- Gates (logs/06/06C-gates.sh): fmt, diff --check, check --all-targets, clippy -D warnings,
+  fresh migration on disposable workflow06c_meta_20261020_test (0 retired columns), SQLx
+  prepare + --check (no .sqlx changes): GATES-PASS. Full lib suite: logs/06/06C-suite.sh
+  (disposable workflow06c_suite_20261020_test) running.
+Phase-08 obligations (recorded): create_agent_channel and list_company_agents as workflow tools
+and Agent Builder creation; production workflow worker wiring + refusal of unhandled step
+kinds; remove single-value HarnessKind/HarnessRegistry and the legacy AgentRunner/outreach/
+quorum/ApprovalUseCases machinery with the legacy binding.
+06C suite run 1 (logs/06/06C-suite-run1.log): 2693 passed / 10 failed / 22 ignored. Causes and
+fixes: (a) tests still using ai-agents config (`reasoning`/`reflection`/`disambiguation`) in
+params_tests, agent_tests (two), routes/agent config-path test → Rig `max_turns` configs and a
+retired-key rejection assertion; (b) skill_tests valid_tool_id_array matrix (function dropped)
+removed; (c) claim_tests competing-claimant snapshot test used the dropped
+lock_task_agent_harnesses trigger to hold its window open → test installs an equivalent
+test-only BEFORE UPDATE OF status trigger in its own database (production claim SQL untouched);
+(d) task_worker scheduled-run test ran ai-agents in-memory → StubHarness registry (scheduling/
+payload recording under test; real Rig covered by thread PostgreSQL suites); (e) two
+rig_execution_tests exercised removed request_approval/outreach native tools → deleted (the
+provider-deadline recovery test kept); (f) PRE-EXISTING (file unchanged since 76fe99c):
+dependency_tests flagged sqlx in test-only `thread/model_usage_assertions.rs` → renamed to
+`model_usage_tests.rs` (#[path] kept module name). channel_assignment lock-order comment no
+longer cites the dropped trigger (agent FOR SHARE pre-lock kept). Focused rerun
+(logs/06/06C-focused.sh, disposable DB): 112/0. Full suite rerun running (06C-suite.sh).
+06C suite run 2 (logs/06/06C-suite-run2.log): 2700 passed / 1 failed / 22 ignored. The failure
+was `response_schema::tests::documented_rig_configuration…`: it classified docs/rig.md JSON
+examples by `harness_kind`, which the doc no longer contains. Fixed: a block without
+`response_contract` must deserialize as `AgentJsonPayload` (deny_unknown_fields, so docs naming
+retired fields fail) and parse as Rig config. Affected module rerun: adapters::response_schema 4/0;
+fmt --check, diff --check, strict all-target Clippy clean. Remaining suite unchanged since run 2.
+06C FROZEN for B whole-batch review: base 76fe99c93266c73ef4d13b2b10ff40df89580afb, digest
+bf1c0360523f460ff2dc097b0309af8b3694e19e0a45c4b1d9aae610281850e7 (excludes
+plan/workflow-foundation/docs). No project edits during review.
+06C RE-FROZEN (B reported digest mismatch, no review performed): root edited
+plan/workflow-foundation/RESUME.md (outside the excluded docs/ dir) after recording digest
+bf1c0360…50e7. No code changed since. New freeze: base 76fe99c93266c73ef4d13b2b10ff40df89580afb,
+digest c9f12d8828d1dbd5dd3b635611d98ea6760c87bab637f7ffd0551502e77a16f5, 291 files; manifest
+logs/06/06C-batch-snapshot.txt. RESUME.md is not edited again until 06C acceptance.
+06-R022 (B, digest c9f12d88…16f5): CHANGES REQUIRED, docs only — 06-F028 (low) + optional 06-F029;
+no code defect; B's independent full lib suite on the frozen tree 2701/0/22 ignored
+(logs/06/06C-review-r022-suite.log).
+06-F028 fixed (docs only): README execution diagram no longer routes agent runs through the
+removed "Approval or outreach requested?" decision or the agent outreach-question delivery edge;
+the Pauses subgraph title states approval/waiting have no agent producer since 06C (phase 08
+rebuilds them as workflow steps). docs/deploy.md MCP pilot row limited to credentials,
+refresh/test, grant review and stale-grant rejection; remote-call receipt/disconnect evidence
+moved to the phase-08 release pilot. No Rust/database rerun needed (root AGENTS.md: docs-only).
+06-F029 dispositions: (1) adopted as recorded intent — after 06C a response_contract edit is no
+longer refused while legacy tasks are unsettled; those runs fail closed at Rig authorization();
+(2) accepted gap — no test drives a scheduled run through real Rig (worker test uses
+StubHarness); scheduled legacy runs are replaced by workflows in phase 08 (obligation added);
+(3) mcp_connections_by_ids has no production caller — kept for workflow MCP test support;
+phase-08 cleanup obligation; (4) Agent Builder prompt wording ("minimum workflow tools", company
+model defaults) is revised in phase 08 when its tools return (obligation added).
+06C recheck freeze: base 76fe99c93266c73ef4d13b2b10ff40df89580afb, digest
+dbeb4953eff762719ffbd56465ae2eaf1b0c263e68d06a06d4fb40e567e4b4d5 (manifest
+logs/06/06C-batch-snapshot-r023.txt; same 291 paths; changed since c9f12d88: README.md,
+docs/deploy.md only).
+06C ROOT ACCEPTED 2026-10-20 on 06-R023 PASS (B) for digest
+dbeb4953eff762719ffbd56465ae2eaf1b0c263e68d06a06d4fb40e567e4b4d5; 06-F028 resolved, 06-F029
+dispositioned (accepted by B). Post-acceptance docs-only edit (B's optional note 1): README
+Pauses subgraph label quoted for Mermaid safety; covered by the combined integration review.
+Next: final phase06 gate (logs/06/06-final-gate.sh) and combined integration review.
+USER-REQUESTED STOP 2026-10-20 ("write handoff and stop"): final phase06 gate stopped during
+build-tests after fmt/diff-check/check/clippy/migrate/sqlx-check PASS (06-final-gate.log); suite,
+stack budget and lease budget not run. Leftover disposable DB workflow06_final_meta_20261020_test
+dropped (0 workflow06* remain; workflow0410_* retained untouched). Handoff:
+logs/06/HANDOFF-20261020-06C.md. Next: rerun 06-final-gate.sh, freeze, B combined integration
+review, report phase06.
+RESUMED 2026-10-20 (user: "continue"): final phase06 gate rerun started (06-final-gate.sh).
+Final phase06 gate run (06-final-gate.log): fmt, diff-check, check, clippy, migrate, sqlx-check,
+build-tests PASS; stack-budget (full lib suite at 2 MiB) 2701/0/22 ignored PASS; lease-budget
+PASS (every required op measured, under budget). All-target isolated suite: 2700 passed / 1
+failed (lib target; bin targets therefore not run): message_tests::agent_tests::
+workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt panicked in
+test_support own_database pool connect — `Protocol("unexpected response from SSLRequest: 0x00")`
+(connection-level, before any test logic; server log shows only normal drop-time terminations;
+cluster ssl=off, max_connections=200). Same test passed in the stack-budget full run, in B's
+R022 run, and 3/3 isolated reruns (06-final-flake-check.log). Treated as unverified until a
+clean rerun: full isolated all-target suite rerunning (06-final-suite-rerun.sh).
+Final-gate follow-up (2026-10-20):
+- All-target suite rerun 1 (host `localhost`, 06-final-suite-rerun1-localhost.log): 2698/3: one
+  more own_database `SSLRequest: 0x00` connect failure (different test) + two timing failures in
+  action_receipt resolution tests (2 s persistence bound elapsed under load; 06C does not touch
+  that code; both pass in other full runs). Root cause candidate for the connect failures: the
+  gate scripts used `localhost`, which resolves to ::1 first while the cluster listens only on
+  127.0.0.1; the recorded fixture for earlier phase gates is 127.0.0.1. Gate scripts switched to
+  127.0.0.1; all-target suite rerunning (06-final-suite-rerun.sh). Stack- and lease-budget
+  results stand (Rust unchanged since).
+- CI parity additions run now: scripts/tests/deploy.sh, credential-key-rotation.sh,
+  transport-boundary.sh + transport-boundary-check.sh PASS (06-final-scripts.log); node tests
+  sse-navigation.mjs + agent-runtime.mjs 8/8 after updating agent-runtime.mjs (it still asserted
+  the removed `harness_kind` in the library payload — a missed 06C frontend test, now asserts the
+  retired fields are absent).
+- CSS: building assets/app.css.in to scratch differs from the working assets/app.css only by the
+  64-unit height utility rule (used solely by the removed MCP selection page), so CI `check:css`
+  would fail. Regenerating assets/app.css was first DENIED by the permission classifier (user WIP
+  file); the user then said "regenerate css". Pitfall: Tailwind v4 automatic source detection
+  also scans plan docs, so writing that utility's class name in a record re-adds the rule — keep
+  class literals out of docs/records.
+- CSS regenerated on user instruction ("regenerate css"): `npm run build:css`; the new
+  assets/app.css equals the previous working file minus exactly the one unused height utility rule
+  (37 bytes); backup of the previous file in the session scratchpad (app.css.before-06C-regen).
+FINAL PHASE06 GATE — PASS (2026-10-20). Evidence (logs/06/):
+| Gate | Result | Log |
+|---|---|---|
+| fmt, diff --check | PASS (rerun after last non-Rust edits) | 06-final-gate.log |
+| check --all-targets, clippy -D warnings | PASS | 06-final-check.log, 06-final-clippy.log |
+| fresh migration, SQLx prepare --check | PASS | 06-final-migrate.log, 06-final-sqlx-check.log |
+| tests --no-run | PASS | 06-final-build-tests.log |
+| isolated all-target suite (127.0.0.1) | PASS: lib 2701/0/22 ignored + bin 5/0 | 06-final-suite-rerun.log |
+| stack budget (2048 KiB) | PASS: 2701/0/22 ignored | 06-final-stack-budget.log |
+| lease budget | PASS: all required ops measured, under budget | 06-final-lease-budget.log |
+| deploy, credential rotation, transport boundary scripts | PASS | 06-final-scripts.log |
+| node sse-navigation + agent-runtime | 8/8 | (inline) |
+| generated CSS current | PASS (scratch build == assets/app.css) | (inline) |
+Earlier failed attempts retained: 06-final-suite.log (localhost; 1 connect failure),
+06-final-suite-rerun1-localhost.log (localhost; 1 connect failure + 2 timing failures). Not run:
+Playwright task-counts browser test (no browser install; frontend task-count code untouched by
+phase06 06C), CI pg_stat_statements activation step. Disposable DBs: 0 workflow06* remain.
+Next: freeze, Reviewer B combined phase06 integration review.
+Phase06 combined-review freeze: base 76fe99c93266c73ef4d13b2b10ff40df89580afb, digest
+33cfebc799ec8a3f6a0814dec2496987a2042541234502354b363a55878c4bf0 (293 paths; manifest
+logs/06/06-final-snapshot.txt). Changed since 06C acceptance (dbeb4953): README Mermaid label
+quoting, RESUME.md (stop/resume notes + phase-08 obligations), scripts/tests/agent-runtime.mjs,
+assets/app.css (regenerated). No Rust change. RESUME.md held unedited until B's verdict.
+06-R024 (B, phase06 combined review, digest 33cfebc7…4bf0): CHANGES REQUIRED — 06-F030 (medium:
+D2 "before phase06 acceptance every production model entry must persist usage or be removed";
+RigTextClassifier callers — spam guardrail and prompt generator — write no model_usage_calls;
+model_usage_calls.task_id/agent_id NOT NULL), 06-F031 (low: stale workflow-language doc,
+harness-query-plans.py looks up dropped triggers, Dockerfile git for ai-agents, stale comments in
+value_objects.rs), 06-F032 (low: deferred memory has no owning phase). B confirms gate evidence;
+corrected connect-failure mechanism: TCP self-connect on [::1]:55450 (port in macOS ephemeral
+range, nothing listening on ::1) — keep fixtures on 127.0.0.1 or move the cluster below 49152.
+Playwright task-counts 4/4 (B). F030/F032 need user decisions (asked in chat); F031 to fix after.
+User decisions (chat, 2026-10-21) on 06-R024: "1. we remove spam guardrail entirely and don't need
+metering for prompt generator / 2. no memory in this release / 3. ok you got it".
+=> F030: delete the Stage-3 LLM spam guardrail end to end (service, AgentRunner call, company
+toggle/field/column, config ENABLE_LLM_SPAM_GUARDRAIL, UI, tests, docs); the prompt generator
+stays unmetered by user decision (D2 narrowed for it). F032: this release ships without workflow
+memory (memory steps stay deferred; no owning phase). F031: root fixes the stale references.
+Implementation delegated to a fresh author agent (root context budget); B rechecks after.
+06-R024 corrections (author A, 2026-10-21; user decisions above). No commits; RESUME.md untouched.
+- 06-F030 (guardrail removed end to end; prompt generator unmetered by decision):
+  - Deleted `services/llm_guardrail.rs` (incl. its phrase blocklist, `llm_guardrail_rejected_total`
+    metric and 5 tests) and its `AgentRunner::execute` call; removed runner `config`/`company`/
+    `skip_spam_guardrail` builders and fields (only the guardrail read them), dispatch's
+    `guardrail_may_be_skipped` + its 3 tests and the now-unused participant-access computation.
+  - Classifier plumbing simplified: `AgentRunner::harnesses(registry)` and
+    `ThreadUseCases::with_harnesses(registry)` no longer take a `TextClassifier`;
+    `agent_harnesses()` returns the registry; test helper `text_classifier()` removed. The
+    classifier stays only for the system-prompt generator (`setup.rs` `prompt_classifier`);
+    `ClassificationRequest.purpose` (read by nothing, justified by two callers) removed; port/Rig
+    docs say one caller, unmetered by user decision.
+  - `Company.enable_llm_spam_guardrail`, `CompanyWrite` field, companies column (init migration,
+    no CHECK existed), runtime SQL in `persistence/company.rs` (binds renumbered; no `query!` macro
+    touched, `.sqlx` unchanged), JSON/HTML forms (`routes/company.rs`, `ui_companies.rs`), the
+    company-settings select and `SpamGuardrail` enum + its page test, ~108 fixture lines.
+  - `AppConfig.enable_llm_spam_guardrail` / `ENABLE_LLM_SPAM_GUARDRAIL` removed;
+    `is_spam_scan_enabled` = heuristic || external scanner (Stage 1/2 untouched).
+  - Docs: `.env.example`, `fly.toml` (key no longer read), README (feature line, Stage 3 bullet,
+    decision-matrix column, ASCII flow), `docs/rig.md` + `docs/deploy.md` (prompt generator
+    unmetered, absent from usage), rig README, marketing copy (3-stage → 2-stage).
+  - CSS: `npm run build:css` output byte-identical to the working `assets/app.css`.
+- 06-F031: (a) `docs/workflow-language-v1.md` rewritten for D5/D6 (`context.history` contract,
+  `ai.classify` requires `agent`, agent-owned tools/skills, no profiles/ceilings, current
+  revocation; memory rows marked registered-but-unhandled; profile facts removed throughout).
+  (b) Deleted `scripts/tests/harness-query-plans.py`, its fixture and
+  `docs/harness-database-performance.md` (both measured trigger functions were dropped in 06C;
+  the remaining bullets described removed MCP selection reads). The partial unsettled-task
+  indexes stay (still used, e.g. `channel_assignment.rs`). (c) Dockerfile: git install and the
+  cargo git cache mount removed (no git sources in Cargo.toml/Cargo.lock). (d)
+  `value_objects.rs` ToolId/SkillSlug comments corrected; same stale `ai-agents` wording fixed in
+  `harness/redaction.rs`.
+- 06-F032: plans 06 (preparation steps, acceptance, usage-analytics D2 narrowing note,
+  guardrail note), 08 (memory toggles: memory absent from this release; phase 08 decides
+  delete-vs-dormant for provider infrastructure), 10 (matrix row), README, NOT_PLANNED,
+  REPLACEMENT-MAP, EXPANSION record "memory out of this release, user decision 2026-10-21".
+  Carry-forward for root: RESUME phase-08 obligations (memory infra decision) not edited.
+- Verification (logs/06/): 06-R024fix-gates.sh → fmt, diff --check, offline all-target check,
+  clippy -D warnings PASS; fresh migration PASS (guardrail column count 0); SQLx prepare --check
+  PASS; focused DB-backed suite (agent_runner, spam_scanner, task_worker, use_cases agent/company/
+  channel/thread dispatch+inter_channel+external_reply+tests, rig classifier, pages, company/
+  ui_companies/agent routes, persistence company, smtp server, config) 479/0/3 ignored
+  (06-R024fix-gates.log, -focused.log). 06-R024fix-suite.sh → isolated full lib suite
+  `--test-threads=6`, fresh DB: 2692/0/22 ignored = 2701 − 9 removed tests
+  (06-R024fix-suite.log); node sse-navigation + agent-runtime 8/8 (06-R024fix-node.log).
+  fmt + diff --check rerun after the last markdown edit: PASS. Disposable DBs: 0 remain.
+  Not run: Docker image rebuild (no docker on host); harness-query-plans command (deleted with
+  its doc); deploy.sh test (stubs fly, does not build the image).
+R024 correction freeze: manifest logs/06/06-R024fix-snapshot.txt (digest in its header). RESUME.md held until B verdict; then add phase-08 obligation: decide delete-or-dormant for memory-provider infrastructure.
+PHASE06 ROOT ACCEPTED 2026-10-21 on 06-R025 PASS (B) for digest 0d8bba5d139ad7dfc69380b45ed32ed48cc3ec481c4be45abdeb2d8f5f329b00: 06-F030/F031 resolved, F032 resolved by user decision. B: isolated full lib 2692/0/22 ignored + bins 5/0, fresh migration, clippy clean. Optional nit (ToolId comment wording vs rig/workflow.rs diagnostics) deferred to phase 08 cleanup. Not run anywhere: docker build (no docker on host), CI pg_stat_statements activation step.

@@ -50,11 +50,6 @@ impl ToolTrace {
         // Cancellation while delivering the start callback has not entered the implementation.
         self.executed = true;
     }
-    pub async fn approval_requested(&self) {
-        if let Some(trace) = &self.trace {
-            optional(trace.approval_requested(&self.call_id)).await;
-        }
-    }
     pub async fn finish(mut self, result: &AppResult<ToolInvocation>) {
         // Mark first: dropping an optional callback is not cancellation of the actual tool.
         self.finished = true;

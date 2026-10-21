@@ -11,46 +11,6 @@
 
 use super::*;
 
-/// Whether the company's spam guardrail is forced on, forced off, or left to the server default.
-///
-/// A checkbox can only say "on" or "absent", and absent already means "server default" here — so
-/// the three states are a `<select>`, and this is what its values parse into.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SpamGuardrail {
-    ServerDefault,
-    Enabled,
-    Disabled,
-}
-
-impl SpamGuardrail {
-    /// What the stored column means, so the pane opens on the state the company is actually in.
-    pub fn from_stored(stored: Option<bool>) -> Self {
-        match stored {
-            None => SpamGuardrail::ServerDefault,
-            Some(true) => SpamGuardrail::Enabled,
-            Some(false) => SpamGuardrail::Disabled,
-        }
-    }
-
-    /// The submitted `<option>` value, parsed back. Anything unrecognised is the default.
-    pub fn from_form(value: Option<&str>) -> Self {
-        match value.map(str::trim) {
-            Some("true") => SpamGuardrail::Enabled,
-            Some("false") => SpamGuardrail::Disabled,
-            _ => SpamGuardrail::ServerDefault,
-        }
-    }
-
-    /// What the use case stores: `None` leaves the company on the server's own setting.
-    pub fn stored(self) -> Option<bool> {
-        match self {
-            SpamGuardrail::ServerDefault => None,
-            SpamGuardrail::Enabled => Some(true),
-            SpamGuardrail::Disabled => Some(false),
-        }
-    }
-}
-
 /// Which half of a company's pane the request asked for.
 ///
 /// The team used to be a workspace of its own; it is now the second tab of the company it belongs
@@ -123,7 +83,6 @@ pub struct CompanySettingsPage<'a> {
 pub struct CompanyDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
-    pub spam_guardrail: SpamGuardrail,
     /// The picture as the picker is holding it, blank for the letter bubble. Kept as the
     /// submitted text so a rejected save comes back showing what was picked -- see
     /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
@@ -156,7 +115,6 @@ impl Default for CompanyDraft<'_> {
         Self {
             name: "",
             slug: "",
-            spam_guardrail: SpamGuardrail::ServerDefault,
             avatar_url: "",
             memory_provider: "",
             default_add_3rd_party: true,
@@ -545,15 +503,6 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
                         </label>
                     </div>
                     <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">LLM Spam Guardrail</span></div>
-                        <select name="enable_llm_spam_guardrail" class="select w-full">
-                            <option value="" {default_selected}>Server default</option>
-                            <option value="true" {enabled_selected}>Enabled for this company</option>
-                            <option value="false" {disabled_selected}>Disabled for this company</option>
-                        </select>
-                        <div class="label"><span class="text-[11px] opacity-60">An extra model pass over inbound mail before an agent ever sees it.</span></div>
-                    </label>
-                    <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Long-term memory</span></div>
                         <select name="memory_provider" class="select w-full">
                             <option value="" {memory_disabled_selected}>Disabled</option>
@@ -599,9 +548,6 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
         }),
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
-        default_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::ServerDefault),
-        enabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Enabled),
-        disabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Disabled),
         memory_disabled_selected = if draft.memory_provider.is_empty() {
             "selected"
         } else {
@@ -779,10 +725,6 @@ fn memory_status(
     )
 }
 
-fn selected_attr(draft: SpamGuardrail, option: SpamGuardrail) -> &'static str {
-    if draft == option { "selected" } else { "" }
-}
-
 fn checked(value: bool) -> &'static str {
     if value { " checked" } else { "" }
 }
@@ -795,7 +737,6 @@ fn stored_draft<'a>(
     CompanyDraft {
         name: &company.name,
         slug: &company.slug,
-        spam_guardrail: SpamGuardrail::from_stored(company.enable_llm_spam_guardrail),
         avatar_url: company.avatar_url.as_deref().unwrap_or(""),
         memory_provider: company
             .memory_provider

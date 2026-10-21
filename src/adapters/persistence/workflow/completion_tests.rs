@@ -2,7 +2,7 @@ use super::*;
 use crate::application::workflow::{batch::*, completion::*, supervise::*};
 
 fn output() -> Value {
-    json!({"items":[],"token_count":0})
+    json!({"items":[],"token_count":0,"omitted":0})
 }
 fn result(fence: WorkflowFence) -> FencedWorkflowResult {
     FencedWorkflowResult {
@@ -16,7 +16,7 @@ fn result(fence: WorkflowFence) -> FencedWorkflowResult {
 }
 fn chain() -> Value {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["steps"]["start"]["routes"]["success"] = json!("finish");
     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"ref":"/steps/start/output/token_count"},"output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
     source
@@ -374,8 +374,8 @@ async fn workflow_completion_reclaimed_generation_refuses() {
 async fn workflow_completion_invalid_outputs_and_activation_budget_settle() {
     for output in [
         Value::Null,
-        json!({"items":[],"token_count":-1}),
-        json!({"items":[],"token_count":0,"extra":"x".repeat(70000)}),
+        json!({"items":[],"token_count":-1,"omitted":0}),
+        json!({"items":[],"token_count":0,"omitted":0,"extra":"x".repeat(70000)}),
     ] {
         let (f, claim) = claimed(chain()).await;
         assert!(

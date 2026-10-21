@@ -16,7 +16,6 @@ mod controls;
 mod counts;
 mod harness_runs;
 mod instructions;
-mod mcp_journal;
 mod operations;
 mod outreach;
 mod ownership;

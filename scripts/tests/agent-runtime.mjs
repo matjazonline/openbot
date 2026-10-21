@@ -8,15 +8,14 @@ function context() {
     const state = { FormData: class { constructor(values) { this.values=values; } get(key) { return this.values[key]??null; } }, alert() {} };
     vm.createContext(state); vm.runInContext(script, state); return state;
 }
-test('library payload preserves explicit Rig and shared JSON schema without a default ai-agents fallback', () => {
+test('library payload carries Rig config and the shared JSON schema, and no retired capability fields', () => {
     const ctx=context();
-    const draft={name:'Agent',slug:'agent',harness_kind:'rig',response_format:'json_schema',response_schema:'{"const":"</textarea>"}',config_json:'{"version":1,"max_turns":4}'};
+    const draft={name:'Agent',slug:'agent',harness_kind:'rig',granted_tool_ids:'calculator',response_format:'json_schema',response_schema:'{"const":"</textarea>"}',config_json:'{"version":1,"max_turns":4}'};
     const result=ctx.libraryPayload(draft);
-    assert.equal(result.harness_kind,'rig');
+    for (const retired of ['harness_kind','granted_tool_ids','native_tool_policy']) assert.equal(retired in result,false,retired);
     assert.equal(result.config_json.max_turns,4);
     assert.equal(result.response_contract.schema.const,'</textarea>');
     assert.equal(draft.response_schema,'{"const":"</textarea>"}');
-    assert.equal(ctx.libraryPayload({}).harness_kind,null);
     assert.equal(ctx.libraryPayload({response_format:'text',response_schema:'{bad'}).response_contract,null);
 });
 test('invalid replacement schema never reaches the library API and leaves the form intact', async () => {

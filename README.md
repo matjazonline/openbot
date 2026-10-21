@@ -12,21 +12,21 @@ binding; canonical channels, actors, messages, threads, and deliveries are not e
 ### Key Capabilities
 - ✅ **Deterministic Multi-Agent Pipelines:** Chain sequential agent workflows via channel syntax (`+`), deterministic role context, and mention triggers (`@slug`), supported by quiet context-only ingestion and automated cron schedules.
 - ✅ **Human-in-the-Loop (HITL) & Safe Delegation:** Automatic manual handoffs on external replies ("Needs Instruction"), interactive draft-and-approval gates (`Draft Ready` $\rightarrow$ dispatch), and response reviews.
-- ✅ **Enterprise Security & Anti-Loop Defenses:** 3-stage inbound spam and prompt-injection filtering (Rust heuristics, Rspamd/SpamAssassin daemon scoring, pre-flight LLM guardrails), participant ACLs, cycle detection, and strict turn/hop rate limits.
+- ✅ **Enterprise Security & Anti-Loop Defenses:** 2-stage inbound spam filtering (Rust heuristics, Rspamd/SpamAssassin daemon scoring), fenced untrusted content in agent prompts, participant ACLs, cycle detection, and strict turn/hop rate limits.
 - ✅ **Governance & Continuity:** Multi-tier RBAC (Owner/Admin/Member), atomic work reassignment during employee offboarding (`MemberWorkAtStake`), and versioned AES-256-GCM BYOK credential management.
 - ✅ **Command Center & Observability:** Live HTMX/SSE mailbox (`/ui`), real-time Kanban tasks board (`/ui/tasks`), delivery audit tracking (`/ui/deliveries`), and operational dashboards.
 - 🔮 **Roadmap:** Pure deterministic step primitives (`transform`, `branch`, `http.request`, `agent.run`), versioned SOP code DAGs (TWI job breakdowns, verification checklists), zero-trust action registries (`Workflow-as-a-Tool`), turnkey workflow marketplace packages, native Slack/webhook ingress, and ephemeral microVM sandboxes.
 
 *(For detailed product architecture and feature breakdowns, see [`marketing/features.md`](marketing/features.md).)*
 
-Agents run on **Rig** by default, with ai-agents selectable per agent. Choose the runtime in agent
-settings or send `"harness_kind":"rig"` with `"config_json":{"version":1}` to the agent API.
-Credentials come from company model connections. Rig supports guarded tools, company HTTP MCP,
-skills, durable approval/resume, and optional validated JSON answers through a separate
-`response_contract` field. It executes in the server process and is not a sandbox.
+Agents run on **Rig**, the only agent runtime. Credentials come from company model connections.
+Rig supports attached skills (loaded through `read_resource`), durable resume, and optional
+validated JSON answers through a separate `response_contract` field. Tools, company HTTP MCP and
+approvals are workflow actions rather than agent-runtime tools. Rig executes in the server process
+and is not a sandbox.
 
 See the [Rig configuration and operator guide](docs/rig.md) for tested examples, compatibility and
-limits, [custom tools](docs/custom_tools.md) for grants and native policy, and the
+limits, [custom tools](docs/custom_tools.md) for the current tool model, and the
 [fresh-database rollout](docs/deploy.md#rig-rollout-on-a-fresh-database) for deployment and recovery.
 
 ## Architecture Glossary
@@ -186,7 +186,6 @@ flowchart TD
         SREUSE[Reuse the stored answer and queue<br/>its mail on its own — the send is what failed]
         AGENTS[Run each matched channel agent<br/>in pipeline order, memory recalled per turn]
         SAGENT[Run the channel's first agent on the<br/>schedule's prompt, memory recalled into it]
-        HITL{Approval or outreach<br/>requested?}
         PLAN[Freeze the reply and its delivery parts<br/>keyed on the task, a schedule's mail<br/>anchored on its own run slot]
         COMMIT_RUN[Fenced transaction<br/>reply message, thread associations,<br/>deliveries and audit payload]
         MEM[Persist memories after the commit]
@@ -196,9 +195,9 @@ flowchart TD
         KIND -->|scheduled_agent_run| SLOAD --> IDEMPOTENT
         IDEMPOTENT -->|yes, inbound| REUSE
         IDEMPOTENT -->|yes, scheduled| SREUSE
-        IDEMPOTENT -->|no, inbound| AGENTS --> HITL
-        IDEMPOTENT -->|no, scheduled| SAGENT --> HITL
-        HITL -->|no| PLAN --> COMMIT_RUN --> MEM --> RESULT
+        IDEMPOTENT -->|no, inbound| AGENTS --> PLAN
+        IDEMPOTENT -->|no, scheduled| SAGENT --> PLAN
+        PLAN --> COMMIT_RUN --> MEM --> RESULT
         REUSE --> RESULT
         SREUSE --> RESULT
     end
@@ -210,7 +209,7 @@ flowchart TD
     RETRY -->|no — 30s doubled per attempt, so 60s then 120s| PENDING
     RETRY -->|yes — third attempt, or a terminal failure| DEAD
 
-    subgraph Pauses[Approval, waiting and manual control]
+    subgraph Pauses["Manual control — approval and waiting have no agent producer since 06C; phase 08 rebuilds them as workflow steps"]
         APPROVAL_ACTION{Approval link action}
         REPLY[Authorized third-party reply recorded]
         TIMEOUT[Quorum expired below its threshold]
@@ -227,8 +226,6 @@ flowchart TD
         STOPPED --> RESUME --> PENDING
     end
 
-    HITL -->|approval required| APPROVAL
-    HITL -->|awaiting replies| WAITING
     QUORUM -. finds due waits .-> TIMEOUT
     PENDING -.-> STOP
     PROCESSING -. a stop clears the lease and fences the in-flight run out .-> STOP
@@ -264,7 +261,6 @@ flowchart TD
     PRE -. system address answered .-> OUT_PENDING
     REJECT -->|bounce| OUT_PENDING
     COMMIT_RUN -->|the agent reply| OUT_PENDING
-    AGENTS -. outreach question .-> OUT_PENDING
     APPROVAL -. approval request mail .-> OUT_PENDING
     SREUSE -. mail for an answer already stored .-> OUT_PENDING
     PART -. addressed to another channel of this company .-> RELAY
@@ -292,7 +288,6 @@ flowchart TD
 - ✅ **Participant Access Control & Spam Check Bypass:** By default (`participant_emails` is `None`), channel access is restricted to Company Team members. If `participant_emails` includes `@public`, the channel is open to the public (external emails are accepted and scanned for spam). If `participant_emails` specifies a list of emails, access is restricted strictly to that list. Trusted participants (company team members or explicitly listed emails) bypass spam scan layers.
 - ✅ **Stage 1 (Local Heuristic Scanner - Option B):** Fast, zero-dependency Rust-native engine analyzing email headers, subject trigger patterns (ALL CAPS, urgency keywords, excess punctuation), link shorteners (`bit.ly`, `tinyurl`), and HTML hidden text tricks (runs for public workflows).
 - ✅ **Stage 2 (External `SpamScanner` - Option A):** Integrates with external spam analysis daemons via `SpamScannerService`. Supports both **Rspamd** (via HTTP API) and **SpamAssassin** (via `spamd` TCP protocol). Evaluates combined scores against `MAX_SPAM_SCORE` threshold and records metrics (`SmtpStatus::RejectedSpamScore`).
-- ✅ **Stage 3 (LLM Spam Guardrail - Option C):** Pre-execution AI security check before main agent execution controlled per `Company` entity (`Company.enable_llm_spam_guardrail`) with system default fallback (`ENABLE_LLM_SPAM_GUARDRAIL=true`). Scans the prompt context using static pattern matchers and low-cost LLM classification to detect prompt injection attempts or malicious intent (runs for public workflows).
 
 ### 3.7 Multi-Agent & Multi-Recipient Handling (`To`, `CC`, and `+` Pipeline Chaining)
 
@@ -321,14 +316,14 @@ Both replies answer Ana's original email. Each channel's thread also receives th
 
 #### Inbound Processing & Spam Check Decision Matrix
 
-| Channel Mode / `participant_emails` | Sender Email (`from`) | Action | Stage 1 & Stage 2 Spam Scanner | Stage 3 LLM Spam Check (Pre-Agent) |
-|---|---|---|---|---|
-| **Default** (`None` / empty) | Company Team Member | **Accept & Process** | **Bypassed** | **Bypassed** |
-| **Default** (`None` / empty) | Non-Team Member / External | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A | N/A |
-| **Public** (contains `@public`) | Company Team Member / Listed | **Accept & Process** | **Bypassed** | **Bypassed** |
-| **Public** (contains `@public`) | Untrusted External Sender | **Scan & Process** | **Executed** (Rejects if score $\ge 5.0$) | **Executed** (Pre-execution AI check) |
-| **Explicit List** (e.g. `alice@example.com`) | **IN** `participant_emails` | **Accept & Process** | **Bypassed** | **Bypassed** |
-| **Explicit List** (e.g. `alice@example.com`) | **NOT in** `participant_emails` | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A | N/A |
+| Channel Mode / `participant_emails` | Sender Email (`from`) | Action | Stage 1 & Stage 2 Spam Scanner |
+|---|---|---|---|
+| **Default** (`None` / empty) | Company Team Member | **Accept & Process** | **Bypassed** |
+| **Default** (`None` / empty) | Non-Team Member / External | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A |
+| **Public** (contains `@public`) | Company Team Member / Listed | **Accept & Process** | **Bypassed** |
+| **Public** (contains `@public`) | Untrusted External Sender | **Scan & Process** | **Executed** (Rejects if score $\ge 5.0$) |
+| **Explicit List** (e.g. `alice@example.com`) | **IN** `participant_emails` | **Accept & Process** | **Bypassed** |
+| **Explicit List** (e.g. `alice@example.com`) | **NOT in** `participant_emails` | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A |
 
 ### Architectural Flow
 
@@ -369,23 +364,7 @@ Inbound Email (SMTP / Webhook)
                        │     │ REJECT Email     │  │ Ingest Email     │
                        │     │ - Spam Threshold │  └────────┬─────────┘
                        │     └──────────────────┘           │
-                       │                                    ▼
-                       │                      ┌──────────────────────────┐
-                       │                      │ Stage 3: LLM Spam Check  │
-                       │                      │ (Pre-Agent Execution)    │
-                       │                      └─────────────┬────────────┘
-                       │                                    │
-                       │                       ┌────────────┴────────────┐
-                       │                       │ Guardrail Flagged Spam? │
-                       │                       └────────────┬────────────┘
-                       │                          YES       │        NO
-                       │                           │                 │
-                       │                           ▼                 ▼
-                       │                 ┌──────────────────┐        │
-                       │                 │ Cancel Execution │        │
-                       │                 └──────────────────┘        │
-                       │                                             │
-                       ├─────────────────────────────────────────────┘
+                       ├────────────────────────────────────┘
                        │ (Bypass All Spam Checks)
                        ▼
 ┌────────────────────────────────────────────────────────┐

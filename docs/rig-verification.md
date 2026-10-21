@@ -19,22 +19,25 @@ schemas, assistant calls and correlated results. Gemini fixtures carry a thought
 continuation. xAI retains distinct output item and call IDs in saved state; its native input
 serializer sends the call ID. The short `LlmTurn` API remains available over this same server.
 
-The actual Rig HTTP boundary and ai-agents execution reject model destinations without an active
-fixture registration before connecting. Classifier execution requires an explicit deterministic
+The actual Rig HTTP boundary rejects model destinations without an active fixture registration
+before connecting. Classifier execution requires an explicit deterministic
 `TextClassifier` test double. OS isolation covers all clients, including MCP, web fetch and delivery.
 
 ## Release matrix
 
 | Area | Required evidence |
 | --- | --- |
-| Shared dispatch | `agent_runner/mod_tests.rs`: both registered harnesses, both configured defaults, real todo invocation, exact assistant/result correlation and conditional final answer |
+| Shared dispatch | `agent_runner/mod_tests.rs`: no configured or registered harness fails the run, credential redaction; `thread/rig_execution_tests.rs` drives the real Rig harness end to end |
 | Provider protocol | `rig/provider_tests.rs`, `protocol_tests.rs`, `batch_tests.rs`: five factories, tenant/credential isolation, grants, usage, call IDs, ordered batch results, durable continuation |
 | Provider failures | `rig/provider_failure_tests.rs`: every provider rejects malformed bodies, rate limits and disconnects without undeclared retry; barrier-controlled cancellation; missing registration; missing/partial usage |
 | Fixture lifecycle | `test_support/scenario{,_tests}.rs`: unused/mismatched/extra requests, explicit retries, framing bounds, auth-safe diagnostics, blocked shutdown, drop and registration cleanup |
-| Default/bootstrap | `infra/config_harness_tests.rs`: clean child environments with the property absent and explicitly `ai_agents`, actual AppConfig and deployment registry; no global environment mutation |
 | Structured answers | `rig/direct_tests.rs`, `thread/structured_response_tests.rs`, `simulation_tests.rs`, `task/harness_runs_tests.rs`: all provider repair positions, exhaustion, budgets, no invalid publication, scheduled/direct/simulation/review, persisted reservation/candidate/final recovery |
-| Durable tool effects | `thread/rig_execution_tests.rs`, `task/harness_runs_tests.rs`, `mcp_durable_tests.rs`: production dispatch, approval/restart, persisted call results, no duplicate committed effects, competing writers and stale ownership |
-| Configuration/product | Existing agent harness, agent/library API, form, runtime settings and simulation suites for configuration and product behavior |
+| Durable tool effects | `thread/rig_execution_tests.rs`, `task/harness_runs_tests.rs`, `rig/skills_tests.rs`: production dispatch, restart, persisted `read_resource` results, no duplicate committed effects, competing writers and stale ownership |
+| Configuration/product | `persistence/agent_config_tests.rs`, agent/library API, form, runtime settings and simulation suites for configuration and product behavior |
+
+Phase 06C (2026-10-20) removed the ai-agents runtime, runtime selection, the legacy tool catalogue,
+agent MCP selections and the legacy MCP journal; the rows above reflect that. The dated record
+below describes the earlier release and is kept as history.
 
 The architecture gate also exposed an existing fabricated email identity in private-note task
 creation. That event now uses `MessageAuthorWrite::Platform`; its database test requires one

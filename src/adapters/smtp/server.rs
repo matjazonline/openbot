@@ -1387,7 +1387,6 @@ mod tests {
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -1426,7 +1425,6 @@ mod tests {
         let task_persistence = Arc::new(MockTaskPersistence);
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1452,7 +1450,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -1624,7 +1621,6 @@ regis";
                 user_id: Uuid::new_v4(),
                 name: "Populus Network".to_string(),
                 slug: "populus".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -1663,7 +1659,6 @@ regis";
         let task_persistence = Arc::new(MockTaskPersistence);
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1689,7 +1684,6 @@ regis";
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -1792,7 +1786,6 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let task_persistence = Arc::new(MockTaskPersistence);
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1818,7 +1811,6 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),

@@ -54,24 +54,11 @@ async fn workflow_job_tenant_association_insert_update_matrix() {
     let mut tx = f.hypothetical().await;
     let links = Links::seed(&f, &mut tx).await;
     let workflow = f.insert(&mut tx, f.payload()).await.unwrap();
-    let provision = links.provision(&f);
     let run = links.run();
-    fixtures::insert_record(&mut tx, "agent_channel_provisions", &provision)
-        .await
-        .unwrap();
     fixtures::insert_record(&mut tx, "schedule_runs", &run)
         .await
         .unwrap();
     for target in [workflow, Uuid::new_v4(), links.foreign_task] {
-        reject_insert_update(
-            &mut tx,
-            "agent_channel_provisions",
-            &provision,
-            "task_id",
-            target,
-            "legacy_provision_task_scope",
-        )
-        .await;
         reject_insert_update(
             &mut tx,
             "schedule_runs",
@@ -79,21 +66,6 @@ async fn workflow_job_tenant_association_insert_update_matrix() {
             "task_id",
             target,
             "legacy_schedule_task_scope",
-        )
-        .await;
-    }
-    for (field, value) in [
-        ("agent_id", links.foreign_agent),
-        ("channel_id", links.foreign_channel),
-        ("company_id", links.foreign_company),
-    ] {
-        reject_insert_update(
-            &mut tx,
-            "agent_channel_provisions",
-            &provision,
-            field,
-            value,
-            "legacy_provision_task_scope",
         )
         .await;
     }
@@ -130,9 +102,6 @@ async fn workflow_job_tenant_association_preserves_taskless_and_delete_atomicity
     let f = JobFixture::new().await;
     let mut tx = f.binding.fixture.persistence.pool().begin().await.unwrap();
     let links = Links::seed(&f, &mut tx).await;
-    fixtures::insert_record(&mut tx, "agent_channel_provisions", &links.provision(&f))
-        .await
-        .unwrap();
     fixtures::insert_record(&mut tx, "schedule_runs", &links.run())
         .await
         .unwrap();
@@ -163,13 +132,6 @@ async fn workflow_job_tenant_association_preserves_taskless_and_delete_atomicity
         .execute(&mut *tx)
         .await
         .unwrap();
-    let retained: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM agent_channel_provisions WHERE task_id = $1")
-            .bind(links.task)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-    assert_eq!(retained, 1);
     sqlx::query("DELETE FROM schedule_runs WHERE task_id = $1")
         .bind(links.task)
         .execute(&mut *tx)
@@ -180,13 +142,6 @@ async fn workflow_job_tenant_association_preserves_taskless_and_delete_atomicity
         .execute(&mut *tx)
         .await
         .unwrap();
-    let retained: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM agent_channel_provisions WHERE task_id = $1")
-            .bind(links.task)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-    assert_eq!(retained, 0);
     tx.rollback().await.unwrap();
 }
 
@@ -206,14 +161,9 @@ async fn workflow_job_tenant_association_rejects_invisible_task() {
         .await
         .unwrap();
     let mut writer = pool.begin().await.unwrap();
-    for (table, mut record, expected) in [
-        (
-            "agent_channel_provisions",
-            links.provision(&f),
-            "legacy_provision_task_scope",
-        ),
-        ("schedule_runs", links.run(), "legacy_schedule_task_scope"),
-    ] {
+    for (table, mut record, expected) in
+        [("schedule_runs", links.run(), "legacy_schedule_task_scope")]
+    {
         record["task_id"] = json!(invisible);
         sqlx::query("SAVEPOINT invisible")
             .execute(&mut *writer)
@@ -233,11 +183,6 @@ async fn workflow_job_tenant_association_rejects_invisible_task() {
             .unwrap();
     }
     creator.commit().await.unwrap();
-    let mut provision = links.provision(&f);
-    provision["task_id"] = json!(invisible);
-    fixtures::insert_record(&mut writer, "agent_channel_provisions", &provision)
-        .await
-        .unwrap();
     let mut run = links.run();
     run["task_id"] = json!(invisible);
     fixtures::insert_record(&mut writer, "schedule_runs", &run)

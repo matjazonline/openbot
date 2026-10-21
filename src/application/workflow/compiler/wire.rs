@@ -305,7 +305,6 @@ pub(crate) fn parse_workflow(
             "parameter_schema",
             "output_schema",
             "resources",
-            "capability_ceiling",
             "entry",
             "steps",
             "limits",
@@ -348,10 +347,6 @@ pub(crate) fn parse_workflow(
             parameter_schema: Some(parameter_schema),
             output_schema: Some(output_schema),
             resources,
-            capability_ceiling: map
-                .get("capability_ceiling")
-                .map(|node| capability_ceiling(node))
-                .transpose()?,
             entry,
             steps: parsed_steps.steps,
             limits,
@@ -359,47 +354,6 @@ pub(crate) fn parse_workflow(
         controls: parsed_steps.controls,
         rules: parsed_steps.rules,
         locations: spans,
-    })
-}
-
-fn capability_ceiling(
-    node: &LocatedNode,
-) -> Result<crate::domain::workflow::CapabilityCeiling, Diagnostic> {
-    let path = "/capability_ceiling";
-    let map = fields(node, path, &["tools", "skills"])?;
-    let names = |field: &str| -> Result<Vec<TypeName>, Diagnostic> {
-        let at = child(path, field);
-        let values = sequence(required(&map, field, path, node)?, &at)?;
-        if values.len() > crate::application::workflow::registry::MAX_SELECTIONS {
-            return Err(Diagnostic::at(
-                "capability.limit",
-                "Too many capability names",
-                &at,
-                node.span,
-            ));
-        }
-        let mut unique = std::collections::BTreeSet::new();
-        values
-            .iter()
-            .enumerate()
-            .map(|(i, value)| {
-                let at = child(&at, &i.to_string());
-                let name = name(value, &at, |s| TypeName::parse(s).ok())?;
-                if !unique.insert(name.clone()) {
-                    return Err(Diagnostic::at(
-                        "capability.duplicate",
-                        "Duplicate capability name",
-                        &at,
-                        value.span,
-                    ));
-                }
-                Ok(name)
-            })
-            .collect()
-    };
-    Ok(crate::domain::workflow::CapabilityCeiling {
-        tools: names("tools")?,
-        skills: names("skills")?,
     })
 }
 

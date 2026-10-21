@@ -3,10 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     adapters::persistence::test_support::test_pool,
-    entities::{
-        creation::CreationProvenance, harness::SubAgentScope, skill::SkillInstruction,
-        value_objects::ToolId,
-    },
+    entities::{creation::CreationProvenance, harness::SubAgentScope, skill::SkillInstruction},
     use_cases::{
         agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
         channel::ChannelWrite,
@@ -50,6 +47,7 @@ async fn company(persistence: &PostgresPersistence, label: &str) -> Uuid {
 
 fn skill_write(slug: impl Into<String>) -> SkillWrite {
     let mut write = SkillWrite {
+        required_tools: None,
         slug: slug.into(),
         name: "Review invoice".into(),
         description: "Review an invoice and report anomalies.".into(),
@@ -447,7 +445,7 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
 }
 
 #[tokio::test]
-async fn database_bounds_skill_positions_and_tool_array_shape() {
+async fn database_bounds_skill_and_sub_agent_positions() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -486,34 +484,6 @@ async fn database_bounds_skill_positions_and_tool_array_shape() {
         .await
         .is_err()
     );
-    let oversized_grant = (0..33)
-        .map(|index| format!("tool-{index}"))
-        .collect::<Vec<_>>();
-    assert!(
-        sqlx::query("UPDATE agents SET granted_tool_ids = $1 WHERE id = $2")
-            .bind(oversized_grant)
-            .bind(agent.id)
-            .execute(&pool)
-            .await
-            .is_err()
-    );
-
-    let long = "x".repeat(121);
-    let matrix = [
-        (Vec::<Option<&str>>::new(), true),
-        (vec![Some("datetime")], true),
-        (vec![Some("")], false),
-        (vec![None], false),
-        (vec![Some(long.as_str())], false),
-    ];
-    for (values, expected) in matrix {
-        let actual: bool = sqlx::query_scalar("SELECT valid_tool_id_array($1::text[])")
-            .bind(values)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(actual, expected);
-    }
 }
 
 #[tokio::test]
@@ -628,12 +598,4 @@ async fn direct_sql_agent_config_cannot_reach_runtime_authority_paths() {
             .any(|path| message.contains(path)),
         "{error}"
     );
-}
-
-#[test]
-fn catalogue_size_remains_within_the_persisted_grant_bound() {
-    let grantable = crate::entities::tool_catalogue::CatalogueTool::grantable()
-        .map(|tool| ToolId::from(tool.id))
-        .collect::<Vec<_>>();
-    assert!(grantable.len() <= crate::entities::agent::MAX_GRANTED_TOOLS);
 }

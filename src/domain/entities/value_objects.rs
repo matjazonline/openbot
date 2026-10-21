@@ -380,17 +380,16 @@ impl AuthservId {
 // [`AvatarUrl::parse`], so a misconfigured base URL cannot put a non-`http` scheme in an `<img>`.
 string_newtype!(ObjectUrl);
 
-// The id of one grantable tool: an `ai-agents` built-in (`datetime`) or one of our own native
-// tools (`outreach_and_await_quorum`).
+// The id of one tool a Rig run declares to the model -- since 06C only `read_resource`, which
+// loads an attached skill's text. Workflow tools are named by `TypeName` and dispatched by
+// workflow actions, not by this id.
 //
-// A newtype because it is used as a map key and because it travels beside [`SkillSlug`] in every
-// skill instruction -- the argument-swap case `src/AGENTS.md` names. It deliberately has no
-// `parse`: a tool id is valid only by being *in* the catalogue, and
-// `entities::tool_catalogue::CatalogueTool::get` is that check.
+// A newtype because it keys the run's tool registry, its trace and its diagnostics. It
+// deliberately has no `parse`: a tool id is valid only by being registered in that run, and the
+// registry's lookup is that check.
 string_newtype!(ToolId);
 
-// A skill's stable identifier within its company, and the `id:` its compiled `ai-agents` YAML
-// `skills:` entry carries.
+// A skill's stable identifier within its company, which its catalogue entry in a Rig run carries.
 string_newtype!(SkillSlug);
 
 impl SkillSlug {

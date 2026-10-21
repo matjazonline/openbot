@@ -35,22 +35,6 @@ fn workflow_publication_duplicate_contracts_identify_the_dependency() {
         "tool",
         "tool lookup: has duplicate snapshots for connection native",
     );
-    let mut source = source("agent.run");
-    source["steps"]["start"]["with"]["capability_profile"] = json!({"literal":"limited"});
-    let profile = registry::CapabilityProfile {
-        name: name("limited"),
-        tools: vec![],
-        skills: vec![],
-    };
-    let mut facts = snapshots();
-    facts.profiles = vec![profile.clone(), profile];
-    assert_diagnostic(
-        &source,
-        facts,
-        "publication.duplicate",
-        "capability_profile",
-        "capability_profile limited: has duplicate snapshots",
-    );
 }
 
 #[test]
@@ -85,20 +69,5 @@ fn workflow_publication_duplicate_selections_identify_the_list_and_member() {
         "publication.duplicate",
         "agent",
         "agent assistant: tools repeats selection lookup",
-    );
-    let mut source = source("agent.run");
-    source["steps"]["start"]["with"]["capability_profile"] = json!({"literal":"limited"});
-    let mut facts = snapshots();
-    facts.profiles.push(registry::CapabilityProfile {
-        name: name("limited"),
-        tools: vec![],
-        skills: vec![name("support"), name("support")],
-    });
-    assert_diagnostic(
-        &source,
-        facts,
-        "publication.duplicate",
-        "capability_profile",
-        "capability_profile limited: skills repeats selection support",
     );
 }

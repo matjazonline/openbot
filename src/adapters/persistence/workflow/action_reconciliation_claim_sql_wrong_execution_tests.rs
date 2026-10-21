@@ -12,7 +12,7 @@ struct AuditIdentity {
 
 fn two_step_source() -> Value {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":2,"repetitions":2});
     source["steps"]["second"] = source["steps"]["start"].clone();
     source["steps"]["start"]["routes"]["success"] = json!("second");
@@ -37,7 +37,7 @@ async fn scheduled_successor() -> (Scheduled, ActivationRequest) {
             )
             .unwrap(),
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap()

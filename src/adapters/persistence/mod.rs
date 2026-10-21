@@ -7,7 +7,6 @@ use std::sync::Arc;
 use crate::app_error::AppError;
 
 pub mod agent;
-pub mod agent_channel;
 pub mod approval;
 pub mod attention;
 pub mod channel;
@@ -44,7 +43,6 @@ pub mod workflow;
 
 #[derive(Clone)]
 pub struct PostgresPersistence {
-    default_agent_harness: crate::entities::harness::HarnessKind,
     pool: PgPool,
     credential_cipher: Option<Arc<credentials::CredentialCipher>>,
 }
@@ -52,7 +50,6 @@ pub struct PostgresPersistence {
 impl PostgresPersistence {
     pub fn new(pool: PgPool) -> Self {
         PostgresPersistence {
-            default_agent_harness: crate::entities::harness::HarnessKind::default(),
             pool,
             credential_cipher: None,
         }
@@ -63,18 +60,9 @@ impl PostgresPersistence {
         credential_cipher: credentials::CredentialCipher,
     ) -> Self {
         Self {
-            default_agent_harness: crate::entities::harness::HarnessKind::default(),
             pool,
             credential_cipher: Some(Arc::new(credential_cipher)),
         }
-    }
-
-    pub fn with_default_agent_harness(
-        mut self,
-        kind: crate::entities::harness::HarnessKind,
-    ) -> Self {
-        self.default_agent_harness = kind;
-        self
     }
 
     pub fn pool(&self) -> &PgPool {
@@ -386,7 +374,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod agent_harness_tests;
+mod agent_config_tests;
 
 pub mod mcp;
 #[cfg(test)]

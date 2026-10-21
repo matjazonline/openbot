@@ -119,8 +119,8 @@ where
     let (instructions, created_by) = encode_write(&validated)?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "INSERT INTO skills AS skill \
-             (id, company_id, slug, name, description, trigger, instructions, created_by) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+             (id, company_id, slug, name, description, trigger, instructions, created_by, required_tools) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, '{{}}'::text[])) \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(Uuid::new_v4())
@@ -131,6 +131,7 @@ where
     .bind(&validated.trigger)
     .bind(instructions)
     .bind(created_by)
+    .bind(validated.required_tools.as_ref().map(|names| names.iter().map(|name| name.as_str().to_owned()).collect::<Vec<_>>()))
     .fetch_one(executor)
     .await
     .map_err(write_error)?;
@@ -172,8 +173,8 @@ pub(crate) async fn copy_library_skill_on(
         let candidate = copied_slug(source.slug.as_str(), suffix);
         let row = sqlx::query_as::<_, SkillDb>(&format!(
             "INSERT INTO skills AS skill \
-                 (id, company_id, slug, name, description, trigger, instructions, created_by) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+                 (id, company_id, slug, name, description, trigger, instructions, created_by, required_tools) \
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, source.required_tools FROM skills AS source WHERE source.id = $9 \
              ON CONFLICT (company_id, slug) DO NOTHING \
              RETURNING {SKILL_COLUMNS}"
         ))
@@ -185,6 +186,7 @@ pub(crate) async fn copy_library_skill_on(
         .bind(&source.trigger)
         .bind(&instructions)
         .bind(&provenance)
+        .bind(skill_id)
         .fetch_optional(&mut **transaction)
         .await
         .map_err(write_error)?;
@@ -362,7 +364,8 @@ where
         .map_err(|error| AppError::Internal(error.to_string()))?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "UPDATE skills AS skill SET slug = $1, name = $2, description = $3, trigger = $4, \
-             instructions = $5, updated_at = CURRENT_TIMESTAMP \
+             instructions = $5, required_tools = COALESCE($8, skill.required_tools), \
+             updated_at = CURRENT_TIMESTAMP \
          WHERE skill.id = $6 AND skill.company_id IS NOT DISTINCT FROM $7 \
          RETURNING {SKILL_COLUMNS}"
     ))
@@ -373,6 +376,12 @@ where
     .bind(instructions)
     .bind(skill_id)
     .bind(company_id)
+    .bind(validated.required_tools.as_ref().map(|names| {
+        names
+            .iter()
+            .map(|name| name.as_str().to_owned())
+            .collect::<Vec<_>>()
+    }))
     .fetch_optional(executor)
     .await
     .map_err(write_error)?

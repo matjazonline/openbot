@@ -129,15 +129,6 @@ pub(super) async fn send(to: &[To]) -> Setup {
     .await
 }
 
-pub(super) async fn setup_with(
-    step: impl FnOnce(Uuid, Uuid, Uuid) -> (&'static str, Value),
-) -> Setup {
-    Box::pin(setup_with_owner(|channel, other, user, _| {
-        step(channel, other, user)
-    }))
-    .await
-}
-
 pub(super) async fn setup_with_owner(
     step: impl FnOnce(Uuid, Uuid, Uuid, Uuid) -> (&'static str, Value),
 ) -> Setup {
@@ -319,7 +310,7 @@ pub(super) async fn state(pool: &sqlx::PgPool, scope: ActivationRequest) -> Stat
         "SELECT run.state AS run, run.waiting_reason AS waiting, job.status AS job,
                 (SELECT attempt.status FROM task_attempts AS attempt WHERE attempt.task_id=job.id ORDER BY attempt_number DESC LIMIT 1) AS attempt,
                 (SELECT attempt.stop_reason FROM task_attempts AS attempt WHERE attempt.task_id=job.id ORDER BY attempt_number DESC LIMIT 1) AS stop,
-                (SELECT wait.state FROM workflow_waits AS wait WHERE wait.execution_id=$2) AS wait
+                (SELECT wait.state FROM workflow_waits AS wait WHERE wait.execution_id=$2 ORDER BY (wait.state='waiting') DESC, wait.created_at DESC LIMIT 1) AS wait
            FROM workflow_runs AS run JOIN background_tasks AS job ON job.id=$3 WHERE run.id=$1",
     )
     .bind(scope.run.as_uuid())
@@ -400,6 +391,38 @@ pub(super) async fn tool(
             },
         )
         .await
+}
+
+/// The delivery of the run's most recent message action.
+pub(super) async fn latest_delivery(pool: &sqlx::PgPool, run: RunId) -> Uuid {
+    sqlx::query_scalar("SELECT destination.delivery_id FROM workflow_message_destinations AS destination JOIN workflow_message_actions AS action ON action.company_id=destination.company_id AND action.invocation_id=destination.invocation_id WHERE action.run_id=$1 AND destination.delivery_id IS NOT NULL ORDER BY action.created_at DESC LIMIT 1")
+        .bind(run.as_uuid()).fetch_one(pool).await.unwrap()
+}
+
+/// D4 continuation of a parked model-tool delivery: settle it, consume its receipt, let the
+/// wait reopen the parked job, and reclaim that job under a fresh fence.
+pub(super) async fn continue_delivery(setup: &mut Setup, delivery: Uuid, outcome: &str) {
+    use crate::application::workflow::{
+        lease::{WorkflowLeases, WorkflowWorkerId},
+        waits::{WaitProgress, WorkflowWaits},
+    };
+    let p = setup.fixture.persistence.clone();
+    deliver(p.pool(), delivery, outcome).await;
+    assert_eq!(
+        p.consume_message_receipts(setup.scope(), lease())
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(matches!(
+        p.resume_wait(setup.scope()).await.unwrap(),
+        WaitProgress::Continued
+    ));
+    setup.claim = p
+        .claim_io(setup.scope(), WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap()
+        .expect("the continued job is claimable");
 }
 
 pub(super) async fn invocations(pool: &sqlx::PgPool, run: RunId) -> Vec<Uuid> {

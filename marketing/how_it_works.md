@@ -64,7 +64,7 @@ Autonomous doesn't have to mean out of control. With BusyBots:
    ┌─────────────────────────────────────────────────────────────┐
    │ 1. Zero-Friction Inbound Parser                             │
    │    • RFC 5322 header reconstruction & quote stripping       │
-   │    • Attachment extraction & 3-stage spam/injection filter  │
+   │    • Attachment extraction & 2-stage spam filter            │
    └─────────────────────────────┬───────────────────────────────┘
                                  │
                                  ▼

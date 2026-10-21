@@ -1435,9 +1435,6 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("Help with the request.".into()),
             description: None,
-            harness_kind: crate::entities::harness::HarnessKind::AiAgents,
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             memory_persistence_mode: Default::default(),
@@ -2408,7 +2405,6 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2434,7 +2430,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -2508,7 +2503,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
             slug: "test".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
@@ -2548,7 +2542,6 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2574,7 +2567,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -2685,7 +2677,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-co".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
@@ -2723,7 +2714,6 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2749,7 +2739,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -2837,7 +2826,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-co".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
@@ -2913,7 +2901,6 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -2939,7 +2926,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -3048,11 +3034,20 @@ mod tests {
 
     #[tokio::test]
     async fn a_successful_scheduled_run_records_execution_parameters_and_result() {
-        use crate::services::test_support::{
-            LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url,
-            scripted_llm,
-        };
-        let _llm = scripted_llm(vec![LlmTurn::text("Audit complete: all good.")]).await;
+        use crate::services::test_support::{SCRIPTED_MODEL, SCRIPTED_PROVIDER, StubHarness};
+        // Scheduling and payload recording are under test, so the runtime is a stub; the real
+        // Rig harness is exercised against PostgreSQL in the thread dispatch suites.
+        let harnesses = Arc::new(
+            crate::services::harness::HarnessRegistry::new()
+                .register(
+                    crate::entities::harness::HarnessKind::Rig,
+                    Arc::new(
+                        StubHarness::new(crate::entities::harness::HarnessKind::Rig)
+                            .replying("Audit complete: all good."),
+                    ),
+                )
+                .unwrap(),
+        );
 
         let task_persistence = Arc::new(MockTaskPersistence::default());
         let company_id = Uuid::new_v4();
@@ -3067,7 +3062,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-co".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
@@ -3133,7 +3127,6 @@ mod tests {
         });
 
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -3159,14 +3152,12 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         });
 
         let mut agent = active_agent(company_id, agent_id);
-        register_scripted_agent_base_url(agent.id, &_llm.base_url);
         agent.config_json = None;
 
         let agent_persistence = Arc::new(MockAgentPersistence { agent });
@@ -3182,7 +3173,8 @@ mod tests {
                 config.clone(),
             )
             .with_agent_persistence(agent_persistence.clone())
-            .with_agent_capability_reader(agent_persistence),
+            .with_agent_capability_reader(agent_persistence)
+            .with_harnesses(harnesses),
         );
 
         let worker = Arc::new(TaskWorker::new(
@@ -3263,11 +3255,9 @@ mod tests {
         );
 
         // Verify token_usage is present on BackgroundTask
-        let token_usage = processed
+        processed
             .token_usage()
             .expect("token_usage must be readable on BackgroundTask");
-        assert!(token_usage.total_tokens > 0);
-        assert_eq!(_llm.finish().await, Ok(1));
     }
 
     /// The one part an email delivery freezes, decoded back into the adapter's own shape.

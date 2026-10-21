@@ -130,14 +130,12 @@ fn report(reason: &Retirement, kind: &str) -> AppResult<WorkflowFailure> {
     if let Retirement::Interrupted(LeaseReleaseCause::Classified(report)) = reason {
         return Ok(report.clone());
     }
-    // These engine-owned read handlers cannot dispatch an effect, and action-owned kinds
-    // dispatch only after a committed marker, so without a marker nothing was sent (the
-    // shared predicate overrides this default whenever a marker exists). Every other
-    // interrupted handler is ambiguous until its owning subsystem reconciles it.
-    // Refusing new work does not prove that earlier charged effects are safe.
-    let safety = if matches!(kind, "context.load" | "memory.load")
-        || crate::application::workflow::actions::marker_owned_effect_kind(kind)
-    {
+    // Effect-free kinds cannot dispatch an effect, and action-owned kinds dispatch only
+    // after a committed marker, so without a marker nothing was sent (the shared SQL
+    // predicate overrides this default whenever a marker exists). Every other interrupted
+    // handler is ambiguous until its owning subsystem reconciles it. Refusing new work
+    // does not prove that earlier charged effects are safe.
+    let safety = if crate::application::workflow::actions::retry_safe_without_marker(kind) {
         RetrySafety::SafeToRetry
     } else {
         RetrySafety::EffectOutcomeUnknown

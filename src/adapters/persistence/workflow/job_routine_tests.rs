@@ -40,31 +40,12 @@ async fn agent(f: &JobFixture, db: &mut PgConnection) -> Uuid {
 }
 
 #[tokio::test]
-async fn workflow_job_routines_harness_and_principal_removal_preserve_isolation() {
+async fn workflow_job_routines_principal_removal_preserves_isolation() {
     let f = JobFixture::new().await;
     let mut tx = f.hypothetical().await;
     let worker = agent(&f, &mut tx).await;
     let workflow = f.insert(&mut tx, f.payload()).await.unwrap();
-    sqlx::query("UPDATE agents SET harness_kind = 'ai_agents' WHERE id = $1")
-        .bind(worker)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
     let task = legacy(&f, &mut tx).await;
-    sqlx::query("SAVEPOINT harness")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    let error = sqlx::query("UPDATE agents SET harness_kind = 'rig' WHERE id = $1")
-        .bind(worker)
-        .execute(&mut *tx)
-        .await
-        .unwrap_err();
-    constraint(error, "agent_harness_has_unsettled_tasks");
-    sqlx::query("ROLLBACK TO SAVEPOINT harness")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
     // Agent deletion cascades to the principal, whose trigger releases legacy ownership.
     sqlx::query("DELETE FROM agents WHERE id = $1")
         .bind(worker)

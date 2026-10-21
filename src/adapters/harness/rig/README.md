@@ -1,13 +1,15 @@
 # Rig adapter maintenance
 
-The executable Rig harness is registered alongside ai-agents and is the default for omitted
-selections. Production tasks use the application-owned conversation ledger, approval continuation,
-MCP journal, structured-answer validation and shared delivery/review path. This directory owns
-provider construction and the runtime bridge, not company credentials or task policy.
+Rig is the only agent runtime (06C removed ai-agents). Production tasks use the application-owned
+conversation ledger, structured-answer validation and shared delivery/review path; workflow
+`agent.run`, `ai.classify` and `decision.agent` steps use the shared durable driver in
+`execution.rs`/`workflow.rs`. This directory owns provider construction and the runtime bridge,
+not company credentials or task policy.
 
 See the [operator guide](../../../../docs/rig.md) for supported behavior, API examples and limits,
 and the [fresh-database rollout](../../../../docs/deploy.md#rig-rollout-on-a-fresh-database) for
-pilot and recovery procedures. The separate classifier remains `AiAgentsTextClassifier`.
+pilot and recovery procedures. The one-shot completion is `RigTextClassifier` (`classifier.rs`), used
+only by the system-prompt generator and not metered.
 
 ## Pinned dependency surface
 
@@ -17,7 +19,6 @@ pilot and recovery procedures. The separate classifier remains `AiAgentsTextClas
 | `rig-core`, `rig-agent` | Lockfile resolves both to `0.42.0` |
 | `rmcp` | `=1.8.0`, defaults disabled; `client`, `reqwest`, `transport-streamable-http-client-reqwest` |
 | `reqwest` | `=0.13.4`, defaults disabled; `json`, `stream`, `rustls`, `form`, `query`, `http2`, `charset`, `system-proxy` |
-| `ai-agents` | Git revision `9ea972e3e3a5b777496c6d6b1b471cac4513a1e4`; standalone allowlisted built-ins and separate classifier |
 
 Commit `Cargo.lock` with dependency changes. Rust 1.96.0 / edition 2024 was verified during the
 implementation; this is a tested toolchain, not an inferred upstream MSRV.
@@ -34,21 +35,17 @@ shared reqwest dependency enables features needed by other adapters. Rig bodies 
 4 MiB. The completion boundary suppresses upstream raw-wire instrumentation in addition to turning
 off content telemetry; application tracing exposes structural IDs, counts, usage and safe reasons.
 
-Rig's automatic MCP integration is disabled. The application selects company connections and grants,
-validates discovery/revisions and journals remote intent before the guarded rmcp call. Sessions are
-tracked and closed during cancellation/shutdown; a disconnect never retries `tools/call`.
-
-Ten built-ins reuse pinned ai-agents standalone schemas/implementations through `builtins.rs` and
-`template.rs`; each bridge has its own todo state and bounded web-fetch instance. Additional
-allocation/template guards are part of the compatibility contract. There is no unrestricted
-upstream registry, YAML conversion, host-tool access or alternate delegation executor.
+Rig's automatic MCP integration is disabled; MCP calls are workflow actions dispatched through the
+application, not runtime tools. The only runtime tool is `read_resource` for attached skills
+(`tools.rs`, `skills.rs`). There is no upstream tool registry, host-tool access or alternate
+delegation executor.
 
 ## Upgrade evidence
 
 An upstream version bump alone is not compatibility evidence. Re-run the provider wire fixtures
-(including tool results, reasoning/call IDs, malformed/partial usage and safe diagnostics), built-in
-and skill fixtures, MCP disconnect/schema tests, durable approval/suspension/restart and competing
-claim tests, and structured repair/review/delivery tests. Check request formats and telemetry after
+(including tool results, reasoning/call IDs, malformed/partial usage and safe diagnostics), skill
+fixtures, durable suspension/restart and competing claim tests, and structured
+repair/review/delivery tests. Check request formats and telemetry after
 an SDK change rather than relying only on compilation.
 
 The [verification record](../../../../docs/rig-verification.md) is the release

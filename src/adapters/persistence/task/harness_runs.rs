@@ -170,15 +170,6 @@ impl PostgresPersistence {
 
 #[async_trait]
 impl HarnessRunStore for PostgresPersistence {
-    fn mcp_journal(
-        &self,
-        lease: crate::entities::task::TaskLeaseRef,
-    ) -> std::sync::Arc<dyn crate::services::mcp_runtime::McpInvocationJournal> {
-        std::sync::Arc::new(super::mcp_journal::PostgresMcpJournal::new(
-            self.pool.clone(),
-            lease,
-        ))
-    }
     async fn reserve_execution(
         &self,
         write: &RunWrite,

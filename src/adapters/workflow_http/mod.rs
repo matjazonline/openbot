@@ -57,13 +57,27 @@ impl HttpRuntime {
         policy: HttpDestinationPolicy,
         lease: crate::application::workflow::lease::LeasePolicy,
     ) -> Self {
+        Self::with_approvals(persistence, policy, lease, None)
+    }
+    /// `notices` lets a protected action park for review; without them it fails closed.
+    pub fn with_approvals(
+        persistence: crate::adapters::persistence::PostgresPersistence,
+        policy: HttpDestinationPolicy,
+        lease: crate::application::workflow::lease::LeasePolicy,
+        notices: Option<crate::application::workflow::decisions::DecisionNotices>,
+    ) -> Self {
         use crate::adapters::persistence::workflow::{
             action_dispatch::PostgresActionDispatch, http::HttpActionAuthority,
         };
+        let mut dispatch =
+            PostgresActionDispatch::new(persistence.clone(), HttpActionAuthority, NoLocal);
+        if let Some(notices) = notices {
+            dispatch = dispatch.with_decision_notices(notices);
+        }
         Self {
             inner: HttpActions::new(
                 persistence.clone(),
-                PostgresActionDispatch::new(persistence.clone(), HttpActionAuthority, NoLocal),
+                dispatch,
                 HttpProvider {
                     persistence,
                     policy,

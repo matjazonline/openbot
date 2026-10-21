@@ -7,6 +7,11 @@ pub(super) async fn update_on(
     update: WorkflowCheckpointUpdate,
     bound: &WriteBound,
 ) -> AppResult<End<Outcome>> {
+    // A saved call is dispatched, or re-dispatched after approval, only under
+    // current agent/model authority; replay of the preparation rechecks it too.
+    if matches!(update, WorkflowCheckpointUpdate::PrepareInvocation(_)) {
+        authorize_on(tx, write.fence).await?;
+    }
     if !lock_owner(tx, write.fence, bound).await? {
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
     }

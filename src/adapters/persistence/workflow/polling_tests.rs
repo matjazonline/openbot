@@ -18,7 +18,7 @@ impl WorkflowHandler for Scripted {
             async {
                 self.calls.fetch_add(1, Ordering::SeqCst);
                 tokio::time::sleep(Duration::from_millis(20)).await;
-                Ok(json!({"items":[],"token_count":0}))
+                Ok(json!({"items":[],"token_count":0,"omitted":0}))
             }
             .await,
         )
@@ -374,7 +374,7 @@ async fn workflow_poll_database_failure_and_spurious_wakeups_do_not_stop_periodi
 #[tokio::test]
 async fn workflow_poll_unsupported_full_page_stays_bounded_and_later_work_progresses() {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["steps"]["start"]["routes"]["success"] = json!("finish");
     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":true}},"routes":{"success":"$end"}});
     let (f, mut scope) = fixture_source(source).await;
@@ -417,7 +417,7 @@ async fn workflow_poll_unsupported_full_page_stays_bounded_and_later_work_progre
             )
             .unwrap(),
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap()

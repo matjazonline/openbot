@@ -51,7 +51,7 @@ async fn admitted_association(
 async fn associated(kind: AssociationKind) -> Associated {
     // Use the real I/O step fixture: data.map is synchronous and has no I/O claim.
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["input_schema"] = json!({"type":"object","properties":{"value":{"type":"integer","minimum":1,"maximum":1000}},"required":["value"]});
     source["steps"]["start"]["with"]["max_tokens"] = json!({"ref":"/input/value"});
     let f = AdmissionFixture::with_binding(BindingFixture::from_source(source).await).await;

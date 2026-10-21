@@ -77,9 +77,10 @@ where
         Ok(match publication {
             MessagePublication::Rejected(error) => return Err(error),
             MessagePublication::Committed(receipt) => MessageObservation::Committed(receipt),
-            MessagePublication::Pending
-            | MessagePublication::Suspended(_)
-            | MessagePublication::PossibleDispatchExists => MessageObservation::Pending,
+            MessagePublication::Suspended(wait) => MessageObservation::DeliveryParked(wait),
+            MessagePublication::Pending | MessagePublication::PossibleDispatchExists => {
+                MessageObservation::Pending
+            }
             MessagePublication::Uncertain => MessageObservation::Uncertain,
             MessagePublication::ApprovalRequired => MessageObservation::ApprovalRequired,
             MessagePublication::ApprovalParked(wait) => MessageObservation::ApprovalParked(wait),

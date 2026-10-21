@@ -3,15 +3,12 @@ use uuid::Uuid;
 
 use crate::entities::{
     creation::CreationProvenance,
-    harness::{HarnessKind, NativeToolPolicy},
     memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
-    value_objects::{AvatarUrl, ToolId},
+    value_objects::AvatarUrl,
 };
 
 pub const MIN_AGENT_RUN_TIMEOUT_SECS: u32 = 1;
 pub const MAX_AGENT_RUN_TIMEOUT_SECS: u32 = 3_600;
-pub const MAX_GRANTED_TOOLS: usize = 32;
-pub const MAX_EFFECTIVE_AGENT_TOOLS: usize = 32;
 pub const MAX_AGENT_SKILLS: usize = 16;
 pub const MAX_AGENT_SUB_AGENTS: usize = 64;
 
@@ -32,9 +29,6 @@ pub struct Agent {
     /// A short statement of what this agent is for, shown to other agents in the same company by
     /// the agent directory tool. Not part of the prompt.
     pub description: Option<String>,
-    pub harness_kind: HarnessKind,
-    pub granted_tool_ids: Vec<ToolId>,
-    pub native_tool_policy: NativeToolPolicy,
     /// Canonical JSON representation used by existing HTTP payloads and form textareas.
     /// Persistence validates it against the harness-specific typed schema before construction.
     #[serde(default)]

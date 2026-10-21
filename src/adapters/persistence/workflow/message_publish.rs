@@ -56,7 +56,7 @@ async fn stored_on(
     let step = stored.origin == "step";
     Ok(
         match (stored.state.as_str(), step, reader, stored.wait_id) {
-            ("pending", true, Reader::Resolve, Some(wait)) => {
+            ("pending", _, Reader::Resolve, Some(wait)) => {
                 MessagePublication::Suspended(WaitId::new(wait))
             }
             (_, true, _, _) => MessagePublication::PossibleDispatchExists,
@@ -271,7 +271,7 @@ async fn park_on(
     }
     sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='effect' WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
-    super::super::waits::audit(tx, scope, "wait_parked").await?;
+    super::super::waits::audit_wait(tx, scope, wait, "wait_parked").await?;
     Ok(())
 }
 
@@ -335,7 +335,9 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
         // The probe above holds the attempt lock, so the SQL admission backstop cannot fire here;
         // it exists for SQL-only writers.
         Self::insert(tx, request, marker, "message", current_policy).await?;
-        let wait = (origin == MessageOrigin::Step && plan.has_delivery()).then(Uuid::new_v4);
+        // Steps and saved model tool calls both park on their own delivery wait; a tool call's
+        // receipt later continues the agent job instead of completing the step (D4).
+        let wait = plan.has_delivery().then(Uuid::new_v4);
         insert_action_on(tx, request, marker, origin, wait, plan.destinations.len()).await?;
         write_destinations_on(tx, request, plan).await?;
         lease::live_window(tx, request.fence, started)

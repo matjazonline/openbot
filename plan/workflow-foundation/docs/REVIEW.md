@@ -481,3 +481,161 @@ Artifact `1d7e5545bb22655b22c40e14aac9f49e67f41af5683699a983b7e23deb4ce4d5`, sam
 
 ### 06-R013 — D4 revision3 root allowance scheduling architecture gate — PASS
 **PASS** for [06-D4 revision3 addendum](logs/06/decision-D4-root-pause-r3.md), SHA-256 `ab2be4fe23c66e31d53296a5d40629cb31a45b5516b3b80e208ac71f774fd3c7`. [Round note](agent-review-notes.md#06-r013--d4-revision3-root-allowance-scheduling-architecture-gate--pass); [finding disposition](agent-review-findings.md#06-r013-architecture-disposition--no-new-findings). B inspected actual pending/pure/I/O scheduling, historical effect safety, retirement debit/hard bounds and SQL progression/reopen seams. No findings. Five-second pending deferral plus bounded genuine processing retirement fits the existing owners while preserving exact native approval/reproposal behavior. Digest matches before/after. This accepts only the architecture extension; unfinished06B2b source, its concurrency/recovery proofs and final gates remain unaccepted.
+
+
+### 06-R014 — 06B2b D5 agent-owned capabilities architecture gate — CHANGES REQUIRED
+**CHANGES REQUIRED** for [06-D5 revision1](logs/06/decision-D5.md), SHA-256 `a5ef1a3f7a3c57495a0b58f495c2ad431c250615ebd43a4445bfd61a784cdb4a` (verified before and after), base `76fe99c93266c73ef4d13b2b10ff40df89580afb`; `implement-opus-reviewed-2.1`, fresh Reviewer B Opus 5.5. [Round note](agent-review-notes.md#06-r014--06b2b-d5-agent-owned-capabilities-architecture-gate--changes-required).
+
+Actionable findings:
+- [06-F008](agent-review-findings.md#06-f008--d5-puts-publication-only-snapshot-equality-in-the-shared-admissionbinding-authority-check) **high**: the equality check placed in `supported_publication` would also run at binding save, root and child admission, replay, and over child bundles.
+- [06-F009](agent-review-findings.md#06-f009--d5-capture-has-no-catalogue-source-for-runtime-selected-agents) **medium**: no catalogue source for runtime-selected agents.
+- [06-F010](agent-review-findings.md#06-f010--directory-composition-tool-deduplication-and-the-http-grant-resolution-rule-are-unspecified) **medium**: directory composition and dedup, and the HTTP grant resolution rule, are unspecified.
+- [06-F011](agent-review-findings.md#06-f011--existing-full-replacement-agent-and-skill-writers-would-wipe-the-new-fields) **medium**: existing full-replacement writers would wipe `workflow_tools` and `required_tools`.
+- [06-F012](agent-review-findings.md#06-f012--the-skill-revocation-predicate-treats-edits-as-revocations-and-lacks-a-stable-skill-identity) **low**: the skill revocation predicate treats edits as revocations, and skills lack a stable identity.
+- [06-F013](agent-review-findings.md#06-f013--runtime-revocation-call-sites-preparation-lock-order-and-replay-of-an-already-dispatched-invocation) **low**: preparation lock order and replay of an already-dispatched invocation.
+- [06-F014](agent-review-findings.md#06-f014--d5-verification-plan-omits-required-regression-parity-and-competing-claimant-proofs) **low**: the verification plan is missing regression, Rust/SQL parity and competing-claimant proofs.
+
+Optional: [06-F015](agent-review-findings.md#06-f015--optional-suggestions-for-d5-non-blocking).
+
+The direction (agent-owned grants, skill required tools, profile and ceiling removal, server capture with SQL equality, authority-class revocation) matches the user's decisions. No D5-dependent implementation until a corrected revision passes a recheck.
+
+
+### 06-R015 — 06B2b D5 revision2 correction recheck — PASS
+**PASS** for [06-D5 revision2](logs/06/decision-D5.md), SHA-256 `eed25e4a5f367ccfd8333039455402d8bea59a4274b361854a398a1a5e084934` (verified before and after; revision1 is retained unchanged as `decision-D5-revision1.md`). Base `76fe99c93266c73ef4d13b2b10ff40df89580afb`; `implement-opus-reviewed-2.1`, same Reviewer B (Opus 5.5). [Round note](agent-review-notes.md#06-r015--06b2b-d5-revision2-correction-recheck--pass).
+
+- 06-F008 to 06-F014 are resolved ([dispositions](agent-review-findings.md#06-r015-dispositions--06-f008-to-06-f014-resolved-at-architecture-level)).
+- From optional [06-F015](agent-review-findings.md#06-r015-disposition--06-f015-optional-suggestions), items (1), (3), (4) and (6) were adopted and (2) and (5) partly adopted.
+- New optional [06-F016](agent-review-findings.md#06-f016--optional-residual-suggestions-for-d5-revision2-non-blocking) is non-blocking.
+- The user's requirement that legacy behaviour is not needed after workflows (temporary `Binding::Legacy`, removed with its last caller in 06C/08) is consistent with accepted D4.
+
+This accepts the architecture only. All D5 and D4 implementation proofs and the final gates remain outstanding for the whole-batch review of 06B2b.
+
+
+### 06-R016 — Whole 06B2b batch review — CHANGES REQUIRED
+Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `6ea98c7ff7ea6f6ff35c3f7dc8005a6cade246da0179b53690aa60f78a02afa8` (excludes `plan/workflow-foundation/docs`), matched before and after. Reviewer B Opus 5.5, `implement-opus-reviewed-2.1`. [Round note](agent-review-notes.md#06-r016--whole-06b2b-batch-review--changes-required).
+
+Actionable findings:
+- [06-F017](agent-review-findings.md#06-f017--a-slot-bound-http-agent-grant-is-prepared-and-dispatched-as-an-mcp-tool) **medium**: a slot-bound HTTP agent grant is routed to the MCP runtime.
+- [06-F018](agent-review-findings.md#06-f018--token-allowance-pauses-from-the-agent-driver-are-not-confirmed-as-suspensions) **medium**: driver token pauses fail `confirm_suspension` and end as lease loss.
+- [06-F019](agent-review-findings.md#06-f019--d4-driver-level-proofs-are-missing) **medium**: D4 driver-level proofs are missing (token approval through the driver, crash/restart matrix, two approvals, unknown tool, repair, rebind, uncertain effect, MCP and dynamic-agent end to end).
+- [06-F020](agent-review-findings.md#06-f020--the-sql-no-longer-separates-model-tool-deliveries-from-step-completion) **low**: no SQL origin guard on step completion from an effect wait.
+
+Optional: [06-F021](agent-review-findings.md#06-f021--optional-suggestions-from-the-06b2b-batch-review-non-blocking).
+
+B's independent run on a fresh disposable DB (`workflow_agent_` + `workflow_harness_` + `workflow_message_`): 113/0 ([log](logs/06/06B2b-review-focused.log)). D5 capture/equality/revocation, the native slot and permit protocol, and the R5 reopen guard otherwise inspected sound. Not accepted until corrections and a recheck.
+
+
+### 06-R017 — 06B2b R016 correction recheck — PASS
+**PASS for 06B2b** at digest `d9ea9e59570ffd34142fc18c7d6542ad5e2ca93ba7ee4755e85110ab544b2ef3` (base `76fe99c93266c73ef4d13b2b10ff40df89580afb`, excludes `plan/workflow-foundation/docs`), verified before and after. [Round note](agent-review-notes.md#06-r017--06b2b-r016-correction-recheck--pass); [dispositions](agent-review-findings.md#06-r017-dispositions--06-f017-to-06-f020-resolved-06-f021-dispositioned).
+
+- 06-F017 resolved: target kind now comes from the declared slot kind, and capture refuses a slot-bound HTTP grant.
+- 06-F018 resolved: `confirm` accepts token pauses under the exact witness, proven through `supervise_io`.
+- 06-F019 resolved: the driver-level proof map is complete. Sibling consumption at the driver stays store-level, which is accepted.
+- 06-F020 resolved: a deferred model-tool continuation trigger plus a step one-wait index.
+- 06-F021: (2) and (3) adopted, (1) declined with an accepted reason, (4) deferred to 06C.
+- New optional [06-F022](agent-review-findings.md#06-f022--optional-agent-driver-test-file-exceeds-the-file-size-guideline-non-blocking): test file size.
+
+B's independent run on a fresh disposable DB: 130/0 ([log](logs/06/06B2b-review-r017-focused.log)). Author gates inspected (all exit 0, workflow_ 1008/0). Phase-end combined integration and the full phase06 gate remain.
+
+
+### 06-R018 — 06B3 D6 preparation-steps architecture gate — CHANGES REQUIRED
+**CHANGES REQUIRED** for [06-D6](logs/06/decision-D6.md), SHA-256 `064dbff7c66fcbcb35a2261112630c03fa907802d0fc49488ceec25e8ca73ecd` (verified before and after); `implement-opus-reviewed-2.1`, Reviewer B Opus 5.5. [Round note](agent-review-notes.md#06-r018--06b3-d6-preparation-steps-architecture-gate--changes-required).
+
+- [06-F023](agent-review-findings.md#06-f023--the-contexthistory-item-contract-drops-each-messages-disclosure-boundary) **medium**: `context.history` items omit audience and entry kind, so internal-only and legacy "do not disclose" messages look like external conversation.
+- [06-F024](agent-review-findings.md#06-f024--max_tokens-can-exceed-the-runs-per-output-byte-limit) **medium**: `max_tokens` (≤131072) is not bounded by the run's per-output byte limit, so long histories fail terminally.
+- Optional [06-F025](agent-review-findings.md#06-f025--optional-suggestions-for-d6-non-blocking).
+
+One driver for Classify/Decide, the route-derived decision enum, current authority on prepared capabilities, the recovery reclassification, deferred memory and the revision bumps were challenged and pass. No dependent 06B3 code should start until the A contract is corrected and rechecked.
+
+
+### 06-R019 — 06B3 D6 revision2 correction recheck — PASS
+**PASS** for [06-D6 revision2](logs/06/decision-D6.md), SHA-256 `e80a5201f60e1b37abf4bf4faef8b3695d19928e05563af3f6e8098775dd497d` (verified before and after; revision1 is retained unchanged as `decision-D6-revision1.md`). [Round note](agent-review-notes.md#06-r019--06b3-d6-revision2-correction-recheck--pass); [dispositions](agent-review-findings.md#06-r019-dispositions--06-f023-and-06-f024-resolved-06-f025-dispositioned).
+
+- 06-F023 resolved: typed `audience`, `entry_kind` and `at` on every history item.
+- 06-F024 resolved: the run-time bound is the minimum of `max_tokens` and the claim's result byte cap, so long threads report `omitted` instead of failing.
+- 06-F025: (2), (3) and (4) adopted; publication refusal deferred as a recorded 06C obligation, with the memory acceptance item marked deferred in the phase plan.
+
+No new findings. This is architecture acceptance only; the 06B3 implementation proofs remain outstanding.
+
+
+### 06-R020 — Whole 06B3 batch review — CHANGES REQUIRED
+Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `b64957f986c172239336b34593bb1de360a501a5e9c6158f01e9fa3821b1fb99` (excludes `plan/workflow-foundation/docs`), verified before and after. Gate 06-D6 revision2. [Round note](agent-review-notes.md#06-r020--whole-06b3-batch-review--changes-required).
+
+- Actionable: [06-F026](agent-review-findings.md#06-f026--decides-response-contract-embeds-data_schema-without-its-own-resource-identity) **low**. Decide's response contract embeds `data_schema` without the registry's `$id`, so a data schema with local `$ref`s fails terminally at preparation.
+- Optional: [06-F027](agent-review-findings.md#06-f027--optional-suggestions-from-the-06b3-batch-review-non-blocking).
+
+B's independent run on a fresh disposable DB (history, classify, decision, model steps, agent, effect-free and application filters): 107/0 ([log](logs/06/06B3-review-r020-focused.log)). The `context.history` contract and reader, tool-free model steps, route-derived choices, capability-scoped current authority, unified recovery predicate and revision 6 otherwise match D6. A targeted recheck of the 06-F026 fix is sufficient.
+
+
+### 06-R021 — 06B3 R020 correction recheck — PASS
+**PASS for 06B3** at digest `afbb5ffb62f5e9cf019323611f2133cc6ae6f24644dda2104acc6ac42f2c3717` (base `76fe99c93266c73ef4d13b2b10ff40df89580afb`, excludes `plan/workflow-foundation/docs`), verified before and after. [Round note](agent-review-notes.md#06-r021--06b3-r020-correction-recheck--pass); [dispositions](agent-review-findings.md#06-r021-dispositions--06-f026-resolved-06-f027-dispositioned).
+
+- 06-F026 resolved: Decide uses the compiled step output contract, and the shared `tool_schema` checker now re-roots at a nested `$id`. That change was reviewed as safe: budgets and recursion refusal are kept, and it is stricter on anchor and absolute references.
+- 06-F027: (1) and (3) adopted, (2) declined with an accepted reason.
+
+B's independent run on a fresh disposable DB: 147/0 ([log](logs/06/06B3-review-r021-focused.log)). Author gates inspected (all exit 0, workflow_ 1027/0). Phase-end integration, 06C and the full phase06 gate remain.
+
+
+### 06-R022 — Whole 06C batch review — CHANGES REQUIRED (docs only)
+Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `c9f12d8828d1dbd5dd3b635611d98ea6760c87bab637f7ffd0551502e77a16f5` (manifest `logs/06/06C-batch-snapshot.txt`), verified before and after. An earlier request at `bf1c0360…` was stopped on a digest mismatch ([log](logs/06/06C-review-digest-mismatch.log)). [Round note](agent-review-notes.md#06-r022--whole-06c-batch-review--changes-required).
+
+- Actionable: [06-F028](agent-review-findings.md#06-f028--operator-and-readme-docs-still-describe-behaviour-06c-made-unreachable) **low**. The `docs/deploy.md` pilot MCP evidence needs workflow execution, which is not wired until phase 08, and the README execution diagrams still show agent-requested approval and outreach.
+- Optional: [06-F029](agent-review-findings.md#06-f029--optional-observations-from-the-06c-review-non-blocking).
+
+All eight challenge points were checked against code; no code defect found. B's full lib suite on a fresh disposable DB at the frozen tree: 2701/0, 22 ignored ([log](logs/06/06C-review-r022-suite.log)). Fresh migration has 0 retired columns. A docs-only correction needs no Rust or DB rerun.
+
+
+### 06-R023 — 06C R022 correction recheck — PASS
+**PASS for 06C** at digest `dbeb4953eff762719ffbd56465ae2eaf1b0c263e68d06a06d4fb40e567e4b4d5` (base `76fe99c93266c73ef4d13b2b10ff40df89580afb`, excludes `plan/workflow-foundation/docs`; manifest `logs/06/06C-batch-snapshot-r023.txt`, the same 291 paths), verified before and after. [Round note](agent-review-notes.md#06-r023--06c-r022-correction-recheck--pass); [dispositions](agent-review-findings.md#06-r023-dispositions--06-f028-resolved-06-f029-dispositioned).
+
+- 06-F028 resolved:
+  - The README execution diagram no longer routes agent runs through the approval/outreach decision.
+  - The Pauses subgraph is marked as having no agent producer until phase 08.
+  - The deploy MCP pilot evidence is limited to what this release can show.
+- 06-F029: all four dispositions accepted. Carry-forward: add (2)-(4) to the `RESUME.md` phase-08 obligations at 06C acceptance.
+
+Docs-only delta (README.md, docs/deploy.md), so no Rust or DB rerun was needed. The 06-R022 full-suite evidence (2701/0) still applies. Not machine-verified: Mermaid rendering of the retitled label, which contains `;` (optional: quote it). The phase06 phase-end gate is still pending.
+
+
+### 06-R024 — Phase06 combined integration review — CHANGES REQUIRED
+Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `33cfebc799ec8a3f6a0814dec2496987a2042541234502354b363a55878c4bf0` (293 paths; manifest `logs/06/06-final-snapshot.txt`), verified before and after. [Round note](agent-review-notes.md#06-r024--phase06-combined-integration-review--changes-required).
+
+- [06-F030](agent-review-findings.md#06-f030--d2s-phase06-acceptance-condition-on-model-usage-is-unmet-for-the-rig-text-classifier) **medium**: D2 requires every production model entry to persist usage, or be removed, before phase06 acceptance. The Rig text classifier (spam guardrail and prompt generator) records none, and the condition was never dispositioned. Correct it by implementation or by a recorded decision.
+- [06-F031](agent-review-findings.md#06-f031--stale-references-left-by-phase06-removals-and-renames) **low**: stale references:
+  - the workflow language reference predates D5/D6;
+  - the harness query-plan script crashes on the current schema, and its fixture and doc describe removed code;
+  - the Dockerfile still installs git for the removed git dependency;
+  - two comments name removed code.
+- [06-F032](agent-review-findings.md#06-f032--deferred-memory-steps-have-no-owning-phase) **low**: deferred memory steps have no owning phase, although phase 08 removes legacy memory and phase 10 expects memory to be visible.
+
+Delta verified:
+- README label quoted;
+- RESUME obligations carried;
+- `agent-runtime.mjs`, with B's run: node 8/8;
+- `app.css`, with B's rebuild byte-identical; it differs from base only by the unused rule.
+
+Plan acceptance mapping is in the note.
+
+Gate evidence:
+- The 127.0.0.1 fix is right. The root cause is a TCP self-connect on the IPv6 loopback at an ephemeral-range port, which B reproduced.
+- The timing failures are the recorded pre-existing lease-family risk, and their treatment is adequate.
+  - B's full runs under host load: 2699/2 and 2689/12. One run overlapped an unrelated project's `cargo test`.
+  - All 17 distinct failing tests pass 3/3 by exact name.
+  - Clean full-suite evidence on this Rust tree: the author's rerun 2701/0 + 5/0 and B's R022 2701/0.
+- B ran the Playwright task-counts test: 4/4. The browser is installed, and the test loads `mailbox.rs`, which 06C changed.
+- Not run by either party: the CI `pg_stat_statements` step.
+
+
+### 06-R025 — Phase06 R024 correction recheck — PASS
+**PASS for phase06** at digest `0d8bba5d139ad7dfc69380b45ed32ed48cc3ec481c4be45abdeb2d8f5f329b00` (base `76fe99c93266c73ef4d13b2b10ff40df89580afb`; manifest `logs/06/06-R024fix-snapshot.txt`, 326 paths), verified before and after. [Round note](agent-review-notes.md#06-r025--phase06-r024-correction-recheck--pass); [dispositions](agent-review-findings.md#06-r025-dispositions--06-f030-06-f031-06-f032-resolved).
+
+- 06-F030: the guardrail is removed end to end, with no dangling config, docs or UI. The prompt generator is unmetered by user decision. Stage 1/2 scanning is untouched.
+- 06-F031: the language reference is rewritten and verified against the registry; the stale script, fixture and doc are deleted; the Dockerfile is fixed; the comments are fixed (one optional `ToolId` comment nit).
+- 06-F032: memory is out of this release by user decision, recorded in the plans.
+
+B's checks:
+- fresh migration (0 guardrail columns);
+- clippy -D warnings: exit 0;
+- isolated full lib suite at 6 threads: 2692/0, 22 ignored; bins 5/0 ([log](logs/06/06-review-r025-suite.log)).
+
+Not run: Docker build (no docker on host). Carry-forward: add the memory-infrastructure decision to the RESUME phase-08 obligations.

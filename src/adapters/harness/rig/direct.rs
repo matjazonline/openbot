@@ -45,16 +45,8 @@ pub(super) async fn execute(
             clock: Arc::new(SystemClock),
             capabilities: harness.capabilities.clone(),
             token_budget: policy.total_input_tokens as usize,
-            approvals: None,
-            mcp: None,
         },
-        run.tool_host.clone(),
     )?;
-    if !compiled.tools.diagnostics.missing_context.is_empty() {
-        return Err(AppError::BadRequest(
-            "Direct Rig tools require unavailable context".into(),
-        ));
-    }
     let tools = Arc::get_mut(&mut compiled.tools)
         .ok_or_else(|| AppError::Internal("Rig tools shared before execution".into()))?;
     tools.restrict_deadline(run.deadline);
@@ -142,7 +134,7 @@ impl Direct<'_> {
             model: None,
             preamble: Some(final_response::response_preamble(
                 &self.checkpoint,
-                &self.compiled,
+                self.compiled.render_preamble()?,
                 repair.as_ref(),
             )?),
             chat_history: protocol::history(&self.checkpoint)?,

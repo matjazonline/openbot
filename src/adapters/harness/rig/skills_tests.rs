@@ -9,7 +9,7 @@ use crate::{
     entities::{
         agent::Agent as AgentEntity,
         creation::CreationProvenance,
-        harness::{HarnessConfig, HarnessKind, NativeToolPolicy, SubAgentScope},
+        harness::{HarnessConfig, HarnessKind, SubAgentScope},
         skill::{Skill, SkillInstruction},
         transport::RecipientRole,
     },
@@ -67,9 +67,6 @@ impl AgentCapabilityReader for Reader {
                 run_timeout_secs: None,
                 system_prompt: None,
                 description: None,
-                harness_kind: HarnessKind::Rig,
-                granted_tool_ids: vec![],
-                native_tool_policy: NativeToolPolicy::default(),
                 config_json: None,
                 memory_enabled: false,
                 memory_persistence_mode: Default::default(),
@@ -87,13 +84,23 @@ impl AgentCapabilityReader for Reader {
 
 fn recipe() -> Skill {
     Skill {
-        id: Uuid::from_u128(3), company_id: Some(Uuid::from_u128(1)), slug: "ordered-proof".into(),
-        name: "Ordered proof".into(), description: "Two dependent echo steps".into(), trigger: "Review a record".into(),
+        id: Uuid::from_u128(3),
+        company_id: Some(Uuid::from_u128(1)),
+        slug: "ordered-proof".into(),
+        name: "Ordered proof".into(),
+        description: "Two dependent prompt steps".into(),
+        trigger: "Review a record".into(),
         instructions: vec![
-            SkillInstruction::Tool { tool: "echo".into(), args: Some(json!({"message":"first"})), output_as: Some("named".into()) },
-            SkillInstruction::Tool { tool: "echo".into(), args: Some(json!({"message":"{{ steps[0].result.message }}-second"})), output_as: None },
-            SkillInstruction::Prompt { text: "Ordered={{ steps[1].result.message }}; argument={{ steps[1].args.message }}; alias={{ named.message }}".into() },
-        ], created_by: CreationProvenance::system(), created_at: Utc::now(), updated_at: Utc::now(),
+            SkillInstruction::Prompt {
+                text: "Classify the record for {{ user_input }}.".into(),
+            },
+            SkillInstruction::Prompt {
+                text: "Answer using the class {{ steps[0].result.label }}.".into(),
+            },
+        ],
+        created_by: CreationProvenance::system(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -107,7 +114,6 @@ fn fixture() -> (AgentCapabilitySpec, Arc<Reader>, CompileContext) {
         model: "model".into(),
         provider_base_url: None,
         skills: vec![recipe()],
-        granted_tools: vec![],
         sub_agents: SubAgentScope::AllCompanySiblings,
         harness_config: HarnessConfig::empty(HarnessKind::Rig),
     };
@@ -127,8 +133,6 @@ fn fixture() -> (AgentCapabilitySpec, Arc<Reader>, CompileContext) {
         clock: Arc::new(Clock(AtomicUsize::new(0))),
         capabilities: reader.clone(),
         token_budget: 262_144,
-        approvals: None,
-        mcp: None,
     };
     (spec, reader, context)
 }
@@ -146,13 +150,11 @@ fn correlation() -> ToolCorrelationId {
 }
 
 #[test]
-fn document_preserves_verbatim_steps_types_trigger_and_output_names() {
+fn document_preserves_verbatim_steps_and_trigger() {
     let mut skill = recipe();
-    if let SkillInstruction::Tool { args, .. } = &mut skill.instructions[0] {
-        *args = Some(
-            json!({"message":"first", "nested":[true, 7, null, {"literal":"quoted \" text\nnext"}]}),
-        );
-    }
+    skill.instructions[0] = SkillInstruction::Prompt {
+        text: "Quote \"this\" text\nnext line as written.".into(),
+    };
     let document = render_document(&skill).unwrap();
     let (_, encoded) = document.split_once('\n').unwrap();
     let encoded: Value = serde_json::from_str(encoded).unwrap();
@@ -172,9 +174,9 @@ fn templates_reject_empty_malformed_future_missing_and_executable_constructs() {
     for text in [
         "{{ }}",
         "{{ missing }}",
-        "{{ named }}",
-        "{{ steps[2].result }}",
-        "{{ steps[99].args }}",
+        "{{ steps[1].result }}",
+        "{{ steps[99].result }}",
+        "{{ steps[0].args }}",
         "{{ context.x",
         "oops }}",
         "{{ context.x|default('missing') }}",
@@ -182,46 +184,27 @@ fn templates_reject_empty_malformed_future_missing_and_executable_constructs() {
         "{{ context.x + 1 }}",
     ] {
         let mut skill = recipe();
-        if let SkillInstruction::Tool { args, .. } = &mut skill.instructions[0] {
-            *args = Some(json!({"message":text}));
-        }
+        skill.instructions[1] = SkillInstruction::Prompt { text: text.into() };
         assert!(render_document(&skill).is_err(), "{text}");
     }
-    for name in ["context", "steps", "user_input"] {
-        let mut skill = recipe();
-        if let SkillInstruction::Tool { output_as, .. } = &mut skill.instructions[0] {
-            *output_as = Some(name.into());
-        }
-        assert!(render_document(&skill).is_err());
-    }
-    let mut skill = recipe();
-    if let SkillInstruction::Tool { output_as, .. } = &mut skill.instructions[1] {
-        *output_as = Some("named".into());
-    }
-    assert!(render_document(&skill).is_err());
 }
 
 #[test]
-fn preflight_checks_scope_collisions_context_tool_availability_and_bounds() {
+fn preflight_checks_scope_collisions_context_and_bounds() {
     let (mut spec, _, context) = fixture();
     spec.skills.push(spec.skills[0].clone());
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
     let (mut spec, _, context) = fixture();
     let mut duplicate = spec.skills[0].clone();
     duplicate.id = Uuid::new_v4();
     spec.skills.push(duplicate);
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
     let (mut spec, _, context) = fixture();
     spec.skills[0].company_id = Some(Uuid::new_v4());
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
     let (mut spec, _, context) = fixture();
     spec.system_prompt = "{{ context.missing }}".into();
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
-    let (mut spec, _, context) = fixture();
-    if let SkillInstruction::Tool { tool, .. } = &mut spec.skills[0].instructions[0] {
-        *tool = "request_approval".into();
-    }
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
     let (mut spec, _, context) = fixture();
     spec.skills[0].instructions = vec![
         SkillInstruction::Prompt {
@@ -229,16 +212,16 @@ fn preflight_checks_scope_collisions_context_tool_availability_and_bounds() {
         };
         3
     ];
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
     let (spec, _, mut context) = fixture();
     context.token_budget = 10;
-    assert!(CompiledRun::compile(&spec, context, None).is_err());
+    assert!(CompiledRun::compile(&spec, context).is_err());
 }
 
 #[tokio::test]
 async fn reads_are_exact_scoped_rechecked_and_share_budget_without_recipe_effects() {
     let (spec, reader, context) = fixture();
-    let compiled = CompiledRun::compile(&spec, context, None).unwrap();
+    let compiled = CompiledRun::compile(&spec, context).unwrap();
     let budget = compiled.budget.clone();
     let before = budget.remaining();
     for _ in 0..2 {
@@ -328,7 +311,7 @@ mod provider;
 #[tokio::test]
 async fn repeated_loads_exhaust_the_same_budget_and_latch_dispatch() {
     let (spec, _, context) = fixture();
-    let compiled = CompiledRun::compile(&spec, context, None).unwrap();
+    let compiled = CompiledRun::compile(&spec, context).unwrap();
     compiled
         .budget
         .charge(compiled.budget.remaining() - 100)

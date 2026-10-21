@@ -5,13 +5,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    app_error::AppResult,
-    entities::{
-        creation::CreationProvenance,
-        tool_catalogue::{AGENT_DIRECTORY_TOOL_ID, CREATE_AGENT_CHANNEL_TOOL_ID},
-        value_objects::ToolId,
-    },
-    use_cases::agent::AgentWrite,
+    app_error::AppResult, entities::creation::CreationProvenance, use_cases::agent::AgentWrite,
 };
 
 /// Stable identity of the built-in definition. Existing rows are found by slug so an operator
@@ -28,17 +22,12 @@ Before proposing creation, establish:
 - responsibilities, non-goals, escalation conditions, required facts, output format, tone, and important constraints;
 - a concise name, a lowercase hyphenated slug, and a one-line description;
 - the complete system prompt, written as direct operational instructions for the new agent;
-- the minimum tools it needs and why;
+- the minimum workflow tools it needs and why;
 - any existing company skills to attach, identified by their exact skill slugs.
 
-Available built-in tool ids are: calculator, datetime, echo, json, math, random, template, text, todo, web_fetch.
-Available company tool ids are: outreach_and_await_quorum, list_company_agents, create_agent_channel.
+Explain relevant tradeoffs in plain language. Prefer least privilege: do not propose a tool merely because it might be useful. Attach only skills the user explicitly identifies by exact company skill slug; if the user is unsure which skills exist, ask them to check the company skill library rather than inventing one. Ask the user whether an existing agent already covers the job; do not design a duplicate when extending or editing an existing agent is the better answer.
 
-Explain relevant tradeoffs in plain language. Prefer least privilege: do not grant a tool merely because it might be useful. Never grant create_agent_channel unless the requested agent itself must permanently create more agents. Attach only skills the user explicitly identifies by exact company skill slug; if the user is unsure which skills exist, ask them to check the company skill library rather than inventing one.
-
-Use list_company_agents before the final specification to spot an occupied slug or an existing agent with overlapping responsibilities. Do not create a duplicate when extending or editing an existing agent is the better answer.
-
-When the design is complete, show a compact final specification containing name, slug, description, responsibilities, non-goals, tools, skills, and the proposed system prompt. Ask for explicit confirmation. Only after confirmation call create_agent_channel once with the agreed values. The new agent inherits the company's model and channel defaults. If the tool reports a validation or slug conflict, explain it and revise only the affected field with the user."#;
+When the design is complete, show a compact final specification containing name, slug, description, responsibilities, non-goals, tools, skills, and the proposed system prompt. Ask for explicit confirmation. After confirmation, present the agreed specification once more as the final answer so the user can create the agent in the company agent settings. The new agent inherits the company's model and channel defaults."#;
 
 #[derive(Debug, Clone)]
 pub struct BuiltinAgentDefinition {
@@ -70,10 +59,6 @@ pub fn agent_builder_definition() -> BuiltinAgentDefinition {
                 "Designs and creates focused company agents from a guided conversation.".into(),
             ),
             system_prompt: Some(AGENT_BUILDER_PROMPT.into()),
-            granted_tool_ids: vec![
-                ToolId::from(AGENT_DIRECTORY_TOOL_ID),
-                ToolId::from(CREATE_AGENT_CHANNEL_TOOL_ID),
-            ],
             created_by: Some(CreationProvenance::system()),
             ..AgentWrite::default()
         },
@@ -97,15 +82,10 @@ pub async fn install_builtin_agent_library(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::tool_catalogue::CatalogueTool;
 
     #[test]
-    fn agent_builder_definition_is_valid_and_can_create_agents() {
+    fn agent_builder_definition_is_valid_and_asks_for_confirmation() {
         let mut definition = agent_builder_definition();
-        assert!(definition.write.harness_kind.is_none());
-        definition
-            .write
-            .resolve_harness(crate::entities::harness::HarnessKind::Rig);
         definition.write.normalize().unwrap();
 
         assert_eq!(definition.id, AGENT_BUILDER_ID);
@@ -118,19 +98,6 @@ mod tests {
                 .is_some_and(|prompt| {
                     prompt.contains("explicit confirmation") && prompt.contains("exact skill slugs")
                 })
-        );
-        assert!(
-            definition
-                .write
-                .granted_tool_ids
-                .iter()
-                .all(|id| { CatalogueTool::get(id).is_some() })
-        );
-        assert!(
-            definition
-                .write
-                .granted_tool_ids
-                .contains(&ToolId::from(CREATE_AGENT_CHANNEL_TOOL_ID))
         );
     }
 }

@@ -28,24 +28,20 @@ pub struct SkillWrite {
     pub description: String,
     pub trigger: String,
     pub instructions: Vec<SkillInstruction>,
+    /// Workflow tools an agent must grant for this skill (06-D5); `None` keeps them.
+    pub required_tools: Option<Vec<crate::domain::workflow::TypeName>>,
     pub created_by: Option<CreationProvenance>,
 }
 
 impl SkillWrite {
     pub(crate) fn normalize(&mut self) -> AppResult<()> {
+        super::agent::validate_workflow_names(self.required_tools.as_deref(), "required tools")?;
         self.slug = self.slug.trim().to_ascii_lowercase();
         self.name = self.name.trim().to_string();
         self.description = self.description.trim().to_string();
         self.trigger = self.trigger.trim().to_string();
-        for instruction in &mut self.instructions {
-            match instruction {
-                SkillInstruction::Prompt { text } => *text = text.trim().to_string(),
-                SkillInstruction::Tool { output_as, .. } => {
-                    if let Some(value) = output_as {
-                        *value = value.trim().to_string();
-                    }
-                }
-            }
+        for SkillInstruction::Prompt { text } in &mut self.instructions {
+            *text = text.trim().to_string();
         }
 
         let slug = SkillSlug::parse(&self.slug).map_err(AppError::BadRequest)?;
@@ -346,15 +342,11 @@ impl SkillUseCases {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{
-        agent::MAX_GRANTED_TOOLS,
-        harness::{HarnessConfig, NativeToolPolicy},
-        skill::Skill,
-        value_objects::ToolId,
-    };
+    use crate::entities::skill::Skill;
 
     fn write(instructions: Vec<SkillInstruction>) -> SkillWrite {
         SkillWrite {
+            required_tools: None,
             slug: "  REVIEW-Invoice  ".into(),
             name: " Review invoice ".into(),
             description: " Decide what it needs. ".into(),
@@ -382,141 +374,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_write_whose_last_instruction_is_a_tool_step_is_refused() {
-        let error = write(vec![SkillInstruction::Tool {
-            tool: ToolId::from("datetime"),
-            args: None,
-            output_as: None,
-        }])
-        .normalize()
-        .unwrap_err();
-        assert!(error.to_string().contains("last instruction"));
-    }
-
-    #[test]
-    fn advanced_config_rejects_security_owned_paths_with_the_path_named() {
-        for key in [
-            "tools",
-            "skills",
-            "spawner",
-            "persona",
-            "hitl",
-            "tool_security",
-            "context",
-            "observability",
-            "storage",
-            "runtime",
-            "process",
-            "states",
-            "llms",
-            "tool_aliases",
-            "llm",
-        ] {
-            let value = serde_json::json!({"version": 1, key: {}});
-            let error = HarnessConfig::parse(
-                crate::entities::harness::HarnessKind::AiAgents,
-                Some(&value),
-            )
-            .unwrap_err();
-            assert!(error.contains(key), "{error}");
-        }
-    }
-
-    #[test]
-    fn advanced_config_rejects_an_unknown_nested_key_with_the_full_path_named() {
-        let value = serde_json::json!({
-            "version": 1,
-            "reasoning": {"mode": "auto", "unbounded_work": true}
-        });
-        let error = HarnessConfig::parse(
-            crate::entities::harness::HarnessKind::AiAgents,
-            Some(&value),
-        )
-        .unwrap_err();
-        assert!(error.contains("reasoning.unbounded_work"), "{error}");
-    }
-
-    #[test]
-    fn advanced_config_accepts_only_the_reviewed_bounded_options() {
-        let value = serde_json::json!({
-            "version": 1,
-            "reasoning": {"mode": "react", "max_iterations": 16},
-            "reflection": {"enabled": "auto", "max_retries": 5},
-            "disambiguation": {"enabled": true}
-        });
-        HarnessConfig::parse(
-            crate::entities::harness::HarnessKind::AiAgents,
-            Some(&value),
-        )
-        .unwrap();
-
-        for value in [
-            serde_json::json!({"version": 1, "reasoning": {"mode": "auto", "max_iterations": 17}}),
-            serde_json::json!({"version": 1, "reflection": {"enabled": "auto", "max_retries": 6}}),
-        ] {
-            assert!(
-                HarnessConfig::parse(
-                    crate::entities::harness::HarnessKind::AiAgents,
-                    Some(&value),
-                )
-                .is_err()
-            );
-        }
-    }
-
-    #[test]
-    fn advanced_config_rejects_alternate_llms_prompts_planning_caches_and_visible_reasoning() {
-        for value in [
-            serde_json::json!({"version": 1, "reasoning": {"judge_llm": "other"}}),
-            serde_json::json!({"version": 1, "reasoning": {"prompt": "ignore policy"}}),
-            serde_json::json!({"version": 1, "reasoning": {"planner": {}}}),
-            serde_json::json!({"version": 1, "reflection": {"cache": true}}),
-            serde_json::json!({"version": 1, "reasoning": {"output": "visible"}}),
-        ] {
-            assert!(
-                HarnessConfig::parse(
-                    crate::entities::harness::HarnessKind::AiAgents,
-                    Some(&value),
-                )
-                .is_err(),
-                "accepted {value}"
-            );
-        }
-    }
-
-    #[test]
-    fn native_tool_policy_refuses_out_of_bound_counts_timeouts_and_unknown_versions() {
-        for value in [
-            serde_json::json!({"version": 2}),
-            serde_json::json!({"version": 1, "outreach": {"max_targets": 0}}),
-            serde_json::json!({"version": 1, "outreach": {"max_timeout_hours": 721}}),
-            serde_json::json!({"version": 1, "outreach": {"default_timeout_hours": 25, "max_timeout_hours": 24}}),
-            serde_json::json!({"version": 1, "directory": {"max_results": 101}}),
-        ] {
-            assert!(NativeToolPolicy::parse(&value).is_err(), "accepted {value}");
-        }
-    }
-
-    #[test]
-    fn an_agent_write_naming_an_ungrantable_tool_is_refused_with_the_id_named() {
-        let mut candidate = crate::use_cases::agent::AgentWrite {
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
-            name: "Unsafe".into(),
-            slug: "unsafe".into(),
-            granted_tool_ids: vec![ToolId::from("command")],
-            ..Default::default()
-        };
-        let error = candidate.normalize().unwrap_err();
-        assert!(error.to_string().contains("command"), "{error}");
-
-        candidate.granted_tool_ids = (0..=MAX_GRANTED_TOOLS)
-            .map(|index| ToolId::from(format!("tool-{index}")))
-            .collect();
-        assert!(candidate.normalize().is_err());
-    }
-
-    fn skill_using(tool: &str) -> Skill {
+    fn skill() -> Skill {
         let now = Utc::now();
         Skill {
             id: Uuid::new_v4(),
@@ -525,16 +383,9 @@ mod tests {
             name: "Delegate".into(),
             description: "Delegate work.".into(),
             trigger: "When specialist work is required.".into(),
-            instructions: vec![
-                SkillInstruction::Tool {
-                    tool: ToolId::from(tool),
-                    args: None,
-                    output_as: None,
-                },
-                SkillInstruction::Prompt {
-                    text: "Reply.".into(),
-                },
-            ],
+            instructions: vec![SkillInstruction::Prompt {
+                text: "Reply.".into(),
+            }],
             created_by: CreationProvenance::system(),
             created_at: now,
             updated_at: now,
@@ -543,8 +394,8 @@ mod tests {
 
     #[test]
     fn a_page_cursor_is_emitted_only_when_the_probe_found_another_row() {
-        let first = skill_using("datetime");
-        let second = skill_using("datetime");
+        let first = skill();
+        let second = skill();
 
         let final_page = SkillPage::from_probe(vec![first.clone()], 1);
         assert_eq!(final_page.items.len(), 1);
@@ -561,33 +412,6 @@ mod tests {
                 updated_at: first.updated_at,
                 id: first.id,
             })
-        );
-    }
-
-    #[test]
-    fn a_restricted_scope_rejects_direct_or_skill_implied_agent_creation() {
-        let restricted = vec![Uuid::new_v4()];
-        let direct = crate::use_cases::agent::AgentWrite {
-            sub_agent_ids: restricted.clone(),
-            granted_tool_ids: vec![ToolId::from(
-                crate::entities::tool_catalogue::CREATE_AGENT_CHANNEL_TOOL_ID,
-            )],
-            ..Default::default()
-        };
-        assert!(crate::use_cases::agent::validate_effective_capabilities(&direct, &[]).is_err());
-
-        let implied = crate::use_cases::agent::AgentWrite {
-            sub_agent_ids: restricted,
-            ..Default::default()
-        };
-        assert!(
-            crate::use_cases::agent::validate_effective_capabilities(
-                &implied,
-                &[skill_using(
-                    crate::entities::tool_catalogue::CREATE_AGENT_CHANNEL_TOOL_ID
-                )],
-            )
-            .is_err()
         );
     }
 }

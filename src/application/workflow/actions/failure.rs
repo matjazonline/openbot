@@ -19,11 +19,39 @@ use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailur
 /// Messaging joins (04.11-D2 §5.2): its only effect-bearing write is the publication
 /// transaction, whose first write is the `message` marker, and provider I/O happens only in
 /// the delivery engine after that commit.
+///
+/// `agent.run` joins (06-D4): its only effects are saved model tool calls dispatched through
+/// the same ActionService entries, and its provider calls are charged checkpoint
+/// reservations, not effects; an unresolved reservation stays charged across a retry.
 pub fn marker_owned_effect_kind(kind: &str) -> bool {
     matches!(
         kind,
-        "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply"
+        "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply" | "agent.run"
     )
+}
+
+/// Step kinds with no external effect (06-D6 E): pure, wait and decision kinds, bounded
+/// reads, and the tool-free model steps, whose provider calls are ledger-charged
+/// reservations (an unresolved one stays charged across a retry), not effects.
+pub fn effect_free_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "data.map"
+            | "decision.rule"
+            | "decision.human"
+            | "decision.agent"
+            | "context.history"
+            | "memory.load"
+            | "ai.classify"
+            | "wait.event"
+            | "wait.timer"
+    )
+}
+
+/// The one predicate for Rust lease retirement and pending recovery: without a
+/// possible-dispatch marker, these kinds cannot have produced an unknown effect.
+pub fn retry_safe_without_marker(kind: &str) -> bool {
+    effect_free_kind(kind) || marker_owned_effect_kind(kind)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -179,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn workflow_action_marker_owned_kinds_are_exactly_the_action_service_steps() {
+    fn workflow_action_marker_owned_kinds_are_exactly_the_action_service_owners() {
         // 04.11-D2 §5.2: messaging deliberately joins; its marker is the first publication write.
         for kind in [
             "http.request",
@@ -187,11 +215,32 @@ mod tests {
             "mcp.call",
             "message.send",
             "message.reply",
+            "agent.run",
         ] {
             assert!(marker_owned_effect_kind(kind));
         }
-        for kind in ["agent.run", "memory.save", "context.load", "data.map"] {
+        for kind in ["memory.save", "context.history", "data.map"] {
             assert!(!marker_owned_effect_kind(kind), "{kind}");
+        }
+    }
+
+    #[test]
+    fn workflow_effect_free_kinds_are_exactly_the_reads_pure_waits_and_model_steps() {
+        let unknown = ["memory.save", "workflow.call", "flow.repeat"];
+        for kind in crate::application::workflow::registry::TYPES {
+            let effect_free = effect_free_kind(kind);
+            assert!(
+                !(effect_free && marker_owned_effect_kind(kind)),
+                "{kind} is in both sets"
+            );
+            assert_eq!(
+                retry_safe_without_marker(kind),
+                !unknown.contains(&kind),
+                "{kind}"
+            );
+        }
+        for kind in ["context.history", "ai.classify", "decision.agent"] {
+            assert!(effect_free_kind(kind), "{kind}");
         }
     }
 }

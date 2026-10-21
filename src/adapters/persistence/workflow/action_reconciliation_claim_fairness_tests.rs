@@ -44,7 +44,7 @@ async fn unique_child(f: &AdmissionFixture, parent: ActivationRequest) -> Activa
 
 async fn descendant_fixture() -> Descendant {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":2,"repetitions":2});
     let (fixture, root) = fixture_source(source).await;
     let parent = unique_child(&fixture, root).await;

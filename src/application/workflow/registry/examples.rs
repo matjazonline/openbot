@@ -72,13 +72,13 @@ fn values(name: &str) -> Value {
     let schema = json!({"type":"string","maxLength":128});
     let deadline = "2030-01-01T00:00:00Z";
     match name {
-        "context.load" => json!({"sources":["conversation"],"max_tokens":1000}),
+        "context.history" => json!({"max_tokens":1000}),
         "memory.load" => json!({"scope":{"kind":"company"},"query":"preferences","limit":10}),
         "memory.save" => {
             json!({"scope":{"kind":"agent","id":"assistant"},"facts":["Prefers concise replies"]})
         }
         "ai.classify" => {
-            json!({"context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})
+            json!({"agent":"assistant","context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})
         }
         "agent.run" => {
             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":schema})

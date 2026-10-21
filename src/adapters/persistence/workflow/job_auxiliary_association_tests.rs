@@ -46,7 +46,13 @@ async fn workflow_job_auxiliary_scoped_insert_update_matrix() {
             .execute(&mut *tx)
             .await
             .unwrap_err();
-            constraint(error, "legacy_auxiliary_task_queue_kind");
+            if table == "task_harness_runs" {
+                // 06-D4 native owner guard: harness owner fields never change, so re-pointing
+                // is refused before (and stronger than) the queue-kind check.
+                assert!(error.to_string().contains("immutable"), "{error}");
+            } else {
+                constraint(error, "legacy_auxiliary_task_queue_kind");
+            }
             sqlx::query("ROLLBACK TO SAVEPOINT auxiliary")
                 .execute(&mut *tx)
                 .await

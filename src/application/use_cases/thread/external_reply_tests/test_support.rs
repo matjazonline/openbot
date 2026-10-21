@@ -15,7 +15,6 @@ pub(super) async fn extra_channel(fx: &Fixture, name: &str, llm_url: &str) -> Ch
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
             system_prompt: Some("Answer the customer briefly.".into()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )

@@ -17,7 +17,7 @@ fn request(
 }
 async fn limited() -> (AdmissionFixture, ActivationRequest) {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":2,"repetitions":2});
     fixture_source(source).await
 }

@@ -41,7 +41,6 @@ fn compiled(provider: &str) -> CompiledRun {
         model: MODEL.into(),
         provider_base_url: None,
         skills: vec![],
-        granted_tools: vec!["echo".into()],
         sub_agents: SubAgentScope::Restricted(vec![]),
         harness_config: HarnessConfig::empty(HarnessKind::Rig),
         response_contract: None,
@@ -58,10 +57,7 @@ fn compiled(provider: &str) -> CompiledRun {
             clock: Arc::new(SystemClock),
             capabilities: Arc::new(Reader),
             token_budget: 1_048_576,
-            approvals: None,
-            mcp: None,
         },
-        None,
     )
     .unwrap()
 }

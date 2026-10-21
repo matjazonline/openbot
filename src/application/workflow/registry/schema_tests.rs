@@ -71,7 +71,7 @@ fn workflow_registry_metadata_matches_effect_families_and_never_claims_authoriza
     for (name, effect, recovery, shared) in [
         ("data.map", "pure", "recompute", false),
         (
-            "context.load",
+            "context.history",
             "bounded_read",
             "reuse_committed_result",
             false,

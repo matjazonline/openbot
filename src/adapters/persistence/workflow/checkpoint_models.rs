@@ -15,9 +15,12 @@ pub(super) async fn reserve_on(
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
     bound: &WriteBound,
 ) -> AppResult<End<Admission>> {
-    if !token_budget::prelock_reviewers(tx, write.fence.scope).await?
-        || !lock_owner(tx, write.fence, bound).await?
-    {
+    if !token_budget::prelock_reviewers(tx, write.fence.scope).await? {
+        return Ok(End::Rollback(Admission::OwnershipLost));
+    }
+    // Revocation linearizes against admission: checked under authority locks.
+    authorize_on(tx, write.fence).await?;
+    if !lock_owner(tx, write.fence, bound).await? {
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;

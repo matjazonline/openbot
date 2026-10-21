@@ -162,26 +162,23 @@ runtime privileges. This procedure describes the operator's reset; it is not a s
    the existing advisory lock; verify completion before allowing company setup. The fresh database
    must have the baseline applied before response-contract or MCP configuration is saved.
    Configure the existing encryption key ring and active version for company model and MCP secrets.
-3. Leave `DEFAULT_AGENT_HARNESS` unset to select Rig by default. Verify startup's resolved default
-   and successful registry construction. Startup checks local configuration and coverage, not
-   company credentials or remote models. Recreate a controlled company, its model connection and
-   enabled model, and an agent using the [tested request](rig.md#select-a-runtime).
+3. Every agent runs on Rig; there is no runtime selection. Verify successful registry
+   construction at startup. Startup checks local configuration and coverage, not company
+   credentials or remote models. Recreate a controlled company, its model connection and enabled
+   model, and an agent using the [tested request](rig.md#configure-an-agent).
 4. Keep access restricted to the pilot operators. Run the pilot below against controlled recipients,
    a captured delivery target and a controlled MCP endpoint. Capture release/model/task/run IDs and
    pass/fail evidence without secrets or candidate/schema contents in operational logs.
 5. Open ordinary ingress and configuration access only after the release gates and pilot pass on
    the deployed release. There is no dedicated Rig, response-contract or MCP admission feature flag:
-   use the coordinated access restriction above. The default-harness property does not disable
-   explicit runtime choices, contract writes or MCP settings.
+   use the coordinated access restriction above.
 
 | Pilot | Required evidence before opening access |
 | --- | --- |
-| Default selection | Omitted creation uses Rig when the property is absent; explicit selection survives changes to the property; the `ai_agents` override affects only omitted new selections |
-| Ordinary execution | Text completion and one safe native-tool result; usage and elapsed duration visible; controlled timeout terminates within budget |
-| Durable wait | Protected call or `request_approval` parks; restart the worker while parked, approve, and observe the saved batch resume without duplicate effect/delivery |
-| Skill | Attached skill loads through `read_resource`, uses an authorized tool, and retains its saved context/results across continuation |
+| Ordinary execution | Text completion; usage and elapsed duration visible; controlled timeout terminates within budget |
+| Skill | Attached skill loads through `read_resource` and its saved result survives continuation |
 | Structured response | Valid JSON; one/two repairs; exhausted repair terminal failure with no answer delivery; invalid review edit rejected; valid edit delivered as exact JSON without footer |
-| MCP | Save separate credentials, refresh/test, review grants, select connection; successful receipt; schema/revision change rejection; controlled disconnect produces an indeterminate effect without replay |
+| MCP | Save separate credentials, refresh/test and review grants; schema/revision change rejects stale grants. Agents no longer call MCP, and workflow MCP actions only run once phase 08 wires workflow execution, so remote-call receipt and disconnect evidence belong to that release's pilot |
 
 Use the deterministic scenarios in the [release verification matrix](rig-verification.md) for
 invalid outputs, timeout and disconnect cases; live model prompts alone cannot reliably force them.
@@ -192,7 +189,6 @@ Relevant deployment settings:
 
 | Setting | Behavior |
 | --- | --- |
-| `DEFAULT_AGENT_HARNESS` | Unset = `rig`; trimmed `rig` or `ai_agents` accepted; empty/invalid fails startup; saved selections take precedence |
 | `MCP_INTERNAL_ENDPOINTS` | Optional comma-separated exact IP-literal URL exceptions to public HTTPS; startup validates syntax, not endpoint readiness |
 | `AGENT_RUN_TIMEOUT_SECS` | Run fallback, default 300 seconds (1–3,600); Rig additionally caps each active claim at 300 seconds |
 | `TASK_WORKER_CONCURRENCY` | Default 4, range 1–64 per process |
@@ -210,6 +206,7 @@ harness/provider/model on representative workloads. Task details expose run/wait
 budgets, replay counts and indeterminate effects. Track structured validation outcomes,
 `repair_call_count`, `terminal_invalid_output_reason` and aggregate token usage (which includes
 repairs); there is no separate repair-only token total. Estimated/mixed usage is not a bill.
+System-prompt generation is not metered and does not appear in usage.
 Use safe diagnostics, not prompts, schemas, candidates or tool payloads, for alerts.
 
 - **Approval/outreach wait:** inspect the task's linked wait and use its normal decision flow.

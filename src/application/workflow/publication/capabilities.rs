@@ -1,17 +1,9 @@
-//! Frozen capability selection. Current policy is a separate execution check,
-//! never a source of replacement instructions or additional grants.
+//! Frozen agent capabilities (06-D5): exactly the agent's saved tools and skills, in
+//! saved order. Nothing at a step, classifier or skill can add or replace them. Current
+//! revocation is a separate execution-time check, never a source of new grants.
 use super::*;
 use crate::app_error::{AppError, AppResult};
-use crate::domain::workflow::{CapabilityCeiling, TypeName};
 use serde::Serialize;
-use std::collections::BTreeSet;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SelectionSource {
-    AgentDefaults,
-    Profile,
-}
 
 /// Constructed only from a validated publication. Serialized content is trace
 /// data, not a permission token; execution must recheck current authority.
@@ -19,8 +11,6 @@ pub enum SelectionSource {
 pub struct ResolvedAgent {
     company_id: CompanyId,
     agent: AgentSnapshot,
-    source: SelectionSource,
-    profile: Option<TypeName>,
     tools: Vec<ToolSnapshot>,
     skills: Vec<SkillSnapshot>,
 }
@@ -32,111 +22,28 @@ impl ResolvedAgent {
     pub fn agent(&self) -> &AgentSnapshot {
         &self.agent
     }
-    pub fn source(&self) -> SelectionSource {
-        self.source
-    }
-    pub fn profile(&self) -> Option<&TypeName> {
-        self.profile.as_ref()
-    }
     pub fn tools(&self) -> &[ToolSnapshot] {
         &self.tools
     }
     pub fn skills(&self) -> &[SkillSnapshot] {
         &self.skills
     }
-
-    /// Refuse revoked capabilities without changing frozen content or broadening
-    /// it with later grants. The caller must obtain these sets from current policy
-    /// for this exact company/agent; this pure check does not authorize dispatch.
-    pub fn validate_current(&self, allowed: &CapabilityCeiling) -> AppResult<()> {
-        if self
-            .agent
-            .tools
-            .iter()
-            .any(|tool| !allowed.tools.contains(tool))
-            || self
-                .agent
-                .skills
-                .iter()
-                .any(|skill| !allowed.skills.contains(skill))
-        {
-            return Err(AppError::Conflict(
-                "Selected agent capability was revoked".into(),
-            ));
-        }
-        Ok(())
+    /// The same frozen agent with no tools or skills, for tool-free model steps
+    /// (`ai.classify`, `decision.agent`; 06-D6 C/D). Narrowing only: the prepared document
+    /// then records no capability, so current authority checks only agent and model.
+    pub fn model_only(mut self) -> Self {
+        self.agent.tools.clear();
+        self.agent.skills.clear();
+        self.tools.clear();
+        self.skills.clear();
+        self
     }
-}
-
-pub(super) struct SelectedProfile {
-    pub name: Option<TypeName>,
-    pub tools: Vec<TypeName>,
-    pub skills: Vec<TypeName>,
-}
-
-pub(super) fn profile(
-    value: &Value,
-    snapshots: &DependencySnapshots,
-) -> Result<SelectedProfile, String> {
-    if let Some(name) = value.as_str() {
-        let name =
-            TypeName::parse(name).map_err(|_| "Invalid capability profile name".to_owned())?;
-        let selected = snapshots
-            .profiles
-            .iter()
-            .find(|p| p.name == name)
-            .ok_or_else(|| format!("Unknown capability profile {name}"))?;
-        return Ok(SelectedProfile {
-            name: Some(selected.name.clone()),
-            tools: selected.tools.clone(),
-            skills: selected.skills.clone(),
-        });
-    }
-    let object = value
-        .as_object()
-        .ok_or_else(|| "Capability profile must be a name or object".to_owned())?;
-    if object.len() != 2 || !object.contains_key("tools") || !object.contains_key("skills") {
-        return Err("Capability profile must declare exactly tools and skills".into());
-    }
-    Ok(SelectedProfile {
-        name: None,
-        tools: names(&object["tools"], "tools")?,
-        skills: names(&object["skills"], "skills")?,
-    })
-}
-
-fn names(value: &Value, field: &str) -> Result<Vec<TypeName>, String> {
-    let values = value
-        .as_array()
-        .ok_or_else(|| format!("Profile {field} must be an array"))?;
-    if values.len() > registry::MAX_SELECTIONS {
-        return Err(format!("Profile {field} exceeds the selection limit"));
-    }
-    let mut seen = BTreeSet::new();
-    values
-        .iter()
-        .map(|value| {
-            let name = value
-                .as_str()
-                .and_then(|s| TypeName::parse(s).ok())
-                .ok_or_else(|| format!("Profile {field} contains an invalid dependency name"))?;
-            if !seen.insert(name.clone()) {
-                return Err(format!("Profile {field} contains duplicate {name}"));
-            }
-            Ok(name)
-        })
-        .collect()
 }
 
 impl PublishedBundle {
-    /// Absent profile inherits saved defaults. A present value, including null,
-    /// is always treated as an explicit selection and never falls back.
-    pub fn resolve_agent(
-        &self,
-        company: CompanyId,
-        key: &AgentKey,
-        selected_profile: Option<&Value>,
-    ) -> AppResult<ResolvedAgent> {
+    /// The frozen agent with exactly its saved tools and skills. Publication already
+    /// validated every reference and each skill's required tools against these tools.
+    pub fn resolve_agent(&self, company: CompanyId, key: &AgentKey) -> AppResult<ResolvedAgent> {
         if company != self.company_id {
             return Err(AppError::NotFound("Agent bundle".into()));
         }
@@ -146,81 +53,79 @@ impl PublishedBundle {
             .iter()
             .find(|agent| &agent.key == key)
             .ok_or_else(|| AppError::BadRequest("Agent is absent from the frozen bundle".into()))?;
-        let (source, mut selected) = match selected_profile {
-            None => (
-                SelectionSource::AgentDefaults,
-                SelectedProfile {
-                    name: None,
-                    tools: saved.tools.clone(),
-                    skills: saved.skills.clone(),
-                },
-            ),
-            Some(value) => (
-                SelectionSource::Profile,
-                profile(value, &self.snapshots).map_err(AppError::BadRequest)?,
-            ),
-        };
-        // Validate references before filtering so unknown names never silently disappear.
-        validation::check_selection(&selected.tools, &selected.skills, &self.snapshots)
+        validation::check_selection(&saved.tools, &saved.skills, &self.snapshots)
             .map_err(AppError::BadRequest)?;
-        let ceiling = self
-            .compiled
-            .graph()
-            .definition()
-            .capability_ceiling
-            .as_ref();
-        selected.tools.retain(|name| {
-            saved.tools.contains(name) && ceiling.is_none_or(|c| c.tools.contains(name))
-        });
-        selected.skills.retain(|name| {
-            saved.skills.contains(name) && ceiling.is_none_or(|c| c.skills.contains(name))
-        });
-        validation::check_selection(&selected.tools, &selected.skills, &self.snapshots)
-            .map_err(AppError::BadRequest)?;
-        Ok(capture(company, saved, source, selected, &self.snapshots))
+        let tools = saved
+            .tools
+            .iter()
+            .map(|name| {
+                self.snapshots
+                    .tools
+                    .iter()
+                    .find(|tool| &tool.contract.name == name)
+                    .cloned()
+                    .ok_or_else(|| AppError::BadRequest("Agent tool is not frozen".into()))
+            })
+            .collect::<AppResult<_>>()?;
+        let skills = saved
+            .skills
+            .iter()
+            .map(|name| {
+                self.snapshots
+                    .skills
+                    .iter()
+                    .find(|skill| &skill.name == name)
+                    .cloned()
+                    .ok_or_else(|| AppError::BadRequest("Agent skill is not frozen".into()))
+            })
+            .collect::<AppResult<_>>()?;
+        Ok(ResolvedAgent {
+            company_id: company,
+            agent: saved.clone(),
+            tools,
+            skills,
+        })
     }
 }
 
-fn capture(
-    company: CompanyId,
-    saved: &AgentSnapshot,
-    source: SelectionSource,
-    selected: SelectedProfile,
-    snapshots: &DependencySnapshots,
-) -> ResolvedAgent {
-    let tools = selected
-        .tools
-        .iter()
-        .map(|name| {
-            snapshots
-                .tools
-                .iter()
-                .find(|t| &t.contract.name == name)
-                .expect("validated unique tool")
-                .clone()
-        })
-        .collect();
-    let skills = selected
-        .skills
-        .iter()
-        .map(|name| {
-            snapshots
-                .skills
-                .iter()
-                .find(|s| &s.name == name)
-                .expect("validated skill")
-                .clone()
-        })
-        .collect();
-    let mut agent = saved.clone();
-    agent.tools = selected.tools;
-    agent.skills = selected.skills;
-    ResolvedAgent {
-        company_id: company,
-        agent,
-        source,
-        profile: selected.name,
-        tools,
-        skills,
+/// The finite set of agent keys a draft's `agent.run`/`decision.agent` steps can select
+/// (06-D5): a literal key, or a `/params/<name>` reference whose declared parameter schema
+/// is a finite string enum. Any other selector is refused, so capture never guesses.
+pub fn agent_universe(decoded: &compiler::DecodedSource) -> Result<Vec<AgentKey>, String> {
+    let parsed = compiler::parse_workflow(decoded, VersionId::new(uuid::Uuid::nil()))
+        .map_err(|diagnostic| diagnostic.message.into_string())?;
+    let definition = &parsed.definition;
+    let mut keys = std::collections::BTreeSet::new();
+    for (id, step) in &definition.steps {
+        if crate::application::workflow::registry::ModelStep::of(step.step_type.as_str()).is_none()
+        {
+            continue;
+        }
+        let refused =
+            || format!("Step {id}: dynamic agent selection requires a finite set of agent keys");
+        match step.inputs.get("agent") {
+            Some(crate::domain::workflow::Binding::Literal(Value::String(key))) => {
+                keys.insert(key.clone());
+            }
+            Some(crate::domain::workflow::Binding::Reference(reference))
+                if reference.root_name() == "params" && reference.tail().len() == 1 =>
+            {
+                let options = definition
+                    .parameter_schema
+                    .as_ref()
+                    .and_then(|schema| {
+                        schema["properties"][&reference.tail()[0]]["enum"].as_array()
+                    })
+                    .filter(|options| !options.is_empty())
+                    .ok_or_else(refused)?;
+                for option in options {
+                    keys.insert(option.as_str().ok_or_else(refused)?.to_owned());
+                }
+            }
+            _ => return Err(refused()),
+        }
     }
+    keys.into_iter()
+        .map(|key| AgentKey::parse(&key).ok_or_else(|| format!("Invalid agent key {key}")))
+        .collect()
 }

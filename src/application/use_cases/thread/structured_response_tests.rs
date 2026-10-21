@@ -1,12 +1,9 @@
 //! Structured answers through production PostgreSQL dispatch and frozen email publication.
 use super::*;
 use crate::adapters::persistence::test_support::own_database;
-use crate::{
-    entities::harness::HarnessKind,
-    services::{
-        harness::runs::RunCheckpoint,
-        test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario},
-    },
+use crate::services::{
+    harness::runs::RunCheckpoint,
+    test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario},
 };
 use serde_json::{Value, json};
 
@@ -35,7 +32,7 @@ async fn structured_dispatch_preserves_json_and_exhaustion_has_no_publication() 
         };
         let count = answers.len();
         let llm = structured_scenario(answers).await;
-        let fx = fixture_for_harness(pool.clone(), Some(&llm.base_url), HarnessKind::Rig).await;
+        let fx = fixture(pool.clone(), Some(&llm.base_url)).await;
         configure(&fx).await;
         let ingest = fx
             .threads
@@ -145,7 +142,7 @@ async fn structured_review_rejects_invalid_edits_and_serializes_edit_against_app
         ScriptedResponse::turn(LlmTurn::text(r#"{"status":"done"}"#), 1),
     )])
     .await;
-    let fx = fixture_for_harness(pool.clone(), Some(&llm.base_url), HarnessKind::Rig).await;
+    let fx = fixture(pool.clone(), Some(&llm.base_url)).await;
     configure(&fx).await;
     fx.persistence
         .set_company_review_policy(fx.company.id, ExternalResponseReview::ReviewAllExternal)
@@ -288,10 +285,8 @@ async fn structured_scheduled_dispatch_delivers_the_validated_json_body() {
         ScriptedResponse::turn(LlmTurn::text(r#"{"status":"done"}"#), 1),
     )])
     .await;
-    let fx = fixture_for_harness(pool.clone(), Some(&llm.base_url), HarnessKind::Rig).await;
+    let fx = fixture(pool.clone(), Some(&llm.base_url)).await;
     configure(&fx).await;
-    sqlx::query("UPDATE agents SET granted_tool_ids='{}' WHERE id IN (SELECT agent_id FROM channel_agents WHERE channel_id=$1)")
-        .bind(fx.channel_a.id).execute(&pool).await.unwrap();
     let ingest = fx
         .threads
         .ingest_test_email(inbound(

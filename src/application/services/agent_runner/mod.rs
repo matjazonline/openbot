@@ -1,8 +1,8 @@
 //! Everything around one agent turn that is ours whichever runtime executes it.
 //!
-//! The runner composes the prompt, runs the spam guardrail, assembles the ports a harness may
-//! reach back through -- approvals, our native tools, tracing -- resolves the harness the agent's
-//! capability spec asks for, and records what the run cost. It does not know what a `tools:` list
+//! The runner composes the prompt, assembles the ports a harness may reach back through --
+//! approvals, our native tools, tracing -- resolves the harness the agent's capability spec asks
+//! for, and records what the run cost. It does not know what a `tools:` list
 //! looks like, how a skill becomes steps, or which crate answers `chat`. That is the harness's,
 //! behind [`AgentHarness`].
 //!
@@ -24,34 +24,16 @@ use uuid::Uuid;
 use crate::app_error::{AppError, AppResult};
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::approval::ApprovalSubject;
-use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::internal_note::AgentInstructionNote;
 use crate::entities::message_view::AgentHistoryMessage;
 use crate::entities::task::TokenUsage;
-use crate::infra::config::AppConfig;
-use crate::services::agent_channel_tool::{
-    AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
-};
-use crate::services::agent_directory_tool::{AgentDirectoryContext, ListCompanyAgentsTool};
 use crate::services::agent_trace_hooks::{AgentTraceContext, AgentTraceHooks};
 use crate::services::harness::{
-    AgentApprovalHandler, AgentExecutionOutput, AgentHarness, AgentRun, HarnessApprovals,
-    HarnessRegistry, HarnessToolHost, HarnessTrace, InternalDelegationPolicy, TextClassifier,
-    sanitize_text,
+    AgentExecutionOutput, AgentHarness, AgentRun, HarnessRegistry, HarnessTrace, sanitize_text,
 };
-use crate::services::llm_guardrail::GuardrailCheck;
-use crate::services::native_tools::NativeToolHost;
-use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
 use crate::services::prompt_fence::UntrustedFence;
-use crate::services::task_ownership_tool::{TaskOwnershipTool, TaskOwnershipToolContext};
-use crate::task_queue::TaskPersistence;
-use crate::transport::DeliveryComposer;
-use crate::use_cases::approval::ApprovalUseCases;
-use crate::use_cases::{
-    agent::AgentPersistence, channel::ChannelPersistence, integration::ChannelBindingPersistence,
-    thread::RecipientRole,
-};
+use crate::use_cases::thread::RecipientRole;
 
 use prompt::PromptParts;
 
@@ -64,34 +46,19 @@ pub struct AgentRunner<'a> {
     history: &'a [AgentHistoryMessage],
     internal_notes: &'a [AgentInstructionNote],
     params: &'a ResolvedAgentCapabilities,
-    approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalSubject>,
     monitoring: Option<Arc<dyn MonitoringService>>,
-    app_config: Option<Arc<AppConfig>>,
-    company: Option<Company>,
     company_id: Option<Uuid>,
     channel_id: Option<Uuid>,
     agent_id: Option<Uuid>,
-    skip_spam_guardrail: bool,
     recipient_role: Option<RecipientRole>,
     upstream_pipeline_context: Option<String>,
-    task_persistence: Option<Arc<dyn TaskPersistence>>,
-    channel_persistence: Option<Arc<dyn ChannelPersistence>>,
-    agent_persistence: Option<Arc<dyn AgentPersistence>>,
-    binding_persistence: Option<Arc<dyn ChannelBindingPersistence>>,
-    /// Freezes what an outreach question will be mailed as. Set with the outreach tool, because
-    /// the two are the same capability: an agent that may ask a third party a question is an agent
-    /// that may queue mail.
-    delivery_composer: Option<DeliveryComposer>,
-    outreach_context: Option<OutreachToolContext>,
-    agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
     /// Set when the run belongs to a durable chain, which is every run driven by a task. Absent
     /// only for a direct, task-less ingest, whose actions have nothing to be correlated with.
     trace: Option<AgentTraceContext>,
     /// The harnesses this deployment can run. Absent means no agent can execute at all, which is
     /// a wiring fault and is reported as one rather than quietly falling back to a default.
     harnesses: Option<Arc<HarnessRegistry>>,
-    classifier: Option<Arc<dyn TextClassifier>>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -104,38 +71,16 @@ impl<'a> AgentRunner<'a> {
             history: &[],
             internal_notes: &[],
             params,
-            approval_use_cases: None,
             approval_context: None,
             monitoring: None,
-            app_config: None,
-            company: None,
             company_id: None,
             channel_id: None,
             agent_id: None,
-            skip_spam_guardrail: false,
             recipient_role: None,
             upstream_pipeline_context: None,
-            task_persistence: None,
-            channel_persistence: None,
-            delivery_composer: None,
-            agent_persistence: None,
-            binding_persistence: None,
-            outreach_context: None,
-            agent_channel_tool: None,
             trace: None,
             harnesses: None,
-            classifier: None,
         }
-    }
-
-    pub fn config(mut self, config: Option<Arc<AppConfig>>) -> Self {
-        self.app_config = config;
-        self
-    }
-
-    pub fn company(mut self, company: Option<Company>) -> Self {
-        self.company = company;
-        self
     }
 
     pub fn history(mut self, history: &'a [AgentHistoryMessage]) -> Self {
@@ -158,11 +103,6 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub fn approval_use_cases(mut self, use_cases: Option<Arc<ApprovalUseCases>>) -> Self {
-        self.approval_use_cases = use_cases;
-        self
-    }
-
     pub fn approval_context(mut self, ctx: Option<ApprovalSubject>) -> Self {
         self.approval_context = ctx;
         self
@@ -173,18 +113,10 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    /// Which runtimes this deployment can execute an agent on, and what answers the spam
-    /// guardrail's one-shot classification.
-    ///
-    /// Both arrive together because both are deployment facts rather than per-run choices, and a
-    /// run that has one and not the other is a half-wired deployment worth failing on.
-    pub fn harnesses(
-        mut self,
-        harnesses: Arc<HarnessRegistry>,
-        classifier: Arc<dyn TextClassifier>,
-    ) -> Self {
+    /// Which runtimes this deployment can execute an agent on -- a deployment fact rather than a
+    /// per-run choice.
+    pub fn harnesses(mut self, harnesses: Arc<HarnessRegistry>) -> Self {
         self.harnesses = Some(harnesses);
-        self.classifier = Some(classifier);
         self
     }
 
@@ -197,11 +129,6 @@ impl<'a> AgentRunner<'a> {
         self.company_id = company_id;
         self.channel_id = channel_id;
         self.agent_id = agent_id;
-        self
-    }
-
-    pub fn skip_spam_guardrail(mut self, skip: bool) -> Self {
-        self.skip_spam_guardrail = skip;
         self
     }
 
@@ -228,46 +155,6 @@ impl<'a> AgentRunner<'a> {
             channel_id: self.channel_id,
             agent_id: self.agent_id,
         });
-        self
-    }
-
-    pub fn outreach_tool(
-        mut self,
-        persistence: Arc<dyn TaskPersistence>,
-        channel_persistence: Arc<dyn ChannelPersistence>,
-        deliveries: DeliveryComposer,
-        context: OutreachToolContext,
-    ) -> Self {
-        self.task_persistence = Some(persistence);
-        self.channel_persistence = Some(channel_persistence);
-        self.delivery_composer = Some(deliveries);
-        self.outreach_context = Some(context);
-        self
-    }
-
-    /// Let the agent discover which sibling channels it may call.
-    ///
-    /// Separate from [`AgentRunner::outreach_tool`] because the directory is a read, not a send:
-    /// an agent can be given the address book without being given the ability to write to it.
-    ///
-    /// The bindings come along because a directory entry says which interfaces a channel is
-    /// reachable on -- display data an agent can mention, never the routing key it delegates by.
-    pub fn agent_directory(
-        mut self,
-        agent_persistence: Arc<dyn AgentPersistence>,
-        binding_persistence: Arc<dyn ChannelBindingPersistence>,
-    ) -> Self {
-        self.agent_persistence = Some(agent_persistence);
-        self.binding_persistence = Some(binding_persistence);
-        self
-    }
-
-    pub fn agent_channel_tool(
-        mut self,
-        persistence: Arc<dyn AgentChannelProvisioning>,
-        context: AgentChannelToolContext,
-    ) -> Self {
-        self.agent_channel_tool = Some((persistence, context));
         self
     }
 
@@ -305,24 +192,6 @@ impl<'a> AgentRunner<'a> {
         .compose(&fence);
         let key = self.params.api_key();
 
-        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
-        if !self.skip_spam_guardrail
-            && let Some(ref cfg) = self.app_config
-        {
-            GuardrailCheck {
-                config: cfg,
-                company: self.company.as_ref(),
-                monitoring: self.monitoring.as_ref(),
-                classifier: self.classifier.as_ref(),
-                prompt_text: &raw_full_prompt,
-                provider: self.params.provider(),
-                model: self.params.model(),
-                api_key: key,
-            }
-            .evaluate()
-            .await?;
-        }
-
         let harness = self.resolve_harness()?;
         let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
         info!("Full prompt context length: {}", full_prompt.len());
@@ -354,8 +223,6 @@ impl<'a> AgentRunner<'a> {
             full_prompt: &full_prompt,
             history_message_count,
             recipient_role: self.recipient_role,
-            approvals: self.approvals(),
-            tool_host: self.tool_host(),
             trace: self.tracer(),
         };
 
@@ -405,110 +272,6 @@ impl<'a> AgentRunner<'a> {
             .require(kind)
             .map(Arc::clone)
             .map_err(|error| AppError::BadRequest(error.to_string()))
-    }
-
-    /// Who decides the actions this run must not take on its own.
-    ///
-    /// `None` when the run has no approval subject: nothing about it can be approved, which is
-    /// also the reason nothing about it may be auto-approved.
-    fn approvals(&self) -> Option<Arc<dyn HarnessApprovals>> {
-        let (use_cases, context) = self
-            .approval_use_cases
-            .clone()
-            .zip(self.approval_context.clone())?;
-        // Only an outreach-capable run can delegate, so only one can be exempted from asking.
-        let delegation = self
-            .outreach_context
-            .as_ref()
-            .zip(self.channel_persistence.as_ref())
-            .map(|(context, channels)| InternalDelegationPolicy {
-                channel_persistence: channels.clone(),
-                company_id: context.company_id,
-                source_channel_id: context.channel_id,
-                sub_agent_scope: self.params.spec().sub_agents.clone(),
-                // Approval authority is server-owned; persisted agent policy cannot weaken it.
-                requires_approval: true,
-            });
-        Some(Arc::new(AgentApprovalHandler {
-            approval_use_cases: use_cases,
-            context,
-            delegation,
-        }))
-    }
-
-    /// Our own tools, assembled from the contexts this run was actually given.
-    ///
-    /// Registration is not a grant: what this returns is what the run *could* serve, and the
-    /// harness intersects it with the capability spec's grant list.
-    fn tool_host(&self) -> Option<Arc<dyn HarnessToolHost>> {
-        let mut host = NativeToolHost::new();
-
-        // All four or none: `AgentRunner::outreach_tool` sets them together, and a partial set
-        // would be a caller that built half a capability.
-        if let (
-            Some(task_persistence),
-            Some(channel_persistence),
-            Some(deliveries),
-            Some(context),
-        ) = (
-            self.task_persistence.clone(),
-            self.channel_persistence.clone(),
-            self.delivery_composer.clone(),
-            self.outreach_context.clone(),
-        ) {
-            if let Some((agent_persistence, binding_persistence)) = self
-                .agent_persistence
-                .clone()
-                .zip(self.binding_persistence.clone())
-            {
-                let mut directory = ListCompanyAgentsTool::new(
-                    channel_persistence.clone(),
-                    agent_persistence,
-                    binding_persistence,
-                    AgentDirectoryContext {
-                        company_id: context.company_id,
-                        source_channel_id: context.channel_id,
-                        sub_agent_scope: self.params.spec().sub_agents.clone(),
-                    },
-                );
-                directory =
-                    directory.with_policy(self.params.native_tool_policy().directory.clone());
-                host = host.with_directory(directory);
-            }
-
-            let mut context = context;
-            context.sub_agent_scope = self.params.spec().sub_agents.clone();
-            host = host.with_task_ownership(TaskOwnershipTool::new(
-                task_persistence.clone(),
-                TaskOwnershipToolContext {
-                    company_id: context.company_id,
-                    channel_id: context.channel_id,
-                    lease: context.lease,
-                },
-            ));
-            let mut outreach = OutreachAndAwaitQuorumTool::new(
-                task_persistence,
-                channel_persistence,
-                deliveries,
-                context,
-            );
-            outreach = outreach.with_policy(self.params.native_tool_policy().outreach.clone());
-            host = host.with_outreach(outreach);
-        }
-
-        if let Some((persistence, context)) = self.agent_channel_tool.clone() {
-            host = host.with_agent_channels(
-                CreateAgentChannelTool::new(persistence, context).with_default_agent_harness(
-                    self.app_config
-                        .as_ref()
-                        .map_or_else(crate::entities::harness::HarnessKind::default, |config| {
-                            config.default_agent_harness
-                        }),
-                ),
-            );
-        }
-
-        (!host.is_empty()).then(|| Arc::new(host) as Arc<dyn HarnessToolHost>)
     }
 
     /// One hook object sees every tool the run reaches for, including the runtime's built-ins and

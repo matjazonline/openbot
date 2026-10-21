@@ -96,7 +96,6 @@ pub(crate) enum Mutation {
     InvalidOutput,
     Execution(ExecutionReservation),
     BindTools(String),
-    BeginRemote(InvocationId, SavedMcpInvocation),
     Reserve(ModelReservation),
     Model(SavedModelTurn),
     Prepare(InvocationId),
@@ -483,7 +482,6 @@ impl RunCheckpoint {
                 }
             }
             Mutation::BindTools(fingerprint) => next.bind_tools(fingerprint)?,
-            Mutation::BeginRemote(id, identity) => next.begin_remote(id, identity)?,
             Mutation::Reserve(value) => next.reserve(value)?,
             Mutation::Model(value) => next.commit_turn(value)?,
             Mutation::Prepare(id) => next.prepare(id)?,
@@ -684,7 +682,6 @@ impl RunCheckpoint {
             ordinal: ordinal as u16,
             state: InvocationState::Prepared,
             result: None,
-            mcp: None,
         });
         Ok(true)
     }
@@ -823,8 +820,8 @@ impl RunCheckpoint {
                     && inv.state == InvocationState::Waiting
             })
             .ok_or_else(|| invalid("Missing waiting invocation"))?;
-        let checkpoint = invocation.call.tool_id.as_str()
-            == crate::entities::tool_catalogue::REQUEST_APPROVAL_TOOL_ID;
+        // Saved runs from before 06C may still wait on a `request_approval` checkpoint.
+        let checkpoint = invocation.call.tool_id.as_str() == "request_approval";
         invocation.state = if approved {
             InvocationState::Ready
         } else {
@@ -962,27 +959,6 @@ impl RunCheckpoint {
             return Err(invalid("Cannot change tools after model work begins"));
         }
         self.tool_catalogue_fingerprint = Some(fingerprint);
-        Ok(true)
-    }
-
-    fn begin_remote(&mut self, id: InvocationId, identity: SavedMcpInvocation) -> AppResult<bool> {
-        self.require_active()?;
-        let invocation = self
-            .invocations
-            .iter_mut()
-            .find(|inv| inv.call.invocation_id == id)
-            .ok_or_else(|| invalid("Remote invocation is not prepared"))?;
-        if invocation.state == InvocationState::Indeterminate {
-            return Err(AppError::Execution(
-                crate::app_error::ExecutionFailure::IndeterminateEffect,
-            ));
-        }
-        if invocation.state != InvocationState::Prepared || invocation.mcp.is_some() {
-            return Err(invalid("Remote invocation is not dispatchable"));
-        }
-        invocation.mcp = Some(identity);
-        // Mark uncertainty before crossing the remote boundary. A crash cannot authorize replay.
-        invocation.state = InvocationState::Indeterminate;
         Ok(true)
     }
 }

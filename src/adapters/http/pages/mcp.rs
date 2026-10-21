@@ -1,6 +1,6 @@
 //! MCP settings share the UI shell and use native POST forms as well as the JSON API.
 use super::{escape_html_attr as esc, escape_html_text};
-use crate::{entities::mcp::*, use_cases::mcp::McpSelectingAgent};
+use crate::entities::mcp::*;
 use uuid::Uuid;
 
 #[derive(Clone, Default, serde::Deserialize)]
@@ -54,15 +54,9 @@ pub fn catalog(
         definition_form(company, None, draft)
     )
 }
-pub fn detail(
-    company: Uuid,
-    connection: &CompanyMcpConnection,
-    agents: &[McpSelectingAgent],
-    draft: &DefinitionDraft,
-) -> String {
+pub fn detail(company: Uuid, connection: &CompanyMcpConnection, draft: &DefinitionDraft) -> String {
     let id = connection.id;
     let revision = connection.revision;
-    let used = agents.iter().map(|a| format!("<li><a class=\"link\" href=\"/ui/agents?company_id={company}&amp;agent_id={}\">{}</a></li>",a.id,escape_html_text(&a.name))).collect::<String>();
     let fields = definition_form(company, Some(connection), draft);
     let credentials = if connection.auth == McpAuth::Bearer {
         format!(
@@ -78,7 +72,7 @@ pub fn detail(
         String::new()
     };
     format!(
-        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Changes apply to every selecting agent. Endpoint changes clear the token and discovery.</p><h2 class="text-xl">Selected by</h2><ul>{used}</ul>{fields}{credentials}<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{refresh}</form><p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
+        r#"<a class="link" href="/ui/companies/{company}/mcp-connections">All MCP servers</a><p>Endpoint changes clear the token and discovery.</p>{fields}{credentials}<form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/refresh"><input type="hidden" name="expected_revision" value="{revision}">{refresh}</form><p>Refresh removes grants for missing or changed schemas. Review tools before granting them again.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" action="/ui/companies/{company}/mcp-connections/{id}/delete"><input type="hidden" name="expected_revision" value="{revision}">{delete}</form>"#,
         refresh = button("Test connection / Refresh tools"),
         delete = button("Delete server")
     )
@@ -118,50 +112,6 @@ fn button(label: &str) -> String {
         "<button type=\"submit\" class=\"btn btn-primary\"><span data-label>{label}</span></button>"
     )
 }
-pub fn selection(
-    company: Uuid,
-    selection: &AgentMcpSelection,
-    connections: &[CompanyMcpConnection],
-    draft: Option<&[Uuid]>,
-) -> String {
-    let selected = draft.unwrap_or(&selection.connection_ids);
-    let mut options = connections
-        .iter()
-        .map(|c| {
-            format!(
-                "<option value=\"{}\"{}{}>{} {}</option>",
-                c.id,
-                if selected.contains(&c.id) {
-                    " selected"
-                } else {
-                    ""
-                },
-                if !c.enabled && !selection.connection_ids.contains(&c.id) {
-                    " disabled"
-                } else {
-                    ""
-                },
-                escape_html_text(&c.slug),
-                if c.enabled { "" } else { "(unavailable)" }
-            )
-        })
-        .collect::<String>();
-    for id in selected
-        .iter()
-        .filter(|id| !connections.iter().any(|c| &c.id == *id))
-    {
-        options.push_str(&format!(
-            "<option selected value=\"{id}\">Deleted server ({id}) — remove this selection</option>"
-        ));
-    }
-    format!(
-        r#"<a class="link" href="/ui/agents?company_id={company}&amp;agent_id={agent}">Agent settings</a><p>Select up to eight company MCP servers. Enabled grants require Rig. Disabled selections remain visible so you can remove them.</p><form data-submit="busy-once" data-pending-label="Working…" method="post" class="space-y-3"><input type="hidden" name="expected_revision" value="{revision}"><select class="select w-full h-64" name="mcp_connection_ids" multiple aria-label="MCP servers">{options}</select>{button}</form>"#,
-        agent = selection.agent_id,
-        revision = selection.revision,
-        button = button("Save selections")
-    )
-}
-
 #[cfg(test)]
 #[path = "mcp_tests.rs"]
 mod tests;

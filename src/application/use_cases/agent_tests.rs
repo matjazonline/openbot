@@ -15,7 +15,6 @@ fn personal_channel_derivation_copies_defaults_and_safely_removes_public() {
         name: "Helper".into(),
         slug: "helper".into(),
         description: Some("Helps".into()),
-        harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
         ..Default::default()
     };
     let defaults = CompanyChannelDefaults {
@@ -52,7 +51,6 @@ fn agent_timeout_is_optional_bounded_and_overrides_the_global_default() {
     let mut inherited = AgentWrite {
         name: "Inherited".into(),
         slug: "inherited".into(),
-        harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
         ..Default::default()
     };
     inherited.normalize().unwrap();
@@ -61,7 +59,6 @@ fn agent_timeout_is_optional_bounded_and_overrides_the_global_default() {
         name: "Invalid".into(),
         slug: "invalid".into(),
         run_timeout_secs: Some(MAX_AGENT_RUN_TIMEOUT_SECS + 1),
-        harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
         ..Default::default()
     };
     assert!(invalid.normalize().is_err());
@@ -81,9 +78,6 @@ fn agent_timeout_is_optional_bounded_and_overrides_the_global_default() {
         run_timeout_secs: Some(45),
         system_prompt: None,
         description: None,
-        harness_kind: HarnessKind::default(),
-        granted_tool_ids: Vec::new(),
-        native_tool_policy: NativeToolPolicy::default(),
         config_json: None,
         avatar_url: None,
         created_by: crate::entities::creation::CreationProvenance::system(),
@@ -109,7 +103,6 @@ fn agent_config_accepts_only_reviewed_settings_and_rejects_authority_paths() {
             name: "Configured".into(),
             slug: "configured".into(),
             config_json: Some(config),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         };
         assert!(write.normalize().is_err());
@@ -118,13 +111,7 @@ fn agent_config_accepts_only_reviewed_settings_and_rejects_authority_paths() {
     let mut allowed = AgentWrite {
         name: "Configured".into(),
         slug: "configured".into(),
-        config_json: Some(json!({
-            "version": 1,
-            "reasoning": {"mode": "react", "max_iterations": 4},
-            "reflection": {"enabled": "auto", "max_retries": 2},
-            "disambiguation": {"enabled": true}
-        })),
-        harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
+        config_json: Some(json!({"version": 1, "max_turns": 4})),
         ..Default::default()
     };
     allowed.normalize().unwrap();
@@ -268,9 +255,6 @@ impl AgentPersistence for MockAgentPersistence {
             run_timeout_secs: write.run_timeout_secs,
             system_prompt: write.system_prompt,
             description: write.description,
-            harness_kind: write.harness_kind.expect("use case resolves harness"),
-            granted_tool_ids: write.granted_tool_ids,
-            native_tool_policy: write.native_tool_policy,
             config_json: write.config_json,
             memory_enabled: write.memory_enabled,
             avatar_url: write.avatar_url,
@@ -349,7 +333,6 @@ impl AgentPersistence for MockAgentPersistence {
             .find(|a| a.id == id)
             .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-        agent.harness_kind = write.harness_kind.unwrap_or(agent.harness_kind);
         agent.name = write.name;
         agent.slug = write.slug;
         agent.provider = write.provider;
@@ -453,7 +436,6 @@ fn fixture(defaults: CompanyChannelDefaults, spam_scanning: SpamScanning) -> Fix
             user_id: owner_id,
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -479,7 +461,6 @@ fn support_agent() -> AgentWrite {
     AgentWrite {
         name: "Support Triage".into(),
         slug: "support-triage".into(),
-        harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
         ..Default::default()
     }
 }
@@ -632,7 +613,6 @@ async fn validating_a_new_agent_normalizes_the_handle_and_refuses_an_unavailable
             AgentWrite {
                 name: "  Support Triage  ".into(),
                 slug: "Support Triage".into(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -672,7 +652,6 @@ async fn company_owner_agent_crud_flow_works() {
             user_id: owner_id,
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -698,7 +677,6 @@ async fn company_owner_agent_crud_flow_works() {
             AgentWrite {
                 name: "Quiet Bot".to_string(),
                 slug: "quiet".to_string(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -706,10 +684,7 @@ async fn company_owner_agent_crud_flow_works() {
     assert!(invalid_res.is_err());
 
     // 1. Owner creates agent with config_json
-    let config = json!({
-        "version": 1,
-        "reasoning": {"mode": "auto", "max_iterations": 5}
-    });
+    let config = json!({"version": 1, "max_turns": 5});
 
     let agent = use_cases
         .create_agent(
@@ -722,7 +697,6 @@ async fn company_owner_agent_crud_flow_works() {
                 model: Some("gpt-4o".to_string()),
                 system_prompt: Some("Prompt".to_string()),
                 config_json: Some(config.clone()),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -745,7 +719,6 @@ async fn company_owner_agent_crud_flow_works() {
             AgentWrite {
                 name: "Hacker Bot".to_string(),
                 slug: "hacker-bot".to_string(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -760,10 +733,7 @@ async fn company_owner_agent_crud_flow_works() {
     assert_eq!(list.len(), 1);
 
     // 4. Update agent
-    let updated_config = json!({
-        "version": 1,
-        "reflection": {"enabled": "enabled", "max_retries": 1}
-    });
+    let updated_config = json!({"version": 1, "max_turns": 2});
     let invalid_model = use_cases
         .update_agent(
             owner_id,
@@ -774,7 +744,6 @@ async fn company_owner_agent_crud_flow_works() {
                 slug: "updated-bot".to_string(),
                 provider: Some("anthropic".to_string()),
                 model: Some("claude-3-5-sonnet".to_string()),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -792,7 +761,6 @@ async fn company_owner_agent_crud_flow_works() {
                 provider: Some("openai".to_string()),
                 model: Some("gpt-4o".to_string()),
                 config_json: Some(updated_config.clone()),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -861,7 +829,6 @@ async fn members_read_agents_and_admins_manage_them() {
         user_id,
         name: "Acme Corp".to_string(),
         slug: slug.into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -894,7 +861,6 @@ async fn members_read_agents_and_admins_manage_them() {
             AgentWrite {
                 name: "Support Bot".to_string(),
                 slug: "support-bot".to_string(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -978,7 +944,6 @@ async fn members_read_agents_and_admins_manage_them() {
             AgentWrite {
                 name: "Admin Bot".into(),
                 slug: "admin-bot".into(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -992,7 +957,6 @@ async fn members_read_agents_and_admins_manage_them() {
             AgentWrite {
                 name: "Managed Bot".into(),
                 slug: "managed-bot".into(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -1017,7 +981,6 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
             user_id: owner_id,
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -1036,9 +999,6 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
         run_timeout_secs: Some(90),
         system_prompt: Some("Answer briefly.".into()),
         description: Some("Sorts support mail".into()),
-        harness_kind: HarnessKind::default(),
-        granted_tool_ids: Vec::new(),
-        native_tool_policy: NativeToolPolicy::default(),
         config_json: None,
         memory_enabled: true,
         memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
@@ -1049,7 +1009,6 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
         created_at: Utc::now(),
     };
     let mut runnable = definition("Triage", "triage", "openai", "gpt-4o");
-    runnable.harness_kind = HarnessKind::Rig;
     runnable.response_contract = Some(
         serde_json::from_value(
             json!({"version":1,"format":"json_schema","schema":{"type":"object"}}),
@@ -1126,94 +1085,36 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
     );
 }
 #[tokio::test]
-async fn omitted_creates_use_injected_policy_and_omitted_updates_keep_the_selection() {
-    for default in HarnessKind::ALL {
-        let fixture = fixture(CompanyChannelDefaults::default(), SpamScanning::Available);
-        let use_cases = fixture.use_cases.with_default_agent_harness(default);
-        let write = AgentWrite {
-            name: "Inherited".into(),
-            slug: "inherited".into(),
-            ..Default::default()
-        };
-        let created = use_cases
-            .create_agent(fixture.owner_id, fixture.company_id, write.clone())
-            .await
-            .unwrap();
-        assert_eq!(created.harness_kind, default);
-        assert!(created.config_json.is_none());
-        let other = if default == HarnessKind::Rig {
-            HarnessKind::AiAgents
-        } else {
-            HarnessKind::Rig
-        };
-        let use_cases = use_cases.with_default_agent_harness(other);
-        let updated = use_cases
-            .update_agent(fixture.owner_id, fixture.company_id, created.id, write)
-            .await
-            .unwrap();
-        assert_eq!(updated.harness_kind, default);
-        let explicit = AgentWrite {
-            name: "Explicit".into(),
-            slug: "explicit".into(),
-            harness_kind: Some(default),
-            ..Default::default()
-        };
-        assert_eq!(
-            use_cases
-                .create_agent(fixture.owner_id, fixture.company_id, explicit)
-                .await
-                .unwrap()
-                .harness_kind,
-            default
-        );
-    }
-}
-
-#[tokio::test]
-async fn a_harness_switch_rejects_carried_settings_but_accepts_an_explicit_empty_target() {
+async fn a_retired_ai_agents_config_is_refused_and_an_explicit_empty_config_is_canonical() {
     let fixture = fixture(CompanyChannelDefaults::default(), SpamScanning::Available);
-    let initial = AgentWrite {
-        name: "Switch".into(),
-        slug: "switch".into(),
-        harness_kind: Some(HarnessKind::AiAgents),
+    let retired = AgentWrite {
+        name: "Config".into(),
+        slug: "config".into(),
         config_json: Some(
             serde_json::json!({"version":1,"reasoning":{"mode":"chain_of_thought","max_iterations":2}}),
         ),
         ..Default::default()
     };
-    let created = fixture
-        .use_cases
-        .create_agent(fixture.owner_id, fixture.company_id, initial)
-        .await
-        .unwrap();
-    let target = AgentWrite {
-        name: "Switch".into(),
-        slug: "switch".into(),
-        harness_kind: Some(HarnessKind::Rig),
-        ..Default::default()
-    };
     assert!(
         fixture
             .use_cases
-            .update_agent(
-                fixture.owner_id,
-                fixture.company_id,
-                created.id,
-                target.clone()
-            )
+            .create_agent(fixture.owner_id, fixture.company_id, retired)
             .await
             .is_err()
     );
-    let mut explicit = target;
-    explicit.config_json = Some(serde_json::json!({"version":1}));
-    let updated = fixture
+    let explicit = AgentWrite {
+        name: "Config".into(),
+        slug: "config".into(),
+        config_json: Some(serde_json::json!({"version":1})),
+        ..Default::default()
+    };
+    let created = fixture
         .use_cases
-        .update_agent(fixture.owner_id, fixture.company_id, created.id, explicit)
+        .create_agent(fixture.owner_id, fixture.company_id, explicit)
         .await
         .unwrap();
-    assert_eq!(updated.harness_kind, HarnessKind::Rig);
     assert_eq!(
-        HarnessConfig::parse(updated.harness_kind, updated.config_json.as_ref()).unwrap(),
+        HarnessConfig::parse(HarnessKind::Rig, created.config_json.as_ref()).unwrap(),
         HarnessConfig::empty(HarnessKind::Rig)
     );
 }

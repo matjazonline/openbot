@@ -114,7 +114,7 @@ fn the_application_layer_imports_no_adapter_framework_or_provider_type() {
 
 /// The agent runtime belongs behind [`AgentHarness`], and nothing above the adapter may name it.
 ///
-/// This is the boundary the harness phases exist to create: a single `use ai_agents::...` in the
+/// This is the boundary the harness phases exist to create: a single `use rig::...` in the
 /// application layer would make a port an alias for one runtime's types and nothing would fail.
 /// `src/application/services/harness/tests.rs` asserts the same thing one module in; this is the
 /// whole layer.
@@ -129,7 +129,7 @@ fn the_application_layer_names_no_agent_runtime() {
         for (number, line) in source.lines().enumerate() {
             let code = line.trim();
             // Prose may name the runtime; a comment compiles to nothing.
-            if code.starts_with("//") || !code.contains("ai_agents") {
+            if code.starts_with("//") || !names_the_rig_crate(code) {
                 continue;
             }
             offenders.push(format!("{file}:{}: {code}", number + 1));
@@ -139,9 +139,19 @@ fn the_application_layer_names_no_agent_runtime() {
     assert!(
         offenders.is_empty(),
         "the application layer must not name the agent runtime. Translate in \
-         `src/adapters/harness/ai_agents/` instead:\n  {}",
+         `src/adapters/harness/rig/` instead:\n  {}",
         offenders.join("\n  ")
     );
+}
+
+/// A path rooted at the `rig` crate, not one merely ending in `rig` (`crate::...::rig::`).
+fn names_the_rig_crate(code: &str) -> bool {
+    code.match_indices("rig::").any(|(at, _)| {
+        !code[..at]
+            .chars()
+            .next_back()
+            .is_some_and(|before| before.is_alphanumeric() || before == '_' || before == ':')
+    })
 }
 
 #[cfg(test)]

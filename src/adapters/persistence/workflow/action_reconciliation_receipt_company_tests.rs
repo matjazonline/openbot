@@ -20,7 +20,8 @@ pub(in super::super::super) async fn foreign_action(
         &format!("-receipt-company-{}", Uuid::new_v4().simple()),
     )
     .await;
-    let source = serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+    let source =
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     let foreign = Box::pin(AdmissionFixture::with_binding(
         BindingFixture::from_fixture(fixture, source).await,
     ))

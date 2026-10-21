@@ -26,7 +26,7 @@ async fn tenant(f: &AdmissionFixture) -> AdmissionFixture {
     .await;
     fixture.target.workflow = WorkflowId::new(Uuid::new_v4());
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["workflow_id"] = json!(fixture.target.workflow.as_uuid());
     AdmissionFixture::with_binding(BindingFixture::from_fixture(fixture, source).await).await
 }
@@ -43,7 +43,7 @@ async fn finish(p: &PostgresPersistence, claim: &ClaimedWorkflow) {
             )
             .unwrap(),
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap()
@@ -264,7 +264,7 @@ async fn workflow_capacity_expiry_restart_releases_without_refunding_attempts() 
                 )
                 .unwrap(),
                 fence: old.fence,
-                output: json!({"items":[],"token_count":0})
+                output: json!({"items":[],"token_count":0,"omitted":0})
             })
             .await
             .unwrap()

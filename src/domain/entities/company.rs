@@ -52,7 +52,6 @@ pub struct Company {
     pub user_id: Uuid,
     pub name: String,
     pub slug: CompanySlug,
-    pub enable_llm_spam_guardrail: Option<bool>,
     #[serde(default)]
     pub memory_provider: Option<MemoryProviderKind>,
     #[serde(default)]

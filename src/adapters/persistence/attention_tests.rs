@@ -50,7 +50,6 @@ async fn fixture(persistence: &PostgresPersistence) -> (Uuid, Uuid, PrincipalId)
             name: "Attention Agent".into(),
             slug: format!("attention-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )

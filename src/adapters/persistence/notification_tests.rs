@@ -103,7 +103,6 @@ async fn make_fixture(persistence: &PostgresPersistence) -> Fixture {
             name: "Notification Agent".into(),
             slug: format!("notification-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )

@@ -4,7 +4,7 @@ fn chain() -> Value {
     let mut source = wait_source(false);
     source["steps"]["wait"] = source["steps"]["start"].clone();
     let context: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["steps"]["context"] = context["steps"]["start"].clone();
     source["steps"]["context"]["routes"]["success"] = json!("wait");
     source["steps"]["recover"] = context["steps"]["start"].clone();

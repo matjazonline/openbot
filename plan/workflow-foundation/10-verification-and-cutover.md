@@ -17,7 +17,7 @@ migrated schema.
 
 | Scenario | Required evidence |
 | --- | --- |
-| Reviewed response | Classification/context/memory visible; exact accepted artifact delivered |
+| Reviewed response | Classification/context visible (memory is out of this release, user decision 2026-10-21); exact accepted artifact delivered |
 | Agent capability defaults | No classifier/profile uses saved agent tools and skills; explicit empty or invalid selections never broaden into defaults |
 | Human feedback | Comments do not advance; revision feedback reaches new work; old records survive |
 | Alternate route | Human or agent choice selects only an eligible declared successor |

@@ -1,5 +1,5 @@
 //! Pure, bounded compiler catalogue. Requirements are not authorization grants;
-//! no entry here has an execution handler.
+//! execution handlers live outside the catalogue.
 mod actions;
 mod budget;
 mod checks;
@@ -21,16 +21,14 @@ use crate::domain::workflow::{
 };
 pub(crate) use actions::message_tool_schemas;
 pub(crate) use checks::InputCheck;
-pub use facts::{CapabilityProfile, CatalogueFacts, ChildContract, ToolContract};
+pub use facts::{CatalogueFacts, ChildContract, ToolContract};
 pub use help::{AuthoringHelp, authoring_help};
-pub use metadata::{
-    CapabilityRequirement, EffectClass, ExecutionConstraints, ProfileSelection, RecoveryMode,
-};
+pub use metadata::{CapabilityRequirement, EffectClass, ExecutionConstraints, RecoveryMode};
 use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.3";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.5";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
@@ -49,7 +47,7 @@ pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
 pub const TYPES: [&str; 18] = [
-    "context.load",
+    "context.history",
     "memory.load",
     "memory.save",
     "ai.classify",
@@ -68,6 +66,36 @@ pub const TYPES: [&str; 18] = [
     "wait.event",
     "wait.timer",
 ];
+
+/// The step kinds that run a selected agent's model (06-D5, 06-D6): the one list that
+/// publication, preparation and the runtime share. Only `AgentRun` uses tools and skills.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelStep {
+    AgentRun,
+    Classify,
+    Decide,
+}
+impl ModelStep {
+    pub fn of(kind: &str) -> Option<Self> {
+        match kind {
+            "agent.run" => Some(Self::AgentRun),
+            "ai.classify" => Some(Self::Classify),
+            "decision.agent" => Some(Self::Decide),
+            _ => None,
+        }
+    }
+    pub fn kind(self) -> &'static str {
+        match self {
+            Self::AgentRun => "agent.run",
+            Self::Classify => "ai.classify",
+            Self::Decide => "decision.agent",
+        }
+    }
+    pub fn uses_capabilities(self) -> bool {
+        self == Self::AgentRun
+    }
+}
 
 /// Compile with the built-in type catalogue and explicit, frozen external facts.
 /// The dependency graph remains caller-owned; no facts are discovered or fetched.
@@ -268,17 +296,7 @@ impl<'a> Registration<'a> {
             },
             ordered_rule: name == "decision.rule",
         };
-        let selection = if name != "agent.run" {
-            ProfileSelection::NotApplicable
-        } else if self.parsed.definition.steps[self.id]
-            .inputs
-            .contains_key("capability_profile")
-        {
-            ProfileSelection::ExplicitSelection
-        } else {
-            ProfileSelection::AgentDefaults
-        };
-        let metadata = metadata::constraints(name, selection);
+        let metadata = metadata::constraints(name);
         Ok(SpecializedDescriptor {
             descriptor,
             facts: json!({"revision":CONTRACT_REVISION,"constraints":metadata,"effective":self.effective,"literal_fields":self.static_fields,"checks":self.checks}),
@@ -313,8 +331,6 @@ mod tests;
 mod contract_tests;
 #[cfg(test)]
 mod decision_tests;
-#[cfg(test)]
-mod profile_tests;
 #[cfg(test)]
 mod runtime_tests;
 #[cfg(test)]

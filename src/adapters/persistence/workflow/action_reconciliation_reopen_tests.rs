@@ -61,7 +61,7 @@ struct Topology {
 }
 fn source() -> Value {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":2,"repetitions":2});
     source["steps"]["second"] = source["steps"]["start"].clone();
     source["steps"]["start"]["routes"]["success"] = json!("second");

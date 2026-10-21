@@ -34,7 +34,6 @@ pub mod task;
 pub mod task_counts;
 pub mod thread;
 pub mod thread_handoff;
-pub mod tool_catalogue;
 pub mod transport;
 pub mod unicode_sanitization;
 pub mod upload;

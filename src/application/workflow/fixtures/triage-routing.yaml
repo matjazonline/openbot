@@ -13,6 +13,7 @@ steps:
   classify:
     type: ai.classify
     with:
+      agent: {literal: assistant}
       context: {object: {untrusted_message: {ref: /input/message}}}
       output_schema: {literal: {type: string, enum: [support, sales, other]}}
     routes: {success: route}

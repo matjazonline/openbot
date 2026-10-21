@@ -24,7 +24,6 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
         AgentWrite {
             name: "Checkpoint".into(),
             slug: "checkpoint".into(),
-            harness_kind: Some(HarnessKind::Rig),
             ..Default::default()
         },
     )
@@ -57,11 +56,16 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
     )
     .unwrap();
     let fence = claim.fence;
+    sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models) VALUES($1,'openai','fixture-key','{fixture}')")
+        .bind(scope.company.as_uuid())
+        .execute(&f.persistence().pool)
+        .await
+        .unwrap();
     let row = json!({"id":run.run_id.0,"company_id":scope.company.as_uuid(),
         "task_id":scope.job.0,"agent_id":agent.id,"owner_kind":"workflow",
         "workflow_run_id":scope.run.as_uuid(),"workflow_execution_id":scope.execution.as_uuid(),
         "workflow_generation":fence.generation.0,"workflow_worker_id":fence.worker.0,
-        "workflow_attempt":fence.attempt.0,"workflow_prepared":{"preamble":"frozen"},
+        "workflow_attempt":fence.attempt.0,"workflow_prepared":prepared(agent.id),
         "schema_version":1,"revision":0,"state":"active","checkpoint":run,
         "created_at":chrono::Utc::now(),"updated_at":chrono::Utc::now()});
     NativeFixture {
@@ -69,6 +73,12 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
         fence,
         row,
     }
+}
+
+/// The selection fields the store's current-authority check reads.
+fn prepared(agent: uuid::Uuid) -> Value {
+    json!({"selection":{"agent":{"agent_id":agent,"tools":[],"skills":[],
+        "model":{"provider":"openai","model":"fixture","max_output_tokens":512}},"skills":[]}})
 }
 
 async fn insert(db: &mut sqlx::PgConnection, row: &Value) -> Result<(), sqlx::Error> {
@@ -322,7 +332,6 @@ async fn workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner() {
         AgentWrite {
             name: "Foreign checkpoint".into(),
             slug: "foreign-checkpoint".into(),
-            harness_kind: Some(HarnessKind::Rig),
             ..Default::default()
         },
     )

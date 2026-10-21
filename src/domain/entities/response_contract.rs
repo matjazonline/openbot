@@ -67,15 +67,6 @@ impl ResponseContract {
             Sha256::digest(format!("response-contract:v1:json_schema:{}", self.schema).as_bytes())
         ))
     }
-    pub fn require_harness(
-        &self,
-        harness: super::harness::HarnessKind,
-    ) -> Result<(), &'static str> {
-        if harness != super::harness::HarnessKind::Rig {
-            return Err("response_contract requires the rig harness");
-        }
-        Ok(())
-    }
 }
 
 /// Omission preserves a stored contract; explicit null clears it.

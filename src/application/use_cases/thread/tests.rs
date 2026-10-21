@@ -29,7 +29,6 @@ use std::sync::Mutex;
 
 fn internal_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -55,7 +54,6 @@ fn internal_test_config() -> Arc<AppConfig> {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -844,7 +842,6 @@ async fn test_inter_channel_hop_limit_rejection() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -906,7 +903,6 @@ async fn test_inter_channel_hop_limit_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -932,7 +928,6 @@ async fn test_inter_channel_hop_limit_rejection() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -984,7 +979,6 @@ async fn test_spf_authentication_failure_rejection() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1020,7 +1014,6 @@ async fn test_spf_authentication_failure_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1046,7 +1039,6 @@ async fn test_spf_authentication_failure_rejection() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1093,7 +1085,6 @@ async fn test_high_spam_score_rejection() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1129,7 +1120,6 @@ async fn test_high_spam_score_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1155,7 +1145,6 @@ async fn test_high_spam_score_rejection() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1200,7 +1189,6 @@ async fn test_dmarc_authentication_failure_rejection() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1236,7 +1224,6 @@ async fn test_dmarc_authentication_failure_rejection() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1262,7 +1249,6 @@ async fn test_dmarc_authentication_failure_rejection() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1307,7 +1293,6 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1343,7 +1328,6 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1369,7 +1353,6 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1415,7 +1398,6 @@ async fn test_participant_sender_bypasses_spam_checks() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1451,7 +1433,6 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1477,7 +1458,6 @@ async fn test_participant_sender_bypasses_spam_checks() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1524,7 +1504,6 @@ async fn test_channel_in_cc_resolves_properly() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1560,7 +1539,6 @@ async fn test_channel_in_cc_resolves_properly() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1586,7 +1564,6 @@ async fn test_channel_in_cc_resolves_properly() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1638,7 +1615,6 @@ async fn test_multi_channel_to_and_cc_execution() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1700,7 +1676,6 @@ async fn test_multi_channel_to_and_cc_execution() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1726,7 +1701,6 @@ async fn test_multi_channel_to_and_cc_execution() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1797,7 +1771,6 @@ async fn test_pipeline_address_chaining_execution() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1883,7 +1856,6 @@ async fn test_pipeline_address_chaining_execution() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -1909,7 +1881,6 @@ async fn test_pipeline_address_chaining_execution() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -1964,7 +1935,6 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -2026,7 +1996,6 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2052,7 +2021,6 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -2147,7 +2115,6 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -2183,7 +2150,6 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2209,7 +2175,6 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -2302,7 +2267,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -2394,7 +2358,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2420,7 +2383,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -2515,7 +2477,6 @@ async fn test_sender_verification_and_delegation_target_check() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -2551,7 +2512,6 @@ async fn test_sender_verification_and_delegation_target_check() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -2577,7 +2537,6 @@ async fn test_sender_verification_and_delegation_target_check() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -2710,7 +2669,6 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -2908,7 +2866,6 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -3011,7 +2968,6 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -3113,7 +3069,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -3151,7 +3106,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -3177,7 +3131,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -3333,7 +3286,6 @@ async fn test_context_only_quiet_mode_ingestion() {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -3371,7 +3323,6 @@ async fn test_context_only_quiet_mode_ingestion() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -3397,7 +3348,6 @@ async fn test_context_only_quiet_mode_ingestion() {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -3557,7 +3507,6 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -3961,9 +3910,6 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
-            harness_kind: crate::entities::harness::HarnessKind::default(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
@@ -4396,7 +4342,6 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -4669,9 +4614,6 @@ async fn a_channel_without_its_own_description_borrows_its_agent_s() {
             run_timeout_secs: None,
             system_prompt: None,
             description: Some("Answers supplier capacity and delivery-date questions.".to_string()),
-            harness_kind: crate::entities::harness::HarnessKind::default(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
@@ -4935,7 +4877,6 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -5061,7 +5002,6 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -5171,7 +5111,6 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -5261,7 +5200,6 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),

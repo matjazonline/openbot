@@ -10,9 +10,7 @@ use uuid::Uuid;
 use crate::app_error::{AppError, AppResult};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::company::Company;
-use crate::entities::harness::{
-    AgentCapabilitySpec, HarnessConfig, HarnessKind, NativeToolPolicy, SubAgentScope,
-};
+use crate::entities::harness::{AgentCapabilitySpec, HarnessConfig, HarnessKind, SubAgentScope};
 use crate::entities::value_objects::{ModelName, ModelProvider};
 use crate::model_providers::{SUPPORTED_MODEL_PROVIDERS, is_supported_model_provider};
 use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
@@ -38,9 +36,6 @@ pub struct ResolvedAgentCapabilities {
     /// Stable identity used for authorization and structured diagnostics. Agent names are mutable
     /// operator-authored display text and must never substitute for this value.
     pub agent_id: Uuid,
-    /// Platform-native bounds consumed by native tool implementations, never by a harness
-    /// compiler.
-    pub native_tool_policy: NativeToolPolicy,
 }
 
 impl std::fmt::Debug for ResolvedAgentCapabilities {
@@ -49,19 +44,16 @@ impl std::fmt::Debug for ResolvedAgentCapabilities {
             .debug_struct("ResolvedAgentCapabilities")
             .field("spec", &self.spec)
             .field("agent_id", &self.agent_id)
-            .field("native_tool_policy", &self.native_tool_policy)
             .field("api_key", &"[REDACTED]")
             .finish()
     }
 }
 
-/// The fallback is injected by the caller only for an unresolved selection. Production snapshots
-/// always contain a persisted agent; test/simulation callers can exercise deployment policy.
+/// Production snapshots always contain a persisted agent; test callers may omit it.
 struct AgentSnapshot<'a> {
     agent: Option<&'a AgentEntity>,
     skills: Vec<crate::entities::skill::Skill>,
     sub_agents: SubAgentScope,
-    default_harness: HarnessKind,
 }
 
 impl ResolvedAgentCapabilities {
@@ -100,7 +92,6 @@ impl ResolvedAgentCapabilities {
                 agent,
                 skills: Vec::new(),
                 sub_agents: SubAgentScope::AllCompanySiblings,
-                default_harness: HarnessKind::default(),
             },
             provider,
             model,
@@ -119,7 +110,6 @@ impl ResolvedAgentCapabilities {
             agent,
             skills,
             sub_agents,
-            default_harness,
         } = snapshot;
         if !is_supported_model_provider(provider.as_str()) {
             return Err(AppError::BadRequest(format!(
@@ -149,19 +139,11 @@ impl ResolvedAgentCapabilities {
             .unwrap_or(DEFAULT_SYSTEM_PROMPT)
             .to_string();
 
-        let harness = agent.map_or(default_harness, |agent| agent.harness_kind);
-        if let Some(contract) = agent.and_then(|agent| agent.response_contract.as_ref()) {
-            contract
-                .require_harness(harness)
-                .map_err(|error| AppError::BadRequest(error.into()))?;
-        }
+        let harness = HarnessKind::Rig;
         let harness_config =
             HarnessConfig::parse(harness, agent.and_then(|agent| agent.config_json.as_ref()))
                 .map_err(AppError::BadRequest)?;
         let agent_id = agent.map_or_else(Uuid::nil, |agent| agent.id);
-        let native_tool_policy = agent
-            .map(|agent| agent.native_tool_policy.clone())
-            .unwrap_or_default();
         Ok(Self {
             api_key,
             spec: Box::new(AgentCapabilitySpec {
@@ -182,15 +164,11 @@ impl ResolvedAgentCapabilities {
                     }
                 }),
                 skills,
-                granted_tools: agent
-                    .map(|agent| agent.granted_tool_ids.clone())
-                    .unwrap_or_default(),
                 sub_agents,
                 response_contract: agent.and_then(|agent| agent.response_contract.clone()),
                 harness_config,
             }),
             agent_id,
-            native_tool_policy,
         })
     }
 
@@ -208,10 +186,6 @@ impl ResolvedAgentCapabilities {
 
     pub fn spec(&self) -> &AgentCapabilitySpec {
         self.spec.as_ref()
-    }
-
-    pub fn native_tool_policy(&self) -> &NativeToolPolicy {
-        &self.native_tool_policy
     }
 
     /// Canonical reviewed harness settings, retained for execution diagnostics.
@@ -309,7 +283,6 @@ pub async fn resolve_agent_capabilities(
             agent: Some(&agent),
             skills,
             sub_agents: sub_agent_scope,
-            default_harness: agent.harness_kind,
         },
         &provider,
         &model,

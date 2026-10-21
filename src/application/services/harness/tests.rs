@@ -16,7 +16,7 @@ fn registry_with(kind: HarnessKind) -> HarnessRegistry {
 
 #[test]
 fn registering_two_harnesses_for_one_kind_is_refused() {
-    let kind = HarnessKind::AiAgents;
+    let kind = HarnessKind::Rig;
     let registry = registry_with(kind);
 
     let error = registry
@@ -32,35 +32,20 @@ fn registering_two_harnesses_for_one_kind_is_refused() {
 }
 
 #[test]
-fn a_harness_whose_kind_disagrees_with_its_slot_is_refused() {
-    let result = HarnessRegistry::new().register(
-        HarnessKind::Rig,
-        Arc::new(StubHarness::new(HarnessKind::AiAgents)),
-    );
-    assert!(matches!(
-        result,
-        Err(HarnessRegistrationError::Mismatched {
-            declared: HarnessKind::Rig,
-            registered: HarnessKind::AiAgents
-        })
-    ));
-}
-
-#[test]
 fn require_reports_the_missing_kind_rather_than_falling_back() {
     let empty = HarnessRegistry::new();
 
     let error = empty
-        .require(HarnessKind::AiAgents)
+        .require(HarnessKind::Rig)
         .err()
         .expect("an empty registry cannot serve any kind");
 
-    assert_eq!(error.kind(), HarnessKind::AiAgents);
+    assert_eq!(error.kind(), HarnessKind::Rig);
     assert!(
-        error.to_string().contains(HarnessKind::AiAgents.as_str()),
+        error.to_string().contains(HarnessKind::Rig.as_str()),
         "the message names the kind that is missing: {error}"
     );
-    assert!(empty.get(HarnessKind::AiAgents).is_none());
+    assert!(empty.get(HarnessKind::Rig).is_none());
     assert!(
         empty.registered().is_empty(),
         "an unregistered kind is not quietly present"
@@ -69,92 +54,14 @@ fn require_reports_the_missing_kind_rather_than_falling_back() {
 
 #[test]
 fn a_registered_harness_is_the_one_that_comes_back() {
-    let registry = registry_with(HarnessKind::AiAgents);
+    let registry = registry_with(HarnessKind::Rig);
 
     let harness = registry
-        .require(HarnessKind::AiAgents)
+        .require(HarnessKind::Rig)
         .expect("the registered kind resolves");
 
-    assert_eq!(harness.kind(), HarnessKind::AiAgents);
-    assert_eq!(registry.registered(), vec![HarnessKind::AiAgents]);
-}
-
-#[test]
-fn an_approval_ask_round_trips_its_variants() {
-    // The serialized shape is stored on the approval row, so it is a contract with rows already
-    // written: an externally-tagged `type` plus the runtime's own field names.
-    let args = json!({ "target_channels": ["billing"] });
-    let cases = [
-        (
-            ApprovalTrigger::Tool {
-                name: "outreach_and_await_quorum",
-                args: &args,
-            },
-            "tool",
-            json!({
-                "type": "tool",
-                "name": "outreach_and_await_quorum",
-                "args": { "target_channels": ["billing"] },
-            }),
-        ),
-        (
-            ApprovalTrigger::Condition {
-                name: "over_budget",
-                matched: "true",
-            },
-            "condition",
-            json!({ "type": "condition", "name": "over_budget", "matched": "true" }),
-        ),
-        (
-            ApprovalTrigger::State {
-                from: Some("draft"),
-                to: "sending",
-            },
-            "state",
-            json!({ "type": "state", "from": "draft", "to": "sending" }),
-        ),
-        (
-            ApprovalTrigger::State {
-                from: None,
-                to: "sending",
-            },
-            "state",
-            json!({ "type": "state", "from": null, "to": "sending" }),
-        ),
-    ];
-
-    for (trigger, kind, expected) in cases {
-        assert_eq!(trigger.kind(), kind);
-        assert_eq!(
-            serde_json::to_value(trigger).expect("a trigger serializes"),
-            expected
-        );
-    }
-}
-
-#[test]
-fn a_rejection_carries_the_reason_it_was_built_with() {
-    assert_eq!(
-        ApprovalVerdict::rejected("no approver is configured"),
-        ApprovalVerdict::Rejected {
-            reason: "no approver is configured".to_string(),
-        }
-    );
-    assert_ne!(ApprovalVerdict::rejected("any"), ApprovalVerdict::Approved);
-}
-
-#[test]
-fn a_pending_approval_is_not_a_human_rejection() {
-    assert_eq!(
-        ApprovalVerdict::pending("waiting for a decision"),
-        ApprovalVerdict::Pending {
-            reason: "waiting for a decision".to_string(),
-        }
-    );
-    assert_ne!(
-        ApprovalVerdict::pending("waiting"),
-        ApprovalVerdict::rejected("waiting")
-    );
+    assert_eq!(harness.kind(), HarnessKind::Rig);
+    assert_eq!(registry.registered(), vec![HarnessKind::Rig]);
 }
 
 #[test]

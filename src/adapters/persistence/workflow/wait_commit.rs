@@ -65,6 +65,14 @@ pub(super) async fn resume_on(
                     reason: WaitFailureReason::EvidenceConflict,
                 });
             }
+            // A saved model tool call's settled delivery (accepted or failed) is received
+            // truth for the agent, not this step's result: continue the parked agent job.
+            message::receipts::EffectResume::Failed
+            | message::receipts::EffectResume::Accepted(_)
+                if message::receipts::model_tool_wait_on(db, scope, wait.id).await? =>
+            {
+                return Box::pin(continue_delivery(db, scope, wait.id)).await;
+            }
             message::receipts::EffectResume::Failed => {
                 return Box::pin(effect_failed(db, scope)).await;
             }
@@ -87,6 +95,26 @@ pub(super) async fn resume_on(
     };
     // Box the transactional continuation to keep the debug async stack shallow.
     Box::pin(advance(db, scope, run, wake)).await
+}
+
+/// Complete the exact delivery wait and reopen the agent job it parked (continuation
+/// debit only). The agent replays its saved call and reads the receipt; the step itself is
+/// not completed here. The SQL reopen guard requires this action's marker attempt.
+async fn continue_delivery(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+) -> AppResult<WaitProgress> {
+    let settled = sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND reason='effect' AND state='waiting'")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).execute(&mut *db).await?;
+    if settled.rows_affected() != 1 {
+        return Err(invalid());
+    }
+    sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2 AND state='waiting' AND waiting_reason='effect'")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+    decisions::approvals::reopen_job(db, scope).await?;
+    waits::audit_wait(db, scope, wait, "wait_completed").await?;
+    Ok(WaitProgress::Continued)
 }
 
 /// What woke the wait: its timer, its event, or its message action's accepted receipt.

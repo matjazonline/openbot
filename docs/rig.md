@@ -1,24 +1,26 @@
 # Rig agents: configuration and operations
 
-Rig is the default **in-process** agent runtime. It shares the server's privileges and is not a
-sandbox. The application owns credentials, tool authorization, durable tasks, approvals, memory,
-review and delivery. The separate spam-guardrail and prompt-generation classifier still uses
-`AiAgentsTextClassifier`, regardless of the agent's runtime.
+Rig is the only **in-process** agent runtime. It shares the server's privileges and is not a
+sandbox. The application owns credentials, authorization, durable tasks, memory, review and
+delivery. The system-prompt generator makes one tool-free Rig completion (`RigTextClassifier`)
+with the credential it resolved. That call writes no model usage row, so usage analytics do not
+count it.
 
-## Select a runtime
+## Configure an agent
 
-In Agents, open an agent's settings (or create an agent), choose **Rig** in the runtime selector,
-and save. Company and library forms use the same selection. Model connections, tool grants,
-skills, response format and MCP selections are separate settings.
+In Agents, open an agent's settings (or create an agent) and save. Company and library forms use
+the same fields. Model connections, skills and the response format are separate settings. There
+is no runtime selector and no tool catalogue: the legacy native tools, built-in tools, agent MCP
+selections and executable skill tool steps were removed in phase 06C. Workflow tools an agent may
+use are named by its `workflow_tools` and dispatched by workflow actions, not by this runtime.
 
-For `POST /api/companies/{company}/agents`, this is a minimal explicit Rig request. The company
-must already have a model connection and an enabled model; credentials are not part of this body.
+For `POST /api/companies/{company}/agents`, this is a minimal request. The company must already
+have a model connection and an enabled model; credentials are not part of this body.
 
 ```json
 {
   "name": "Assistant",
   "slug": "assistant",
-  "harness_kind": "rig",
   "config_json": { "version": 1 }
 }
 ```
@@ -26,22 +28,11 @@ must already have a model connection and an enabled model; credentials are not p
 Rig V1 accepts only `version` and optional `max_turns` (integer 1–16, default 8). For example,
 `{"version":1,"max_turns":4}` allows at most four model requests across the run, including repairs
 and continuations. Unknown fields fail validation. Advanced JSON cannot configure credentials,
-providers, URLs, tools or a response contract. The UI label **ai-agents** is `ai_agents` on the wire.
+providers, URLs, tools or a response contract. Payloads naming the retired `harness_kind`,
+`granted_tool_ids` or `native_tool_policy` fields are rejected.
 
-| Agent selection | `DEFAULT_AGENT_HARNESS` | Result |
-| --- | --- | --- |
-| Omitted for a new agent/run | Unset | `rig` |
-| Omitted for a new agent/run | `rig` | `rig` |
-| Omitted for a new agent/run | `ai_agents` | `ai_agents` |
-| Explicit or already stored | Either valid value or unset | Preserve that selection |
-| Any | Empty/invalid | Startup configuration error |
-
-Removing the variable restores Rig for new/unresolved selections. Changing it leaves saved agents
-and library definitions intact. API update omission preserves stored fields; an explicit
-`config_json: {"version":1}` resets advanced settings. A harness change requires explicit target
-configuration and revalidates capabilities. Active or suspended work can fence configuration edits.
-Library installation preserves its definition's runtime, config and response contract. There is no
-automatic fallback to another runtime on failure.
+API update omission preserves stored fields; an explicit `config_json: {"version":1}` resets
+advanced settings. Library installation preserves its definition's config and response contract.
 
 ## Verified compatibility
 
@@ -60,24 +51,16 @@ model and capabilities before production use.
 
 | Capability | Rig behavior |
 | --- | --- |
-| Built-ins | `calculator`, `datetime`, `echo`, `json`, `math`, `random`, `template`, `text`, `todo`, `web_fetch` |
-| Native tools | `create_agent_channel`, `outreach_and_await_quorum`, `list_company_agents`, `transfer_or_release_task`, `request_approval`; require their application context and grants |
-| Company HTTP MCP | Explicit company connections and reviewed remote tool grants; durable invocation journal |
-| Skills | Scoped catalog plus `read_resource`; model follows loaded instructions using the guarded tool path |
+| Tools | Only `read_resource`, for attached skills; no built-in, native or MCP tools |
+| Skills | Scoped catalog plus `read_resource`; the model follows the loaded prompt steps |
 | Context and memory | Application-composed history/memory and refreshed time, timezone, identity and recipient role |
 | Structured final responses | Optional shared JSON Schema contract, enforced by the application |
-| Host access / delegation | No shell, filesystem, unrestricted HTTP, provider-hosted tools, or Rig-managed sub-agent runtime; delegation uses native tools |
+| Host access / delegation | No shell, filesystem, HTTP, provider-hosted tools, or Rig-managed sub-agent runtime |
 | Streaming / multipart completions | Unsupported |
 
-The ten built-ins use the pinned standalone ai-agents implementations through a compatibility
-bridge, with per-run todo state and additional bounds. Inline templates have 10,000 fuel, depth 32,
-8 KiB arguments, 4 KiB template text and a 64 KiB output writer. File templates and amplification
-constructs are refused. `web_fetch` retains public-address validation, redirect checks, a 1 MiB
-response ceiling and at most five redirects.
-
-Skills are instructions, not deterministic recipes: loading a resource does not execute its steps.
-Supported references use `user_input`, `context`, earlier `steps[index].args`/`.result`, and earlier
-named outputs, with dotted fields and numeric indices. Filters, expressions, control blocks,
+Skills are prompt steps, not deterministic recipes: loading a resource does not execute them.
+Supported references use `user_input`, `context` and earlier `steps[index].result`, with dotted
+fields and numeric indices. Filters, expressions, control blocks,
 forward references and unknown roots fail preflight. Missing runtime values require clarification.
 Limits are 16 attached skills, 32 steps/skill, 8,000 characters/prompt, a 32 KiB catalog and a
 16,384-character rendered resource. Resume revalidates access and uses saved resource/results.
@@ -135,8 +118,9 @@ recursive schemas are rejected; regular expressions use a non-backtracking engin
 compiled-pattern limit. The JSON examples above are read by the application's parser tests in CI.
 
 Create omission or null means ordinary text. Update omission preserves the contract; explicit
-`response_contract: null`, or choosing ordinary text in the form, clears it when the active-run
-fence permits. ai-agents rejects non-null contracts until supported. Structured delivery requires
+`response_contract: null`, or choosing ordinary text in the form, clears it. A run already
+prepared with a different contract fails closed rather than delivering under the new one.
+Structured delivery requires
 one answering agent, since concatenating constrained answers would change the payload.
 
 The final candidate must be exactly one JSON value. The application validates it **after
@@ -151,18 +135,12 @@ deadline budgets. Repair calls expose no tools. Exhaustion is terminal `invalid_
 completed answer or answer delivery; restarting a worker does not reset repair counters. Without a
 contract, ordinary text remains the default.
 
-## Execution, approvals and limits
+## Execution and limits
 
 Production inbound, scheduled and simulated work uses the task-backed execution ledger. The full
-assistant tool batch is saved before execution; calls execute sequentially with their original
-arguments and IDs. Completed results are replayed after restart. Native effects and receipts commit
-together, and final output is consumed with the reply/review/outbox transaction.
-
-Protected native tools park the task before their effect. Approval resumes the saved batch;
-`request_approval` adds an explicit workflow checkpoint but does not approve later protected tools.
-Rejection/expiry stops the run. Outreach parks until the existing reply/quorum decision resumes it.
-Parked time does not consume active execution allowance, but approval/outreach deadlines still
-apply. MCP calls have no automatic approval prompt, including side-effecting calls.
+assistant tool batch (`read_resource` calls) is saved before execution; calls execute sequentially
+with their original arguments and IDs. Completed results are replayed after restart, and final
+output is consumed with the reply/review/outbox transaction.
 
 | Resource | Enforced ceiling |
 | --- | --- |
@@ -187,25 +165,23 @@ pilot evidence and recovery.
 In company settings, open **MCP servers**. Create a `streamable_http` connection with an endpoint,
 enabled state and authentication type (`none` or `bearer`). Save a bearer token separately, then
 use the connection test/refresh to initialize and discover tools. Review discovered schemas and
-grant tool names explicitly. In agent settings, follow **MCP connections**, select the shared
-connections, and save. Agents store references only; definitions and encrypted secrets belong to
-the company and are separate from model credentials.
+grant tool names explicitly. Workflow MCP actions call granted tools; agents no longer select
+connections (removed in 06C). Definitions and encrypted secrets belong to the company and are
+separate from model credentials.
 
 Saving checks local configuration, not connectivity or authentication. Refresh tests both enabled
 and disabled definitions; bearer connections require a token first. Discovery grants nothing.
 Refresh revokes grants for removed/changed schemas; review and re-grant them before use. Execution
-rechecks discovery fingerprints and definition, credential and selection revisions before dispatch.
-Shared edits affect every selecting agent; inspect the selecting-agent list first. Endpoint/auth
-changes clear the token. Ordinary agent edits preserve selections; an explicit empty selection
-clears them. Library export/copy does not transfer company connections or secrets.
+rechecks discovery fingerprints and definition and credential revisions before dispatch.
+Endpoint/auth changes clear the token. Library export/copy does not transfer company connections or
+secrets.
 
 | Surface under `/api/companies/{company}` | Operation |
 | --- | --- |
 | `/mcp-connections` | GET catalog; POST definition |
-| `/mcp-connections/{id}` | GET (includes selecting agents); PUT `{expected_revision, definition}`; DELETE `{expected_revision}` |
+| `/mcp-connections/{id}` | GET; PUT `{expected_revision, definition}`; DELETE `{expected_revision}` |
 | `/mcp-connections/{id}/credential` | PUT `{expected_revision, token}`; null removes the token |
 | `/mcp-connections/{id}/refresh` | POST `{expected_revision}` |
-| `/agents/{agent}/mcp-selection` | GET; PUT `{expected_revision, mcp_connection_ids}`; omission preserves, `[]` clears |
 
 A definition has `slug`, `endpoint_url`, `transport: "streamable_http"`, `enabled`,
 `auth: {"type":"none"}` or `{"type":"bearer"}`, and optional `tool_grants: [{"name":"remote_name"}]`.
@@ -220,11 +196,10 @@ Company settings cannot widen this policy. JSON and POST SSE responses are suppo
 legacy SSE, OAuth, unsolicited GET streams, sampling, roots, elicitation, resources and prompts
 are not enabled.
 
-Limits: 64 live definitions/company, 8 selections/agent, 32 effective tools/agent, 100 discovered
-tools/connection, 64 KiB/schema and arguments, 2,048 bytes/URL, 16 KiB/bearer token and 1 MiB wire
+Limits: 64 live definitions/company, 32 granted tools/connection, 100 discovered tools/connection, 64 KiB/schema and arguments, 2,048 bytes/URL, 16 KiB/bearer token and 1 MiB wire
 data/discovery or call. Discovery has a 30-second total deadline; initialization/call deadlines are
 30 seconds, DNS/connect 5 seconds and idle reads 10 seconds. Each process allows 32 sessions total
-and four per exact endpoint. Selecting-agent lists reject more than 1,000 entries.
+and four per exact endpoint.
 
 Remote intent is journaled before network dispatch. Completed receipts bypass the network;
 uncertain effects become `indeterminate` and are never automatically replayed. There is no automated

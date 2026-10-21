@@ -72,9 +72,6 @@ struct LibraryAgentResponse {
     avatar_url: Option<AvatarUrl>,
     created_by: crate::entities::creation::CreationProvenance,
     created_at: chrono::DateTime<chrono::Utc>,
-    harness_kind: crate::entities::harness::HarnessKind,
-    granted_tool_ids: Vec<crate::entities::value_objects::ToolId>,
-    native_tool_policy: crate::entities::harness::NativeToolPolicy,
     skill_ids: Vec<Uuid>,
     sub_agent_ids: Vec<Uuid>,
 }
@@ -100,9 +97,6 @@ impl LibraryAgentResponse {
             avatar_url: agent.avatar_url,
             created_by: agent.created_by,
             created_at: agent.created_at,
-            harness_kind: agent.harness_kind,
-            granted_tool_ids: agent.granted_tool_ids,
-            native_tool_policy: agent.native_tool_policy,
             skill_ids,
             sub_agent_ids,
         }
@@ -128,6 +122,7 @@ pub(super) async fn require_operator(
 fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
     Ok(AgentWrite {
+        workflow_tools: None,
         response_contract: payload.response_contract,
         name: payload.name,
         slug: payload.slug,
@@ -136,9 +131,6 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         run_timeout_secs: payload.run_timeout_secs,
         system_prompt: payload.system_prompt,
         description: payload.description,
-        harness_kind: payload.harness_kind,
-        granted_tool_ids: payload.granted_tool_ids.unwrap_or_default(),
-        native_tool_policy: payload.native_tool_policy.unwrap_or_default(),
         skill_ids: payload.skill_ids.unwrap_or_default(),
         sub_agent_ids: payload.sub_agent_ids.unwrap_or_default(),
         config_json: payload.config_json,
@@ -368,12 +360,8 @@ async fn workspace(
                 "text"
             },
             response_schema: pages::agent_response_schema(&agent),
-            harness_kind_raw: None,
-            harness_kind: Some(agent.harness_kind),
-            granted_tool_ids: agent.granted_tool_ids.clone(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
             sub_agent_ids: Vec::new(),
-            native_tool_policy: agent.native_tool_policy.clone(),
             avatar_url: agent
                 .avatar_url
                 .as_ref()
@@ -394,7 +382,6 @@ async fn workspace(
     let create_fields = pages::library_agent_fields_with_capabilities(
         &pages::AgentDraft {
             advanced: true,
-            harness_kind: Some(config.default_agent_harness),
             ..pages::AgentDraft::default()
         },
         None,
@@ -434,7 +421,7 @@ mod structured_contract_tests {
     #[test]
     fn library_api_preserves_the_response_contract_patch() {
         let payload: AgentJsonPayload = serde_json::from_value(serde_json::json!({
-            "name":"Structured", "slug":"structured", "harness_kind":"rig",
+            "name":"Structured", "slug":"structured",
             "response_contract":{"version":1,"format":"json_schema","schema":{"type":"object"}}
         }))
         .unwrap();

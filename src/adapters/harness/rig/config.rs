@@ -39,7 +39,7 @@ mod tests {
     use crate::entities::harness::{HarnessConfig, SubAgentScope};
     #[test]
     fn every_attempt_consumes_the_same_budget_and_mismatches_fail() {
-        let mut spec = AgentCapabilitySpec {
+        let spec = AgentCapabilitySpec {
             response_contract: None,
             harness: HarnessKind::Rig,
             name: "test".into(),
@@ -48,7 +48,6 @@ mod tests {
             model: "model".into(),
             provider_base_url: None,
             skills: vec![],
-            granted_tools: vec![],
             sub_agents: SubAgentScope::AllCompanySiblings,
             harness_config: HarnessConfig::empty(HarnessKind::Rig),
         };
@@ -64,9 +63,5 @@ mod tests {
                 .charge()
                 .is_err()
         );
-        spec.harness_config = HarnessConfig::empty(HarnessKind::AiAgents);
-        assert!(ModelCallBudget::compile(&spec, 3).is_err());
-        spec.harness = HarnessKind::AiAgents;
-        assert!(ModelCallBudget::compile(&spec, 3).is_err());
     }
 }

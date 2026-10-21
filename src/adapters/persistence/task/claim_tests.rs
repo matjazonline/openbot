@@ -410,16 +410,35 @@ async fn concurrent_workers_never_receive_the_same_task_twice() {
 /// so two workers ran it and only one could finish.
 ///
 /// The window has to be held open between the second claim's snapshot and its lock on the task.
-/// The claim's own trigger does that. `lock_task_agent_harnesses` takes `FOR SHARE` on the agent
-/// of every task being claimed, so a transaction holding one agent `FOR UPDATE` stops the claim
-/// part-way through its batch: after its snapshot, holding its first task, its second not yet
-/// locked.
+/// A test-only trigger on this test's own database does that (06C removed the production
+/// `lock_task_agent_harnesses` trigger that used to): it takes `FOR SHARE` on the agent of every
+/// task being claimed, so a transaction holding one agent `FOR UPDATE` stops the claim part-way
+/// through its batch: after its snapshot, holding its first task, its second not yet locked.
 #[tokio::test]
 async fn a_claim_never_takes_a_task_another_worker_claimed_after_its_snapshot() {
     let Some(database) = own_database().await else {
         return;
     };
     let pool = database.pool.clone();
+    sqlx::raw_sql(
+        "CREATE FUNCTION test_pause_claim_on_agent() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN
+             IF NEW.status = 'processing' THEN
+                 PERFORM agent.id FROM channel_agents AS assignment
+                 JOIN agents AS agent ON agent.id = assignment.agent_id
+                 WHERE assignment.channel_id = NEW.channel_id
+                   AND assignment.company_id = NEW.company_id
+                 ORDER BY agent.id FOR SHARE OF agent;
+             END IF;
+             RETURN NEW;
+         END;
+         $$;
+         CREATE TRIGGER test_pause_claim_on_agent BEFORE UPDATE OF status ON background_tasks
+             FOR EACH ROW EXECUTE FUNCTION test_pause_claim_on_agent();",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     let persistence = PostgresPersistence::new(pool.clone());
     // One task per company, so all three are first in their company and sort by age alone.
     let (first, first_channel) = seed_company_and_channel(&persistence).await;

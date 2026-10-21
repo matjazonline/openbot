@@ -12,7 +12,7 @@ mod controls;
 
 async fn prior_fixture() -> (AdmissionFixture, ActionDispatchRequest) {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["input_schema"] = json!({"type":"object","properties":{"value":{"type":"integer","minimum":1,"maximum":1000}},"required":["value"]});
     source["steps"]["start"]["with"]["max_tokens"] = json!({"ref":"/input/value"});
     // Supported limits are frozen before admission; nothing replenishes a debit.

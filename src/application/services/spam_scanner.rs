@@ -344,7 +344,6 @@ mod tests {
     #[tokio::test]
     async fn test_spam_scanner_service_composite() {
         let config = Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -370,7 +369,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),

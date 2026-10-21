@@ -23,17 +23,6 @@ pub(super) fn validate(
             .map_err(|reason| fail("publication.selection", &reason))?;
     }
     validate_skills(company_id, snapshots, compiled)?;
-    for profile in &snapshots.profiles {
-        check_selection(&profile.tools, &profile.skills, snapshots).map_err(|reason| {
-            dependency_error(
-                compiled,
-                "capability_profile",
-                profile.name.as_str(),
-                "publication.selection",
-                &reason,
-            )
-        })?;
-    }
     validate_tools(company_id, snapshots, compiled)?;
     validate_agents(snapshots, compiled)
 }
@@ -164,51 +153,14 @@ pub(super) fn check_selection(
     Ok(())
 }
 
-pub(super) fn validate_profile(
-    value: &Value,
-    snapshots: &DependencySnapshots,
-    compiled: &CompiledWorkflow,
-    path: &str,
-) -> Result<(), Diagnostic> {
-    let check = || {
-        let selected = super::capabilities::profile(value, snapshots)?;
-        check_selection(&selected.tools, &selected.skills, snapshots)
-    };
-    check().map_err(|message| error(compiled, path, "publication.selection", &message))
-}
-
-fn constant(binding: &Binding) -> Option<Value> {
-    match binding {
-        Binding::Literal(value) => Some(value.clone()),
-        Binding::Array(values) => values
-            .iter()
-            .map(constant)
-            .collect::<Option<Vec<_>>>()
-            .map(Value::Array),
-        Binding::Object(fields) => fields
-            .iter()
-            .map(|(key, value)| Some((key.clone(), constant(value)?)))
-            .collect::<Option<serde_json::Map<_, _>>>()
-            .map(Value::Object),
-        _ => None,
-    }
-}
-
 fn validate_agents(
     snapshots: &DependencySnapshots,
     compiled: &CompiledWorkflow,
 ) -> Result<(), Diagnostic> {
     for (id, step) in &compiled.graph().definition().steps {
-        if !matches!(step.step_type.as_str(), "agent.run" | "decision.agent") {
+        if crate::application::workflow::registry::ModelStep::of(step.step_type.as_str()).is_none()
+        {
             continue;
-        }
-        if let Some(value) = step.inputs.get("capability_profile").and_then(constant) {
-            validate_profile(
-                &value,
-                snapshots,
-                compiled,
-                &format!("/steps/{id}/with/capability_profile"),
-            )?;
         }
         let path = format!("/steps/{id}/with/agent");
         let fail = || {

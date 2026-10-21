@@ -1,47 +1,17 @@
 //! Shared skill-library editor for company owners and platform operators.
 
 use super::*;
-use crate::entities::{
-    skill::{Skill, SkillInstruction},
-    tool_catalogue::CatalogueTool,
-};
+use crate::entities::skill::{Skill, SkillInstruction};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DraftInstruction {
-    Prompt {
-        text: String,
-    },
-    Tool {
-        tool: String,
-        args: String,
-        output_as: String,
-        args_error: Option<String>,
-    },
+    Prompt { text: String },
 }
 
 impl DraftInstruction {
     pub fn prompt() -> Self {
         Self::Prompt {
             text: String::new(),
-        }
-    }
-
-    pub fn tool() -> Self {
-        Self::Tool {
-            tool: CatalogueTool::grantable()
-                .next()
-                .map(|tool| tool.id.to_string())
-                .unwrap_or_default(),
-            args: String::new(),
-            output_as: String::new(),
-            args_error: None,
-        }
-    }
-
-    fn kind(&self) -> &'static str {
-        match self {
-            Self::Prompt { .. } => "prompt",
-            Self::Tool { .. } => "tool",
         }
     }
 }
@@ -74,33 +44,13 @@ impl SkillDraft {
             instructions: skill
                 .instructions
                 .iter()
-                .map(|instruction| match instruction {
-                    SkillInstruction::Prompt { text } => {
-                        DraftInstruction::Prompt { text: text.clone() }
-                    }
-                    SkillInstruction::Tool {
-                        tool,
-                        args,
-                        output_as,
-                    } => DraftInstruction::Tool {
-                        tool: tool.to_string(),
-                        args: args
-                            .as_ref()
-                            .map(|value| serde_json::to_string_pretty(value).unwrap_or_default())
-                            .unwrap_or_default(),
-                        output_as: output_as.clone().unwrap_or_default(),
-                        args_error: None,
+                .map(
+                    |SkillInstruction::Prompt { text }| DraftInstruction::Prompt {
+                        text: text.clone(),
                     },
-                })
+                )
                 .collect(),
         }
-    }
-
-    pub fn ends_with_prompt(&self) -> bool {
-        matches!(
-            self.instructions.last(),
-            Some(DraftInstruction::Prompt { .. })
-        )
     }
 }
 
@@ -248,7 +198,6 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
     } else {
         "New skill"
     };
-    let invalid_last_step = !draft.ends_with_prompt();
     let skill_id = draft.id.map_or_else(String::new, |id| {
         format!(r#"<input type="hidden" name="skill_id" value="{id}">"#)
     });
@@ -278,9 +227,8 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
             <label class="form-control"><span class="label text-xs opacity-70">Trigger</span>
                 <textarea class="textarea w-full" name="trigger" maxlength="500" required>{trigger}</textarea></label>
             {instructions}
-            {hint}
             <div class="flex items-center gap-3 border-t border-base-300 pt-4">
-                <button type="submit" class="btn btn-primary"{disabled}>
+                <button type="submit" class="btn btn-primary">
                     <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
                     <span class="[.htmx-request_&]:hidden">Save skill</span>
                     <span class="hidden [.htmx-request_&]:inline">Saving...</span></button>
@@ -298,17 +246,11 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
         description = escape_html_text(&draft.description),
         trigger = escape_html_text(&draft.trigger),
         instructions = skill_instruction_editor(company_id, draft),
-        hint = if invalid_last_step {
-            r#"<p class="text-sm text-error">A skill must end with a prompt step.</p>"#
-        } else {
-            ""
-        },
-        disabled = if invalid_last_step { " disabled" } else { "" },
         base_url = skill_url(company_id, None),
     )
 }
 
-/// The fragment replaced by every add/remove/reorder/kind action.
+/// The fragment replaced by every add/remove/reorder action.
 pub fn skill_instruction_editor(company_id: Option<Uuid>, draft: &SkillDraft) -> String {
     let rows = draft
         .instructions
@@ -321,7 +263,7 @@ pub fn skill_instruction_editor(company_id: Option<Uuid>, draft: &SkillDraft) ->
     format!(
         r##"<section id="skill-instruction-editor" class="space-y-3" aria-live="polite">
             <div class="flex items-center justify-between"><div><h4 class="text-sm font-semibold">Instructions</h4>
-                <p class="text-xs opacity-60">At most 32. The last instruction must be a prompt.</p></div>{add}</div>
+                <p class="text-xs opacity-60">At most 32 prompt instructions.</p></div>{add}</div>
             <input type="hidden" name="instruction_count" value="{count}">
             <div class="space-y-3">{rows}</div>
         </section>"##,
@@ -345,45 +287,21 @@ fn instruction_row(
     instruction: &DraftInstruction,
 ) -> String {
     let url = instruction_url(company_id);
-    let prompt_selected = if instruction.kind() == "prompt" {
-        " selected"
-    } else {
-        ""
-    };
-    let tool_selected = if instruction.kind() == "tool" {
-        " selected"
-    } else {
-        ""
-    };
-    let body = match instruction {
-        DraftInstruction::Prompt { text } => format!(
-            r#"<textarea class="textarea min-h-24 w-full" name="instruction_{index}_text" maxlength="8000" required>{}</textarea>"#,
-            escape_html_text(text)
-        ),
-        DraftInstruction::Tool {
-            tool,
-            args,
-            output_as,
-            args_error,
-        } => tool_instruction_fields(index, tool, args, output_as, args_error.as_deref()),
-    };
+    let DraftInstruction::Prompt { text } = instruction;
+    let body = format!(
+        r#"<textarea class="textarea min-h-24 w-full" name="instruction_{index}_text" maxlength="8000" required>{}</textarea>"#,
+        escape_html_text(text)
+    );
     format!(
         r##"<div class="rounded-box border border-base-300 bg-base-100 p-3" data-instruction-row="{index}">
             <div class="mb-2 flex flex-wrap items-center gap-2">
-                <select class="select select-sm" name="instruction_{index}_kind"
-                    hx-post="{url}" hx-vals='{{"action":"kind:{index}:__selected__"}}'
-                    hx-include="#skill-editor" hx-target="#skill-editor" hx-swap="outerHTML"
-                    hx-sync="#skill-editor:replace" hx-disabled-elt="this"
-                    hx-indicator="#skill-kind-{index}-progress" data-action="skill-kind">
-                    <option value="prompt"{prompt_selected}>Prompt</option>
-                    <option value="tool"{tool_selected}>Tool</option>
-                </select>
-                <span id="skill-kind-{index}-progress" class="htmx-indicator loading loading-spinner loading-xs" aria-label="Updating instruction"></span>
+                <span class="text-xs opacity-70">Prompt {number}</span>
                 <span class="ml-auto flex gap-1">
                     {up}{down}{remove}
                 </span>
             </div>{body}
         </div>"##,
+        number = index + 1,
         up = instruction_action_button(&url, &format!("up:{index}"), "↑", "btn btn-ghost btn-xs"),
         down =
             instruction_action_button(&url, &format!("down:{index}"), "↓", "btn btn-ghost btn-xs"),
@@ -393,47 +311,6 @@ fn instruction_row(
             "×",
             "btn btn-ghost btn-xs"
         ),
-    )
-}
-
-fn tool_instruction_fields(
-    index: usize,
-    selected_tool: &str,
-    args: &str,
-    output_as: &str,
-    args_error: Option<&str>,
-) -> String {
-    let options = CatalogueTool::grantable()
-        .map(|tool| {
-            format!(
-                r#"<option value="{}"{}>{}</option>"#,
-                escape_html_attr(tool.id),
-                if tool.id == selected_tool {
-                    " selected"
-                } else {
-                    ""
-                },
-                escape_html_text(tool.label),
-            )
-        })
-        .collect::<String>();
-    let error = args_error.map_or_else(String::new, |message| {
-        format!(
-            r#"<p class="mt-1 text-xs text-error">{}</p>"#,
-            escape_html_text(message)
-        )
-    });
-    format!(
-        r##"<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="form-control"><span class="label text-xs opacity-70">Tool</span>
-                <select class="select w-full" name="instruction_{index}_tool">{options}</select></label>
-            <label class="form-control"><span class="label text-xs opacity-70">Output as</span>
-                <input class="input w-full font-mono" name="instruction_{index}_output_as" maxlength="64" value="{output_as}"></label>
-            <label class="form-control md:col-span-2"><span class="label text-xs opacity-70">Arguments (JSON object)</span>
-                <textarea class="textarea w-full font-mono text-xs" name="instruction_{index}_args" maxlength="524288" placeholder='{{"format":"iso8601"}}'>{args}</textarea>{error}</label>
-        </div>"##,
-        output_as = escape_html_attr(output_as),
-        args = escape_html_text(args),
     )
 }
 
@@ -483,21 +360,5 @@ mod tests {
         assert!(!html.contains(&["<scr", "ipt>"].concat()));
         assert!(!html.contains("</textarea><"));
         assert!(html.contains("&lt;script&gt;"));
-    }
-
-    #[test]
-    fn an_instruction_tool_select_offers_only_grantable_tools() {
-        let draft = SkillDraft {
-            instructions: vec![DraftInstruction::Tool {
-                tool: "datetime".into(),
-                args: "{}".into(),
-                output_as: String::new(),
-                args_error: None,
-            }],
-            ..SkillDraft::default()
-        };
-        let html = skill_instruction_editor(None, &draft);
-        assert!(html.contains("datetime"));
-        assert!(!html.contains("value=\"command\""));
     }
 }

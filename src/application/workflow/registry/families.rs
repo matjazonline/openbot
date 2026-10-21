@@ -2,12 +2,12 @@ use super::*;
 impl Registration<'_> {
     pub(super) fn basic(&mut self) -> Result<Contract, Diagnostic> {
         match self.name() {
-            "context.load" => Ok(contract(
-                json!({"sources":array(identifier(), 1, MAX_SELECTIONS),"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
-                &["sources", "max_tokens"],
+            "context.history" => Ok(contract(
+                json!({"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
+                &["max_tokens"],
                 object(
-                    json!({"items":array(provenance_item(),0,MAX_ITEMS),"token_count":{"type":"integer","minimum":0,"maximum":MAX_CONTEXT_TOKENS}}),
-                    &["items", "token_count"],
+                    json!({"items":array(history_item(),0,MAX_ITEMS),"token_count":{"type":"integer","minimum":0,"maximum":MAX_CONTEXT_TOKENS},"omitted":{"type":"integer","minimum":0}}),
+                    &["items", "token_count", "omitted"],
                 ),
             )),
             "memory.load" => Ok(contract(
@@ -45,25 +45,21 @@ impl Registration<'_> {
                 if !finite_labels(&schema) {
                     return Err(self.error(
                         "registry.labels",
-                        "Declare a finite scalar enum or a label/profile enum property",
+                        "Declare a finite scalar enum or a label enum property",
                         "output_schema",
                     ));
                 }
                 contract(
-                    json!({"context":true,"output_schema":declaration}),
-                    &["context", "output_schema"],
-                    schema,
-                )
-            }
-            "agent.run" => {
-                let profiles: BTreeMap<_,_> = self.facts.profiles.iter().map(|p| (p.name.to_string(),json!({"tools":p.tools.iter().map(TypeName::as_str).collect::<Vec<_>>(),"skills":p.skills.iter().map(TypeName::as_str).collect::<Vec<_>>()}))).collect();
-                self.effective["profiles"] = json!(profiles);
-                contract(
-                    json!({"agent":identifier(),"context":true,"output_schema":declaration,"capability_profile":profile(self.facts)}),
+                    json!({"agent":identifier(),"context":true,"output_schema":declaration}),
                     &["agent", "context", "output_schema"],
                     schema,
                 )
             }
+            "agent.run" => contract(
+                json!({"agent":identifier(),"context":true,"output_schema":declaration}),
+                &["agent", "context", "output_schema"],
+                schema,
+            ),
             _ => unreachable!("schema output family"),
         };
         if self.name() == "agent.run" {
@@ -196,7 +192,7 @@ fn finite_labels(schema: &Value) -> bool {
     finite(schema)
         || ((matches!(schema.get("type"), Some(Value::String(kind)) if kind == "object")
             || schema.get("type") == Some(&json!(["object"])))
-            && ["label", "profile"].iter().any(|name| {
+            && ["label"].iter().any(|name| {
                 schema
                     .get("properties")
                     .and_then(|p| p.get(name))

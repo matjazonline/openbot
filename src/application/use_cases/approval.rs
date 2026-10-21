@@ -535,7 +535,6 @@ mod tests {
     /// The one config every test here uses; kept in one place so a new field is added once.
     fn test_config() -> Arc<AppConfig> {
         Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".into(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -561,7 +560,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -1149,128 +1147,6 @@ mod tests {
                 .is_none(),
             "nothing carried the note"
         );
-    }
-
-    #[tokio::test]
-    async fn test_simulated_server_restart_with_agent_approval_handler() {
-        use crate::services::harness::{
-            AgentApprovalHandler, ApprovalAsk, ApprovalTrigger, ApprovalVerdict, HarnessApprovals,
-        };
-
-        // One deploy attempt, asked twice: the same trigger from two process lifetimes must hash
-        // to the same step key or the second instance re-asks a human who already answered.
-        let deploy_args = serde_json::json!({ "cmd": "deploy_prod" });
-        let deploy_attempt = || ApprovalAsk {
-            invocation: None,
-            trigger: ApprovalTrigger::Tool {
-                name: "command",
-                args: &deploy_args,
-            },
-            message: "Execute deployment script",
-            context: &serde_json::Value::Null,
-        };
-
-        // Shared persistent database mock across server instances
-        let shared_db = Arc::new(MockApprovalPersistence {
-            threads: Mutex::new(None),
-            approvals: Mutex::new(Vec::new()),
-        });
-        let thread_persistence = Arc::new(InMemoryThreads::new());
-
-        let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-
-        // --- SERVER INSTANCE 1 ---
-        let (server1, thread_id) =
-            approval_fixture(shared_db.clone(), thread_persistence.clone(), channel_id).await;
-        let server1_approval_use_cases = Arc::new(server1);
-
-        let ctx1 = ApprovalSubject {
-            correlation_id: CorrelationId::new(),
-            company_id,
-            channel_id,
-            channel_name: "Deploy Agent".into(),
-            channel_slug: "deploy".into(),
-            company_slug: "acme".into(),
-            thread_id,
-            suspension: None,
-            approver_email: "devops@acme.com".into(),
-        };
-
-        let handler1 = AgentApprovalHandler {
-            approval_use_cases: server1_approval_use_cases,
-            context: ctx1,
-            delegation: None,
-        };
-
-        // Server 1 handles request -> No prior approval -> Pauses task and creates DB token
-        let res1 = handler1
-            .decide(deploy_attempt())
-            .await
-            .expect("the first attempt is decided");
-        assert!(
-            matches!(res1, ApprovalVerdict::Pending { .. }),
-            "the turn is paused, not approved"
-        );
-
-        // Verify pending record created in shared DB
-        let token = {
-            let db_list1 = shared_db.approvals.lock().unwrap();
-            assert_eq!(db_list1.len(), 1);
-            assert_eq!(db_list1[0].status, ApprovalStatus::Pending);
-            db_list1[0].token.clone()
-        };
-
-        // =========================================================================
-        // SIMULATED SERVER CRASH / RESTART: Server 1 is completely dropped!
-        // =========================================================================
-        drop(handler1);
-
-        // --- SERVER INSTANCE 2 (After Restart) ---
-        // A second process over the same stores: nothing about the approval lives in memory.
-        let (server2, _) =
-            approval_fixture(shared_db.clone(), thread_persistence.clone(), channel_id).await;
-        let server2_approval_use_cases = Arc::new(server2);
-
-        // 1. User clicks confirmation link on Server 2
-        let (processed_approval, result_msg) = server2_approval_use_cases
-            .process_link_action(&token, "confirm")
-            .await
-            .unwrap();
-
-        assert_eq!(processed_approval.status, ApprovalStatus::Approved);
-        assert!(result_msg.contains("CONFIRMED successfully"));
-
-        // 2. Server 2 re-runs Agent task after restart
-        let ctx2 = ApprovalSubject {
-            correlation_id: CorrelationId::new(),
-            company_id,
-            channel_id,
-            channel_name: "Deploy Agent".into(),
-            channel_slug: "deploy".into(),
-            company_slug: "acme".into(),
-            thread_id,
-            suspension: None,
-            approver_email: "devops@acme.com".into(),
-        };
-
-        let handler2 = AgentApprovalHandler {
-            approval_use_cases: server2_approval_use_cases,
-            context: ctx2,
-            delegation: None,
-        };
-
-        // Server 2 handles same trigger -> Checks DB -> Auto-passes as Approved!
-        let res2 = handler2
-            .decide(deploy_attempt())
-            .await
-            .expect("the second attempt is decided");
-        assert_eq!(res2, ApprovalVerdict::Approved); // Auto-passed! No duplicate email!
-
-        // Ensure no extra approval rows were created in DB
-        let db_list2 = shared_db.approvals.lock().unwrap();
-        assert_eq!(db_list2.len(), 1);
-        assert_eq!(db_list2[0].status, ApprovalStatus::Approved);
     }
 
     #[tokio::test]

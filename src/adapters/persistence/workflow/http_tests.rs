@@ -503,3 +503,6 @@ async fn workflow_http_publication_rejects_forged_policy_and_registration_revoca
 
 #[path = "action_approval_http_tests.rs"]
 mod approval_tests;
+
+#[path = "agent_runtime_tests.rs"]
+mod agent_runtime_tests;

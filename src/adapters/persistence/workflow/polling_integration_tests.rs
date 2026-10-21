@@ -58,7 +58,7 @@ async fn workflow_poll_complete_chain_and_competing_wait_consumption() {
     source["steps"]["wait"]["with"]["deadline"] =
         json!({"literal":(chrono::Utc::now()+chrono::Duration::minutes(5)).to_rfc3339()});
     let context: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["steps"]["context"] = context["steps"]["start"].clone();
     source["steps"]["context"]["routes"]["success"] = json!("wait");
     source["steps"]["start"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":true}},"routes":{"success":"context"}});

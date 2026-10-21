@@ -115,7 +115,7 @@ async fn workflow_harness_token_processing_pause_charges_one_failure_only() {
         p.settled()
             .complete_io(FencedWorkflowResult {
                 fence: claim.fence,
-                output: json!({"items":[],"token_count":0}),
+                output: json!({"items":[],"token_count":0,"omitted":0}),
                 policy
             })
             .await
@@ -181,7 +181,7 @@ async fn workflow_harness_token_pause_last_attempt_terminalizes() {
         p.settled()
             .complete_io(FencedWorkflowResult {
                 fence: claim.fence,
-                output: json!({"items":[],"token_count":0}),
+                output: json!({"items":[],"token_count":0,"omitted":0}),
                 policy
             })
             .await
@@ -277,7 +277,7 @@ async fn workflow_harness_token_competing_deferred_claims_do_not_lock_ancestor()
 async fn workflow_harness_token_pure_pending_reports_deferral_and_resumes() {
     use crate::application::workflow::batch::{BatchBudget, BatchDisposition, WorkflowBatch};
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     let end = source["steps"]["start"]["routes"]["success"].clone();
     source["steps"]["start"]["routes"]["success"] = json!("finish");
     source["steps"]["finish"] = json!({"type":"data.map","with":{
@@ -298,7 +298,7 @@ async fn workflow_harness_token_pure_pending_reports_deferral_and_resumes() {
         .settled()
         .complete_io(FencedWorkflowResult {
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
             policy,
         })
         .await

@@ -134,7 +134,7 @@ BEGIN
         'not_result_poison',attempt.workflow_failure_code<>'workflow.invalid_result','not_deadline_poison',attempt.workflow_failure_code<>'workflow.run_deadline',
         'not_budget_poison',attempt.workflow_failure_code<>'workflow.root_budget_exhausted','action_safe',workflow_action_retry_safe(config.company_id,execution.id) IS TRUE,
         'budget_link',link.company_id=owner.company_id AND link.run_id=owner.id AND link.root_run_id=budget.root_run_id,
-        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'frozen_v3',budget.provenance='frozen_v3',
+        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'frozen_v6',budget.provenance='frozen_v6',
         'budget_activations',usage.activations<=budget.activations,'budget_model',usage.model_calls<budget.model_calls,'budget_repetitions',usage.repetitions<=budget.repetitions,
         'no_exhausted_receipt',NOT EXISTS(SELECT 1 FROM workflow_budget_receipts WHERE company_id=config.company_id AND run_id=config.run_id AND disposition='exhausted'),
         'no_refusal',NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals WHERE company_id=config.company_id AND run_id=config.run_id AND execution_id=config.execution_id AND job_id=config.job_id),

@@ -173,6 +173,12 @@ impl CompiledWorkflow {
         Ok(PreparedInputs { value })
     }
 
+    /// The named step's compiled output contract: the exact schema
+    /// `validate_step_output` enforces, for a handler that must state it to a model.
+    pub fn step_output_schema(&self, step: &StepId) -> Option<&Value> {
+        self.step_outputs.get(step).map(Schema::raw)
+    }
+
     /// Validate only the named step's handler output before the runtime commits it.
     pub fn validate_step_output(&self, step: &StepId, value: &Value) -> Result<(), Diagnostic> {
         let Some(schema) = self.step_outputs.get(step) else {

@@ -254,7 +254,27 @@ BEGIN
             OR NEW.continuation_count <> OLD.continuation_count + 1 OR NEW.continuation_count > 63
             OR (NEW.company_id,NEW.workflow_execution_id) IS DISTINCT FROM (OLD.company_id,OLD.workflow_execution_id)
             OR NEW.worker_id IS NOT NULL OR NEW.execution_generation IS NOT NULL OR NEW.lock_expires_at IS NOT NULL
-            OR NOT EXISTS (
+            OR NOT (EXISTS (
+                -- A model-tool delivery continues its parked agent job: the exact action whose
+                -- marker closed this attempt, its completed effect wait and its receipt.
+                SELECT 1 FROM workflow_executions AS execution
+                JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+                JOIN workflow_message_actions AS action ON action.company_id=execution.company_id
+                    AND action.execution_id=execution.id AND action.origin='model_tool'
+                JOIN workflow_action_dispatches AS marker ON marker.company_id=action.company_id
+                    AND marker.invocation_id=action.invocation_id AND marker.id=action.dispatch_id
+                JOIN workflow_waits AS wait ON wait.company_id=action.company_id
+                    AND wait.execution_id=action.execution_id AND wait.id=action.wait_id
+                JOIN workflow_action_receipts AS receipt ON receipt.company_id=action.company_id
+                    AND receipt.invocation_id=action.invocation_id
+                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
+                WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
+                    AND execution.completed_at IS NULL AND execution.committed_route IS NULL
+                    AND run.state='running' AND run.deadline>clock_timestamp()
+                    AND attempt.status='completed' AND attempt.stop_reason='effect_parked'
+                    AND marker.job_id=OLD.id AND marker.attempt_number=OLD.attempt_ordinal
+                    AND wait.reason='effect' AND wait.state='completed'
+            ) OR EXISTS (
                 SELECT 1 FROM workflow_executions AS execution
                 JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
                 JOIN workflow_decisions AS decision ON decision.company_id=execution.company_id AND decision.execution_id=execution.id
@@ -269,8 +289,8 @@ BEGIN
                     AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
                     AND decision.submitted_xact=pg_current_xact_id()
                     AND wait.reason='decision' AND wait.state='completed'
-            ) THEN
-            RAISE EXCEPTION 'workflow job reopen requires an approval in this transaction' USING ERRCODE='23514';
+            )) THEN
+            RAISE EXCEPTION 'workflow job reopen requires an approval or delivery continuation' USING ERRCODE='23514';
         END IF;
     END IF;
     RETURN NULL;
@@ -484,7 +504,7 @@ BEGIN
         WHERE company_id=NEW.company_id AND root_run_id=NEW.root_run_id;
     consumed=CASE NEW.resource WHEN 'activation' THEN usage.activations WHEN 'model_call' THEN usage.model_calls ELSE usage.repetitions END;
     ceiling=CASE NEW.resource WHEN 'activation' THEN budget.activations WHEN 'model_call' THEN budget.model_calls ELSE budget.repetitions END;
-    NEW.disposition=CASE WHEN budget.provenance='frozen_v4' AND NEW.quantity>0
+    NEW.disposition=CASE WHEN budget.provenance='frozen_v6' AND NEW.quantity>0
         AND consumed<=ceiling::bigint-NEW.quantity THEN 'granted' ELSE 'exhausted' END;
     IF NEW.disposition='granted' THEN
         UPDATE workflow_root_budget_usage SET
@@ -833,72 +853,6 @@ $$;
 
 
 --
--- Name: guard_active_agent_harness_change(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.guard_active_agent_harness_change() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.harness_kind IS NOT DISTINCT FROM OLD.harness_kind
-       AND NEW.response_contract IS NOT DISTINCT FROM OLD.response_contract THEN
-        RETURN NEW;
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM principals AS principal
-        JOIN background_tasks AS task
-          ON task.company_id = principal.company_id AND task.owner_principal_id = principal.id
-        WHERE principal.company_id = OLD.company_id AND principal.agent_id = OLD.id
-          AND task.queue_kind = 'legacy'
-          AND task.status IN ('pending', 'processing', 'pending_approval',
-                              'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter')
-    ) OR EXISTS (
-        SELECT 1 FROM channel_agents AS assignment
-        JOIN background_tasks AS task
-          ON task.company_id = assignment.company_id AND task.channel_id = assignment.channel_id
-        WHERE assignment.agent_id = OLD.id
-          AND task.queue_kind = 'legacy'
-          AND task.status IN ('pending', 'processing', 'pending_approval',
-                              'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter')
-    ) THEN
-        RAISE EXCEPTION USING ERRCODE = '23514',
-            CONSTRAINT = 'agent_harness_has_unsettled_tasks',
-            MESSAGE = 'Agent harness cannot change while tasks are active or suspended';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: guard_agent_mcp_harness(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.guard_agent_mcp_harness() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.harness_kind <> 'rig' AND NEW.company_id IS NOT NULL THEN
-        PERFORM id FROM companies WHERE id = NEW.company_id FOR SHARE;
-        IF EXISTS (
-            SELECT 1 FROM agent_mcp_selections AS selection
-            JOIN company_mcp_connections AS connection
-              ON connection.company_id = selection.company_id AND connection.id = selection.connection_id
-            JOIN company_mcp_tool_grants AS grant_row
-              ON grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id
-            WHERE selection.company_id = NEW.company_id AND selection.agent_id = NEW.id
-              AND connection.enabled AND connection.deleted_at IS NULL
-        ) THEN
-            RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'agent_mcp_requires_rig',
-                MESSAGE = 'Remove enabled MCP grants before changing harness to ai_agents';
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: guard_workflow_capacity_policy(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -980,7 +934,7 @@ BEGIN
         -- not become executable or receive defaults through this SQL boundary.
         BEGIN
             stored=convert_from(NEW.bundle,'UTF8')::jsonb;
-            IF stored->>'compiler_revision'='4' THEN
+            IF stored->>'compiler_revision'='6' THEN
                 SELECT version->'compiled'->'root_budget' INTO limits
                     FROM jsonb_array_elements(stored->'versions') AS version
                     WHERE version->>'version'=stored->>'root';
@@ -989,7 +943,7 @@ BEGIN
             limits=NULL;
         END;
         INSERT INTO workflow_root_budgets(company_id,root_run_id,provenance,activations,model_calls,repetitions,token_policy)
-            VALUES(NEW.company_id,root,CASE WHEN limits IS NULL THEN 'sealed_legacy' ELSE 'frozen_v4' END,
+            VALUES(NEW.company_id,root,CASE WHEN limits IS NULL THEN 'sealed_legacy' ELSE 'frozen_v6' END,
                 (limits->>'activations')::integer,(limits->>'model_calls')::integer,(limits->>'repetitions')::integer,limits->'tokens');
         INSERT INTO workflow_root_budget_usage(company_id,root_run_id) VALUES(NEW.company_id,root);
     END IF;
@@ -1050,32 +1004,6 @@ BEGIN
         RETURN OLD;
     END IF;
     RAISE EXCEPTION 'internal note audit rows are immutable' USING ERRCODE = '55000';
-END;
-$$;
-
-
---
--- Name: lock_task_agent_harnesses(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.lock_task_agent_harnesses() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.status IN ('pending', 'processing', 'pending_approval',
-                      'waiting_for_third_party_reply', 'stopped', 'failed', 'dead_letter') THEN
-        PERFORM agent.id FROM agents AS agent
-        JOIN (
-            SELECT principal.agent_id AS id FROM principals AS principal
-            WHERE principal.id = NEW.owner_principal_id AND principal.company_id = NEW.company_id
-            UNION
-            SELECT assignment.agent_id AS id FROM channel_agents AS assignment
-            WHERE assignment.channel_id = NEW.channel_id AND assignment.company_id = NEW.company_id
-        ) AS affected ON affected.id = agent.id
-        -- Preserve stable lock order and shared/library agents selected by this channel.
-        ORDER BY agent.id FOR SHARE OF agent;
-    END IF;
-    RETURN NEW;
 END;
 $$;
 
@@ -2422,7 +2350,8 @@ BEGIN
     IF NEW.owner_kind = 'legacy' THEN
         IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
             WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id AND task.queue_kind='legacy') THEN
-            RAISE EXCEPTION 'legacy harness requires legacy task' USING ERRCODE='23514';
+            RAISE EXCEPTION 'legacy harness requires legacy task'
+                USING ERRCODE='23514', CONSTRAINT='legacy_auxiliary_task_queue_kind';
         END IF;
         RETURN NEW;
     END IF;
@@ -2570,38 +2499,6 @@ BEGIN
         RAISE EXCEPTION 'Handoff event requires a visible scoped legacy task'
             USING ERRCODE = '23514', CONSTRAINT = 'legacy_handoff_event_task_provenance';
     END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: require_legacy_provision_task(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.require_legacy_provision_task() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE task_company uuid;
-BEGIN
-    IF TG_OP = 'UPDATE' THEN
-        IF (NEW.company_id, NEW.task_id, NEW.agent_id, NEW.channel_id)
-            IS NOT DISTINCT FROM (OLD.company_id, OLD.task_id, OLD.agent_id, OLD.channel_id) THEN
-            RETURN NEW;
-        END IF;
-    END IF;
-    SELECT task.company_id INTO task_company FROM public.background_tasks AS task
-    WHERE task.id = NEW.task_id AND task.queue_kind = 'legacy';
-    IF task_company IS NULL
-       OR (NEW.company_id IS NOT NULL AND NEW.company_id <> task_company)
-       OR NOT EXISTS (SELECT 1 FROM public.agents AS agent
-                      WHERE agent.id = NEW.agent_id AND agent.company_id = task_company)
-       OR NOT EXISTS (SELECT 1 FROM public.channels AS channel
-                      WHERE channel.id = NEW.channel_id AND channel.company_id = task_company) THEN
-        RAISE EXCEPTION 'Provision requires a visible legacy task and same-company owners'
-            USING ERRCODE = '23514', CONSTRAINT = 'legacy_provision_task_scope';
-    END IF;
-    NEW.company_id := task_company;
     RETURN NEW;
 END;
 $$;
@@ -2870,16 +2767,20 @@ CREATE FUNCTION public.valid_inbound_safe_header_facts(facts jsonb) RETURNS bool
 
 
 --
--- Name: valid_tool_id_array(text[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: valid_workflow_type_names(text[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.valid_tool_id_array(ids text[]) RETURNS boolean
+CREATE FUNCTION public.valid_workflow_type_names(names text[]) RETURNS boolean
     LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
     AS $$
-    SELECT cardinality(ids) <= 32
-       AND array_position(ids, NULL) IS NULL
-       AND COALESCE(bool_and(btrim(id) <> '' AND char_length(id) <= 120), TRUE)
-    FROM unnest(ids) AS id;
+    -- Mirrors domain::workflow::TypeName: dotted parts [A-Za-z_][A-Za-z0-9_-]*, <=128 bytes;
+    -- ordered, unique, at most 32 (agent workflow tool grants, skill required tools).
+    SELECT cardinality(names) <= 32
+       AND array_position(names, NULL) IS NULL
+       AND (SELECT count(DISTINCT name) FROM unnest(names) AS name) = cardinality(names)
+       AND COALESCE(bool_and(octet_length(name) BETWEEN 1 AND 128
+           AND name ~ '^[A-Za-z_][A-Za-z0-9_-]*([.][A-Za-z_][A-Za-z0-9_-]*)*$'), TRUE)
+    FROM unnest(names) AS name;
 $$;
 
 
@@ -3418,7 +3319,7 @@ BEGIN
             WHERE target.company_id=NEW.company_id AND target.invocation_id=NEW.invocation_id
                 AND target.delivery_id IS NOT NULL);
         IF action.wait_id IS NOT NULL THEN
-            IF NOT has_delivery OR action.origin<>'step' OR action.fence_expires_at<=clock_timestamp()
+            IF NOT has_delivery OR action.fence_expires_at<=clock_timestamp()
                 OR NOT EXISTS (
                     SELECT 1 FROM workflow_runs AS run
                     JOIN workflow_waits AS wait ON wait.company_id=run.company_id AND wait.run_id=run.id
@@ -3434,8 +3335,8 @@ BEGIN
             THEN RAISE EXCEPTION 'workflow message park lost its fence'; END IF;
             RETURN NEW;
         END IF;
-        IF action.origin='step' AND has_delivery THEN
-            RAISE EXCEPTION 'workflow message step with deliveries must park';
+        IF has_delivery THEN
+            RAISE EXCEPTION 'workflow message with deliveries must park';
         END IF;
         IF NOT has_delivery AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts AS receipt
             WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id
@@ -3742,7 +3643,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_budget_eligible(company uu
     SELECT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
         JOIN workflow_root_budgets AS budget ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id
         JOIN workflow_root_budget_usage AS usage ON usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id
-        WHERE link.company_id=company AND link.run_id=run AND budget.provenance='frozen_v4'
+        WHERE link.company_id=company AND link.run_id=run AND budget.provenance='frozen_v6'
             AND usage.activations<=budget.activations AND usage.model_calls<budget.model_calls
             AND usage.repetitions<=budget.repetitions
             AND NOT EXISTS(SELECT 1 FROM workflow_budget_receipts AS receipt
@@ -4309,6 +4210,26 @@ $$;
 -- Name: workflow_message_effect_wait_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
+CREATE FUNCTION public.workflow_model_tool_wait_continuation_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- 06-D4: a saved model tool call's delivery wait only continues its agent job; at commit
+    -- the execution is still open and its job is pending again. Step waits complete the step.
+    IF EXISTS(SELECT 1 FROM workflow_message_actions AS action
+            WHERE action.company_id=NEW.company_id AND action.execution_id=NEW.execution_id
+              AND action.wait_id=NEW.id AND action.origin='model_tool')
+       AND NOT EXISTS(SELECT 1 FROM workflow_executions AS execution
+            JOIN background_tasks AS job ON job.company_id=execution.company_id
+                AND job.workflow_execution_id=execution.id
+            WHERE execution.company_id=NEW.company_id AND execution.id=NEW.execution_id
+              AND execution.completed_at IS NULL AND execution.committed_route IS NULL
+              AND job.status='pending')
+    THEN RAISE EXCEPTION 'model-tool delivery only continues its agent job' USING ERRCODE='23514'; END IF;
+    RETURN NULL;
+END $$;
+
+
 CREATE FUNCTION public.workflow_message_effect_wait_guard() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -4400,44 +4321,6 @@ END $$;
 
 
 --
--- Name: agent_channel_provisions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_channel_provisions (
-    task_id uuid NOT NULL,
-    request_hash text NOT NULL,
-    agent_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    company_id uuid NOT NULL
-);
-
-
---
--- Name: agent_mcp_selection_revisions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_mcp_selection_revisions (
-    company_id uuid NOT NULL,
-    agent_id uuid NOT NULL,
-    revision bigint DEFAULT 1 NOT NULL,
-    CONSTRAINT agent_mcp_selection_revisions_revision_check CHECK ((revision > 0))
-);
-
-
---
--- Name: agent_mcp_selections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_mcp_selections (
-    company_id uuid NOT NULL,
-    agent_id uuid NOT NULL,
-    connection_id uuid NOT NULL
-);
-
-
---
 -- Name: agent_skills; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4486,21 +4369,17 @@ CREATE TABLE public.agents (
     memory_max_results smallint DEFAULT 5 NOT NULL,
     memory_persistence_mode text DEFAULT 'audience_only'::text NOT NULL,
     memory_enabled boolean DEFAULT false NOT NULL,
-    harness_kind text DEFAULT 'rig'::text NOT NULL,
-    granted_tool_ids text[] DEFAULT '{}'::text[] NOT NULL,
-    native_tool_policy jsonb DEFAULT '{"version": 1}'::jsonb NOT NULL,
+    -- Ordered workflow tool names this agent grants (06-D5).
+    workflow_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT agents_workflow_tools_shape CHECK (public.valid_workflow_type_names(workflow_tools)),
     response_contract jsonb,
     CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
     CONSTRAINT agents_config_v1_shape_check CHECK (((config_json IS NULL) OR COALESCE(((jsonb_typeof(config_json) = 'object'::text) AND (jsonb_typeof((config_json -> 'version'::text)) = 'number'::text) AND ((config_json ->> 'version'::text) = '1'::text) AND (octet_length((config_json)::text) <= 65536)), false))),
     CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT agents_granted_tool_ids_bounded CHECK (public.valid_tool_id_array(granted_tool_ids)),
-    CONSTRAINT agents_harness_kind_check CHECK ((harness_kind = ANY (ARRAY['ai_agents'::text, 'rig'::text]))),
     CONSTRAINT agents_memory_max_results_check CHECK (((memory_max_results >= 1) AND (memory_max_results <= 20))),
     CONSTRAINT agents_memory_persistence_mode_check CHECK ((memory_persistence_mode = ANY (ARRAY['audience_only'::text, 'scope_specific_facts'::text]))),
     CONSTRAINT agents_memory_recall_mode_check CHECK ((memory_recall_mode = ANY (ARRAY['fast'::text, 'thinking'::text]))),
     CONSTRAINT agents_name_not_blank CHECK ((btrim(name) <> ''::text)),
-    CONSTRAINT agents_native_tool_policy_shape CHECK (COALESCE(((jsonb_typeof(native_tool_policy) = 'object'::text) AND (jsonb_typeof((native_tool_policy -> 'version'::text)) = 'number'::text) AND ((native_tool_policy ->> 'version'::text) = '1'::text) AND (octet_length((native_tool_policy)::text) <= 16384)), false)),
-    CONSTRAINT agents_response_contract CHECK (((response_contract IS NULL) OR COALESCE(((harness_kind = 'rig'::text) AND (jsonb_typeof(response_contract) = 'object'::text) AND ((response_contract ->> 'version'::text) = '1'::text) AND ((response_contract ->> 'format'::text) = 'json_schema'::text) AND (response_contract ? 'schema'::text) AND ((response_contract - ARRAY['version'::text, 'format'::text, 'schema'::text]) = '{}'::jsonb) AND (octet_length((response_contract)::text) <= 131072)), false))),
+    CONSTRAINT agents_response_contract CHECK (((response_contract IS NULL) OR COALESCE(((jsonb_typeof(response_contract) = 'object'::text) AND ((response_contract ->> 'version'::text) = '1'::text) AND ((response_contract ->> 'format'::text) = 'json_schema'::text) AND (response_contract ? 'schema'::text) AND ((response_contract - ARRAY['version'::text, 'format'::text, 'schema'::text]) = '{}'::jsonb) AND (octet_length((response_contract)::text) <= 131072)), false))),
     CONSTRAINT agents_run_timeout_secs_check CHECK (((run_timeout_secs >= 1) AND (run_timeout_secs <= 3600))),
     CONSTRAINT agents_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
 );
@@ -4736,7 +4615,6 @@ CREATE TABLE public.companies (
     user_id uuid NOT NULL,
     name text NOT NULL,
     slug public.citext NOT NULL,
-    enable_llm_spam_guardrail boolean,
     default_add_3rd_party boolean DEFAULT true NOT NULL,
     default_participant_emails public.citext[],
     default_retrieve_company_memory boolean DEFAULT false NOT NULL,
@@ -5723,6 +5601,8 @@ CREATE TABLE public.skills (
     description text NOT NULL,
     trigger text NOT NULL,
     instructions jsonb NOT NULL,
+    -- Workflow tools the agent must grant for this skill (06-D5); never a grant itself.
+    required_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT skills_required_tools_shape CHECK (public.valid_workflow_type_names(required_tools)),
     created_by jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -6507,7 +6387,6 @@ CREATE TABLE public.workflow_message_actions (
     consume_after timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT workflow_message_actions_check CHECK (((origin = 'step'::text) OR (wait_id IS NULL))),
     CONSTRAINT workflow_message_actions_check1 CHECK (((state <> 'stalled'::text) OR (consume_failures = 5))),
     CONSTRAINT workflow_message_actions_consume_failures_check CHECK (((consume_failures >= 0) AND (consume_failures <= 5))),
     CONSTRAINT workflow_message_actions_consumed_through_check CHECK ((consumed_through >= 0)),
@@ -7311,9 +7190,9 @@ CREATE TABLE public.workflow_root_budgets (
     model_calls integer,
     repetitions integer,
     token_policy jsonb,
-    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR (provenance='frozen_v4' AND public.valid_workflow_token_policy(token_policy))),
-    CONSTRAINT workflow_root_budgets_check CHECK ((((provenance = 'sealed_legacy'::text) AND (activations IS NULL) AND (model_calls IS NULL) AND (repetitions IS NULL)) OR ((provenance = 'frozen_v4'::text) AND (activations IS NOT NULL) AND ((activations >= 1) AND (activations <= 100000)) AND (model_calls IS NOT NULL) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND (repetitions IS NOT NULL) AND ((repetitions >= 1) AND (repetitions <= 1000))))),
-    CONSTRAINT workflow_root_budgets_provenance_check CHECK ((provenance = ANY (ARRAY['frozen_v4'::text, 'sealed_legacy'::text])))
+    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR (provenance='frozen_v6' AND public.valid_workflow_token_policy(token_policy))),
+    CONSTRAINT workflow_root_budgets_check CHECK ((((provenance = 'sealed_legacy'::text) AND (activations IS NULL) AND (model_calls IS NULL) AND (repetitions IS NULL)) OR ((provenance = 'frozen_v6'::text) AND (activations IS NOT NULL) AND ((activations >= 1) AND (activations <= 100000)) AND (model_calls IS NOT NULL) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND (repetitions IS NOT NULL) AND ((repetitions >= 1) AND (repetitions <= 1000))))),
+    CONSTRAINT workflow_root_budgets_provenance_check CHECK ((provenance = ANY (ARRAY['frozen_v6'::text, 'sealed_legacy'::text])))
 );
 
 
@@ -7345,6 +7224,10 @@ CREATE TABLE public.workflow_run_events (
     execution_id uuid,
     terminal_state text,
     terminal_execution_id uuid,
+    -- Effect park/continuation audits of one exact delivery wait; an agent execution may
+    -- park on several sequential deliveries, each with its own audit identity.
+    wait_id uuid,
+    CONSTRAINT workflow_run_event_wait_shape CHECK (((wait_id IS NULL) OR ((execution_id IS NOT NULL) AND (decision_id IS NULL) AND (event_kind = ANY (ARRAY['wait_parked'::text, 'wait_completed'::text]))))),
     CONSTRAINT workflow_action_audit_execution CHECK (((event_kind <> 'action_reconciled'::text) OR (execution_id IS NOT NULL))),
     CONSTRAINT workflow_run_events_event_kind_check CHECK (((octet_length(event_kind) >= 1) AND (octet_length(event_kind) <= 128))),
     CONSTRAINT workflow_run_events_sequence_check CHECK ((sequence > 0)),
@@ -7502,30 +7385,6 @@ CREATE TABLE public.workflow_waits (
     CONSTRAINT workflow_wait_state CHECK ((state = ANY (ARRAY['waiting'::text, 'completed'::text, 'expired'::text, 'failed'::text, 'cancelled'::text]))),
     CONSTRAINT workflow_waits_reason_check CHECK ((reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text])))
 );
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_pkey PRIMARY KEY (task_id, request_hash);
-
-
---
--- Name: agent_mcp_selection_revisions agent_mcp_selection_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_mcp_selection_revisions
-    ADD CONSTRAINT agent_mcp_selection_revisions_pkey PRIMARY KEY (company_id, agent_id);
-
-
---
--- Name: agent_mcp_selections agent_mcp_selections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_mcp_selections
-    ADD CONSTRAINT agent_mcp_selections_pkey PRIMARY KEY (company_id, agent_id, connection_id);
 
 
 --
@@ -9748,7 +9607,9 @@ ALTER TABLE ONLY public.workflow_wait_events
 -- Name: workflow_waits workflow_wait_execution; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX workflow_wait_execution ON public.workflow_waits(company_id,run_id,execution_id,reason) WHERE reason<>'decision';
+-- Effect waits are per message action (unique wait_id per action); an agent execution may
+-- park on several sequential deliveries, while workflow_wait_one_active keeps one active wait.
+CREATE UNIQUE INDEX workflow_wait_execution ON public.workflow_waits(company_id,run_id,execution_id,reason) WHERE reason NOT IN ('decision','effect');
 
 CREATE UNIQUE INDEX workflow_wait_one_active ON public.workflow_waits(company_id,run_id,execution_id) WHERE state='waiting';
 
@@ -10561,7 +10422,11 @@ CREATE INDEX workflow_message_actions_open ON public.workflow_message_actions US
 -- Name: workflow_message_actions_wait; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX workflow_message_actions_wait ON public.workflow_message_actions USING btree (company_id, execution_id, wait_id) WHERE (wait_id IS NOT NULL);
+CREATE UNIQUE INDEX workflow_message_actions_wait ON public.workflow_message_actions USING btree (company_id, execution_id, wait_id) WHERE (wait_id IS NOT NULL);
+
+-- A message step parks on at most one effect wait; only saved model tool calls may park
+-- sequentially within one (agent) execution (06-D4).
+CREATE UNIQUE INDEX workflow_message_step_one_wait ON public.workflow_message_actions USING btree (company_id, execution_id) WHERE ((origin = 'step'::text) AND (wait_id IS NOT NULL));
 
 
 --
@@ -10603,7 +10468,9 @@ CREATE INDEX workflow_wait_event_unconsumed ON public.workflow_wait_events USING
 -- Name: workflow_run_event_execution_kind; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX workflow_run_event_execution_kind ON public.workflow_run_events USING btree (company_id, run_id, execution_id, event_kind) WHERE (event_kind <> 'action_reconciled'::text AND decision_id IS NULL);
+CREATE UNIQUE INDEX workflow_run_event_execution_kind ON public.workflow_run_events USING btree (company_id, run_id, execution_id, event_kind) WHERE (event_kind <> 'action_reconciled'::text AND decision_id IS NULL AND wait_id IS NULL);
+
+CREATE UNIQUE INDEX workflow_run_event_wait_kind ON public.workflow_run_events USING btree (company_id, run_id, wait_id, event_kind) WHERE (wait_id IS NOT NULL);
 
 
 --
@@ -10740,20 +10607,6 @@ CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check AFTER INSERT OR UPD
 
 
 --
--- Name: agents guard_active_agent_harness_change; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER guard_active_agent_harness_change BEFORE UPDATE OF harness_kind, response_contract ON public.agents FOR EACH ROW EXECUTE FUNCTION public.guard_active_agent_harness_change();
-
-
---
--- Name: agents guard_agent_mcp_harness; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER guard_agent_mcp_harness BEFORE UPDATE OF harness_kind ON public.agents FOR EACH ROW EXECUTE FUNCTION public.guard_agent_mcp_harness();
-
-
---
 -- Name: attention_source_events handoff_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -10828,13 +10681,6 @@ CREATE TRIGGER library_agent_delete_guard BEFORE DELETE ON public.agents FOR EAC
 --
 
 CREATE TRIGGER library_skill_delete_guard BEFORE DELETE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.prevent_assigned_library_skill_delete();
-
-
---
--- Name: background_tasks lock_task_agent_harnesses; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER lock_task_agent_harnesses BEFORE INSERT OR UPDATE OF status, owner_principal_id, channel_id ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.lock_task_agent_harnesses();
 
 
 --
@@ -11058,13 +10904,6 @@ CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.t
 --
 
 CREATE TRIGGER require_legacy_handoff_event_task BEFORE INSERT ON public.thread_handoff_events FOR EACH ROW EXECUTE FUNCTION public.require_legacy_handoff_event_task();
-
-
---
--- Name: agent_channel_provisions require_legacy_provision_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_provision_task BEFORE INSERT OR UPDATE ON public.agent_channel_provisions FOR EACH ROW EXECUTE FUNCTION public.require_legacy_provision_task();
 
 
 --
@@ -11743,6 +11582,8 @@ CREATE TRIGGER workflow_message_destination_immutable BEFORE DELETE OR UPDATE ON
 -- Name: workflow_waits workflow_message_effect_wait_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
+CREATE CONSTRAINT TRIGGER workflow_model_tool_wait_continuation AFTER UPDATE ON public.workflow_waits DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (((old.state = 'waiting'::text) AND (new.state = 'completed'::text) AND (new.reason = 'effect'::text))) EXECUTE FUNCTION public.workflow_model_tool_wait_continuation_guard();
+
 CREATE TRIGGER workflow_message_effect_wait_guard BEFORE INSERT ON public.workflow_waits FOR EACH ROW WHEN ((new.reason = 'effect'::text)) EXECUTE FUNCTION public.workflow_message_effect_wait_guard();
 
 
@@ -11922,78 +11763,6 @@ CREATE TRIGGER workflow_wait_revision AFTER INSERT OR UPDATE ON public.workflow_
 --
 
 CREATE TRIGGER workflow_wakeup_immutable BEFORE UPDATE ON public.workflow_run_events FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_wakeup();
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_agent_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_agent_scope_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.channels(id) ON DELETE CASCADE;
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_channel_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_channel_scope_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
-
-
---
--- Name: agent_channel_provisions agent_channel_provisions_task_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_channel_provisions
-    ADD CONSTRAINT agent_channel_provisions_task_scope_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_mcp_selection_revisions agent_mcp_selection_revisions_company_id_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_mcp_selection_revisions
-    ADD CONSTRAINT agent_mcp_selection_revisions_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_mcp_selections agent_mcp_selections_company_id_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_mcp_selections
-    ADD CONSTRAINT agent_mcp_selections_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_mcp_selections agent_mcp_selections_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_mcp_selections
-    ADD CONSTRAINT agent_mcp_selections_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.company_mcp_connections(company_id, id) ON DELETE RESTRICT;
 
 
 --
@@ -13535,6 +13304,10 @@ ALTER TABLE ONLY public.workflow_action_evidence_conflicts
 --
 -- Name: workflow_action_dispatches workflow_action_dispatches_company_id_execution_id_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
+
+ALTER TABLE ONLY public.workflow_run_events
+    ADD CONSTRAINT workflow_run_event_wait FOREIGN KEY (company_id, run_id, execution_id, wait_id) REFERENCES public.workflow_waits(company_id, run_id, execution_id, id);
+
 
 ALTER TABLE ONLY public.workflow_action_dispatches
     ADD CONSTRAINT workflow_action_dispatches_company_id_execution_id_job_id_fkey FOREIGN KEY (company_id, execution_id, job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;

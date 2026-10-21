@@ -54,7 +54,16 @@ fn workflow_registry_classifier_contract_excludes_scalar_loopholes() {
             "registry.labels"
         );
     }
-    for field in ["label", "profile"] {
+    // Profiles are removed (06-D5): a profile-only classifier schema is not finite labels.
+    let mut profile_only = example("ai.classify").unwrap();
+    changed(&mut profile_only, |v| {
+        v["steps"]["start"]["with"]["output_schema"] = json!({"literal":{"type":"object","properties":{"profile":{"enum":["support"]}},"required":["profile"]}});
+    });
+    assert_eq!(
+        compile_example(&profile_only).err().unwrap().code,
+        "registry.labels"
+    );
+    for field in ["label"] {
         let mut example = example("ai.classify").unwrap();
         changed(&mut example, |v| {
             let mut properties = json!({});
@@ -200,28 +209,9 @@ fn repeat_steps(example: &mut AuthoringExample, count: usize) {
 
 #[test]
 fn workflow_registry_expansion_rejects_reused_facts_before_specialization() {
-    for name in [
-        "agent.run",
-        "tool.call",
-        "mcp.call",
-        "workflow.call",
-        "flow.repeat",
-    ] {
+    for name in ["tool.call", "mcp.call", "workflow.call", "flow.repeat"] {
         let mut example = example(name).unwrap();
         match name {
-            "agent.run" => {
-                example.facts.profiles = (0..50)
-                    .map(|i| CapabilityProfile {
-                        name: TypeName::parse(format!("profile{i}")).unwrap(),
-                        tools: (0..128)
-                            .map(|j| {
-                                TypeName::parse(format!("tool{j}{}", "x".repeat(100))).unwrap()
-                            })
-                            .collect(),
-                        skills: vec![],
-                    })
-                    .collect();
-            }
             "tool.call" | "mcp.call" => {
                 example.facts.tools[0].output_schema["description"] = json!("x".repeat(60_000))
             }
@@ -229,11 +219,7 @@ fn workflow_registry_expansion_rejects_reused_facts_before_specialization() {
         }
         // If specialization runs, this deliberately invalid declaration/tool fact fails first.
         // The aggregate guard must reject before any native validator or registration runs.
-        if name == "agent.run" {
-            changed(&mut example, |v| {
-                v["steps"]["start"]["with"]["output_schema"] = json!({"literal":{"type":"invalid"}})
-            });
-        } else if name.contains("call") && !name.starts_with("workflow") {
+        if name.contains("call") && !name.starts_with("workflow") {
             example.facts.tools[0].output_schema["type"] = json!("invalid");
         } else {
             example.facts.children[0].output_schema["type"] = json!("invalid");

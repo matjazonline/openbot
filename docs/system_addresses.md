@@ -46,7 +46,7 @@ bounce.
 | Rule | Why |
 |---|---|
 | Matched against the **raw** local part | Context-suffix stripping turns a bare reserved suffix into an empty slug, so a future `_msg` would be eaten before `SystemAddress::parse` ever saw it |
-| Never answered on the internal channel path | An agent has `list_company_agents`; keeping reserved addresses off that path keeps them out of the trace and the trust model |
+| Never answered on the internal channel path | Agents can address sibling channels; keeping reserved addresses off that path keeps them out of the trace and the trust model |
 | Answered only for the company's team | A reply would otherwise confirm that a company exists to anyone who guessed the domain |
 | Skipped by channel routing, never bounced | Lets `_help` be CC'd on a real message without bouncing it; and a bounce's fuzzy suggestions could offer a stranger a real channel named `help` |
 | The reply carries `Auto-Submitted: auto-replied` | `guard_ingress` refuses inbound auto-replies, so an auto-responder on the other end cannot ping-pong |

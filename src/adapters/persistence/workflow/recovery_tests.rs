@@ -23,7 +23,7 @@ async fn claim(f: &AdmissionFixture, scope: ActivationRequest) -> ClaimedWorkflo
 }
 fn source(target: Option<&str>) -> Value {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     if let Some(target) = target {
         source["steps"]["start"]["routes"]["error"] = json!(target);
     }
@@ -204,7 +204,7 @@ async fn workflow_failure_competes_with_completion_without_duplicate_successor()
                     )
                     .unwrap(),
                     fence: owned.fence,
-                    output: json!({"items":[],"token_count":0}),
+                    output: json!({"items":[],"token_count":0,"omitted":0}),
                 })
                 .await
                 .unwrap()

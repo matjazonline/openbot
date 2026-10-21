@@ -664,7 +664,7 @@ async fn workflow_lease_resolution_completion_replays_or_expires_once() {
             Stall::Commit,
         )
         .await;
-        let output = json!({"items":[],"token_count":0});
+        let output = json!({"items":[],"token_count":0,"omitted":0});
         let result = FencedWorkflowResult {
             policy: gated_policy(),
             fence: owned.fence,
@@ -758,7 +758,7 @@ async fn workflow_lease_resolution_completion_retirement_owns_nothing() {
     let result = FencedWorkflowResult {
         policy: gated_policy(),
         fence: owned.fence,
-        output: json!({"items":[],"token_count":-1}),
+        output: json!({"items":[],"token_count":-1,"omitted":0}),
     };
     let p = f.persistence().clone();
     let completion = tokio::spawn(async move { p.complete_io(result).await });

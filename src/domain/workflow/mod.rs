@@ -28,8 +28,7 @@ pub use context::{
     canonical_array_index, preflight_binding, resolve, resolve_inputs, validate_context_value,
 };
 pub use definition::{
-    CapabilityCeiling, ExecutionLimits, ResourceRequirement, Routes, StepDefinition,
-    WorkflowDefinition,
+    ExecutionLimits, ResourceRequirement, Routes, StepDefinition, WorkflowDefinition,
 };
 pub use evidence::*;
 pub use graph::{GraphError, ValidatedWorkflow, validate};

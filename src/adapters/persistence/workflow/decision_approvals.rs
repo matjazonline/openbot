@@ -209,12 +209,14 @@ pub(in crate::adapters::persistence::workflow) async fn fail(
     Ok(())
 }
 
+/// Confirms a suspension the handler reported: an action approval or a token-allowance pause
+/// (06-D4), each parked in its own exact attempt with the same `approval_parked` witness.
 pub(in crate::adapters::persistence::workflow) async fn confirm(
     persistence: &PostgresPersistence,
     fence: WorkflowFence,
     wait: WaitId,
 ) -> AppResult<bool> {
-    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decision.job_id AND attempt.attempt_number=decision.parked_attempt_number WHERE decision.job_id=$4 AND decision.parked_attempt_number=$5 AND decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.wait_id=$8 AND decision.subject_kind='action_approval' AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked')")
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decision.job_id AND attempt.attempt_number=decision.parked_attempt_number WHERE decision.job_id=$4 AND decision.parked_attempt_number=$5 AND decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.wait_id=$8 AND decision.subject_kind IN ('action_approval','token_allowance') AND attempt.worker_id=$6 AND attempt.execution_generation=$7 AND attempt.status='completed' AND attempt.stop_reason='approval_parked')")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).bind(wait.as_uuid()).fetch_one(persistence.pool()).await?)
 }
 
@@ -252,7 +254,10 @@ pub(super) async fn record_choice(
     Ok(())
 }
 
-pub(super) async fn reopen_job(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<()> {
+pub(in crate::adapters::persistence::workflow) async fn reopen_job(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> AppResult<()> {
     let reopened = sqlx::query("UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1,run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND status='completed' AND continuation_count<63")
             .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     if reopened.rows_affected() != 1 {

@@ -74,6 +74,7 @@ impl WorkflowWaits for PostgresPersistence {
             };
             let changed = match self.resume_wait(scope).await? {
                 WaitProgress::Completed(saved) => saved.disposition == CommitDisposition::Committed,
+                WaitProgress::Continued => true,
                 WaitProgress::Expired(disposition) | WaitProgress::Failed { disposition, .. } => {
                     disposition == CommitDisposition::Committed
                 }
@@ -141,15 +142,26 @@ pub(super) async fn row(
         WaitSelection::Execution => "execution",
         WaitSelection::Decision => "decision",
     };
-    // A completed approval does not complete its execution. Only the active wait or
+    // A completed approval or model-tool delivery does not complete its execution. Only the active wait or
     // the actual terminal step wait can answer execution resume/replay.
-    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval')))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
+    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR (NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval') AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=wait.company_id AND action.wait_id=wait.id AND action.origin='model_tool'))))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(selection).fetch_optional(db).await?)
 }
 pub(super) async fn now(db: &mut PgConnection) -> AppResult<DateTime<Utc>> {
     Ok(sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(db)
         .await?)
+}
+/// An audit bound to one exact effect wait (park or continuation of one delivery).
+pub(super) async fn audit_wait(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+    kind: &str,
+) -> AppResult<()> {
+    sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id,execution_id,wait_id) SELECT run.company_id,run.id,(SELECT COALESCE(MAX(event.sequence),0)+1 FROM workflow_run_events AS event WHERE event.company_id=$1 AND event.run_id=$2),$4,run.actor_id,$3,$5 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(kind).bind(wait).execute(db).await?;
+    Ok(())
 }
 pub(super) async fn audit(
     db: &mut PgConnection,

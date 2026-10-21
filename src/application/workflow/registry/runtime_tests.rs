@@ -64,7 +64,7 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
     for name in TYPES {
         let mut example = example(name).unwrap();
         let (field, bad) = match name {
-            "context.load" => ("max_tokens", json!(0)),
+            "context.history" => ("max_tokens", json!(0)),
             "memory.load" | "memory.save" => ("scope", json!({"kind":"user"})),
             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
             "agent.run" | "decision.agent" => ("agent", json!(3)),
@@ -133,19 +133,16 @@ fn workflow_registry_facts_bounded_unique_and_identity_sensitive() {
         }
         assert!(compile_example(&example).is_err());
     }
-    let mut example = example("agent.run").unwrap();
+    let mut example = example("tool.call").unwrap();
+    let tool = example.facts.tools[0].clone();
     for _ in 0..257 {
-        example.facts.profiles.push(CapabilityProfile {
-            name: TypeName::parse("same").unwrap(),
-            tools: vec![],
-            skills: vec![],
-        });
+        example.facts.tools.push(tool.clone());
     }
     assert_eq!(
         compile_example(&example).err().unwrap().code,
         "registry.limit"
     );
-    example.facts.profiles.truncate(2);
+    example.facts.tools.truncate(2);
     assert_eq!(
         compile_example(&example).err().unwrap().code,
         "registry.facts"

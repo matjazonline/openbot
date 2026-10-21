@@ -67,7 +67,6 @@ impl Fixture {
                 )),
                 name: "Agent".into(),
                 slug: format!("runs-{suffix}"),
-                harness_kind: Some(HarnessKind::Rig),
                 ..Default::default()
             },
         )

@@ -1,5 +1,4 @@
 //! Shared final-candidate gate for durable and direct executions.
-use super::compile::CompiledRun;
 use crate::adapters::response_schema::JsonResponseValidator;
 use crate::{
     app_error::{AppError, AppResult},
@@ -29,12 +28,13 @@ pub(super) fn repair_reservation(
     }))
 }
 
+/// `base` is the owner's rendered instructions; the final-answer contract and repair
+/// suffix are shared so every binding asks for the same validated candidate.
 pub(super) fn response_preamble(
     checkpoint: &RunCheckpoint,
-    compiled: &CompiledRun,
+    mut preamble: String,
     repair: Option<&RepairReservation>,
 ) -> AppResult<String> {
-    let mut preamble = compiled.render_preamble()?;
     if let Some(contract) = &checkpoint.identity.response_contract {
         preamble.push_str("\nFinal answer: return exactly one JSON value conforming to this Draft 2020-12 schema. No prose or code fences. Apply this only to the final answer, after tools finish.\n");
         preamble.push_str(&contract.schema().to_string());

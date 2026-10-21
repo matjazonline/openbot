@@ -3,7 +3,6 @@ use super::*;
 use crate::adapters::persistence::test_support::own_database;
 use crate::{
     adapters::http::{pages, routes::channel::compose_and_ingest},
-    entities::harness::HarnessKind,
     services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario},
 };
 use serde_json::{Value, json};
@@ -36,7 +35,7 @@ async fn queued_simulation_continues_after_a_tool_and_renders_validated_json() {
         ),
     ])
     .await;
-    let fx = fixture_for_harness(pool.clone(), Some(&llm.base_url), HarnessKind::Rig).await;
+    let fx = fixture(pool.clone(), Some(&llm.base_url)).await;
     let contract = json!({"version":1,"format":"json_schema","schema":{"type":"object","properties":{"status":{"type":"string"}},"required":["status"]}});
     sqlx::query("UPDATE agents SET response_contract=$1 WHERE company_id=$2")
         .bind(&contract)

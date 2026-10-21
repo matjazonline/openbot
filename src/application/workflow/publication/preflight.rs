@@ -11,7 +11,6 @@ pub(super) fn validate(
         .agents
         .len()
         .saturating_add(snapshots.skills.len())
-        .saturating_add(snapshots.profiles.len())
         .saturating_add(snapshots.tools.len())
         .saturating_add(children.len());
     if count > MAX_DEPENDENCIES {
@@ -158,20 +157,6 @@ impl SnapshotCheck<'_> {
                     &format!("has duplicate snapshots for connection {slot}"),
                 ));
             }
-        }
-        let mut profiles = BTreeSet::new();
-        for profile in &snapshots.profiles {
-            let name = profile.name.as_str();
-            if !profiles.insert(&profile.name) {
-                return Err(self.error(
-                    "capability_profile",
-                    name,
-                    "publication.duplicate",
-                    "has duplicate snapshots",
-                ));
-            }
-            self.selection("capability_profile", name, "tools", &profile.tools)?;
-            self.selection("capability_profile", name, "skills", &profile.skills)?;
         }
         Ok(())
     }

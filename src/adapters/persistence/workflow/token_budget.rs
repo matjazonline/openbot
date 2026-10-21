@@ -91,7 +91,7 @@ pub(super) async fn lock_scope(
 ) -> AppResult<RootTokens> {
     let root: RootRow = sqlx::query_as("SELECT usage.root_run_id,(budget.token_policy->>'max_tokens')::bigint AS original,
         GREATEST(usage.authorized_tokens,COALESCE((budget.token_policy->>'max_tokens')::bigint,0)) AS allowance,usage.token_refusal,
-        (budget.provenance<>'frozen_v4' OR usage.model_calls>=COALESCE(budget.model_calls,0)) AS model_exhausted
+        (budget.provenance<>'frozen_v6' OR usage.model_calls>=COALESCE(budget.model_calls,0)) AS model_exhausted
         FROM workflow_run_budgets AS link JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
         JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
         WHERE link.company_id=$1 AND link.run_id=$2 FOR UPDATE OF usage")

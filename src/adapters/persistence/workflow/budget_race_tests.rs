@@ -154,7 +154,7 @@ async fn workflow_budget_runtime_reservation_competes_with_cancel_and_completion
                             )
                             .unwrap(),
                             fence,
-                            output: json!({"items":[],"token_count":0})
+                            output: json!({"items":[],"token_count":0,"omitted":0})
                         })
                         .await
                         .unwrap()

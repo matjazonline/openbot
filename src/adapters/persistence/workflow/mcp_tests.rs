@@ -33,6 +33,9 @@ use support::*;
 #[path = "mcp_reconciliation_tests.rs"]
 mod reconciliation_tests;
 
+#[path = "mcp_agent_tests.rs"]
+mod agent_tests;
+
 fn code(failure: &WorkflowFailure) -> &str {
     failure.failure.code().as_str()
 }

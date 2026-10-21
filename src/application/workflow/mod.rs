@@ -5,6 +5,7 @@
 
 pub mod actions;
 pub mod activation;
+pub mod agent;
 mod authorization;
 pub mod batch;
 pub mod binding;
@@ -17,6 +18,7 @@ pub mod completion;
 mod contracts;
 pub mod decisions;
 pub mod fixtures;
+pub mod history;
 pub mod http;
 pub mod lease;
 pub mod lifecycle;

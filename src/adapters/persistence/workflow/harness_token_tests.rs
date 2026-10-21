@@ -24,7 +24,7 @@ struct TokenFixture {
 
 async fn configured() -> TokenFixture {
     let source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     configured_source(source).await
 }
 

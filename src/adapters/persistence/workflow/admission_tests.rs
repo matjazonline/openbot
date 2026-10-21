@@ -13,6 +13,8 @@ mod admission_token_tests;
 mod batch_tests;
 #[path = "decision_tests.rs"]
 mod decision_tests;
+#[path = "history_reader_tests.rs"]
+mod history_reader_tests;
 #[path = "lease_tests.rs"]
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
 #[path = "model_usage_tests.rs"]

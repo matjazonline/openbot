@@ -81,7 +81,7 @@
       <ul>
         <li><a href="#security">Zero-Trust Action Handlers</a></li>
         <li><a href="#security">Human-in-the-Loop Gates</a></li>
-        <li><a href="#security">3-Stage Spam & Injection Shield</a></li>
+        <li><a href="#security">2-Stage Spam Shield</a></li>
         <li><a href="#security">Offboarding Continuity (MemberWorkAtStake)</a></li>
         <li><a href="#security">BYOK AES-256 Encryption</a></li>
       </ul>

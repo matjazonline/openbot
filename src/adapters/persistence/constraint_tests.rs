@@ -221,18 +221,11 @@ async fn agent_json_requires_an_explicit_numeric_version_and_preserves_valid_doc
     };
     let mut transaction = pool.begin().await.unwrap();
     let local = fixture(&mut transaction).await;
-    for column in [
-        JsonColumn {
-            update: "UPDATE agents SET config_json = $2 WHERE id = $1",
-            constraint: "agents_config_v1_shape_check",
-            max_bytes: 65_536,
-        },
-        JsonColumn {
-            update: "UPDATE agents SET native_tool_policy = $2 WHERE id = $1",
-            constraint: "agents_native_tool_policy_shape",
-            max_bytes: 16_384,
-        },
-    ] {
+    for column in [JsonColumn {
+        update: "UPDATE agents SET config_json = $2 WHERE id = $1",
+        constraint: "agents_config_v1_shape_check",
+        max_bytes: 65_536,
+    }] {
         for document in [
             json!({}),
             json!({"version": null}),
@@ -260,13 +253,13 @@ async fn agent_json_requires_an_explicit_numeric_version_and_preserves_valid_doc
             .await
             .unwrap();
     }
-    let documents: (serde_json::Value, serde_json::Value) =
-        sqlx::query_as("SELECT config_json, native_tool_policy FROM agents WHERE id = $1")
+    let document: serde_json::Value =
+        sqlx::query_scalar("SELECT config_json FROM agents WHERE id = $1")
             .bind(local.agent)
             .fetch_one(&mut *transaction)
             .await
             .unwrap();
-    assert_eq!(documents, (json!({"version": 1}), json!({"version": 1})));
+    assert_eq!(document, json!({"version": 1}));
     // An omitted optional configuration remains distinct from an explicit JSON null.
     sqlx::query("UPDATE agents SET config_json = NULL WHERE id = $1")
         .bind(local.agent)

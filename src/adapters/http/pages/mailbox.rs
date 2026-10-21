@@ -963,13 +963,6 @@ document.addEventListener('change', function (event) {
     var control = event.target.closest('[data-action]');
     if (!control) return;
     switch (control.dataset.action) {
-        case 'agent-runtime': {
-            var runtime = control.closest('[data-agent-runtime]');
-            runtime.querySelectorAll('[data-harness-help]').forEach(function(help) {
-                help.hidden = !!control.value && help.dataset.harnessHelp !== control.value;
-            });
-            break;
-        }
         case 'theme-toggle': applyTheme(control.checked ? 'light' : 'dark'); break;
         case 'toggle-schedule-type': toggleScheduleType(control); break;
         case 'toggle-schedule-delivery': toggleScheduleDelivery(control); break;
@@ -990,18 +983,8 @@ document.addEventListener('change', function (event) {
         case 'capability-multi-select': {
             var capabilityRoot = control.closest('[data-capability-multi-select]');
             capabilityRoot.querySelector('input[type=hidden]').value = Array.from(capabilityRoot.querySelectorAll('input[type=checkbox]:checked')).map(function (item) { return item.value; }).join(',');
-            var picker = control.closest('[data-agent-capability-picker]');
-            var count = picker && picker.querySelector('[data-effective-grant-count]');
-            if (count) {
-                var grants = new Set(Array.from(picker.querySelectorAll('[data-direct-tool-grant]:checked')).map(function (item) { return item.value; }));
-                picker.querySelectorAll('[data-required-tools]:checked').forEach(function (item) {
-                    item.dataset.requiredTools.split(',').filter(Boolean).forEach(function (id) { grants.add(id); });
-                });
-                count.textContent = grants.size + ' / ' + count.dataset.effectiveGrantMax + ' effective grants';
-            }
             break;
         }
-        case 'skill-kind': break;
         case 'model-provider': {
             var grid = control.closest('[data-model-connection]');
             var providerInput = control.nextElementSibling;

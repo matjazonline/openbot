@@ -20,15 +20,17 @@ pub mod compile;
 pub mod config;
 pub mod skills;
 
-mod builtins;
 mod schema;
-mod template;
 mod tool_hook;
 pub mod tools;
 
+mod classifier;
 mod execution;
 mod protocol;
+mod workflow;
+pub use classifier::RigTextClassifier;
 pub use execution::RigHarness;
+pub use workflow::WorkflowAgentRuntime;
 
 mod direct;
 mod final_response;

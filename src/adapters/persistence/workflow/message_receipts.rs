@@ -282,6 +282,23 @@ pub(in crate::adapters::persistence::workflow) async fn effect_resume_on(
     })
 }
 
+/// Whether this effect wait belongs to a saved model tool call (an agent continuation)
+/// rather than a message step.
+pub(in crate::adapters::persistence::workflow) async fn model_tool_wait_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_message_actions WHERE company_id=$1 AND execution_id=$2 AND wait_id=$3 AND origin='model_tool')",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(wait)
+    .fetch_one(&mut *db)
+    .await?)
+}
+
 /// The Reconcile outcome `retire_on` gives `complete_io`'s conflict failure, for a parked
 /// message step (D4 §M): no route, successor or output; unsent siblings superseded; any
 /// receipt stays recorded truth.

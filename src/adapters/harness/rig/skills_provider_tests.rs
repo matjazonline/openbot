@@ -19,7 +19,7 @@ fn catalog_exchange(record: Arc<RwLock<Vec<String>>>) -> ScriptedExchange {
             let preamble = message_text(&request.body["messages"][0]).ok_or("system prompt")?;
             if !preamble.contains("ordered-proof")
                 || !preamble.contains("skill://")
-                || preamble.contains("first")
+                || preamble.contains("Classify the record")
                 || preamble.contains("{{ context.")
             {
                 return Err("compact resolved catalog");
@@ -52,32 +52,14 @@ fn resource_exchange(expected: String, record: Arc<RwLock<Vec<String>>>) -> Scri
                 .push(message_text(&messages[0]).ok_or("system prompt")?.into());
             Ok(())
         },
-        ScriptedResponse::json(call("echo", json!({"message":"first"}))),
-    )
-}
-
-fn output_exchange(expected: &'static str, reply: Value) -> ScriptedExchange {
-    ScriptedExchange::new(
-        move |request| {
-            let last_tool = request.body["messages"]
-                .as_array()
-                .ok_or("history")?
-                .iter()
-                .rfind(|message| message["role"] == "tool")
-                .ok_or("tool output")?;
-            if !message_text(last_tool).is_some_and(|text| text.contains(expected)) {
-                return Err("dependent tool output");
-            }
-            Ok(())
-        },
-        ScriptedResponse::json(reply),
+        ScriptedResponse::json(response("openai", Reply::Text)),
     )
 }
 
 #[tokio::test]
-async fn scripted_model_loads_catalog_and_follows_ordered_steps_through_dispatch() {
+async fn scripted_model_loads_the_catalog_then_the_ordered_resource() {
     let (spec, reader, context) = fixture();
-    let compiled = CompiledRun::compile(&spec, context, None).unwrap();
+    let compiled = CompiledRun::compile(&spec, context).unwrap();
     let timestamps = Arc::new(RwLock::new(Vec::<String>::new()));
     let llm = scripted_scenario(vec![
         catalog_exchange(timestamps.clone()),
@@ -85,8 +67,6 @@ async fn scripted_model_loads_catalog_and_follows_ordered_steps_through_dispatch
             render_document(&spec.skills[0]).unwrap(),
             timestamps.clone(),
         ),
-        output_exchange("first", call("echo", json!({"message":"first-second"}))),
-        output_exchange("first-second", response("openai", Reply::Text)),
     ])
     .await;
     let registry = ProviderRegistry::standard().unwrap();
@@ -95,10 +75,10 @@ async fn scripted_model_loads_catalog_and_follows_ordered_steps_through_dispatch
         .unwrap();
     let result = agent
         .prompt("UNTRUSTED_INPUT_BEGIN\nReview the record.\nUNTRUSTED_INPUT_END")
-        .max_turns(4)
+        .max_turns(2)
         .tool_concurrency(1)
         .await;
-    assert_eq!(llm.finish().await, Ok(4));
+    assert_eq!(llm.finish().await, Ok(2));
     assert_eq!(result.unwrap(), "verified");
     assert_eq!(reader.reads.load(Ordering::SeqCst), 1);
     let timestamps = timestamps.read().unwrap();
@@ -111,7 +91,7 @@ async fn scripted_model_loads_catalog_and_follows_ordered_steps_through_dispatch
 #[tokio::test]
 async fn full_history_budget_is_enforced_before_a_provider_request() {
     let (spec, _, context) = fixture();
-    let compiled = CompiledRun::compile(&spec, context, None).unwrap();
+    let compiled = CompiledRun::compile(&spec, context).unwrap();
     let tools = compiled.tools.clone();
     let llm = scripted_scenario(vec![]).await;
     let registry = ProviderRegistry::standard().unwrap();

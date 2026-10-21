@@ -63,7 +63,6 @@ struct OnboardingChannelForm {
     #[serde(default)]
     instructions: String,
     library_agent_ids: Option<String>,
-    harness_kind: Option<String>,
 }
 
 async fn start(
@@ -189,7 +188,6 @@ async fn channel_step(
         &mailbox_user,
         &company,
         &library_agents,
-        config.default_agent_harness.as_str(),
         None,
     ))
     .into_response())
@@ -216,10 +214,6 @@ async fn create_channel(
     let submitted_ids =
         super::channel::parse_agent_ids_form(form.library_agent_ids.clone()).unwrap_or_default();
     let draft = pages::OnboardingAgentDraft {
-        harness: form
-            .harness_kind
-            .as_deref()
-            .unwrap_or(config.default_agent_harness.as_str()),
         name: &form.name,
         instructions: &form.instructions,
         library_ids: &submitted_ids,
@@ -239,22 +233,6 @@ async fn create_channel(
             Some("One or more selected library agents are no longer available."),
         ))
         .into_response());
-    };
-    let harness = match form.harness_kind.as_deref() {
-        None | Some("") => config.default_agent_harness,
-        Some(value) => match crate::entities::harness::HarnessKind::parse(value) {
-            Some(kind) => kind,
-            None => {
-                return Ok(Html(pages::onboarding_channel_draft_page(
-                    &mailbox_user,
-                    &company,
-                    &library_agents,
-                    &draft,
-                    Some("Unknown harness_kind: choose rig or ai_agents"),
-                ))
-                .into_response());
-            }
-        },
     };
     let custom_name = form.name.trim();
     let custom_instructions = form.instructions.trim();
@@ -290,7 +268,6 @@ async fn create_channel(
         match create_agent_from_instructions(
             &agent_use_cases,
             AgentInstructionRequest {
-                harness_kind: Some(harness),
                 user_id: user.id,
                 company_id,
                 name: custom_name,
@@ -404,7 +381,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -427,9 +403,6 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("Help with email.".to_string()),
             description: Some("A ready-made helper".to_string()),
-            harness_kind: crate::entities::harness::HarnessKind::default(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
@@ -487,27 +460,23 @@ mod tests {
             &user,
             &company,
             std::slice::from_ref(&library_agent),
-            "rig",
             None,
         );
         assert!(channel_page.contains("Step 2 of 3"));
-        for harness in crate::entities::harness::HarnessKind::ALL {
-            let page = pages::onboarding_channel_draft_page(
-                &user,
-                &company,
-                &[],
-                &pages::OnboardingAgentDraft {
-                    harness: harness.as_str(),
-                    name: "Retained name",
-                    instructions: "Retained <instructions>",
-                    library_ids: &[],
-                },
-                Some("Fix the selected configuration"),
-            );
-            assert!(page.contains(&format!("value=\"{}\" selected", harness.as_str())));
-            assert!(page.contains("value=\"Retained name\""));
-            assert!(page.contains("Retained &lt;instructions&gt;"));
-        }
+        let page = pages::onboarding_channel_draft_page(
+            &user,
+            &company,
+            &[],
+            &pages::OnboardingAgentDraft {
+                name: "Retained name",
+                instructions: "Retained <instructions>",
+                library_ids: &[],
+            },
+            Some("Fix the selected configuration"),
+        );
+        assert!(!page.contains("harness_kind"));
+        assert!(page.contains("value=\"Retained name\""));
+        assert!(page.contains("Retained &lt;instructions&gt;"));
 
         assert!(channel_page.contains(&format!(
             "action=\"/ui/onboarding/companies/{}/channel\"",

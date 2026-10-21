@@ -8,7 +8,7 @@ use tokio::sync::Notify;
 
 /// A result valid both for the frozen action contract and as the step's committed output.
 fn step_output() -> Value {
-    json!({"items":[],"token_count":0})
+    json!({"items":[],"token_count":0,"omitted":0})
 }
 
 fn provider(f: &AdmissionFixture) -> DeduplicatingProvider<'_> {

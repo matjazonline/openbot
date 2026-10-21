@@ -60,9 +60,10 @@ impl Fixture {
     /// Caller chooses the test tenant. These synthetic facts never confer authority.
     pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {
         match self {
-            Self::ReviewedSupport | Self::AutonomousResponse | Self::HumanRevisionRound => {
-                agent_snapshots(company)
-            }
+            Self::ReviewedSupport
+            | Self::AutonomousResponse
+            | Self::HumanRevisionRound
+            | Self::TriageRouting => agent_snapshots(company),
             Self::McpLookup => DependencySnapshots {
                 tools: vec![mcp_snapshot(company)],
                 ..Default::default()
@@ -94,6 +95,7 @@ fn agent_snapshots(company: CompanyId) -> DependencySnapshots {
         }],
         skills: vec![SkillSnapshot {
             company_id: company,
+            skill_id: uuid::Uuid::from_u128(2),
             name: name("support"),
             instructions: "Use knowledge.search for product facts.".into(),
             required_tools: vec![name("knowledge.search")],
@@ -108,7 +110,6 @@ fn agent_snapshots(company: CompanyId) -> DependencySnapshots {
             },
             policy: read_policy(),
         }],
-        ..Default::default()
     }
 }
 

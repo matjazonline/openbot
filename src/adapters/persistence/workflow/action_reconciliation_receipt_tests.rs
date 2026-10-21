@@ -421,10 +421,10 @@ async fn counts(f: &AdmissionFixture) -> (i64, i64, i64) {
 async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_and_different_truth()
  {
     for (result, completed) in [
-        (json!({"items":[],"token_count":0}), false),
-        (json!({"items":[],"token_count":1}), false),
-        (json!({"items":[],"token_count":0}), true),
-        (json!({"items":[],"token_count":1}), true),
+        (json!({"items":[],"token_count":0,"omitted":0}), false),
+        (json!({"items":[],"token_count":1,"omitted":0}), false),
+        (json!({"items":[],"token_count":0,"omitted":0}), true),
+        (json!({"items":[],"token_count":1,"omitted":0}), true),
     ] {
         let (f, mut request) = setup().await;
         let verifier = ledger(&f, &request).await;
@@ -457,7 +457,7 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
         assert_eq!(projection(&f).await, ("needs_reconciliation".into(), false));
         assert!(matches!(
             writer
-                .finish_remote(new, json!({"items":[],"token_count":0}))
+                .finish_remote(new, json!({"items":[],"token_count":0,"omitted":0}))
                 .await
                 .unwrap(),
             RemoteDispatchObservation::Committed(_)
@@ -473,7 +473,7 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
                         )
                         .unwrap(),
                         fence: request.fence,
-                        output: json!({"items":[],"token_count":0})
+                        output: json!({"items":[],"token_count":0,"omitted":0})
                     })
                     .await
                     .unwrap()
@@ -525,7 +525,7 @@ async fn workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_
                         )
                         .unwrap(),
                         fence: request.fence,
-                        output: json!({"items":[],"token_count":0})
+                        output: json!({"items":[],"token_count":0,"omitted":0})
                     })
                     .await
                     .unwrap()

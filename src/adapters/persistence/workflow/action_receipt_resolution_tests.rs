@@ -62,7 +62,7 @@ async fn workflow_action_receipt_resolution_stalled_commit_against_completion() 
                 p.complete_io(FencedWorkflowResult {
                     policy: lease,
                     fence,
-                    output: json!({"items":[],"token_count":0}),
+                    output: json!({"items":[],"token_count":0,"omitted":0}),
                 })
                 .await
             });

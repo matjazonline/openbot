@@ -1,9 +1,8 @@
 use super::{PostgresPersistence, credentials::CredentialCipher, test_support::test_pool};
 use crate::{
     app_error::AppError,
-    entities::{harness::HarnessKind, mcp::*},
+    entities::mcp::*,
     use_cases::{
-        agent::{AgentPersistence, AgentWrite},
         company::{CompanyPersistence, CompanyWrite},
         mcp::*,
         user::UserPersistence,
@@ -47,22 +46,6 @@ fn write(slug: &str) -> McpConnectionWrite {
         tool_grants: vec![name],
     }
 }
-async fn agent(p: &PostgresPersistence, company: Uuid, slug: &str) -> Uuid {
-    AgentPersistence::create(
-        p,
-        company,
-        AgentWrite {
-            name: slug.into(),
-            slug: slug.into(),
-            harness_kind: Some(HarnessKind::Rig),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .id
-}
-
 #[tokio::test]
 async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
     let Some(pool) = test_pool().await else {
@@ -78,21 +61,7 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
         .create_mcp_connection(company, write("knowledge"))
         .await
         .unwrap();
-    let a = agent(&p, company, "first").await;
-    let b = agent(&p, company, "second").await;
-    let selected = p
-        .replace_agent_mcp_selection(
-            p.agent_mcp_selection(company, a).await.unwrap(),
-            Some(vec![first.id, second.id]),
-        )
-        .await
-        .unwrap();
-    p.replace_agent_mcp_selection(
-        p.agent_mcp_selection(company, b).await.unwrap(),
-        Some(vec![first.id]),
-    )
-    .await
-    .unwrap();
+    assert_ne!(first.id, second.id);
     let rev = p
         .replace_mcp_token(
             company,
@@ -124,18 +93,6 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
             .unwrap()
             .contains("synthetic-token")
     );
-    AgentPersistence::update(
-        &p,
-        a,
-        AgentWrite {
-            name: "Renamed".into(),
-            slug: "first".into(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    assert_eq!(p.agent_mcp_selection(company, a).await.unwrap(), selected);
     // 04.10: an endpoint is fixed for the connection's lifetime (frozen workflow actions
     // target the connection id). The writer refuses, and the trigger backs it up.
     let mut moved = write("crm");
@@ -161,84 +118,9 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
         .unwrap();
     assert!(!changed.secret_set);
     assert!(p.mcp_token(company, first.id, rev).await.is_err());
-    assert_eq!(
-        p.agent_mcp_selection(company, b)
-            .await
-            .unwrap()
-            .connection_ids,
-        vec![first.id]
-    );
-    assert!(
-        AgentPersistence::update(
-            &p,
-            a,
-            AgentWrite {
-                name: "Renamed".into(),
-                slug: "first".into(),
-                harness_kind: Some(HarnessKind::AiAgents),
-                ..Default::default()
-            }
-        )
-        .await
-        .is_err()
-    );
-    p.replace_agent_mcp_selection(selected, Some(vec![]))
-        .await
-        .unwrap();
-    AgentPersistence::delete(&p, a).await.unwrap();
     assert_eq!(p.list_mcp_connections(company).await.unwrap().len(), 2);
     sqlx::query("DELETE FROM companies WHERE id=$1")
         .bind(company)
-        .execute(&pool)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn mcp_competing_selection_and_definition_writes_have_one_winner() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let p = PostgresPersistence::with_credential_cipher(pool.clone(), CredentialCipher::for_test());
-    let owner = company(&p).await;
-    let foreign = company(&p).await;
-    let a = agent(&p, owner, "race").await;
-    let connection = p.create_mcp_connection(owner, write("crm")).await.unwrap();
-    let other = p
-        .create_mcp_connection(foreign, write("foreign"))
-        .await
-        .unwrap();
-    let initial = p.agent_mcp_selection(owner, a).await.unwrap();
-    assert!(
-        p.replace_agent_mcp_selection(initial.clone(), Some(vec![other.id]))
-            .await
-            .is_err()
-    );
-    let err = sqlx::query(
-        "INSERT INTO agent_mcp_selections(company_id,agent_id,connection_id) VALUES($1,$2,$3)",
-    )
-    .bind(owner)
-    .bind(a)
-    .bind(other.id)
-    .execute(&pool)
-    .await
-    .unwrap_err();
-    assert_eq!(
-        err.as_database_error().unwrap().code().as_deref(),
-        Some("23503")
-    );
-    let (left, right) = tokio::join!(
-        p.replace_agent_mcp_selection(initial.clone(), Some(vec![connection.id])),
-        p.replace_agent_mcp_selection(initial, Some(vec![]))
-    );
-    assert_ne!(left.is_ok(), right.is_ok());
-    let (left, right) = tokio::join!(
-        p.update_mcp_connection(owner, connection.id, connection.revision, write("left")),
-        p.update_mcp_connection(owner, connection.id, connection.revision, write("right"))
-    );
-    assert_ne!(left.is_ok(), right.is_ok());
-    sqlx::query("DELETE FROM companies WHERE id=ANY($1)")
-        .bind(vec![owner, foreign])
         .execute(&pool)
         .await
         .unwrap();
@@ -339,77 +221,6 @@ async fn mcp_connection_capacity_is_atomic_for_competing_creators() {
         .await
         .unwrap();
 }
-
-#[tokio::test]
-async fn mcp_selection_and_effective_grant_limits_reject_the_whole_edit() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let p = PostgresPersistence::new(pool.clone());
-    let owner = company(&p).await;
-    let a = agent(&p, owner, "bounded").await;
-    let mut definition = write("first");
-    definition.discovered_tools = (0..4)
-        .map(|i| McpDiscoveredTool {
-            name: format!("tool-{i}").try_into().unwrap(),
-            description: String::new(),
-            input_schema: serde_json::json!({"type":"object"}),
-            output_schema: None,
-        })
-        .collect();
-    definition.tool_grants = definition
-        .discovered_tools
-        .iter()
-        .map(|tool| tool.name.clone())
-        .collect();
-    let mut ids = vec![];
-    for i in 0..9 {
-        definition.slug = format!("connection-{i}").into();
-        ids.push(
-            p.create_mcp_connection(owner, definition.clone())
-                .await
-                .unwrap()
-                .id,
-        );
-    }
-    let initial = p.agent_mcp_selection(owner, a).await.unwrap();
-    assert!(
-        p.replace_agent_mcp_selection(initial.clone(), Some(ids.clone()))
-            .await
-            .is_err()
-    );
-    let selected = p
-        .replace_agent_mcp_selection(initial, Some(ids[..8].to_vec()))
-        .await
-        .unwrap();
-    definition.slug = "connection-0".into();
-    definition.discovered_tools.push(McpDiscoveredTool {
-        name: "extra".to_string().try_into().unwrap(),
-        description: String::new(),
-        input_schema: serde_json::json!({}),
-        output_schema: None,
-    });
-    definition.tool_grants = definition
-        .discovered_tools
-        .iter()
-        .map(|tool| tool.name.clone())
-        .collect();
-    assert!(
-        p.update_mcp_connection(owner, ids[0], 1, definition)
-            .await
-            .is_err()
-    );
-    assert_eq!(p.agent_mcp_selection(owner, a).await.unwrap(), selected);
-    assert_eq!(p.list_mcp_connections(owner).await.unwrap()[0].revision, 1);
-    sqlx::query("DELETE FROM companies WHERE id=$1")
-        .bind(owner)
-        .execute(&pool)
-        .await
-        .unwrap();
-}
-
-#[path = "mcp_flow_tests.rs"]
-mod flows;
 
 #[path = "mcp_read_tests.rs"]
 mod reads;

@@ -38,6 +38,8 @@ are deliberate architectural boundaries. Listing an item here does not promise i
 - Shared mutable context between independent message runs or conversation-wide execution locks.
 - Implicit tool grants from skills, hidden memory side effects, or automatic message sending by
   the agent harness. Explicit tools remain supported through the shared action service.
+- Workflow memory (`memory.load`/`memory.save` handlers, scopes and grants) in this release, by
+  user decision 2026-10-21 (06-F032). The contracts stay registered but unhandled.
 - Arbitrary next-step IDs supplied by a model or reviewer. Routing remains declared and validated.
 - Exactly-once remote-effect guarantees for providers without the necessary idempotency/reconciliation
   contract. Unknown outcomes are exposed and recovered explicitly.
@@ -51,6 +53,7 @@ are deliberate architectural boundaries. Listing an item here does not promise i
 Human comments, structured feedback, revised drafts, alternate human-selected routes, and bounded
 review rounds are part of the foundation. So are direct agent write tools, workflow-as-tool calls,
 action-specific authorization, uncertain-effect recovery, independent same-thread message runs,
-provider-neutral sending/replying, explicit memory steps, classifier-selected capabilities, and
-explicit `mcp.call` steps over Streamable HTTP through the shared action service.
+provider-neutral sending/replying, and explicit `mcp.call` steps over Streamable HTTP through the
+shared action service. (Explicit memory steps were dropped from this release by user decision
+2026-10-21, 06-F032; classifier-selected capabilities were removed by 06-D5.)
 The phases must implement these contracts before the foundation is considered complete.

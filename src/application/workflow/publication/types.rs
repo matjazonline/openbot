@@ -1,4 +1,4 @@
-use super::registry::{CapabilityProfile, ToolContract};
+use super::registry::ToolContract;
 use crate::domain::workflow::{CompanyId, TypeName};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,6 +62,8 @@ pub struct AgentSnapshot {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SkillSnapshot {
     pub company_id: CompanyId,
+    /// Trusted library identity for revocation checks; never model input.
+    pub skill_id: uuid::Uuid,
     pub name: TypeName,
     pub instructions: String,
     pub required_tools: Vec<TypeName>,
@@ -105,7 +107,6 @@ pub struct ToolSnapshot {
 pub struct DependencySnapshots {
     pub agents: Vec<AgentSnapshot>,
     pub skills: Vec<SkillSnapshot>,
-    pub profiles: Vec<CapabilityProfile>,
     pub tools: Vec<ToolSnapshot>,
 }
 

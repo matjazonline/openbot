@@ -4,7 +4,7 @@ This document describes the phase 02 compiler and its 18-type catalogue. The
 application provides library validation/publication commands, but does not yet accept
 workflow YAML through an authoring API, persist prepared inputs, or execute these definitions.
 `application::workflow::registry::compile` uses the built-in catalogue and explicit
-caller-supplied tool/profile/pinned-child and dependency facts. The lower-level
+caller-supplied tool/pinned-child and dependency facts. The lower-level
 `compiler::compile` remains available for explicit descriptor callers and tests. A structurally `ValidatedWorkflow` is not a compiled or
 publishable workflow.
 
@@ -89,11 +89,11 @@ for **resolved values**; every `with` field still needs a binding wrapper.
 
 | Type | Required `with` fields | Optional fields / result |
 | --- | --- | --- |
-| `context.load` | `sources`, `max_tokens` | Result `{items: [{id, source, content}], token_count}` |
-| `memory.load` | `scope`, `query`, `limit` | Result `{items: [{id, source, content}]}` |
-| `memory.save` | `scope`, `facts` (nonempty strings) | Result `{saved_ids: [...]}` |
-| `ai.classify` | `context`, literal `output_schema` | Direct schema result; finite string enum, or required `label`/`profile` enum property |
-| `agent.run` | `agent`, `context`, literal `output_schema` | Optional `capability_profile`; direct schema result |
+| `context.history` | `max_tokens` | Result `{items: [{message_id, at, role, audience, entry_kind, author, subject, body, truncated}], token_count, omitted}`: the run's thread history frozen at admission, internal notes excluded |
+| `memory.load` | `scope`, `query`, `limit` | Result `{items: [{id, source, content}]}`; registered but unhandled: memory is not in this release |
+| `memory.save` | `scope`, `facts` (nonempty strings) | Result `{saved_ids: [...]}`; registered but unhandled: memory is not in this release |
+| `ai.classify` | `agent`, `context`, literal `output_schema` | Tool-free call with the agent's instructions and model; direct schema result; finite string enum, or required `label` enum property |
+| `agent.run` | `agent`, `context`, literal `output_schema` | Runs with exactly the agent's saved tools and skills; direct schema result |
 | `decision.rule` | `data`, literal `data_schema` | Top-level ordered `rule`; result `{choice, data}` |
 | `decision.human` | `proposal`, `reviewer`, `deadline`, literal `data_schema` | Optional literal `feedback_required` choice list; result `{choice, feedback, data}` |
 | `decision.agent` | `agent`, `context`, literal `data_schema` | Result `{choice, data}` |
@@ -112,7 +112,7 @@ Decisions derive eligible names from `routes.choices`; there are no fixed
 approve/reject names. A required human feedback choice needs nonempty feedback.
 Schemas remain Draft 2020-12 with native local resource/reference semantics, not
 closed configuration maps. Classifier object contracts require `type: object` (or `[object]`) and a required
-finite `label`/`profile` enum; scalar alternatives are rejected. There is no second
+finite `label` enum; scalar alternatives are rejected. There is no second
 `config` authority.
 
 Registration-owned objects reject unknown fields. Scope is `{kind, id?}` where
@@ -128,17 +128,18 @@ never fabricate it. User context/proposals/HTTP bodies may contain arbitrary JSO
 within the workflow context budget; arguments, mapped values, child inputs and
 results follow their explicit schemas. HTTP headers are a bounded string map.
 
-`capability_profile` is optional and non-null. Omission preserves absence in
-prepared inputs and records `agent_defaults`. Inline `{tools: [...], skills: [...]}`
-requires both lists; empty lists select none. Named profiles must exist in supplied
-frozen facts. References are validated after resolution with the same schema;
-null, missing required references, unknown names, duplicate selections and unknown
-inline fields fail. An unwired classifier never changes omission semantics.
-Actual agent loading, skill requirements, grants, ceilings and revocation remain
-phase06 responsibilities.
+An agent's capabilities are defined on the agent. `agent.run` uses exactly the
+agent's saved workflow tools and skills, frozen when the workflow version is
+published; there is no step-level capability profile and no workflow-level
+capability ceiling, so a step can neither add nor narrow a capability.
+`ai.classify` and `decision.agent` use only the selected agent's instructions and
+model, with no tools and no skills. Agent edits take effect on republish. At
+execution the runtime refuses a model step (terminal `agent.rejected`, before any
+provider call) when its agent or model is no longer available, or when a prepared
+tool or skill has since been removed from the agent.
 
-All identifiers/selections are bounded to 128 characters; selections/profiles have
-at most 128 tools, skills, sources or destinations. Collections of context/memory
+All identifiers/selections are bounded to 128 characters; selections have
+at most 128 tools, skills or destinations. Collections of context/memory
 items, saved facts/IDs and MCP content blocks have at most 256 entries. Text fields
 are at most 16,384 characters, context token requests at most 131,072, paths 2,048,
 correlations 256, and RFC3339 deadlines 64. Header maps have at most 64 properties,
@@ -148,7 +149,7 @@ MCP base64 payloads are at most 16,384 characters, MIME types and resource names
 128, resource URIs 2,048, and metadata maps 64 properties with 128-character keys.
 Resource links allow at most 128 icons; each icon source is at most 16,384 characters,
 with at most 128 size strings of 128 characters.
-Supplied tool/profile/child contracts total at most 256 entries. Borrowed expanded
+Supplied tool/child contracts total at most 256 entries. Borrowed expanded
 facts are checked before specialization (1 MiB and 65,536 schema nodes); the exact
 serialized descriptor/dependency facts also have a 1 MiB ceiling before validators. Each declared schema uses the existing bounded schema
 validator. Duplicate facts fail; named fact lookup is side-effect free.
@@ -170,7 +171,7 @@ identities. Shared HTTP/tool/MCP/message actions may suspend for approval,
 reconciliation or delivery continuation. HTTP verbs, MCP metadata and author declarations never establish safe
 replay. Existing failure classes/retry eligibility retain their domain meaning.
 
-Specialized schemas, selected tool/child facts, available profile contracts,
+Specialized schemas, selected tool/child facts,
 registration revision and recovery/capability constraints are hashed by **StepId**.
 Two same-type steps can have different contracts; catalogue ordering does not
 change identity. This is compiler metadata, not an approved publication bundle.
@@ -183,7 +184,7 @@ executable loop, provider call, timer sleeper or handler in this catalogue.
 `templates::TemplateCatalogue::build` constructs a trusted composition-time,
 immutable starter catalogue using the real bounded YAML decoder and step registry
 compiler. This workflow-template catalogue is distinct from the step-type registry.
-Assembly supplies illustrative tool/profile/child facts; these are validated and
+Assembly supplies illustrative tool/child facts; these are validated and
 then discarded, not installed or granted to a company. Future operator ingress
 must enforce the account/config operator policy before catalogue construction.
 Distribution, operator editing and server configuration are not wired.
@@ -229,7 +230,7 @@ authorization service. The lifecycle layer must load trusted company-owned snaps
 and approved policies; a caller-supplied company identifier is not proof of access.
 
 The bundle retains source/compiler content, agent instructions and explicit model
-settings, ordered saved tools/skills, skill instructions and required tools, profiles,
+settings, ordered saved tools/skills, skill instructions and required tools,
 tool schemas and approved effect/recovery policy, and pinned immutable child bundles.
 Compiler facts are derived from that same content. SHA-256 hashes cover each captured
 dependency and the version manifest; child hashes transitively cover child content.
@@ -238,14 +239,15 @@ Policies come from the trusted policy loader, never MCP server annotations. Tool
 plus MCP slot identify explicit calls; name-only capability selections reject ambiguous
 tool names across slots.
 
-Agent selectors may use parameters or other typed bindings. Publication requires a
-finite captured agent catalogue; `PublishedBundle::prepare_step_inputs` rejects a
-resolved selection outside it. Runtime integration must use this bundle hook rather
-than the compiler-only input hook. Omitted profiles preserve ordered saved defaults;
-explicit profiles remain separate selections, including deliberately empty lists.
-Selected skills must have their required tools in the captured selection. These
-snapshots do not grant execution access: current grants, ceilings and revocation must
-still be enforced by the runtime. This point introduces no execution handler.
+An agent selector is a literal agent key or a binding whose compiled type is a
+finite string enum of agent keys; publication captures every agent in that set and
+refuses any other selector. `PublishedBundle::prepare_step_inputs` rejects a resolved
+selection outside the captured catalogue. Runtime integration must use this bundle
+hook rather than the compiler-only input hook. Each captured agent carries exactly
+its saved tools and skills, in order, and every skill's required tools must be among
+the agent's own tools. These snapshots do not grant execution access: the runtime
+re-checks the agent, its model and the prepared tools and skills before each model
+call.
 
 Resource declarations retain slot, kind and optional contract. MCP snapshots must
 refer to declared MCP slots. Company resource selection, provider compatibility and
@@ -323,7 +325,7 @@ The tests use those same paths, so later runtime/handler tests can reuse and ext
 | Source under `src/application/workflow/fixtures/` | Demonstrated contract |
 | --- | --- |
 | `reviewed-support.yaml` | Draft → human review → reply using human-edited data; rejection ends without reply |
-| `autonomous-response.yaml` | Agent → reply, no classifier or profile; captured saved defaults include a tool and skill |
+| `autonomous-response.yaml` | Agent → reply, no classifier; the captured agent's saved tools and skills include a tool and a skill |
 | `triage-routing.yaml` | Finite classifier → ordered support/sales rule cases with required default |
 | `repeated-human-revision.yaml` | Three-round bounded child pin → accepted reply or escalation |
 | `human-revision-round.yaml` | Draft with prior body/feedback → human accept/revise with required revision feedback |

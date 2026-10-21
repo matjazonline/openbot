@@ -1,8 +1,8 @@
 //! Removing credentials from anything a run is about to log or store.
 //!
-//! It lives beside the harness ports rather than inside the `ai-agents` adapter because both
-//! sides of the boundary need it: the adapter redacts the compiled config and the provider's
-//! response, and the runner redacts the error it records against the task. Two copies of a
+//! It lives beside the harness ports rather than inside the Rig adapter because both sides of
+//! the boundary need it: the adapter redacts what the provider sends back, and the runner redacts
+//! the error it records against the task. Two copies of a
 //! redaction list is one copy that stops being updated.
 //!
 //! The patterns are deliberately broader than this platform's own keys. What passes through here

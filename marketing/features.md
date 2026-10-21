@@ -42,10 +42,9 @@
 
 ### 3. Military-Grade Security, Spam Shield & Loop Prevention
 *Defense-in-depth protection before an agent ever touches an input.*
-* **3-Stage Inbound Spam & Injection Defense:**
+* **2-Stage Inbound Spam Defense:**
   * *Stage 1 (Local Heuristic Engine):* High-speed Rust-native scanner catching spoofed headers, malformed MIME, and suspicious links.
   * *Stage 2 (External Daemon Scoring):* Deep integration with Rspamd and SpamAssassin daemons.
-  * *Stage 3 (Pre-Flight LLM Guardrail):* A dedicated, pre-execution classifier intercepts prompt injections, adversarial jailbreaks, and toxic inputs before the main agent executes.
 * **Anti-Loop Defense & Turn Limits:** Strict bounds enforce maximum 20 messages/hour per thread, 5-hop inter-workflow limits, cycle detection, and standard auto-reply headers (`Auto-Submitted: auto-replied`, `X-Auto-Response-Suppress: All`) to permanently block AI-to-AI ping-pong storms.
 * **Participant Access Control (ACLs):** Lock channels down to internal team members, an explicit customer email whitelist, or open public access (`@public`).
 

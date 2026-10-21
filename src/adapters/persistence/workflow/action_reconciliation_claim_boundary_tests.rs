@@ -6,7 +6,7 @@ mod claim_recovery_tests;
 
 fn source(activations: u32) -> Value {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["limits"]["root_budget"] =
         json!({"activations":activations,"model_calls":2,"repetitions":2});
     source

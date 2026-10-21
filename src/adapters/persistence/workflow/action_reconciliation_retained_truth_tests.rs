@@ -41,7 +41,7 @@ impl ActionEvidenceVerifier for LaterVerifier {
                 assert_eq!(*recovered_result, Some(good()));
                 // An inconsistent trusted adapter reports a second schema-valid
                 // result; the underlying entered effect and ledger stay immutable.
-                *recovered_result = Some(json!({"items":[],"token_count":1}));
+                *recovered_result = Some(json!({"items":[],"token_count":1,"omitted":0}));
             }
             LaterObservation::Unknown => {
                 // A later unavailable answer cannot erase earlier durable truth.
@@ -163,7 +163,7 @@ async fn verified_conflict() {
         &saved,
         TruthChange {
             disposition: "applied",
-            recovered: Some(json!({"items":[],"token_count":1})),
+            recovered: Some(json!({"items":[],"token_count":1,"omitted":0})),
             receipt: false,
             contradiction: Some(prior),
         },

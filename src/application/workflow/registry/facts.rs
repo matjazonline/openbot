@@ -5,7 +5,6 @@ use std::io::{self, Write};
 #[derive(Default)]
 pub struct CatalogueFacts {
     pub tools: Vec<ToolContract>,
-    pub profiles: Vec<CapabilityProfile>,
     pub children: Vec<ChildContract>,
 }
 
@@ -16,13 +15,6 @@ pub struct ToolContract {
     pub connection: Option<ResourceName>,
     pub input_schema: Value,
     pub output_schema: Value,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct CapabilityProfile {
-    pub name: TypeName,
-    pub tools: Vec<TypeName>,
-    pub skills: Vec<TypeName>,
 }
 
 pub struct ChildContract {
@@ -48,7 +40,7 @@ impl Write for Budget {
 
 impl CatalogueFacts {
     pub(super) fn validate(&self, span: SourceSpan) -> Result<(), Diagnostic> {
-        if self.tools.len() + self.profiles.len() + self.children.len() > MAX_FACTS {
+        if self.tools.len() + self.children.len() > MAX_FACTS {
             return Err(Diagnostic::at(
                 "registry.limit",
                 "At most 256 supplied contracts are allowed",
@@ -65,25 +57,6 @@ impl CatalogueFacts {
             check_fact_schema(&tool.input_schema, &mut budget, span)?;
             check_fact_schema(&tool.output_schema, &mut budget, span)?;
         }
-        let mut names = BTreeSet::new();
-        for profile in &self.profiles {
-            if !names.insert(&profile.name)
-                || profile.tools.len() > MAX_SELECTIONS
-                || profile.skills.len() > MAX_SELECTIONS
-                || !unique(&profile.tools)
-                || !unique(&profile.skills)
-            {
-                return Err(fact_error(span));
-            }
-            for name in std::iter::once(&profile.name)
-                .chain(&profile.tools)
-                .chain(&profile.skills)
-            {
-                budget
-                    .write_all(name.as_str().as_bytes())
-                    .map_err(|_| fact_error(span))?;
-            }
-        }
         let mut versions = BTreeSet::new();
         for child in &self.children {
             if !versions.insert(child.version_id) {
@@ -94,9 +67,6 @@ impl CatalogueFacts {
         }
         Ok(())
     }
-}
-fn unique(names: &[TypeName]) -> bool {
-    names.iter().collect::<BTreeSet<_>>().len() == names.len()
 }
 fn fact_error(span: SourceSpan) -> Diagnostic {
     Diagnostic::at(

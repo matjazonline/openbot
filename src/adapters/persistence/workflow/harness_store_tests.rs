@@ -76,11 +76,12 @@ async fn workflow_harness_owner_store_competing_open_and_execution_replay() {
     assert_eq!(reloaded, saved);
     let mut changed = spec;
     changed.prepared["preamble"] = json!("changed");
+    // A changed preparation can never match the immutable checkpoint: terminal, not retried.
     assert!(matches!(
         f.persistence()
             .open_workflow_checkpoint(fence, &changed, policy)
             .await,
-        Err(AppError::Conflict(_))
+        Err(AppError::BadRequest(_))
     ));
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM model_usage_calls")
         .fetch_one(f.persistence().pool())

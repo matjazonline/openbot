@@ -172,7 +172,7 @@ async fn workflow_wait_refuses_scope_kind_and_invalid_events() {
         assert!(recorded(p, event).await.is_err());
         assert_eq!(snapshot_all(&f).await, before);
     }
-    for kind in ["data.map", "decision.human", "context.load"] {
+    for kind in ["data.map", "decision.human", "context.history"] {
         let source = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
         let (f, scope) = fixture_source(source).await;
         let before = snapshot_all(&f).await;

@@ -22,7 +22,7 @@ use crate::{
     entities::{
         agent::Agent,
         approval::ApprovalSubject,
-        channel::{Channel, PUBLIC_PARTICIPANT, ParticipantAccess},
+        channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
@@ -38,11 +38,9 @@ use crate::{
         value_objects::{EmailAddress, MessageId},
     },
     services::{
-        agent_channel_tool::AgentChannelToolContext,
         agent_runner::{AgentRunner, ResolvedAgentCapabilities, resolve_agent_capabilities},
         harness::AgentExecutionDisposition,
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outreach_tool::OutreachToolContext,
     },
     task_queue::{AgentDispatchCommit, AgentReviewCandidate, DispatchCommit, TASK_LEASE_SECONDS},
     transport::{
@@ -113,22 +111,6 @@ impl ReplyDeliveryMode {
             Self::Durable { task_id } => Some(format!("task:{task_id}:reply")),
         }
     }
-}
-
-/// Whether a run may skip the inbound guardrail.
-///
-/// Trust is a property of the *sender*: [`Channel::participant_access`] grants it to a listed
-/// channel participant or to a member of the owning company's team. A forward carries text that
-/// sender did not write and that no authentication covers -- DMARC passed for the forwarder, not
-/// for whoever wrote the quoted body, and [`strip_quoted_history`] deliberately keeps the whole
-/// quoted chain intact on a forward. A teammate forwarding a hostile email is therefore the one
-/// shape where the envelope is trusted and the payload is not, so it does not inherit the
-/// forwarder's trust.
-///
-/// [`Channel::participant_access`]: crate::entities::channel::Channel::participant_access
-/// [`strip_quoted_history`]: super::support::strip_quoted_history
-fn guardrail_may_be_skipped(access: &ParticipantAccess, envelope: &InboundEnvelope) -> bool {
-    access.trusted && !envelope.directives.is_forwarded
 }
 
 /// The RFC id an outbound reply answers.
@@ -499,7 +481,6 @@ impl ThreadUseCases {
             .subject(Some(&payload.subject))
             .history(&history)
             .internal_notes(&instruction_notes)
-            .approval_use_cases(self.approval_use_cases.clone())
             .approval_context(Some(
                 self.approval_context_for_channel(
                     &company,
@@ -512,38 +493,11 @@ impl ThreadUseCases {
                 .await,
             ))
             .monitoring(self.monitoring.clone())
-            .config(Some(self.config.clone()))
-            .company(Some(company.clone()))
             .ids(Some(company.id), Some(channel.id), Some(agent.id))
             .trace(task.correlation_id, Some(task.id));
 
-        if let Some((harnesses, classifier)) = self.agent_harnesses() {
-            runner = runner.harnesses(harnesses, classifier);
-        }
-
-        if let Some(agent_persistence) = self.agent_persistence() {
-            runner =
-                runner.agent_directory(agent_persistence.clone(), self.binding_persistence.clone());
-        }
-        if let Some(provisioning) = self.agent_channel_provisioning.clone() {
-            runner = runner.agent_channel_tool(
-                provisioning,
-                AgentChannelToolContext {
-                    company_id: company.id,
-                    company_slug: company.slug.clone(),
-                    source_agent_id: agent.id,
-                    source_agent_name: agent.name.clone(),
-                    source_channel_id: channel.id,
-                    lease,
-                    app_domain_name: self.config.app_domain_name.clone(),
-                    channel_defaults: company.channel_defaults.clone(),
-                    spam_scanning: if self.config.is_spam_scan_enabled() {
-                        crate::use_cases::agent::SpamScanning::Available
-                    } else {
-                        crate::use_cases::agent::SpamScanning::Unavailable
-                    },
-                },
-            );
+        if let Some(harnesses) = self.agent_harnesses() {
+            runner = runner.harnesses(harnesses);
         }
 
         let run_timeout = agent.run_timeout(self.agent_run_timeout);
@@ -967,7 +921,6 @@ impl ThreadUseCases {
             // The actor behind the handle, resolved once here. Memory is scoped to it and nothing
             // downstream reads the handle string as a key.
             let subject_principal = context.principal_id;
-            let access = channel_match.channel.participant_access(context);
 
             let upstream_context = self
                 .upstream_context_for(&run.outputs, lease.task_id)
@@ -1016,15 +969,11 @@ impl ThreadUseCases {
                         .subject(Some(envelope.content.subject()))
                         .history(&history)
                         .internal_notes(if index == 0 { &instruction_notes } else { &[] })
-                        .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
                             self.approval_context_for(channel_match, lease, run_correlation_id)
                                 .await,
                         ))
                         .monitoring(self.monitoring.clone())
-                        .config(Some(self.config.clone()))
-                        .company(Some(channel_match.company.clone()))
-                        .skip_spam_guardrail(guardrail_may_be_skipped(&access, envelope))
                         .recipient_role(Some(channel_match.recipient_role))
                         .upstream_pipeline_context(upstream_context)
                         .ids(
@@ -1034,21 +983,9 @@ impl ThreadUseCases {
                         )
                         // After `ids`, which is where the hook context reads them from.
                         .trace(run_correlation_id, Some(lease.task_id));
-                    if let Some((harnesses, classifier)) = self.agent_harnesses() {
-                        runner = runner.harnesses(harnesses, classifier);
+                    if let Some(harnesses) = self.agent_harnesses() {
+                        runner = runner.harnesses(harnesses);
                     }
-                    runner = self.with_task_tools(
-                        runner,
-                        channel_match,
-                        agent.as_ref(),
-                        self.outreach_context_for(
-                            channel_match,
-                            envelope,
-                            lease,
-                            run_correlation_id,
-                            params.spec().sub_agents.clone(),
-                        ),
-                    );
                     let run_timeout = agent
                         .as_ref()
                         .map(|agent| agent.run_timeout(self.agent_run_timeout))
@@ -1097,47 +1034,6 @@ impl ThreadUseCases {
         }
 
         Ok(Some(run))
-    }
-
-    /// Configure tools synchronously so the agent dispatch chain gains no async stack frame.
-    fn with_task_tools<'a>(
-        &self,
-        mut runner: AgentRunner<'a>,
-        channel_match: &ChannelMatch,
-        agent: Option<&Agent>,
-        outreach: OutreachToolContext,
-    ) -> AgentRunner<'a> {
-        if let (Some(provisioning), Some(agent)) = (self.agent_channel_provisioning.clone(), agent)
-        {
-            runner = runner.agent_channel_tool(
-                provisioning,
-                AgentChannelToolContext {
-                    company_id: outreach.company_id,
-                    company_slug: outreach.company_slug.clone(),
-                    source_agent_id: agent.id,
-                    source_agent_name: agent.name.clone(),
-                    source_channel_id: channel_match.channel.id,
-                    lease: outreach.lease,
-                    app_domain_name: self.config.app_domain_name.clone(),
-                    channel_defaults: channel_match.company.channel_defaults.clone(),
-                    spam_scanning: if self.config.is_spam_scan_enabled() {
-                        crate::use_cases::agent::SpamScanning::Available
-                    } else {
-                        crate::use_cases::agent::SpamScanning::Unavailable
-                    },
-                },
-            );
-        }
-        if let Some(agent_persistence) = self.agent_persistence() {
-            runner =
-                runner.agent_directory(agent_persistence.clone(), self.binding_persistence.clone());
-        }
-        runner.outreach_tool(
-            self.task_persistence.clone(),
-            self.channel_persistence.clone(),
-            self.deliveries.clone(),
-            outreach,
-        )
     }
 
     async fn persist_memories(&self, task_id: Uuid, run: &AgentRun<'_>) {
@@ -1265,31 +1161,6 @@ impl ThreadUseCases {
             .await;
         subject.channel_slug = channel_match.reply_slug();
         subject
-    }
-
-    fn outreach_context_for(
-        &self,
-        channel_match: &ChannelMatch,
-        envelope: &InboundEnvelope,
-        lease: TaskLeaseRef,
-        correlation_id: CorrelationId,
-        sub_agent_scope: crate::entities::harness::SubAgentScope,
-    ) -> OutreachToolContext {
-        OutreachToolContext {
-            lease,
-            correlation_id,
-            company_id: channel_match.company.id,
-            channel_id: channel_match.channel.id,
-            sub_agent_scope,
-            thread_id: channel_match.thread.id,
-            channel_name: channel_match.channel.name.clone(),
-            channel_slug: channel_match.reply_slug(),
-            company_slug: channel_match.company.slug.clone(),
-            threading: answering(envelope),
-            hop_count: envelope.directives.hop_count,
-            trace_channels: envelope.directives.trace_channels.to_vec(),
-            app_domain_name: self.config.app_domain_name.clone(),
-        }
     }
 
     /// Earlier pipeline steps' answers, plus any outreach replies gathered so far, prepended to the
@@ -1871,44 +1742,6 @@ mod memory_bound_tests {
 }
 
 #[cfg(test)]
-mod guardrail_trust_tests {
-    use super::*;
-    use crate::transport::test_support::envelope_from;
-
-    fn access(trusted: bool) -> ParticipantAccess {
-        ParticipantAccess {
-            authorized: true,
-            trusted,
-        }
-    }
-
-    fn envelope(is_forwarded: bool) -> InboundEnvelope {
-        let mut envelope = envelope_from("colleague@acme.test", "Quick question", "hello");
-        envelope.directives.is_forwarded = is_forwarded;
-        envelope
-    }
-
-    #[test]
-    fn a_trusted_sender_skips_the_guardrail_on_their_own_words() {
-        assert!(guardrail_may_be_skipped(&access(true), &envelope(false)));
-    }
-
-    /// The forwarded-injection case: a teammate's envelope around a stranger's words. The marker
-    /// is set by the mail adapter, from the subject or the body; what matters here is that trust
-    /// stops at it.
-    #[test]
-    fn a_forward_does_not_inherit_the_forwarders_trust() {
-        assert!(!guardrail_may_be_skipped(&access(true), &envelope(true)));
-    }
-
-    #[test]
-    fn an_untrusted_sender_never_skips_it() {
-        assert!(!guardrail_may_be_skipped(&access(false), &envelope(false)));
-        assert!(!guardrail_may_be_skipped(&access(false), &envelope(true)));
-    }
-}
-
-#[cfg(test)]
 mod agent_reply_tests {
     use super::super::PipelineStep;
     use super::*;
@@ -1926,7 +1759,6 @@ mod agent_reply_tests {
             user_id: Uuid::new_v4(),
             name: "Acme".into(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
@@ -2000,9 +1832,6 @@ mod agent_reply_tests {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
-            harness_kind: crate::entities::harness::HarnessKind::default(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: None,
             avatar_url: None,
             memory_persistence_mode: Default::default(),

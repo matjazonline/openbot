@@ -35,18 +35,6 @@ pub(super) fn reviewers() -> Value {
     list["uniqueItems"] = json!(true);
     list
 }
-pub(super) fn profile(facts: &CatalogueFacts) -> Value {
-    let mut list = array(identifier(), 0, MAX_SELECTIONS);
-    list["uniqueItems"] = json!(true);
-    let inline = object(json!({"tools":list,"skills":list}), &["tools", "skills"]);
-    if facts.profiles.is_empty() {
-        inline
-    } else {
-        let mut names: Vec<_> = facts.profiles.iter().map(|p| p.name.as_str()).collect();
-        names.sort_unstable();
-        json!({"oneOf":[inline,{"type":"string","enum":names}]})
-    }
-}
 /// Code points are only a coarse bound: `InputCheck::Message` and `CanonicalContent::parse`
 /// enforce the canonical 998-byte subject at compilation (literals) and at resolution.
 pub(super) fn content() -> Value {
@@ -55,6 +43,29 @@ pub(super) fn content() -> Value {
 }
 pub(super) fn uuid() -> Value {
     json!({"type":"string","pattern":"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"})
+}
+/// One frozen thread-history message (06-D6 A). `audience` and `entry_kind` keep the
+/// message's disclosure boundary as data; nothing beyond internal notes is dropped.
+pub(super) fn history_item() -> Value {
+    object(
+        json!({"message_id":identifier(),"at":{"type":"string","format":"date-time","maxLength":MAX_DEADLINE},
+            "role":{"enum":["human","agent","system"]},
+            "audience":{"enum":["external_conversation","internal_only","legacy_unclassified"]},
+            "entry_kind":{"enum":["conversation","note","delegation","system_event"]},
+            "author":{"type":"string","maxLength":MAX_TEXT},"subject":{"type":"string","maxLength":MAX_TEXT},
+            "body":{"type":"string","maxLength":MAX_TEXT},"truncated":{"type":"boolean"}}),
+        &[
+            "message_id",
+            "at",
+            "role",
+            "audience",
+            "entry_kind",
+            "author",
+            "subject",
+            "body",
+            "truncated",
+        ],
+    )
 }
 pub(super) fn provenance_item() -> Value {
     object(

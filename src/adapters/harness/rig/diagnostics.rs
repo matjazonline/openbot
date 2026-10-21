@@ -10,6 +10,15 @@ pub(super) struct InputCounts {
     prompt_characters: usize,
     history_message_count: usize,
 }
+impl InputCounts {
+    /// A workflow run's only input is its delimited context prompt; it has no history.
+    pub(super) fn prompt(text: &str) -> Self {
+        Self {
+            prompt_characters: text.chars().count(),
+            history_message_count: 0,
+        }
+    }
+}
 impl From<&AgentRun<'_>> for InputCounts {
     fn from(run: &AgentRun<'_>) -> Self {
         Self {

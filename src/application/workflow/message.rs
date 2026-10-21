@@ -424,6 +424,8 @@ pub struct MessageToolCall {
 /// What a direct tool observes. Pending never claims provider acceptance.
 pub enum MessageObservation {
     Committed(ActionReceipt),
+    /// The publication parked this execution on its delivery wait in the same commit.
+    DeliveryParked(WaitId),
     Pending,
     Uncertain,
     ApprovalRequired,

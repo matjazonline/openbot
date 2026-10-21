@@ -166,40 +166,10 @@ pub struct CarriedAgent {
     pub response_schema: Option<String>,
     #[serde(rename = "agent_config_json")]
     pub config_json: Option<String>,
-    #[serde(rename = "agent_harness_kind")]
-    pub harness_kind: Option<String>,
-    #[serde(rename = "agent_granted_tool_ids")]
-    pub granted_tool_ids: Option<String>,
     #[serde(rename = "agent_skill_ids")]
     pub skill_ids: Option<String>,
     #[serde(rename = "agent_sub_agent_ids")]
     pub sub_agent_ids: Option<String>,
-    #[serde(rename = "agent_outreach_target_scope")]
-    pub outreach_target_scope: Option<String>,
-    #[serde(
-        rename = "agent_outreach_max_targets",
-        default,
-        deserialize_with = "deserialize_empty_string_as_none"
-    )]
-    pub outreach_max_targets: Option<u16>,
-    #[serde(
-        rename = "agent_outreach_default_timeout_hours",
-        default,
-        deserialize_with = "deserialize_empty_string_as_none"
-    )]
-    pub outreach_default_timeout_hours: Option<u16>,
-    #[serde(
-        rename = "agent_outreach_max_timeout_hours",
-        default,
-        deserialize_with = "deserialize_empty_string_as_none"
-    )]
-    pub outreach_max_timeout_hours: Option<u16>,
-    #[serde(
-        rename = "agent_directory_max_results",
-        default,
-        deserialize_with = "deserialize_empty_string_as_none"
-    )]
-    pub directory_max_results: Option<u16>,
     #[serde(rename = "agent_avatar_url")]
     pub avatar_url: Option<String>,
     /// A ticked box as its raw value: a flattened field is handed to its type as the string the
@@ -232,15 +202,8 @@ impl From<CarriedAgent> for AgentForm {
             config_json: carried.config_json,
             response_format: carried.response_format,
             response_schema: carried.response_schema,
-            harness_kind: carried.harness_kind,
-            granted_tool_ids: carried.granted_tool_ids,
             skill_ids: carried.skill_ids,
             sub_agent_ids: carried.sub_agent_ids,
-            outreach_target_scope: carried.outreach_target_scope,
-            outreach_max_targets: carried.outreach_max_targets,
-            outreach_default_timeout_hours: carried.outreach_default_timeout_hours,
-            outreach_max_timeout_hours: carried.outreach_max_timeout_hours,
-            directory_max_results: carried.directory_max_results,
             avatar_url: carried.avatar_url,
             memory_enabled: checkbox_ticked(carried.memory_enabled.as_deref()),
             memory_persistence_mode: carried.memory_persistence_mode,
@@ -518,7 +481,6 @@ async fn create_agent(
         let generated = agent_write_from_instructions(
             &workspace.agent_use_cases,
             AgentInstructionRequest {
-                harness_kind: write.harness_kind,
                 user_id: workspace.user_id,
                 company_id: company.id,
                 name: &submitted.form.name,
@@ -1062,10 +1024,7 @@ impl AgentSettingsView<'_> {
             None => pages::AgentCreateTab::Easy,
         };
 
-        let mut draft = form.draft.clone();
-        if form.error.is_none() && draft.harness_kind.is_none() {
-            draft.harness_kind = Some(self.agent_use_cases.default_agent_harness());
-        }
+        let draft = form.draft.clone();
         Ok(pages::agent_create_pane(&pages::AgentCreatePane {
             company: self.company,
             app_domain_name: self.app_domain_name,
@@ -1201,12 +1160,8 @@ impl AgentSettingsView<'_> {
                 "text"
             },
             response_schema: super::super::pages::agent_response_schema(agent),
-            harness_kind_raw: None,
-            harness_kind: Some(agent.harness_kind),
-            granted_tool_ids: agent.granted_tool_ids.clone(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
             sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
-            native_tool_policy: agent.native_tool_policy.clone(),
             avatar_url: agent
                 .avatar_url
                 .as_ref()
@@ -1363,6 +1318,7 @@ impl SubmittedAgent {
     pub(super) fn agent_write(&self) -> Result<AgentWrite, String> {
         let capabilities = self.form.capabilities()?;
         Ok(AgentWrite {
+            workflow_tools: None,
             response_contract: self.form.response_contract()?,
             name: self.form.name.clone(),
             slug: self.slug.clone(),
@@ -1371,15 +1327,9 @@ impl SubmittedAgent {
             run_timeout_secs: self.form.run_timeout_secs,
             system_prompt: self.form.system_prompt.clone(),
             description: self.form.description.clone(),
-            harness_kind: capabilities.harness_kind,
-            granted_tool_ids: capabilities.granted_tool_ids,
             skill_ids: capabilities.skill_ids,
             sub_agent_ids: capabilities.sub_agent_ids,
-            native_tool_policy: capabilities.native_tool_policy,
-            config_json: parse_config_form(
-                self.form.config_json.clone(),
-                capabilities.harness_kind,
-            )?,
+            config_json: parse_config_form(self.form.config_json.clone())?,
             memory_enabled: self.form.memory_enabled,
             memory_persistence_mode: self.form.memory_persistence_mode.unwrap_or_default(),
             memory_recall_mode: self.form.memory_recall_mode.unwrap_or_default(),
@@ -1400,17 +1350,13 @@ impl SubmittedAgent {
     }
 
     pub(super) fn draft(&self) -> pages::AgentDraft<'_> {
-        let mut for_capabilities = self.form.clone();
-        for_capabilities.harness_kind = None;
-        let capabilities = for_capabilities.capabilities().unwrap_or_else(|_| {
-            super::agent::SubmittedCapabilities {
-                harness_kind: None,
-                granted_tool_ids: Vec::new(),
-                skill_ids: Vec::new(),
-                sub_agent_ids: Vec::new(),
-                native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
-            }
-        });
+        let capabilities =
+            self.form
+                .capabilities()
+                .unwrap_or_else(|_| super::agent::SubmittedCapabilities {
+                    skill_ids: Vec::new(),
+                    sub_agent_ids: Vec::new(),
+                });
         pages::AgentDraft {
             name: &self.form.name,
             slug: &self.slug,
@@ -1439,16 +1385,8 @@ impl SubmittedAgent {
             config_json: self.form.config_json.as_deref().unwrap_or(""),
             response_format: self.form.response_format.as_deref().unwrap_or("text"),
             response_schema: self.form.response_schema.clone().unwrap_or_default(),
-            harness_kind_raw: self.form.harness_kind.as_deref(),
-            harness_kind: self
-                .form
-                .harness_kind
-                .as_deref()
-                .and_then(crate::entities::harness::HarnessKind::parse),
-            granted_tool_ids: capabilities.granted_tool_ids,
             skill_ids: capabilities.skill_ids,
             sub_agent_ids: capabilities.sub_agent_ids,
-            native_tool_policy: capabilities.native_tool_policy,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),
         }

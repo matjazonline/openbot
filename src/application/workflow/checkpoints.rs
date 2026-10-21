@@ -151,4 +151,12 @@ pub trait WorkflowCheckpointStore: Send + Sync {
         write: WorkflowCheckpointWrite,
         allowance_ms: u64,
     ) -> AppResult<WriteOutcome<RunCheckpoint>>;
+
+    /// The saved reservation of a request parked before I/O. A driver must present this
+    /// exact identity again; admission verifies the approved proposal and fingerprint.
+    async fn blocked_workflow_model(
+        &self,
+        fence: WorkflowFence,
+        policy: LeasePolicy,
+    ) -> AppResult<Option<ModelReservation>>;
 }

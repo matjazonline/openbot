@@ -11,8 +11,7 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::services::agent_channel_tool::AgentChannelProvisioning;
-use crate::services::harness::{HarnessRegistry, TextClassifier};
+use crate::services::harness::HarnessRegistry;
 use crate::{
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
@@ -426,18 +425,15 @@ pub struct ThreadUseCases {
     deliveries: DeliveryComposer,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     agent_capability_reader: Option<Arc<dyn crate::use_cases::skill::AgentCapabilityReader>>,
-    agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     memory: Option<Arc<MemoryCoordinator>>,
-    /// Which runtimes this deployment can execute an agent on, and what answers the spam
-    /// guardrail's one-shot classification.
+    /// Which runtimes this deployment can execute an agent on.
     ///
     /// Optional in the same way `approval_use_cases` is -- most of this module runs without
-    /// touching an agent at all. A dispatch that reaches an agent without them fails the run
-    /// rather than choosing a harness for itself.
+    /// touching an agent at all. A dispatch that reaches an agent without it fails the run rather
+    /// than choosing a harness for itself.
     harnesses: Option<Arc<HarnessRegistry>>,
-    classifier: Option<Arc<dyn TextClassifier>>,
     config: Arc<AppConfig>,
     agent_run_timeout: std::time::Duration,
 }
@@ -483,12 +479,10 @@ impl ThreadUseCases {
             deliveries,
             agent_persistence: None,
             agent_capability_reader: None,
-            agent_channel_provisioning: None,
             approval_use_cases: None,
             monitoring: None,
             memory: None,
             harnesses: None,
-            classifier: None,
             config,
             agent_run_timeout: std::time::Duration::from_secs(300),
         }
@@ -557,35 +551,17 @@ impl ThreadUseCases {
         self
     }
 
-    pub fn with_agent_channel_provisioning(
-        mut self,
-        persistence: Arc<dyn AgentChannelProvisioning>,
-    ) -> Self {
-        self.agent_channel_provisioning = Some(persistence);
-        self
-    }
-
-    /// Wire the harnesses an agent may run on, and the classifier the guardrail asks.
-    ///
-    /// One call for both because both are deployment facts settled at boot, and a deployment with
-    /// one and not the other would run agents whose spam guardrail cannot answer.
-    pub fn with_harnesses(
-        mut self,
-        harnesses: Arc<HarnessRegistry>,
-        classifier: Arc<dyn TextClassifier>,
-    ) -> Self {
+    /// Wire the harnesses an agent may run on, a deployment fact settled at boot.
+    pub fn with_harnesses(mut self, harnesses: Arc<HarnessRegistry>) -> Self {
         self.harnesses = Some(harnesses);
-        self.classifier = Some(classifier);
         self
     }
 
     /// What an [`AgentRunner`] is given to execute with, when this deployment wired any.
     ///
     /// [`AgentRunner`]: crate::services::agent_runner::AgentRunner
-    pub(crate) fn agent_harnesses(
-        &self,
-    ) -> Option<(Arc<HarnessRegistry>, Arc<dyn TextClassifier>)> {
-        self.harnesses.clone().zip(self.classifier.clone())
+    pub(crate) fn agent_harnesses(&self) -> Option<Arc<HarnessRegistry>> {
+        self.harnesses.clone()
     }
 
     pub fn with_approval_use_cases(mut self, approval_use_cases: Arc<ApprovalUseCases>) -> Self {

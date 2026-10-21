@@ -274,7 +274,6 @@ fn mailbox_company() -> Company {
         user_id: Uuid::new_v4(),
         name: "Acme".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: Utc::now(),
@@ -1878,9 +1877,6 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         run_timeout_secs: None,
         system_prompt: None,
         description: None,
-        harness_kind: crate::entities::harness::HarnessKind::default(),
-        granted_tool_ids: Vec::new(),
-        native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
         config_json: None,
         avatar_url: None,
         created_by: crate::entities::creation::CreationProvenance::system(),
@@ -4619,7 +4615,6 @@ fn company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band() {
 fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
     let company = Company {
         channel_defaults: Default::default(),
-        enable_llm_spam_guardrail: Some(true),
         ..settings_company("Acme & Co", "acme")
     };
     let model_connections = [CompanyModelConnection {
@@ -4828,7 +4823,6 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
     let draft = CompanyDraft {
         name: "Acme Renamed",
         slug: "acme-renamed",
-        spam_guardrail: SpamGuardrail::Disabled,
         avatar_url: "",
         memory_provider: "",
         model_connections: Vec::new(),
@@ -4852,39 +4846,6 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
     assert!(html.contains(r##"value="acme-renamed""##));
     // The header still names the stored company — only the form carries what was typed.
     assert!(html.contains(">Acme</h2>"));
-}
-
-#[test]
-fn the_spam_guardrail_select_opens_on_the_state_it_was_given() {
-    // The three states a checkbox cannot express, each round-tripping through the form value.
-    for (stored, marked) in [
-        (None, r##"<option value="" selected>"##),
-        (Some(true), r##"<option value="true" selected>"##),
-        (Some(false), r##"<option value="false" selected>"##),
-    ] {
-        let guardrail = SpamGuardrail::from_stored(stored);
-        let draft = CompanyDraft {
-            spam_guardrail: guardrail,
-            ..CompanyDraft::default()
-        };
-        let html = company_create_pane(&CompanyCreatePane {
-            draft: &draft,
-            error: None,
-        });
-
-        assert!(html.contains(marked), "expected {marked} for {stored:?}");
-        assert_eq!(guardrail.stored(), stored);
-    }
-
-    assert_eq!(
-        SpamGuardrail::from_form(Some("false")),
-        SpamGuardrail::Disabled
-    );
-    assert_eq!(
-        SpamGuardrail::from_form(Some("")),
-        SpamGuardrail::ServerDefault
-    );
-    assert_eq!(SpamGuardrail::from_form(None), SpamGuardrail::ServerDefault);
 }
 
 #[test]
@@ -4989,7 +4950,7 @@ fn the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon() 
     // must not push a second one of its own -- `&new=1` is that URL, and nothing else emits it.
     assert!(!html.contains("&new=1"));
     // The Settings tab's own form is not in the pane while the team is.
-    assert!(!html.contains(r##"name="enable_llm_spam_guardrail""##));
+    assert!(!html.contains(r##"name="default_add_3rd_party""##));
 }
 
 #[test]

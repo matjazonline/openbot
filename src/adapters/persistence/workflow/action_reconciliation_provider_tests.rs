@@ -209,7 +209,7 @@ async fn effects(f: &AdmissionFixture) -> i64 {
         .unwrap()
 }
 fn good() -> Value {
-    json!({"items":[],"token_count":0})
+    json!({"items":[],"token_count":0,"omitted":0})
 }
 
 #[tokio::test]

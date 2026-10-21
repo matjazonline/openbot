@@ -52,110 +52,19 @@ A outreach target
   -> B background_tasks.source_message_id
 ```
 
-## Agent Configuration
+## Starting a Call
 
-Agent A uses the existing `outreach_and_await_quorum` tool with a same-company-only target policy.
-A single target and a 100 percent threshold represent one channel call, and both are the defaults,
-so the model need only supply the target selector, subject, and body.
+Phase 06C removed the agent-runtime tools that used to start a call (`outreach_and_await_quorum`)
+and list callable siblings (`list_company_agents`), together with per-agent tool grants and
+`native_tool_policy`. Phase 08 rebuilds both as workflow tools. The durable machinery below them
+is unchanged: an outreach request names its targets (same-company channel selectors such as
+`supplier` or `acme/supplier`, or external addresses), `create_outreach_and_pause` records it and
+queues the deliveries in one transaction, and the reply path resumes the caller.
+`src/application/use_cases/thread/inter_channel_tests.rs` drives exactly that path against a real
+database, calling `create_outreach_and_pause` with the arguments a request carries.
 
-Grant `list_company_agents` alongside it so Agent A can discover Agent B as a channel selector
-instead of carrying adapter routing syntax in its prompt. An email address may be shown only as the
-initial email binding's display/delivery projection.
-
-The agent stores `list_company_agents` and `outreach_and_await_quorum` in its typed
-`granted_tool_ids`. Before a run, the harness unions those grants with every tool selected skills
-invoke, intersects the result with the platform catalogue and the native tools available to the
-run, and logs refused or unavailable ids. See [Custom Agent Tools](custom_tools.md).
-
-A non-empty effective grant is compiled with the server-owned `llm.tool_choice: auto`, so the
-provider receives the tool declarations. Agent configuration cannot override the tool choice.
-
-```json
-{
-  "granted_tool_ids": ["list_company_agents", "outreach_and_await_quorum"],
-  "native_tool_policy": {
-    "version": 1,
-    "outreach": {
-      "allowed_target_scope": "same_company_channels",
-      "max_targets": 1,
-      "default_timeout_hours": 96,
-      "max_timeout_hours": 168
-    }
-  }
-}
-```
-
-`AgentRunner` hands the typed policy directly to the native tool. Approval rules, execution
-timeouts, and output ceilings are not fields in this policy and remain server-owned. Internal
-delegation therefore requires approval just like external outreach unless the deployment changes
-its trusted server policy.
-
-Agent B should normally retain the external-only policy and approval requirements for third-party email:
-
-```json
-{
-  "granted_tool_ids": ["outreach_and_await_quorum"],
-  "native_tool_policy": {
-    "version": 1,
-    "outreach": {
-      "allowed_target_scope": "external_only",
-      "max_targets": 50,
-      "max_timeout_hours": 72
-    }
-  }
-}
-```
-
-Supported target scopes are:
-
-| Scope | Permitted targets |
-|---|---|
-| `external_only` | External email addresses only; this is the default |
-| `same_company_channels` | Canonical agent channels selected within the current company only |
-| `any` | External addresses and valid same-company agent channels |
-
-Use `same_company_channels` for coordinator agents that must not contact third parties directly.
-
-## Tool Call
-
-Agent A calls Agent B through a channel selector. The outreach tool accepts same-company
-channel selectors in `target_channels`:
-
-```json
-{
-  "target_channels": ["supplier"],
-  "subject": "Acquire supplier capacity data",
-  "body": "Contact the supplier and return available quantity and earliest delivery date."
-}
-```
-
-`completion_threshold_percent` defaults to 100 and `timeout_hours` to `default_timeout_hours`, so a delegated request omits both. Spelling them out explicitly produces an identical idempotency key.
-
-Agent A finds that channel by calling `list_company_agents` first, which returns one entry per
-callable sibling channel with its `channel` selector:
-
-```json
-{
-  "agents": [
-    {
-      "channel": "supplier",
-      "channel_id": "00000000-0000-0000-0000-000000000000",
-      "channel_name": "Supplier Desk",
-      "agent_name": "VendorResearchAgent",
-      "description": "Answers supplier capacity and delivery-date questions.",
-      "interfaces": [
-        {
-          "transport": "email",
-          "label": "supplier@acme.mailagents.example"
-        }
-      ]
-    }
-  ],
-  "count": 1
-}
-```
-
-`description` comes from the agent's Description field on its settings page. The directory applies exactly the same eligibility rules as the send path, so it can never advertise a channel the tool would then refuse. Pass the returned `channel` selector to `target_channels`. Platform channel email addresses must not be passed to `target_emails` (which is reserved for external email contacts and rejects platform channel addresses).
+A single target and a 100 percent threshold represent one channel call. Platform channel email
+addresses are never valid external targets; internal targets are always channel selectors.
 
 An internal target must satisfy all of these conditions after selector parsing and canonical
 channel resolution:
@@ -182,7 +91,7 @@ M5  A -> Human
 ```
 
 1. `M0` creates Agent A thread `TA` and task `tA`.
-2. Agent A calls the outreach tool with Agent B as the only target.
+2. Agent A's run records an outreach with Agent B as the only target.
 3. `M1` is queued in `message_deliveries`, and `tA` changes to `waiting_for_third_party_reply`.
 4. The email sender recognizes B as a same-company channel and performs trusted in-process delivery instead of SMTP.
 5. `M1` is outbound in `TA`, inbound in a new Agent B thread `TB`, and creates task `tB`.

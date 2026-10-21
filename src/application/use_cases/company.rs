@@ -104,7 +104,6 @@ impl CompanyModelConnectionWrite {
 pub struct CompanyWrite {
     pub name: String,
     pub slug: String,
-    pub enable_llm_spam_guardrail: Option<bool>,
     /// `None` preserves the current value on update and chooses autonomous on create.
     pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     /// `None` preserves the current value on update and chooses automatic on create.
@@ -559,7 +558,6 @@ mod tests {
                 user_id,
                 name: write.name,
                 slug: write.slug.into(),
-                enable_llm_spam_guardrail: write.enable_llm_spam_guardrail,
                 avatar_url: write.avatar_url,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -633,7 +631,6 @@ mod tests {
 
             company.name = write.name;
             company.slug = write.slug.into();
-            company.enable_llm_spam_guardrail = write.enable_llm_spam_guardrail;
             company.avatar_url = write.avatar_url;
             Ok(company.clone())
         }
@@ -797,7 +794,6 @@ mod tests {
                 CompanyWrite {
                     name: "Acme Corp".to_string(),
                     slug: "acme-corp".to_string(),
-                    enable_llm_spam_guardrail: Some(true),
                     external_response_review: Some(
                         crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
                     ),
@@ -811,7 +807,6 @@ mod tests {
             .unwrap();
         assert_eq!(company.name, "Acme Corp");
         assert_eq!(company.slug, "acme-corp");
-        assert_eq!(company.enable_llm_spam_guardrail, Some(true));
         assert_eq!(
             company.avatar_url,
             Some(AvatarUrl::from("https://cdn.example.com/acme.png"))
@@ -828,14 +823,12 @@ mod tests {
                 CompanyWrite {
                     name: "Acme Inc".to_string(),
                     slug: "acme-inc".to_string(),
-                    enable_llm_spam_guardrail: Some(false),
                     ..CompanyWrite::default()
                 },
             )
             .await
             .unwrap();
         assert_eq!(updated.name, "Acme Inc");
-        assert_eq!(updated.enable_llm_spam_guardrail, Some(false));
         // A write sets every column, so a save that carries no picture is a save that clears it.
         assert_eq!(updated.avatar_url, None);
 
@@ -857,7 +850,6 @@ mod tests {
             user_id: owner,
             name: "Acme".into(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -897,7 +889,6 @@ mod tests {
             user_id: owner,
             name: "Acme".into(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),

@@ -11,6 +11,8 @@ use serde_json::{Value, json};
 #[path = "message_test_support.rs"]
 pub(super) mod support;
 use support::*;
+#[path = "message_agent_tests.rs"]
+mod agent_tests;
 #[path = "message_authority_tests.rs"]
 mod authority_tests;
 #[path = "message_delivery_tests.rs"]
@@ -318,39 +320,20 @@ async fn workflow_message_receipt_unknown_is_uncertain_until_the_deadline() {
 /// with only the intent; its late acceptance is recorded as truth without advancing.
 #[tokio::test]
 async fn workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth() {
-    let setup = Box::pin(setup_with(|_, other, user| {
-        let _ = other;
+    // Two email destinations of one parked step: one in flight, one unsent. (A saved model
+    // tool delivery parks its own job, so it can no longer be an unsent sibling here.)
+    let setup = Box::pin(setup_with_owner(|_, _, user, owner| {
         (
             "message.send",
             json!({"content":{"literal":{"subject":"Status","body":"Two recipients."}},
-                   "destinations":{"literal":[{"kind":"user","id":user.to_string()}]}}),
+                   "destinations":{"literal":[{"kind":"user","id":user.to_string()},{"kind":"user","id":owner.to_string()}]}}),
         )
     }))
     .await;
     let (p, scope, run) = (&setup.fixture.persistence, setup.scope(), setup.scope().run);
-    // An unsent sibling: a direct tool's delivery in the same execution, published while the
-    // step still holds its fence (after the park the closed fence refuses new work).
-    let observed = Box::pin(tool(
-        &setup,
-        "late-sibling",
-        send_arguments(&[("user", setup.user)], "Sibling"),
-    ))
-    .await
-    .unwrap();
-    assert!(matches!(
-        observed,
-        crate::application::workflow::message::MessageObservation::Pending
-    ));
-    let sibling = delivery(setup.pool(), run, 0).await;
     parked(&setup).await;
-    let first: Uuid = sqlx::query_scalar(
-        "SELECT delivery_id FROM workflow_message_destinations WHERE run_id=$1 AND delivery_id<>$2",
-    )
-    .bind(run.as_uuid())
-    .bind(sibling)
-    .fetch_one(setup.pool())
-    .await
-    .unwrap();
+    let first = delivery(setup.pool(), run, 0).await;
+    let sibling = delivery(setup.pool(), run, 1).await;
     // The first is in flight: claimed alone, its request started.
     let claimed = claim(p, first).await;
     use crate::transport::DeliveryQueue;
@@ -402,7 +385,7 @@ async fn workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth()
         ),
         "{settled:?}"
     );
-    assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 2);
+    assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 1);
     let states: Vec<String> = sqlx::query_scalar(
         "SELECT state FROM workflow_message_actions WHERE run_id=$1 ORDER BY origin DESC",
     )
@@ -410,7 +393,7 @@ async fn workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth()
     .fetch_all(setup.pool())
     .await
     .unwrap();
-    assert_eq!(states, vec!["accepted".to_string(), "failed".to_string()]);
+    assert_eq!(states, vec!["failed".to_string()]);
     let after = state(setup.pool(), scope).await;
     assert_eq!(
         (after.run.as_str(), after.wait.as_deref()),
@@ -429,11 +412,12 @@ async fn workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth()
     ));
 }
 
-/// F002 consumption page: nine ready actions of one execution take two visits.
+/// D4: saved model-tool deliveries are sequential. Each parks the job on its own effect wait;
+/// its receipt continues the job (continuation only) and a fresh fence publishes the next.
 #[tokio::test]
-async fn workflow_message_receipt_page_takes_two_visits_for_nine_actions() {
-    let setup = Box::pin(send(&[To::Channel])).await;
-    let (p, scope, run) = (&setup.fixture.persistence, setup.scope(), setup.scope().run);
+async fn workflow_message_model_tool_deliveries_park_and_continue_sequentially() {
+    let mut setup = Box::pin(send(&[To::Channel])).await;
+    let run = setup.scope().run;
     for call in 0..9 {
         let observed = Box::pin(tool(
             &setup,
@@ -442,38 +426,57 @@ async fn workflow_message_receipt_page_takes_two_visits_for_nine_actions() {
         ))
         .await
         .unwrap();
-        assert!(matches!(
-            observed,
-            crate::application::workflow::message::MessageObservation::Pending
-        ));
-    }
-    let deliveries: Vec<Uuid> =
-        sqlx::query_scalar("SELECT delivery_id FROM workflow_message_destinations WHERE run_id=$1")
-            .bind(run.as_uuid())
-            .fetch_all(setup.pool())
+        let crate::application::workflow::message::MessageObservation::DeliveryParked(_) = observed
+        else {
+            panic!("model-tool delivery must park");
+        };
+        // A second publication in the parked attempt has no fence.
+        assert!(
+            Box::pin(tool(
+                &setup,
+                "late",
+                send_arguments(&[("user", setup.user)], "Late")
+            ))
             .await
-            .unwrap();
-    assert_eq!(deliveries.len(), 9);
-    for delivery in deliveries {
-        deliver(setup.pool(), delivery, "delivered").await;
+            .is_err()
+        );
+        let after = state(setup.pool(), setup.scope()).await;
+        assert_eq!(
+            (after.run.as_str(), after.job.as_str()),
+            ("waiting", "completed")
+        );
+        let delivery = latest_delivery(setup.pool(), run).await;
+        Box::pin(continue_delivery(&mut setup, delivery, "delivered")).await;
     }
-    assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 8);
-    assert_eq!(candidates(&setup).await, vec![PollWork::MessageReceipt]);
-    assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 1);
-    let pending: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM workflow_message_actions WHERE run_id=$1 AND state<>'accepted'",
+    let (accepted, waits, continuations): (i64, i64, i16) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM workflow_message_actions WHERE run_id=$1 AND origin='model_tool' AND state='accepted'),
+                (SELECT count(*) FROM workflow_waits WHERE run_id=$1 AND reason='effect' AND state='completed'),
+                (SELECT continuation_count FROM background_tasks WHERE workflow_execution_id=(SELECT execution_id FROM workflow_waits WHERE run_id=$1 LIMIT 1))",
     )
     .bind(run.as_uuid())
     .fetch_one(setup.pool())
     .await
     .unwrap();
-    assert_eq!(pending, 0);
-    // The direct-tool seam records receipts only; the enclosing step's fence is untouched.
-    let after = state(setup.pool(), scope).await;
-    assert_eq!(
-        (after.run.as_str(), after.job.as_str()),
-        ("running", "processing")
-    );
+    assert_eq!((accepted, waits, continuations), (9, 9, 9));
+    // Replay of an earlier saved call reads its receipt; nothing is republished.
+    let replay = Box::pin(tool(
+        &setup,
+        "page-0",
+        send_arguments(&[("user", setup.user)], "Body 0"),
+    ))
+    .await
+    .unwrap();
+    assert!(matches!(
+        replay,
+        crate::application::workflow::message::MessageObservation::Committed(_)
+    ));
+    let deliveries: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_message_destinations WHERE run_id=$1")
+            .bind(run.as_uuid())
+            .fetch_one(setup.pool())
+            .await
+            .unwrap();
+    assert_eq!(deliveries, 9);
 }
 
 /// F002 poison: a failing page is not reclaimed without advancing time, and stalls at five.
@@ -481,15 +484,14 @@ async fn workflow_message_receipt_page_takes_two_visits_for_nine_actions() {
 async fn workflow_message_receipt_poison_backs_off_and_stalls_at_five() {
     let setup = Box::pin(send(&[To::Channel])).await;
     let (p, scope, run) = (&setup.fixture.persistence, setup.scope(), setup.scope().run);
-    for call in 0..8 {
-        Box::pin(tool(
-            &setup,
-            &format!("poison-{call}"),
-            send_arguments(&[("user", setup.user)], &format!("Body {call}")),
-        ))
-        .await
-        .unwrap();
-    }
+    // One saved model-tool delivery parks the job (D4); its receipt consumption is poisoned.
+    Box::pin(tool(
+        &setup,
+        "poison-0",
+        send_arguments(&[("user", setup.user)], "Body 0"),
+    ))
+    .await
+    .unwrap();
     let deliveries: Vec<Uuid> =
         sqlx::query_scalar("SELECT delivery_id FROM workflow_message_destinations WHERE run_id=$1")
             .bind(run.as_uuid())
@@ -513,7 +515,7 @@ async fn workflow_message_receipt_poison_backs_off_and_stalls_at_five() {
     assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 0);
     let failures: Vec<i16> = sqlx::query_scalar("SELECT consume_failures FROM workflow_message_actions WHERE run_id=$1 AND origin='model_tool'")
         .bind(run.as_uuid()).fetch_all(setup.pool()).await.unwrap();
-    assert_eq!(failures, vec![1; 8]);
+    assert_eq!(failures, vec![1]);
     for _ in 0..4 {
         sqlx::query("UPDATE workflow_message_actions SET consume_after=clock_timestamp() WHERE run_id=$1 AND state='pending'")
             .bind(run.as_uuid()).execute(setup.pool()).await.unwrap();
@@ -521,7 +523,7 @@ async fn workflow_message_receipt_poison_backs_off_and_stalls_at_five() {
     }
     let stalled: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_message_actions WHERE run_id=$1 AND state='stalled' AND consume_failures=5")
         .bind(run.as_uuid()).fetch_one(setup.pool()).await.unwrap();
-    assert_eq!(stalled, 8);
+    assert_eq!(stalled, 1);
     sqlx::query(
         "UPDATE workflow_message_actions SET consume_after=clock_timestamp() WHERE run_id=$1",
     )
@@ -531,7 +533,7 @@ async fn workflow_message_receipt_poison_backs_off_and_stalls_at_five() {
     .unwrap();
     // Stalled is final for the consumer: no backoff reset makes it a candidate again.
     assert!(candidates(&setup).await.is_empty());
-    let invocation = invocations(setup.pool(), run).await[1];
+    let invocation = *invocations(setup.pool(), run).await.last().unwrap();
     assert_eq!(
         effect_state(setup.pool(), invocation).await.0,
         "needs_reconciliation"

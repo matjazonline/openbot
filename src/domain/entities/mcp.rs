@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const MAX_MCP_CONNECTIONS: usize = 64;
-pub const MAX_MCP_SELECTIONS: usize = 8;
 pub const MAX_EFFECTIVE_MCP_TOOLS: usize = 32;
 pub const MAX_MCP_DISCOVERED_TOOLS: usize = 100;
 pub const MAX_MCP_SCHEMA_BYTES: usize = 65_536;
@@ -112,21 +111,11 @@ pub struct CompanyMcpConnection {
     pub tool_grants: Vec<McpToolName>,
 }
 
-/// A revision belongs to the set, including an empty set; deletion cannot reset it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AgentMcpSelection {
-    pub company_id: Uuid,
-    pub agent_id: Uuid,
-    pub revision: i64,
-    pub connection_ids: Vec<Uuid>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn endpoint_and_selection_schemas_reject_inline_authority() {
+    fn endpoints_reject_inline_authority() {
         for value in [
             "https://secret@example.com/mcp",
             "https://example.com/mcp?token=secret",
@@ -137,7 +126,5 @@ mod tests {
         assert!(
             McpEndpoint::try_from(format!("https://example.com/{}", "x".repeat(2048))).is_err()
         );
-        let value = serde_json::json!({"company_id":Uuid::nil(),"agent_id":Uuid::nil(),"revision":1,"connection_ids":[],"endpoint":"https://example.com"});
-        assert!(serde_json::from_value::<AgentMcpSelection>(value).is_err());
     }
 }

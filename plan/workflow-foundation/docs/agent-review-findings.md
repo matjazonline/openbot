@@ -1458,3 +1458,421 @@ No new findings from the final fixture delta or combined integration evidence re
 
 ### 06-R013 architecture disposition — no new findings
 2026-10-19; `implement-astra-reviewed-2.1`; [06-R013](agent-review-notes.md#06-r013--d4-revision3-root-allowance-scheduling-architecture-gate--pass) independently passes06-D4 revision3 addendum SHA-256 `ab2be4fe23c66e31d53296a5d40629cb31a45b5516b3b80e208ac71f774fd3c7`. No concrete issue identified;06-F008 remains unused. F007 remains resolved at architecture level. Pending implementation and its verification are not accepted by this decision-only review.
+
+
+## 06-F008 — D5 puts publication-only snapshot equality in the shared admission/binding authority check
+- Context: 2026-10-19; `implement-opus-reviewed-2.1`; [TASK](TASK.md), [REVIEW](REVIEW.md); batch 06B2b, architecture gate (pre-implementation); round [06-R014](agent-review-notes.md#06-r014--06b2b-d5-agent-owned-capabilities-architecture-gate--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Decision [06-D5 revision1](logs/06/decision-D5.md) SHA-256 `a5ef1a3f7a3c57495a0b58f495c2ad431c250615ebd43a4445bfd61a784cdb4a`; base `76fe99c93266c73ef4d13b2b10ff40df89580afb`.
+- Classification: actionable architecture/requirements defect, **high**; originates in the gated decision. OPEN.
+- Evidence: D5 says "`supported_publication` replaces its blanket agent/skill refusal: ... lock each referenced agent row and its skill rows FOR SHARE, re-derive ... require exact equality". `authority.rs:93-133` is not publication-only. It also runs on every binding save (`bindings.rs:42` → `verify_selection` `:117`), on every new admission including child admissions (`admission.rs:40` → `verify_current` `:124`), and on admission replay (`admission_replay.rs:88`). It also walks the whole child closure (`authority.rs:97-131`). Exact equality with *current* rows at those sites means one post-publication agent edit refuses every later binding activation, admission and replay of every published version (and every parent embedding a child) that references the agent. Such edits include a prompt change, model change, added tool or newly linked skill. User decision 3 says the opposite (freeze at publication, republish picks up edits, only revocation applies at execution). So does D5's own "Additions after publication have no effect until republish". Child admission also already holds the parent run and execution locks (`admission_source.rs:95-102`), so agent/skill row locks taken inside `supported_publication` there run local→authority. That breaks D5's stated authority→local lock order. Children are already immutable published versions: `definitions.rs:208-229 verify_children` checks the stored content hash, so they need no capture re-verification.
+- Required correction: apply provenance equality only to the root bundle being newly published, inside `publish`. For binding save, admission (root and child) and admission replay, decide explicitly what checks agent-related facts. Either nothing (rely on runtime `current_on`) or a revocation-only subset check. A subset check must be placed in the authority class before any local run/execution lock, or explicitly justified. Keep the existing tool registration checks as they are. Add regressions: publish, then edit the agent (add a tool, change the prompt/model, link a skill). After that, binding save, root admission, child admission and replay of the old version must still succeed, and runtime still uses frozen content. Also prove that a revocation has the specified effect.
+- Instruction lesson: the decision changed a function by name without tracing its callers. The existing guidance (`graft callers <sym> --depth all` before changing shared symbols) applies to gate authors as well as implementers. Candidate (architecture gates): when a decision changes a named shared function, list its call sites and the intended behaviour at each. Evidence: this finding.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F009 — D5 capture has no catalogue source for runtime-selected agents
+- Context: as 06-F008 (06-R014, D5 revision1 SHA-256 `a5ef1a3f…cdb4a`, base `76fe99c`).
+- Classification: actionable requirements/completeness defect, **medium**; gated decision. OPEN.
+- Evidence: the accepted 02/06A contract lets `with.agent` be a runtime binding that chooses from a frozen finite catalogue. See `publication/mod.rs:58-96 prepare_step_inputs` ("reject agent selectors outside the published finite catalogue") and `validation.rs:213-232` ("Supply the selected agent snapshot, or a finite catalogue for a runtime selector"). It is tested by `publication/tests.rs:147-173` (`{"ref":"/params/agent"}`). The phase plan's own canonical example uses `agent: { ref: "/params/support_agent" }`. D5 captures snapshots only "for every agent key referenced by the draft's agent.run/decision.agent steps". The SQL owner locks "each referenced agent". Neither defines which agents form the catalogue for a non-literal selector. So such workflows either cannot be published (empty catalogue → `publication.agent`), or catalogue membership and the SQL equality set are left to implementation inference. If only literal references are re-derived, extra AgentSnapshots in a forged bundle are not covered either.
+- Required correction: name the authoritative source of the runtime-selector catalogue. For example, an explicit authoring selection of agent keys given to the directory, bounded by `MAX_DEPENDENCIES`, with each entry captured and verified like a literal reference. Otherwise remove runtime agent selection explicitly and get the user's confirmation, since the phase plan example uses it. The SQL owner must verify every AgentSnapshot in the bundle and refuse SkillSnapshots not linked to a captured agent. Add a publication test for a parameter-selected agent and a forged extra-agent test.
+- Instruction lesson: cause is a missed existing contract. No new instruction is supported beyond 06-F008's caller/contract trace.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F010 — Directory composition, tool deduplication and the HTTP grant resolution rule are unspecified
+- Context: as 06-F008.
+- Classification: actionable architecture/correctness defect, **medium**; gated decision. OPEN.
+- Evidence: a definition service holds exactly one `PublicationDirectory` (`lifecycle/mod.rs:29-32`, `lifecycle/definitions.rs:196`). No production composition exists today. The HTTP directory emits a snapshot per explicit selection, carrying the author's slot (`http_publication.rs:30-48`). The message directory always emits both builtins (`message.rs:477-483`). Preflight refuses duplicate `(connection, name)` contracts (`preflight.rs:145-161`). Selection requires exactly one snapshot per tool name (`validation.rs:131-140`). D5 says the agent directory "composes with" these but defines neither merge semantics nor whether an HTTP grant is resolved by name across company registrations (connection `None`, `registered_on` style) or must be one of the HTTP selections. Then take a workflow that both uses a tool directly and grants it to an agent (`message.send`, or an HTTP operation selected with slot S). It fails as a duplicate contract, or the name becomes ambiguous and the agent's selection fails. D5 also does not say whether the SQL owner applies the same none/several rule as capture. The SQL owner's `registered_on` disambiguates by exact snapshot (`http.rs:45-51`), so it can accept a bundle that capture would refuse as ambiguous. The phrase "each agent's tools equal its selection universe" does not define this either.
+- Required correction: specify composition: a union with exact-snapshot dedup, with an actionable refusal for name-level conflicts. Specify the HTTP and MCP grant resolution inputs, and make capture and the SQL owner apply the same rule. Add a test that a tool used by a direct step and also granted to an agent publishes and resolves to one snapshot.
+- Instruction lesson: none supported beyond the "One decision, one place" rule already in `src/AGENTS.md`.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F011 — Existing full-replacement agent and skill writers would wipe the new fields
+- Context: as 06-F008.
+- Classification: actionable correctness/failure-mode defect, **medium**; gated decision (affected contracts). OPEN.
+- Evidence: agent update replaces every column from `AgentWrite` (`persistence/agent.rs:485-514`). Grant vectors default to empty (`use_cases/agent.rs:43-82`). Only `config_json` and `response_contract` are preserved when absent (`persistence/agent.rs:434-448`). Skill update likewise replaces all columns (`persistence/skill.rs:364-367`). D5 adds `agents.workflow_tools` and `skills.required_tools` but defers editing UI to phase 09. It does not say that existing settings, library, onboarding and skill writers keep stored values they do not carry. Without that, any unrelated save clears an agent's workflow grants or a skill's declared requirements. Under D5's runtime rule, a cleared grant terminally rejects in-flight runs, and a cleared requirement would also trip the "unchanged required tools" check.
+- Required correction: specify preserve-on-absent (an explicit typed "replace" versus "unchanged") for both writers. Add create→update→re-read round-trip tests proving an unrelated agent or skill save keeps `workflow_tools` and `required_tools`, as `src/adapters/persistence/AGENTS.md` step 3 and its round-trip rule require.
+- Instruction lesson: `src/adapters/persistence/AGENTS.md` already covers this (UPDATE SET list, round-trip). Gate authors should apply it when deferring UI to a later phase. No new instruction.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F012 — The skill revocation predicate treats edits as revocations and lacks a stable skill identity
+- Context: as 06-F008.
+- Classification: actionable requirements-alignment defect, **low**; gated decision. OPEN.
+- Evidence: the D5 runtime check requires "every frozen skill is still linked to the agent with unchanged required tools". Required tools are declared requirements, not grants (user decision 2; phase plan: "Skill selection never silently grants tools"), and the frozen skill text is what executes. Changing them is an edit, which user decision 3 makes effective only on republish, yet the clause terminally rejects in-flight runs on benign edits such as removing a requirement. `SkillSnapshot` has no UUID (`publication/types.rs:63-68`), unlike `AgentSnapshot.agent_id`. So "still linked" can only be matched by slug, which is mutable (`persistence/skill.rs:364`). Skill slugs may start with a digit (`skills_slug_format`), which `TypeName` refuses (`domain/workflow/ids.rs:15-24`). D5 does not specify that mapping or its error.
+- Required correction: the revocation predicate should cover only capability removal: agent still owned, frozen tools ⊆ current `workflow_tools`, frozen skills still linked by stable identity, frozen model still offered. Either drop the required-tools clause or justify it as an intentional fail-closed rule with user agreement. Add the skill UUID to `SkillSnapshot`. Define the slug→`TypeName` mapping and an actionable refusal when it fails.
+- Instruction lesson: none supported.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F013 — Runtime revocation call sites: preparation lock order and replay of an already-dispatched invocation
+- Context: as 06-F008; WIP inspected only as integration context, not reviewed.
+- Classification: actionable architecture clarification, **low**; gated decision (claims about call sites). OPEN.
+- Evidence: D5 says `current_on` is "already inside model admission before local locks, and at every PrepareInvocation". It extends that function's lock set to agent_skills and skill rows. The WIP preparation path also calls `current_on`, but after `runtime::facts` has taken `workflow_runs ... FOR UPDATE` (`http_runtime.rs:16-20`, `agent_preparation.rs:119-135`), which is local→authority. D5 neither names nor orders this site. The WIP checks PrepareInvocation authority on replay too (`checkpoint_updates.rs:10-14`). After a crash between ActionService dispatch and InvocationResult, a revocation therefore refuses before the existing receipt or uncertainty is consumed. D5 says "terminal agent.rejected" but not how that interacts with D4's rule that uncertain effects stay owned by recovery and reconciliation.
+- Required correction: list every `current_on` site, including preparation, with its lock position. State that revocation refuses only *new* model admission and dispatch: replay of an invocation that already has an action marker or receipt defers to the existing receipt and unknown-effect finality and is never re-dispatched or dropped. Add a test for revocation after dispatch and before receipt consumption.
+- Instruction lesson: none new; D4's "uncertain effects remain blocked" already applies.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F014 — D5 verification plan omits required regression, parity and competing-claimant proofs
+- Context: as 06-F008.
+- Classification: actionable verification defect, **low**; gated decision. OPEN.
+- Evidence: the D5 plan lacks the following.
+  - (a) The 06-F008 regression: an old version is still admitted and bound after an agent edit, including child admission.
+  - (b) Phase acceptance "An agent with no saved capabilities receives none" (empty tools and skills).
+  - (c) An actionable publication error for a skill requirement missing from the agent's tools (the decision states it, but the plan does not test it).
+  - (d) The 06-F010 composition and dedup case.
+  - (e) The 06-F011 preserve-on-absent round trip.
+  - (f) Rust `TypeName` ↔ SQL `workflow_tools`/`required_tools` shape parity. `src/adapters/persistence/AGENTS.md` requires one generated definition or a DB-backed equivalence matrix when a rule lives in both.
+  - (g) Competing claimants for the changed runtime protocol (root `AGENTS.md`). One test holds an agent update or skill relink under `FOR UPDATE` while model admission or PrepareInvocation waits, in both orders. Another runs a skill relink concurrently with publication. The plan's "competing agent edit during publication" covers only part of this.
+  - (h) The 06-F013 replay-after-dispatch case.
+  The publication runtime-selector case is covered by 06-F009.
+- Required correction: add these to the focused per-batch checks. Keep the final fmt, offline all-target, strict Clippy, fresh migration, SQLx and full phase06 gate.
+- Instruction lesson: the root `AGENTS.md` competing-claimant rule and the persistence Rust/SQL parity rule exist. Gate verification plans should list them explicitly. No new instruction.
+- Resolution history: 2026-10-19 OPEN (06-R014).
+
+
+## 06-F015 — Optional suggestions for D5 (non-blocking)
+- Context: as 06-F008.
+- Classification: **optional suggestions**, none acceptance-blocking. OPEN (author's discretion).
+- (1) Check at publication that the company model connection offers the frozen provider/model, so an actionable error appears before runtime refusal. Model connection replacement validates only current agents (`persistence/company.rs:693-716`), not frozen versions.
+- (2) State whether `decision.agent` uses the agent's tools. If it does not, capture can skip resolving its tools, avoiding spurious publication failures (for example an MCP grant without a slot in this workflow).
+- (3) State that agent tool snapshots join the bundle's shared tool universe, which direct `tool.call`/`mcp.call` steps also select from. Alternatively, keep a per-agent tool mapping.
+- (4) Name the legacy `agent_mcp_selections` table (`init_schema.sql:4433`) in the 06C removal obligations, and state that it does not feed `workflow_tools`.
+- (5) Define a canonical bundle-level ordering of SkillSnapshots, so SQL-owner equality is deterministic when agents share skills.
+- (6) State that `agent_skills` is mutated only under the agent row `FOR UPDATE` (`persistence/agent.rs:402-421,475`), since D5's `FOR SHARE` serialization relies on that invariant.
+- Resolution history: 2026-10-19 recorded (06-R014).
+
+
+## 06-R015 dispositions — 06-F008 to 06-F014 RESOLVED at architecture level
+- Context: 2026-10-19; `implement-opus-reviewed-2.1`; correction recheck [06-R015](agent-review-notes.md#06-r015--06b2b-d5-revision2-correction-recheck--pass); same Reviewer B, Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Decision [06-D5 revision2](logs/06/decision-D5.md), SHA-256 `eed25e4a5f367ccfd8333039455402d8bea59a4274b361854a398a1a5e084934`, verified before and after. Revision1 is retained unchanged as `decision-D5-revision1.md` (`a5ef1a3f…cdb4a`). Base `76fe99c93266c73ef4d13b2b10ff40df89580afb`.
+- **06-F008 RESOLVED.** Equality now runs only in the `definitions.rs` publish transaction, after the company-first locks, and covers only the new root bundle's own snapshots. `supported_publication` keeps its existing tool-registration checks at binding save, admission, child admission and replay, and does no agent/skill comparison or row locks there. This matches the call sites I re-read (`bindings.rs:42,117`, `admission.rs:40,124`, `admission_replay.rs:88`). Child bundles are no longer re-derived (they are hash-verified by `definitions.rs:208-229`). The stated lock order now has no agent/skill locks in admission. The plan includes "old version still binds and admits after an agent edit". Child admission and replay share that function, so one admission regression covers them.
+- **06-F009 RESOLVED.** A literal names one key. A non-literal selector must resolve to a finite string enum of agent keys, all captured; otherwise publication refuses, so the rule fails closed. The SQL owner verifies every agent and skill snapshot, not only literal ones. `prepare_step_inputs` (`publication/mod.rs:61-96`) still confines runtime selection to the catalogue, so an imprecise projection cannot widen authority. The plan covers literal, enum-ref and refused non-finite selectors. The projection mechanism is noted in optional 06-F016.
+- **06-F010 RESOLVED.**
+  - One capture runs the step-direct directories, then the agent capture, and merges tools by `(name, slot)`: byte-identical snapshots dedup, and conflicting snapshots or names that resolve differently refuse.
+  - HTTP, MCP and message grant rules are stated, and capture shares them with the SQL owner.
+  - The existing `unique_contracts`/`has_tool` checks still apply after the merge. MCP and message builtins dedup byte-identically.
+  - An HTTP operation selected for a direct step under a slot and also granted name-only refuses explicitly rather than silently.
+  - The plan includes the dedup case.
+- **06-F011 RESOLVED.** `workflow_tools` and `required_tools` are Options, with `None` preserved through `COALESCE` in the full-row UPDATEs (checked against `persistence/agent.rs:485-514`, `persistence/skill.rs:364-367`, and `SkillWrite` at `use_cases/skill.rs:25`). Skill links change only under the agent `FOR UPDATE` lock, as already done at `persistence/agent.rs:402-421,475`. The plan includes preservation tests.
+- **06-F012 RESOLVED.** The revocation predicate is now: agent still owned, frozen tools ⊆ current `workflow_tools`, frozen `skill_id` still linked, model still offered. Skill text and required-tool edits are explicitly not revocations. `SkillSnapshot` gains a trusted `skill_id`. A slug that is not a valid `TypeName` (including a digit-leading one) is refused at capture with an actionable error. Skill order is defined.
+- **06-F013 RESOLVED.** `current_on` runs at model admission and at every PrepareInvocation, including replay, before local locks. In the WIP these are `checkpoint_models.rs:22` and `checkpoint_updates.rs:12-15`. `prepare_agent` no longer calls it, which removes the call after `workflow_runs FOR UPDATE` (`http_runtime.rs:19`). A refused replay of a dispatched invocation leaves its marker, receipt or uncertainty with ActionService recovery and the shared retry predicate, and records no result. This is consistent with D4 revision2/revision3 effect ownership.
+- **06-F014 RESOLVED.** The plan now includes: pure Rust/SQL shape parity, merge, finite universe and skill order; capture refusals (missing requirement, model or connection, legacy tool step, digit-leading slug, unregistered or ambiguous HTTP/MCP); an agent with no tools or skills; a forged snapshot; real concurrent agent-edit and skill-relink publishes; old-version bind and admit; writer preservation; runtime revocation including a competing race; replay after dispatch; end to end; and the final full gate. Implementation must still produce these proofs.
+
+
+## 06-R015 disposition — 06-F015 optional suggestions
+- (1) Adopted: model-connection availability checked at capture and in publish equality.
+- (2) Partly adopted: `decision.agent` is defined as tool-free. Whether capture skips tool resolution for agents used only by `decision.agent` is not stated, and refusal stays fail-closed (see 06-F016).
+- (3) Adopted: granted tools join the shared bundle universe.
+- (4) Adopted: `agent_mcp_selections` and `granted_tool_ids` added to the 06C removals.
+- (5) Partly adopted: per-agent order is position then `skill_id`. Bundle-level ordering of shared skills is left to the equality implementation (see 06-F016).
+- (6) Adopted: the skill-link writer lock invariant is stated.
+- Non-blocking; closed as recorded.
+
+
+## 06-F016 — Optional residual suggestions for D5 revision2 (non-blocking)
+- Context: as 06-R015 (D5 revision2 SHA-256 `eed25e4a…4934`).
+- Classification: **optional suggestions**, none blocks acceptance. OPEN (author's discretion).
+- (1) Finite agent universe mechanism. No existing compiler artifact gives the value set behind a reference. `Schema::guarantees`/`project` in `compiler/schema.rs:84-86,323-364` return only `PathGuarantee`. Step input schemas come from the registry descriptor, where `agent` is `identifier()` (`registry/families.rs:62,88`). So the rule needs a new pure value-set projection. Suggested semantics:
+  - project the referenced root schema (input, params or step output) along the reference tail;
+  - require a `Default` fallback literal to be a member;
+  - take the union for anyOf/oneOf and the intersection for allOf/enum/const, following local `$ref`;
+  - refuse non-reference bindings such as operators or templates.
+  The function should be shared by capture and freeze validation. Capture must also get the parsed definition: `PublicationDirectory::capture` currently receives only the draft (`lifecycle/definitions.rs:196`). This is safe as written (fail-closed, with runtime guarded by `prepare_step_inputs`); it is about clarity and usability.
+- (2) If an agent is referenced only by tool-free `decision.agent` steps, consider not requiring its tools to resolve. Otherwise an unrelated grant can refuse publication.
+- (3) Define bundle-level SkillSnapshot ordering (for example by `skill_id`), or compare skills as a set keyed by `skill_id`, when agents share skills.
+- (4) The publish SQL owner re-verifies HTTP grants with `registered_on`, which disambiguates by exact snapshot (`http.rs:45-51`). Capture's "single registration of that name" rule is stricter. Either apply the name rule at publish too or accept the snapshot-pinned routing explicitly. No authority widening either way.
+- Resolution history: 2026-10-19 recorded (06-R015).
+
+
+## 06-F017 — A slot-bound HTTP agent grant is prepared and dispatched as an MCP tool
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; whole-batch 06B2b review [06-R016](agent-review-notes.md#06-r016--whole-06b2b-batch-review--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `6ea98c7ff7ea6f6ff35c3f7dc8005a6cade246da0179b53690aa60f78a02afa8` (excludes `plan/workflow-foundation/docs`), checked before and after the review.
+- Classification: actionable correctness defect, **medium**; implementation (D5 and D4 are explicit). OPEN.
+- Evidence: `agent_publication.rs:240-256 granted_tool` reuses any single already-captured snapshot with the granted name. That includes a step-direct HTTP selection carrying an author slot, which `HttpPublicationSelection.slot` allows and validation accepts for declared `http` resources (`validation.rs` `validate_tools`). `agent_preparation.rs:127-131 targets` then maps *every* slot-bound tool to `AgentToolTarget::Mcp { slot }`, and `agent.rs:208` accepts that as consistent. So the publish (where `supported_publication` correctly checks it as `http` via `slot_kind`) and the preparation both succeed. After a model turn requests the tool, `AgentActionTools` routes it to the MCP runtime, which builds an `mcp` target for the HTTP connection UUID (`mcp_runtime.rs:10-42`) and fails with not-found. The run ends terminally as `agent.rejected` after a charged model call.
+- Required by: D4 ("Selected tool declarations must have a concrete ActionService dispatch binding; unsupported bindings fail preparation explicitly") and D5 revision2 (an HTTP grant resolves to the single ready registration of that name; MCP resolves only through a declared MCP slot).
+- Required correction: decide target kind from the slot's declared resource kind (`resources::slot_kind`), not from whether a slot exists. Either support a slot-bound HTTP agent target through the HTTP runtime's bound connection, or refuse reuse of a slot-bound HTTP snapshot at capture with an actionable error. Add a test where the same HTTP operation is used by a direct step with a slot and granted to an agent.
+- Instruction lesson: none new. A discriminating attribute was inferred from the presence of an optional field.
+- Resolution history: 2026-10-20 OPEN (06-R016).
+
+
+## 06-F018 — Token-allowance pauses from the agent driver are not confirmed as suspensions
+- Context: as 06-F017.
+- Classification: actionable correctness/integration defect, **medium**; implementation, in the disclosed untested path "token approval through the driver". OPEN.
+- Evidence:
+  - When model admission or settlement parks for token review, `WorkflowAgentRuntime` returns `WorkflowHandlerOutcome::Suspended(wait)` (`rig/workflow.rs:116-119,149-150,382-384`). The token decision is `subject_kind='token_allowance'` (`decision_tokens.rs:55-61`).
+  - `supervise_io` confirms every suspension through `confirm_suspension` (`supervise.rs:71-81`). That tries the message-effect confirm, then `decision_approvals::confirm`, which accepts only `subject_kind='action_approval'` (`decision_approvals.rs:217`). Both return false.
+  - Supervision therefore ends as `Stopped(LeaseLost)` and calls `release_io` with a lease-lost cause (`supervise.rs:103-116`). The committed park survives only because the release then fails to lock the closed fence.
+  - Every user-required token pause is consequently misreported as lease loss. Root `AGENTS.md` and `src/AGENTS.md` require telemetry to distinguish lease loss from parked/stuck work. The suspension contract ("Never complete or release a parked attempt") also now depends on a failing release rather than on confirmation.
+  - Store-level token tests do not cover this boundary, because they never go through `supervise_io`.
+- Required correction: confirm token-allowance parks for the exact fence, wait, job and parked attempt (both reservation- and settlement-stage). Add an end-to-end test of a driver token pause → approval → fresh claim through `supervise_io` (see 06-F019).
+- Instruction lesson: when a new suspension subject is added, check every generic suspension consumer. Disclosed "store-level only" coverage hid a cross-layer contract break. Candidate: a gate's proof matrix should name the worker/supervisor boundary for each new parked-state kind.
+- Resolution history: 2026-10-20 OPEN (06-R016).
+
+
+## 06-F019 — D4 driver-level proofs are missing
+- Context: as 06-F017.
+- Classification: actionable verification defect, **medium**; acceptance condition of accepted D4 ("Required proofs before acceptance"; F007 matrix "real scripted provider counts, request IDs and ledger assertions"). OPEN.
+- Covered today: store-level native owner/model/token/scheduling suites (`harness_*_tests.rs`, about 40 tests), plus agent end-to-end tests for:
+  - one HTTP tool dispatch and replay;
+  - one protected-tool approval;
+  - one message delivery wait;
+  - revocations;
+  - publication.
+- Missing at the driver (`WorkflowAgentRuntime`/`Execution`) level:
+  - (a) Token pause → approval → fresh claim consuming the blocked request through `blocked_workflow_model` and `WorkflowBinding::reservation` (no test calls `blocked_workflow_model`). Also a settlement-stage pause, sibling re-park and denial. This is the gap that hid 06-F018.
+  - (b) A crash or restart after each boundary with provider-call counts: after reservation and before I/O, after provider entry and before settlement, after settlement, and after receipt.
+  - (c) Two approval cycles in one run.
+  - (d) A model-invented tool name (`unknown_tool` result, nothing dispatched).
+  - (e) Structured-output repair and the invalid-output terminal through the workflow binding.
+  - (f) A target rebind refused at re-preparation.
+  - (g) `Uncertain`/`IndeterminateEffect` → terminal plus the shared reconciliation predicate.
+  - (h) An MCP agent tool end to end.
+  - (i) Dynamic (parameter-enum) agent capture end to end.
+  The author disclosed four of these gaps. Implementing (a) would have exposed 06-F018, and covering MCP or slot-bound tools would have exposed 06-F017.
+- Required correction: add these driver-level tests with scripted-provider and effect counts, request IDs and ledger assertions. Then rerun the affected suites and the batch gates.
+- Instruction lesson: the skill already says passing tests and author summaries are not proof. A D4-style required proof list should be traced item by item in TASK before freezing. Candidate (author freeze checklist): map each gate-required proof to a test name, or mark it unmet.
+- Resolution history: 2026-10-20 OPEN (06-R016).
+
+
+## 06-F020 — The SQL no longer separates model-tool deliveries from step completion
+- Context: as 06-F017.
+- Classification: actionable defense-in-depth defect, **low**; implementation versus D4 ("SQL guards distinguish the two transitions using immutable origin and checkpoint association"). OPEN.
+- Evidence: the init SQL drops `workflow_message_actions_check (origin='step' OR wait_id IS NULL)`, which previously guaranteed that every effect wait belonged to a step. The only origin-aware guard now is the model-tool *reopen* guard (`init_schema.sql` near 255-282). Completing an execution through an effect wait (`wait_commit.rs` `advance(Wake::Effect)`) is separated from the delivery continuation only by the Rust branch `model_tool_wait_on` (`wait_commit.rs:68-75`). No SQL refuses completing `agent.run` with a model-tool receipt. In addition, `workflow_wait_execution` now excludes `effect` waits for every origin, so step executions also lose their one-effect-wait uniqueness.
+- Required correction: add a SQL guard so that completing an execution or step from an effect wait requires the wait's action `origin='step'`. Keep per-execution effect-wait uniqueness for step origin, or document why `workflow_message_actions_wait` plus `workflow_wait_one_active` suffice. Add the negative SQL tests.
+- Instruction lesson: `src/adapters/persistence/AGENTS.md` ("Application checks are useful error messages, not substitutes for constraints") already covers this.
+- Resolution history: 2026-10-20 OPEN (06-R016).
+
+
+## 06-F021 — Optional suggestions from the 06B2b batch review (non-blocking)
+- Context: as 06-F017. Classification: **optional**, none acceptance-blocking. OPEN (author's discretion).
+- (1) `NewModelAdmission::committed` is `pub(crate)` (`application/workflow/checkpoints.rs:89`). D4 asks for private permit construction; narrowing it to the store module, or using a sealed constructor, makes "only fresh committed admission enters the provider" structural.
+- (2) The context prompt wraps JSON in `<context>…</context>` (`application/workflow/agent.rs:94-97`). A literal `</context>` inside a JSON string is not escaped. Escaping `<`, for example as `<`, would harden the data boundary. Tool approval remains the security boundary.
+- (3) `agent_publication::derive_on(…, lock: bool)` is a behaviour-selecting flag parameter (`src/AGENTS.md` "No flag parameters"). Two named entry points, or a `Locking` enum, would read better.
+- (4) The native checkpoint keeps a NO ACTION FK to `agents(company_id,id)` (as legacy rows do). So an agent that has run a workflow cannot be deleted, and `persistence/agent.rs:733-746` reports it as "active on an enabled channel". Consider an accurate message or a retention decision (pre-existing pattern, now reachable from workflows).
+- Resolution history: 2026-10-20 recorded (06-R016).
+
+
+## 06-R017 dispositions — 06-F017 to 06-F020 RESOLVED; 06-F021 dispositioned
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; correction recheck [06-R017](agent-review-notes.md#06-r017--06b2b-r016-correction-recheck--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `d9ea9e59570ffd34142fc18c7d6542ad5e2ca93ba7ee4755e85110ab544b2ef3` (excludes `plan/workflow-foundation/docs`), verified before and after.
+- **06-F017 RESOLVED.**
+  - `agent_preparation.rs:127-136` maps a slot-bound tool to an MCP target only when `resources::slot_kind` is `mcp` and the slot is bound. Anything else fails preparation as unsupported.
+  - Capture (`agent_publication.rs:268-296 granted_tool`) reuses a captured snapshot only when it has no slot or an MCP slot. It refuses a slot-bound HTTP step selection granted to the agent.
+  - Covered by `workflow_agent_capture_refuses_slot_bound_http_grant` (passed in B's run). `workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot` proves the remaining MCP route end to end.
+- **06-F018 RESOLVED.**
+  - `decision_approvals.rs confirm` accepts `subject_kind IN ('action_approval','token_allowance')`. The exact job, parked attempt, worker, generation and wait witness is unchanged.
+  - Proven through `supervise_io` at both the settlement and reservation stages, with negative confirms for a random wait and for an earlier wait under a later fence (`…settlement_pause_and_second_pause_resume_exact_requests`, `…token_denial_never_enters_the_provider`).
+- **06-F019 RESOLVED.** I checked each item of the proof map against test names and spot-read the assertions in the token-pause, settlement/second-pause and crash-during-effect tests:
+  - (a) `token_pause_resumes_with_the_saved_request` checks that the admitted request ID equals the approved `token_request_id` and that the provider was called once. The settlement and second-pause test, and the denial test, are also present.
+  - (b) restart after reservation, after provider entry, after settlement and after receipt;
+  - (c) two approval cycles;
+  - (d) model-invented tool;
+  - (e) repair once, and invalid output after repairs;
+  - (f) rebound target, now terminal by design (`checkpoints.rs` `matching` → BadRequest, which matches D4's immutable preparation);
+  - (g) unanswered effect and crash during effect: `effect_unknown`, then reconciliation with one dispatch and no claimable retry;
+  - (h) MCP end to end;
+  - (i) dynamic selection end to end.
+  Sibling consumption between approval and claim remains store-level only (`workflow_harness_token_sibling_usage_reparks_exact_request_without_debit`). This is accepted: the driver path on a fresh claim is the same admission→Parked branch that the second-pause test proves.
+- **06-F020 RESOLVED.**
+  - The deferred constraint trigger `workflow_model_tool_wait_continuation` (`init_schema.sql:11816`, function at `:4347`) refuses, at commit, completing a model-tool effect wait unless its execution is still open with no committed route and its job is pending again. So a model-tool receipt can only continue the agent job, never complete the step.
+  - `workflow_message_step_one_wait` (`:10632`) restores one effect wait per step execution.
+  - Negative tests: the continuation-guard refusal inside `…message_tool_parks_on_delivery_and_continues_with_its_receipt`, and `workflow_message_sql_step_execution_keeps_one_effect_wait`. Both passed in B's run.
+- **06-F021:**
+  - (2) adopted: `agent.rs:94-100` escapes `</` as `<\/`. That is the same JSON string, and `<` occurs only inside strings.
+  - (3) adopted: the `Rows::{Read, Shared}` enum replaces the bool.
+  - (1) not adopted. The reason is accepted: the permit is non-clone and consumed once, and `pub(in …)` cannot reach the adapter store from `application`.
+  - (4) deferred to 06C with agent deletion and retention.
+  None blocks acceptance; closed as recorded.
+
+
+## 06-F022 — Optional: agent driver test file exceeds the file-size guideline (non-blocking)
+- Context: as 06-R017 (digest `d9ea9e59…2ef3`). Classification: **optional**, maintainability. OPEN (author's discretion).
+- `src/adapters/persistence/workflow/agent_runtime_tests.rs` is 1043 lines. `src/AGENTS.md` says to split files past about 1,000 lines. The recovery proofs already moved to `agent_recovery_tests.rs`; the approval/token driver cases could follow.
+- Resolution history: 2026-10-20 recorded (06-R017).
+
+
+## 06-F023 — The context.history item contract drops each message's disclosure boundary
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; architecture gate 06B3, round [06-R018](agent-review-notes.md#06-r018--06b3-d6-preparation-steps-architecture-gate--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Decision [06-D6](logs/06/decision-D6.md) SHA-256 `064dbff7c66fcbcb35a2261112630c03fa907802d0fc49488ceec25e8ca73ecd`, verified before and after; base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus the accepted 06B2b worktree.
+- Classification: actionable requirements/security (privacy) defect, **medium**; originates in the gated decision. It is costly to unwind because the output contract is compiled into versioned bundles. OPEN.
+- Evidence:
+  - D6 A fixes items as `{message_id, role, author, subject, body, truncated}` and excludes only internal notes.
+  - Thread messages also carry `messages.audience` ∈ `external_conversation | internal_only | legacy_unclassified` (`init_schema.sql` `messages_audience_check`) and `thread_messages.entry_kind` ∈ `conversation | note | delegation | system_event`.
+  - Legacy agent history selects both (`persistence/thread/views.rs:393-427`). The legacy prompt labels every entry "External conversation", "Internal-only" or "Legacy unclassified; do not disclose", plus its entry kind (`agent_runner/prompt.rs:131-141`).
+  - Under D6, internal-only delegation and system messages and unclassified legacy messages reach a downstream `agent.run` (for example one drafting a customer reply) indistinguishable from external conversation. That loses a disclosure boundary the current runtime gives every agent.
+- Required correction: add typed `audience` and `entry_kind` enums to each item, mirroring the legacy labels, and keep them in the frozen output. Alternatively, exclude non-external messages by an explicit, user-confirmed rule; `omitted` must still report them. Add DB tests for each audience and entry kind.
+- Instruction lesson: when replacing a legacy reader, carry over every field the legacy consumer uses for a safety decision, not only the fields of the obvious render. Candidate (gates replacing a legacy path): list the legacy reader's columns and say what happens to each. Evidence: this finding.
+- Resolution history: 2026-10-20 OPEN (06-R018).
+
+
+## 06-F024 — `max_tokens` can exceed the run's per-output byte limit
+- Context: as 06-F023.
+- Classification: actionable correctness defect, **medium**; gated decision. OPEN.
+- Evidence:
+  - D6 fixes `max_tokens: 1..131072` and counts one serialized UTF-8 byte as one token. One item can be about 68 KB (a 16384-character body is up to 64 KiB of UTF-8, plus a 2048-byte subject and the author).
+  - Every step output is bounded by the run's `limits.max_context_bytes` (1..1 MiB; fixtures use 65536). `graph.rs:56-63` is the per-binding output bound, and `lease_claim.rs:80,133` sets `max_result_bytes = max_context_bytes`.
+  - An oversized output stops supervision with `OversizedResult` → `workflow.invalid_result`, which is **terminal** (`supervise.rs:86,148`, `recovery.rs:151-153`).
+  - So a valid workflow (for example `max_tokens: 100000`, `max_context_bytes: 65536`) fails terminally whenever its thread history is long, and the size of the downstream `agent.run` context input is also unbounded relative to that limit.
+- Required correction: bound the history output by both `max_tokens` and the run's per-output byte limit minus the output envelope. Do it at compile time (refuse `max_tokens` above the available bytes) or by using the minimum at run time, still reporting `omitted`. Add a DB test with a long thread at the boundary.
+- Instruction lesson: none new (src/AGENTS.md "Bound work at every external boundary").
+- Resolution history: 2026-10-20 OPEN (06-R018).
+
+
+## 06-F025 — Optional suggestions for D6 (non-blocking)
+- Context: as 06-F023. Classification: **optional**. OPEN (author's discretion).
+- (1) Memory kinds stay advertised and publishable but unhandled. Once a worker exists, a run reaching `memory.load` or `memory.save` waits as Unsupported until its deadline (`worker.rs:68-73,156-159`). This is the same pattern as the phase-07 child kinds. Refusing them at publication with an actionable error would be more direct, and is reversible. The phase-plan memory acceptance bullets should be recorded as deferred by the user's decision.
+- (2) D6 E updates two separate kind lists (`recovery.rs:138-144` and `pending_recovery.rs:166-175`) that already duplicate one decision. Consolidate them into one predicate beside `marker_owned_effect_kind` ("One decision, one place").
+- (3) History items carry no timestamp. The legacy prompt gives one for notes; a `created_at` field would let agents reason about recency. Also state whether the admission's own triggering message is included (it is in the membership snapshot).
+- (4) State whether newest-first token accumulation *stops* at the first item that does not fit, or *skips* it and keeps going. Both are deterministic and reported through `omitted`, but the contract should say which.
+- Resolution history: 2026-10-20 recorded (06-R018).
+
+
+## 06-R019 dispositions — 06-F023 and 06-F024 RESOLVED; 06-F025 dispositioned
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; recheck [06-R019](agent-review-notes.md#06-r019--06b3-d6-revision2-correction-recheck--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Decision [06-D6 revision2](logs/06/decision-D6.md), SHA-256 `e80a5201f60e1b37abf4bf4faef8b3695d19928e05563af3f6e8098775dd497d`, verified before and after. Revision1 is retained unchanged as `decision-D6-revision1.md` (`064dbff7…cecd`, rechecked).
+- **06-F023 RESOLVED.** Each item now carries typed `audience` (`external_conversation | internal_only | legacy_unclassified`), `entry_kind` (`conversation | note | delegation | system_event`) and `at`. These are the same facts legacy history labels (`agent_runner/prompt.rs:131-141`). Only internal notes are excluded; every other member stays eligible with its boundary as data. An unknown stored value is a terminal `context.invalid_history`. The verification plan asserts the exact audience, entry kind and `at` for each kind.
+- **06-F024 RESOLVED.** An item fits only while the serialized items stay ≤ `max_tokens` *and* the complete serialized output stays ≤ the claim's `max_result_bytes`. That is the run's `max_context_bytes`, the same value `supervise_io` checks before completion (`supervise.rs:85-86`, `lease_claim.rs:80,133`). The minimum is applied at run time, so a long thread gives a larger `omitted`, never a terminal `workflow.invalid_result`. Tests at the cap and one byte over are planned, plus the case where the newest item alone does not fit.
+- **06-F025 dispositioned (optional):**
+  - (2) adopted: a single `effect_free_kind` predicate with a unit test over every registry kind.
+  - (3) adopted: `at`, and the triggering message is included.
+  - (4) adopted: stop at the first non-fitting item, giving a contiguous suffix.
+  - (1) publication refusal not adopted now. The reason is accepted: no production worker exists before 06C/08. D6 F records the 06C obligation that publication or binding must refuse kinds with no production handler, and phase-plan line 151 marks the memory acceptance item as deferred by the user's decision.
+- Note for implementation review: folding `data.map`, `decision.*` and `wait.*` into `recovery.rs`'s SafeToRetry set via `effect_free_kind` is correct because these kinds have no effects. The unit test must pin `memory.save` (and every action kind) outside it.
+
+
+## 06-F026 — Decide's response contract embeds `data_schema` without its own resource identity
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; whole-batch 06B3 review [06-R020](agent-review-notes.md#06-r020--whole-06b3-batch-review--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `b64957f986c172239336b34593bb1de360a501a5e9c6158f01e9fa3821b1fb99` (excludes `plan/workflow-foundation/docs`), verified before and after. Gate: 06-D6 revision2 (`e80a5201…497d`).
+- Classification: actionable correctness defect, **low**; implementation. OPEN.
+- Evidence:
+  - `application/workflow/agent.rs:275-283 decision_schema` places the declared `data_schema` verbatim under `properties.data`.
+  - The registry builds the same `decision.agent` output contract with `embedded(schema, "decision-data")`, which adds a `$id` (`registry/mod.rs:318-325`). That makes local references (`#/$defs/…`) inside the data schema resolve against the data schema itself.
+  - Workflow schemas may use local non-recursive `$ref` (`compiler/schema.rs` `check_resources`/`NoExternalReferences`), and the response validator compiles them the same way (`adapters/response_schema/mod.rs:10-24`).
+  - So a `decision.agent` whose `data_schema` uses `$defs` compiles and publishes. At run time the Decide contract's `#/$defs/x` resolves against the new root, which has no `$defs`. Contract validation in `WorkflowAgentRuntime::run` then fails, and the step ends terminally as `agent.rejected`.
+  - The same schema works as an `agent.run` `output_schema`, because there it is the root.
+  - This also duplicates the step output contract that D6 C says completion already enforces ("One decision, one place").
+- Required correction: build the Decide response contract from the compiled step's output contract, or at least with the registry's `embedded` rule. Add a scripted-provider test with a `data_schema` that uses `$defs`.
+- Instruction lesson: none new.
+- Resolution history: 2026-10-20 OPEN (06-R020).
+
+
+## 06-F027 — Optional suggestions from the 06B3 batch review (non-blocking)
+- Context: as 06-F026. Classification: **optional**. OPEN (author's discretion).
+- (1) Bounded database work. `history_reader.rs` materializes every eligible member (up to 10000), including `left(clean_text_body, 16385)` and `left(subject, …)`, because the CTE is referenced twice (count and select). Only then does it apply `LIMIT 256`.
+  - Under `begin_http`'s 5 s statement timeout, a very long thread with large bodies can repeatedly fail as `context.unavailable` until its retries run out.
+  - Counting eligible members without message bodies, then reading bodies only for the newest 256, bounds the work by the read. `src/adapters/persistence/AGENTS.md` says a bounded result set does not imply bounded database work.
+  - If this is deferred pending production evidence, add the duration or working-set metric that AGENTS.md asks for.
+- (2) `select` re-serializes the whole output for every candidate item (`history.rs` `size(&output(...))`). That is O(n²) up to 256 × the result cap. An incremental envelope count gives the same result.
+- (3) D6 said `context.history` "takes no locks beyond its read". The reader uses `runtime::facts`, which takes the actor prelock and `workflow_runs … FOR UPDATE`. That matches other I/O preparation and adds current actor authority, so either note it in the decision record or use a share lock. Relatedly, an actor-authority refusal surfaces as retryable `context.unavailable`, whereas model steps fail terminally as `agent.rejected`.
+- Resolution history: 2026-10-20 recorded (06-R020).
+
+
+## 06-R021 dispositions — 06-F026 RESOLVED; 06-F027 dispositioned
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; correction recheck [06-R021](agent-review-notes.md#06-r021--06b3-r020-correction-recheck--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c` plus worktree, digest `afbb5ffb62f5e9cf019323611f2133cc6ae6f24644dda2104acc6ac42f2c3717`, verified before and after.
+- **06-F026 RESOLVED.**
+  - Decide's response contract is now exactly the compiled step output contract (`CompiledWorkflow::step_output_schema`, `agent_preparation.rs:188-198`, `PreparedStep::Decide { contract }`). The hand-built schema and the choice loop are gone. This is one decision in one place, and the contract is the same object completion enforces.
+  - The broadened shared fix, `services::tool_schema::visit`, was checked for safety:
+    - Re-rooting at a nested `$id` matches 2020-12 resolution, the validator, and the compiler's `schema_budget`.
+    - Every visit, including `$ref` expansion, still consumes the depth (≤32) and node (4096) budgets, and the 65,536-byte size check is unchanged.
+    - Fragment-only references can resolve only inside the enclosing resource, so a reference cycle is re-entered under the same root and exhausts the budget. Recursion is still refused.
+    - Every node is also visited through ordinary child traversal under its correct enclosing root. So a pointer that reaches into a nested resource from outside cannot hide a cycle in that resource.
+    - Non-fragment and `$anchor` references remain refused (stricter than the validator, fail-closed).
+  - Tests passed in B's run: `workflow_decision_agent_data_schema_local_references_resolve` (end to end), `schema_local_references_resolve_inside_their_nested_resource` (also refuses the same schema without `$id`), and the verbatim-contract test in `agent_tests.rs`.
+- **06-F027:**
+  - (1) adopted: the eligible count reads members only; just the newest 256 join messages, principals and identities.
+  - (3) adopted: NotFound and InvalidCredentials now map to Terminal `context.rejected`, consistent with model steps, with a unit test; D6's lock wording is corrected in TASK, and the standard claim locks are kept.
+  - (2) not adopted; the reason is accepted, since the loop is bounded by 256 items and the result cap.
+  Non-blocking; closed as recorded.
+
+
+## 06-F028 — Operator and README docs still describe behaviour 06C made unreachable
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; whole-batch 06C review [06-R022](agent-review-notes.md#06-r022--whole-06c-batch-review--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `c9f12d8828d1dbd5dd3b635611d98ea6760c87bab637f7ffd0551502e77a16f5` (manifest `logs/06/06C-batch-snapshot.txt`), verified before and after.
+- Classification: actionable documentation defect, **low**; implementation (docs). OPEN.
+- Evidence:
+  - `docs/deploy.md:181`: the pilot gate "Required evidence before opening access" now requires, for MCP, "a workflow MCP action's successful receipt". 06C removed agent MCP selections, so MCP is reachable only through workflow actions. Workflow worker wiring is a recorded phase-08 obligation (TASK "06C implementation complete"; `infra/setup.rs` wires no workflow worker). So an operator following the checklist cannot produce this evidence on a deployment of this release.
+  - `README.md:180-235`: the task-execution and pause diagrams still route agent runs through `HITL{Approval or outreach requested?}` and show agent-originated approval and outreach flows. 06C deleted every producer: the `request_approval`/`outreach_and_await_quorum` native tools are gone, and no production path calls `create_approval` or `create_outreach_and_pause`; only tests do.
+  - Root `AGENTS.md` requires production documentation to match what the application does. The rest of the doc set was updated accurately: the `.env.example` keys are all read, and the `docs/rig.md` anchors are valid.
+- Required correction: mark the MCP pilot evidence as applying once phase 08 wires workflow execution, or limit it to configuration, refresh and grant review for this release. In the README diagrams, mark agent-requested approval and outreach as retained, inactive machinery until phase 08, or remove those branches. This is a documentation-only change.
+- Instruction lesson: when a removal batch removes a feature's only producer, search docs for the consumer-side flows as well, not just for the removed identifiers. Candidate (removal batches): grep docs for the removed capability's user-visible verbs (for example "approval requested", "outreach"), not only its config keys and field names.
+- Resolution history: 2026-10-20 OPEN (06-R022).
+
+
+## 06-F029 — Optional observations from the 06C review (non-blocking)
+- Context: as 06-F028. Classification: **optional**. OPEN (author's discretion).
+- (1) Dropping `guard_active_agent_harness_change` changes visible behaviour. Previously a `response_contract` edit on an agent with unsettled legacy tasks was refused. Now it succeeds, and those tasks fail closed at the next Rig `authorization()` ("Capabilities changed after dispatch preparation", `rig/execution.rs`). That is safe, no wrong-contract reply, and consistent with skill and sub-agent edits, which were never guarded. Record it as an intended behaviour change in TASK and docs.
+- (2) The scheduled-run worker test now uses `StubHarness`, and its token-usage and provider-call assertions are gone. No test drives a *scheduled* run through real Rig. The shared dispatch path is covered by the PostgreSQL thread suites. Accept as a gap until phase 08 replaces legacy ingress, or add one PostgreSQL scheduled-run test with real Rig.
+- (3) `McpPersistence::mcp_connections_by_ids` has no production caller after the selections were removed (only `mcp_read_tests` and workflow MCP test support). Its new bound equals the per-company connection cap and the over-cap case is tested. Remove it, or note it as reserved for phase 08.
+- (4) The Agent Builder prompt asks for "the minimum workflow tools", but `agents.workflow_tools` has no editing UI until phase 09. It also says the new agent "inherits the company's model … defaults", whereas D5 workflow use needs an explicit provider and model. Consider aligning the wording until phase 08 restores creation.
+- Resolution history: 2026-10-20 recorded (06-R022).
+
+## 06-R023 dispositions — 06-F028 RESOLVED; 06-F029 dispositioned
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; correction recheck [06-R023](agent-review-notes.md#06-r023--06c-r022-correction-recheck--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c` plus worktree, digest `dbeb4953eff762719ffbd56465ae2eaf1b0c263e68d06a06d4fb40e567e4b4d5` (manifest `logs/06/06C-batch-snapshot-r023.txt`, the same 291 paths), verified before and after.
+- **06-F028 RESOLVED.**
+  - `README.md`: the `HITL{Approval or outreach requested?}` node, its four edges and the agent `outreach question` delivery edge are removed. `AGENTS`/`SAGENT` go straight to `PLAN`. The `Pauses` subgraph title says approval and waiting have no agent producer since 06C and that phase 08 rebuilds them as workflow steps. The remaining approval/wait edges are retained link-action, quorum and manual-control machinery.
+  - `docs/deploy.md:181`: the MCP pilot evidence is limited to what this release can show: credentials, refresh/test, grant review, and stale-grant rejection on a schema/revision change. Remote-call receipt and disconnect are deferred to the phase-08 release pilot, which matches the unwired workflow worker.
+  - Not machine-verified: Mermaid rendering of the new title, the repo's only Mermaid label containing `;`. Optional: quote the label. Non-blocking.
+- **06-F029** (TASK.md:4690-4696):
+  - (1) adopted as recorded intent: an edit is allowed and legacy runs fail closed at Rig `authorization()`.
+  - (2) accepted gap: no scheduled-run test through real Rig; phase-08 obligation.
+  - (3) `mcp_connections_by_ids` kept for workflow MCP test support; phase-08 cleanup.
+  - (4) Agent Builder prompt wording revised in phase 08.
+  All four are accepted. Carry-forward: add (2)-(4) to the phase-08 obligation list in `RESUME.md` when 06C is accepted, since today they are only in the TASK dispositions paragraph. Non-blocking; closed as recorded.
+
+## 06-F030 — D2's phase06 acceptance condition on model usage is unmet for the Rig text classifier
+- Context: 2026-10-20; `implement-opus-reviewed-2.1`; phase06 combined integration review [06-R024](agent-review-notes.md#06-r024--phase06-combined-integration-review--changes-required); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c93266c73ef4d13b2b10ff40df89580afb` plus worktree, digest `33cfebc799ec8a3f6a0814dec2496987a2042541234502354b363a55878c4bf0` (manifest `logs/06/06-final-snapshot.txt`).
+- Classification: actionable requirement gap, **medium**; implementation or decision. OPEN.
+- Requirement: accepted D2 (`logs/06/decision-D2.md:63-65`, restated in TASK.md:3247-3249) says "Direct in-memory Rig execution and alternate-runtime classifier calls remain explicit 06C migration obligations: before phase06 acceptance every production model entry must persist usage or be removed." The 06 plan's usage section (user revision 2026-10-19) also says "missing usage must not silently become zero".
+- Evidence:
+  - 06C replaced the ai-agents classifier with `RigTextClassifier` (`adapters/harness/rig/classifier.rs:1-4,42-78`, wired at `infra/setup.rs:185-203,264`). It makes a provider call with the company's credential and records no `model_usage_calls` row. It returns text only, and the response usage is dropped.
+  - Production callers:
+    - The Stage-3 spam guardrail runs on every non-trusted legacy agent run, before the harness (`agent_runner/mod.rs:230-246`), and repeats on every task attempt.
+    - The system-prompt generator (`use_cases/agent.rs:938-983`; routes `agent_library.rs:276,298`, `ui_agents.rs:422`).
+  - The guardrail emits only a monitoring estimate (`llm_guardrail.rs:166-174`, characters/4), which is not analytics. Its own comment (`llm_guardrail.rs:119-121`) records that before this change the call never reached a provider. So 06C turned it into a working, unmetered production model entry.
+  - The only usage writer is `adapters/persistence/model_usage/mod.rs`, reached from the durable Rig checkpoint paths. `model_usage_calls.task_id` and `agent_id` are NOT NULL (`init_schema.sql:14224-14225`), so the prompt generator, which runs with no task, has no attribution path at all.
+  - Nothing in TASK, RESUME or the review records discharges or dispositions the D2 condition. The direct Rig path is not a production entry (see 06-R024), so only the classifier remains.
+- Effect: company provider usage on these paths is silently missing from analytics and cost estimates. Nothing marks it as unknown.
+- Required correction (either):
+  - (a) Persist usage. The guardrail can be attributed to the claimed task and agent inside `AgentRunner::execute`; record the reservation and settlement from the Rig response usage. For the prompt generator, either add a schema-supported attribution (the schema is edited in place; reset the DB) or remove the entry.
+  - (b) Record an explicit decision that narrows D2 for these two system calls. If it narrows the user's 2026-10-19 measurement requirement, the user decides. Disclose the gap where analytics are documented, and carry "guardrail relocation out of AgentRunner must persist usage" into the RESUME phase-08 obligations.
+  Either way, add a test that a classifier call's usage appears in, or is explicitly excluded from, the analytics read model.
+- Instruction lesson: an accepted decision's "before phase acceptance" condition that is deferred to a later batch is invisible to batch reviews. Candidate (skill, final integration stage): list every such condition from the accepted decision records in the final gate record, and mark each as met or dispositioned.
+- Resolution history: 2026-10-20 OPEN (06-R024).
+
+
+## 06-F031 — Stale references left by phase06 removals and renames
+- Context: as 06-F030. Classification: actionable documentation/tooling defect, **low**; implementation (docs, test script, build comment). OPEN.
+- Evidence:
+  - (a) `docs/workflow-language-v1.md`, the language reference for workflow authors, was not updated for D5 or D6.
+    - It still documents `context.load` with `sources` and the old result shape (line 92), `ai.classify` without `agent` and with a `profile` enum property (line 95), and `agent.run` "Optional `capability_profile`" (line 96).
+    - It still describes profile, classifier-omission and ceiling semantics as "phase06 responsibilities" (lines 131-138, 231-233, 241-248).
+    - The registry now defines `context.history` (`max_tokens` only; items plus `omitted`) and requires `agent` for `ai.classify` and `agent.run` (`application/workflow/registry/families.rs:5-12,44-60`). D5 removed profiles and ceilings.
+    - An author following the reference gets publication errors.
+  - (b) `scripts/tests/harness-query-plans.py:13-21` extracts `lock_task_agent_harnesses` and `guard_active_agent_harness_change` from the current init migration. 06C dropped both (0 occurrences), so `re.search(...).group()` raises, and the command documented in `docs/harness-database-performance.md:19-22` fails. The rest of that doc (admission-lock and configuration-guard measurements, MCP selection reads) and `scripts/tests/fixtures/harness-fencing-before.sql` describe removed code.
+  - (c) `Dockerfile:4-6` still installs `git` in the builder stage "for the ai-agents git dependency". `Cargo.toml` and `Cargo.lock` have no git sources after 06C; ai-agents was the only one (base `Cargo.toml:30`).
+  - (d) Comments at `domain/entities/value_objects.rs:383-384,392-393` still describe tool ids as ai-agents built-ins or `outreach_and_await_quorum`, and skill slugs as compiled ai-agents YAML ids.
+- Required correction:
+  - (a) update the language reference to the D5/D6 contracts;
+  - (b) delete the script, fixture and performance doc, or rewrite them for queries that still exist;
+  - (c) drop the git install and its comment;
+  - (d) correct the comments.
+  Docs, script and comment changes need no Rust suite. After (c), rebuild the image or run the deploy script test if available. Keep Tailwind class literals out of docs (TASK pitfall), and re-run `npm run check:css` equivalence after editing `.md` files.
+- Instruction lesson: removals and renames need a repo-wide search for the old identifiers in docs and scripts, not only in `src/` and the files the batch touched. Candidate (removal/rename batches): a `git grep` over the whole tree for each retired identifier, with the remaining hits listed in the gate record.
+- Resolution history: 2026-10-20 OPEN (06-R024).
+
+
+## 06-F032 — Deferred memory steps have no owning phase
+- Context: as 06-F030. Classification: planning gap, **low**; user or root decision. OPEN.
+- Evidence:
+  - The 06 plan marks its memory acceptance item "Deferred by user decision 2026-10-20 (06-D6)" (plan lines 150-151). `decision-D6.md:117-123` keeps `memory.load`/`memory.save` publishable but unhandled (`registry/families.rs:13-28`). The user's words were "don't implement memory now".
+  - No phase is named to implement them, and the RESUME phase-08 obligation list does not mention memory.
+  - Phase 08 replaces the legacy "memory toggles" with workflow bindings (`08-…md:19-20`). The legacy runner's automatic recall and persistence goes with the legacy binding, so memory disappears entirely unless steps exist by then.
+  - Phase 10 cutover still expects "Classification/context/memory visible" (`10-…md:20`).
+- Required correction: record which phase implements the memory steps (and add it to that phase's plan or the RESUME obligations), or record a user decision that this release ships without memory and adjust the phase 08/10 criteria. Planning only.
+- Instruction lesson: a deferral without a destination is a silent drop. Candidate: every "deferred" acceptance item records its owning phase, or an explicit "dropped" decision.
+- Resolution history: 2026-10-20 OPEN (06-R024).
+
+## 06-R025 dispositions — 06-F030, 06-F031, 06-F032 RESOLVED
+- Context: 2026-10-21; `implement-opus-reviewed-2.1`; correction recheck [06-R025](agent-review-notes.md#06-r025--phase06-r024-correction-recheck--pass); Reviewer B Opus 5.5 (`claude-opus-5-5`), requested xhigh, effective effort not reported. Artifact: base `76fe99c` plus worktree, digest `0d8bba5d139ad7dfc69380b45ed32ed48cc3ec481c4be45abdeb2d8f5f329b00` (manifest `logs/06/06-R024fix-snapshot.txt`), verified before and after. The user decisions of 2026-10-21 are recorded verbatim in TASK.
+- **06-F030 RESOLVED** by user decision plus removal.
+  - The Stage-3 LLM spam guardrail is gone end to end: service, runner call and builders, dispatch skip logic, company field/column/SQL/forms/settings, `AppConfig` and `ENABLE_LLM_SPAM_GUARDRAIL`, `fly.toml`, docs and marketing. No reference remains, and the fresh schema has no column.
+  - The prompt generator stays unmetered by user decision. D2 is narrowed in plan 06:148-152 and disclosed in `docs/rig.md` and `docs/deploy.md`.
+  - Stage 1/2 scanning is untouched.
+  - B's full lib suite: 2692/0.
+- **06-F031 RESOLVED.** (a) The language reference matches the registry contracts. (b) The script, fixture and doc are deleted. (c) The `Dockerfile` git install and cache mount are removed (not built: no docker). (d) Comments fixed. Optional nit: the `ToolId` comment at `value_objects.rs:383-385` understates its use for workflow tool names in diagnostics (`rig/workflow.rs:76-81`).
+- **06-F032 RESOLVED** by user decision. Memory is out of this release, recorded in plans 06, 08, 10 and the plan index files. Phase 08 decides delete-or-dormant for the provider infrastructure; root adds that to the RESUME phase-08 obligations.

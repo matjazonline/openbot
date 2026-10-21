@@ -8,8 +8,9 @@
 
 Replace hardcoded message-to-agent dispatch with one durable workflow engine in Rust and
 PostgreSQL. Company admins author YAML workflows, publish immutable versions, and bind them to
-channels and schedules. Agents, human decisions, context loading, memory, tools, HTTP requests,
-MCP tool calls over HTTP, and message delivery become explicit steps.
+channels and schedules. Agents, human decisions, context loading, tools, HTTP requests,
+MCP tool calls over HTTP, and message delivery become explicit steps. Memory is out of this
+release by user decision 2026-10-21 (06-F032).
 
 This is an implementation plan, not documentation of shipped features. It incorporates the
 architecture discussion and the subsequent human-comment, feedback, and revision design.
@@ -49,7 +50,7 @@ all interfaces until then. Build the representative workflow fixtures from phase
 | [03](03-durable-runtime-and-persistence.md) | Admission, independent runs, jobs, transitions, recovery |
 | [04](04-actions-http-and-delivery.md) | Shared action protocol, HTTP, MCP calls, tools, message effects |
 | [05](05-human-decisions-and-waits.md) | Human tasks, comments, feedback, authorization decisions, waits |
-| [06](06-agent-context-memory-and-capabilities.md) | Rig integration, explicit context/memory/classification |
+| [06](06-agent-context-memory-and-capabilities.md) | Rig integration, explicit context/classification (memory out of this release) |
 | [07](07-child-workflows-and-review-revisions.md) | Child calls, workflow tools, bounded feedback rounds |
 | [08](08-triggers-and-application-replacement.md) | Channels, schedules, manual starts, removal of old orchestration |
 | [09](09-authoring-and-operations-ui.md) | Authoring, binding, runs, decisions, sample execution |

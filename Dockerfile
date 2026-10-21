@@ -1,10 +1,6 @@
 # ---- builder ----
 FROM rust:1-bookworm AS builder
 
-# git: the `ai-agents` dependency is a git dependency
-RUN apt-get update && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # sqlx::query! macros are checked at compile time; use the committed .sqlx/
@@ -18,7 +14,6 @@ COPY assets ./assets
 COPY src ./src
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
     cargo build --release --locked \
     && cp target/release/mail_agents /app/mail_agents

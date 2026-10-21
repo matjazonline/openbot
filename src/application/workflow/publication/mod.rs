@@ -11,7 +11,7 @@ mod validation;
 use super::compiler::{self, CompiledWorkflow, DecodedSource, Diagnostic, PreparedInputs};
 use super::registry::{self, CatalogueFacts};
 use crate::domain::workflow::{CompanyId, Context, StepId, VersionId};
-pub use capabilities::{ResolvedAgent, SelectionSource};
+pub use capabilities::{ResolvedAgent, agent_universe};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -65,10 +65,7 @@ impl PublishedBundle {
     ) -> Result<PreparedInputs, Diagnostic> {
         let inputs = self.compiled.prepare_step_inputs(step, context)?;
         let definition = &self.compiled.graph().definition().steps[step];
-        if matches!(
-            definition.step_type.as_str(),
-            "agent.run" | "decision.agent"
-        ) {
+        if registry::ModelStep::of(definition.step_type.as_str()).is_some() {
             let selected = inputs.value()["agent"].as_str();
             if !self
                 .snapshots
@@ -83,14 +80,6 @@ impl PublishedBundle {
                     "Agent selection is not present in this frozen bundle",
                 ));
             }
-        }
-        if let Some(profile) = inputs.value().get("capability_profile") {
-            validation::validate_profile(
-                profile,
-                &self.snapshots,
-                &self.compiled,
-                &format!("/steps/{step}/with/capability_profile"),
-            )?;
         }
         Ok(inputs)
     }
@@ -110,7 +99,6 @@ pub fn freeze(
     let child_facts = dependencies::capture(company_id, &parsed, children)?;
     let facts = CatalogueFacts {
         tools: snapshots.tools.iter().map(|t| t.contract.clone()).collect(),
-        profiles: snapshots.profiles.clone(),
         children: child_facts.contracts,
     };
     let compiled = registry::compile(decoded, version_id, &facts, &child_facts.graph)?;

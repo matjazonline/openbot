@@ -134,7 +134,7 @@ async fn workflow_action_receipt_resolved_reconcile_retires_safe_and_reclaims_ze
 async fn workflow_action_receipt_actual_result_precedes_shared_completion_writer() {
     let (f, request, contract) = receipt_fixture(ActionRecovery::Reconcile, false).await;
     let mut provider = dedup(&f, contract, false);
-    provider.result = json!({"items":[],"token_count":0});
+    provider.result = json!({"items":[],"token_count":0,"omitted":0});
     let RemoteDispatchObservation::Committed(receipt) = ActionService::new(adapter(&f, 0))
         .dispatch_remote(&request, &provider, &CancellationToken::new())
         .await

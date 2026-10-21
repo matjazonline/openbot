@@ -91,7 +91,7 @@ async fn workflow_budget_activation_rollback_and_fresh_handle_replay() {
 
 #[tokio::test]
 async fn workflow_budget_activation_pure_io_wait_refusal_no_hot_poll() {
-    for kind in ["data.map", "context.load", "wait.timer", "wait.event"] {
+    for kind in ["data.map", "context.history", "wait.timer", "wait.event"] {
         let (f, root) = limited(kind, 1).await;
         let child = admit_child(&f, root, "start", "child").await;
         f.persistence().activate(root).await.unwrap();
@@ -106,7 +106,7 @@ async fn workflow_budget_activation_pure_io_wait_refusal_no_hot_poll() {
                     BatchDisposition::Failed
                 );
             }
-            "context.load" => {
+            "context.history" => {
                 assert!(
                     f.persistence()
                         .claim_io(
@@ -241,7 +241,7 @@ async fn workflow_budget_activation_mid_batch_refusal_commits_prior_results() {
 
 #[tokio::test]
 async fn workflow_budget_activation_successful_io_and_wait_replay_charge_once() {
-    let (f, scope) = limited("context.load", 1).await;
+    let (f, scope) = limited("context.history", 1).await;
     let claimed = f
         .persistence()
         .claim_io(
@@ -258,7 +258,7 @@ async fn workflow_budget_activation_successful_io_and_wait_replay_charge_once() 
         )
         .unwrap(),
         fence: claimed.fence,
-        output: json!({"items":[],"token_count":0}),
+        output: json!({"items":[],"token_count":0,"omitted":0}),
     };
     f.persistence()
         .complete_io(result())

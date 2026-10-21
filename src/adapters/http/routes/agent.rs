@@ -16,14 +16,11 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
-        agent::{Agent, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS, MAX_GRANTED_TOOLS},
+        agent::{Agent, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS},
         channel::Channel,
-        harness::{
-            DirectoryToolPolicy, HarnessConfig, HarnessKind, NativeToolPolicy, OutreachTargetScope,
-            OutreachToolPolicy,
-        },
+        harness::{HarnessConfig, HarnessKind},
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
-        value_objects::{AvatarUrl, ToolId},
+        value_objects::AvatarUrl,
     },
     use_cases::{
         agent::{AgentUseCases, ProvisioningWarning},
@@ -92,22 +89,9 @@ pub struct AgentForm {
     pub response_format: Option<String>,
     pub response_schema: Option<String>,
     #[serde(default)]
-    pub harness_kind: Option<String>,
-    #[serde(default)]
-    pub granted_tool_ids: Option<String>,
-    #[serde(default)]
     pub skill_ids: Option<String>,
     #[serde(default)]
     pub sub_agent_ids: Option<String>,
-    pub outreach_target_scope: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub outreach_max_targets: Option<u16>,
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub outreach_default_timeout_hours: Option<u16>,
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub outreach_max_timeout_hours: Option<u16>,
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub directory_max_results: Option<u16>,
     pub avatar_url: Option<String>,
     #[serde(default)]
     pub memory_enabled: bool,
@@ -168,72 +152,23 @@ impl AgentForm {
     }
 
     pub(super) fn capabilities(&self) -> Result<SubmittedCapabilities, String> {
-        let harness_kind = match self.harness_kind.as_deref().map(str::trim) {
-            None | Some("") => None,
-            Some(value) => Some(
-                HarnessKind::parse(value)
-                    .ok_or_else(|| format!("Unknown agent harness '{value}'."))?,
-            ),
-        };
-        let granted_tool_ids = parse_csv(
-            self.granted_tool_ids.as_deref(),
-            MAX_GRANTED_TOOLS,
-            "tool grants",
-        )?
-        .into_iter()
-        .map(ToolId::from)
-        .collect();
         let skill_ids = parse_uuid_csv(self.skill_ids.as_deref(), MAX_AGENT_SKILLS, "skills")?;
         let sub_agent_ids = parse_uuid_csv(
             self.sub_agent_ids.as_deref(),
             MAX_AGENT_SUB_AGENTS,
             "sub-agents",
         )?;
-        let defaults = NativeToolPolicy::default();
-        let target_scope = match self.outreach_target_scope.as_deref().map(str::trim) {
-            None | Some("") | Some("external_only") => OutreachTargetScope::ExternalOnly,
-            Some("same_company_channels") => OutreachTargetScope::SameCompanyChannels,
-            Some("any") => OutreachTargetScope::Any,
-            Some(value) => return Err(format!("Unknown outreach target scope '{value}'.")),
-        };
-        let native_tool_policy = NativeToolPolicy {
-            version: 1,
-            outreach: OutreachToolPolicy {
-                max_targets: self
-                    .outreach_max_targets
-                    .unwrap_or(defaults.outreach.max_targets),
-                default_timeout_hours: self
-                    .outreach_default_timeout_hours
-                    .unwrap_or(defaults.outreach.default_timeout_hours),
-                max_timeout_hours: self
-                    .outreach_max_timeout_hours
-                    .unwrap_or(defaults.outreach.max_timeout_hours),
-                allowed_target_scope: target_scope,
-            },
-            directory: DirectoryToolPolicy {
-                max_results: self
-                    .directory_max_results
-                    .unwrap_or(defaults.directory.max_results),
-            },
-        };
-        native_tool_policy.validate()?;
         Ok(SubmittedCapabilities {
-            harness_kind,
-            granted_tool_ids,
             skill_ids,
             sub_agent_ids,
-            native_tool_policy,
         })
     }
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct SubmittedCapabilities {
-    pub harness_kind: Option<HarnessKind>,
-    pub granted_tool_ids: Vec<ToolId>,
     pub skill_ids: Vec<Uuid>,
     pub sub_agent_ids: Vec<Uuid>,
-    pub native_tool_policy: NativeToolPolicy,
 }
 
 const MAX_CAPABILITY_CSV_BYTES: usize = 8 * 1024;
@@ -274,27 +209,26 @@ pub(super) fn parse_uuid_csv(
         .collect()
 }
 
+/// A submitted config field becomes canonical Rig settings; an absent one keeps what is stored.
 pub(super) fn parse_config_form(
     input: Option<String>,
-    harness_kind: Option<HarnessKind>,
 ) -> Result<Option<serde_json::Value>, String> {
-    let submitted = input.is_some();
-    let value = match input {
-        Some(value) if value.len() > crate::entities::harness::MAX_AGENT_HARNESS_CONFIG_BYTES => {
-            return Err("Agent config exceeds 64 KiB".into());
-        }
-        Some(value) if !value.trim().is_empty() => Some(
-            serde_json::from_str(value.trim())
+    let Some(input) = input else {
+        return Ok(None);
+    };
+    if input.len() > crate::entities::harness::MAX_AGENT_HARNESS_CONFIG_BYTES {
+        return Err("Agent config exceeds 64 KiB".into());
+    }
+    let value = match input.trim() {
+        "" => None,
+        trimmed => Some(
+            serde_json::from_str(trimmed)
                 .map_err(|error| format!("Invalid JSON config: {error}"))?,
         ),
-        _ => None,
     };
-    let Some(harness_kind) = harness_kind else {
-        return Ok(value.or_else(|| submitted.then(|| serde_json::json!({"version": 1}))));
-    };
-    let config = HarnessConfig::parse(harness_kind, value.as_ref())?;
-    let canonical = config.to_json()?;
-    Ok(submitted.then_some(canonical))
+    HarnessConfig::parse(HarnessKind::Rig, value.as_ref())?
+        .to_json()
+        .map(Some)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -312,15 +246,9 @@ pub struct AgentJsonPayload {
     pub response_contract: crate::entities::response_contract::ContractUpdate,
     pub config_json: Option<serde_json::Value>,
     #[serde(default)]
-    pub harness_kind: Option<HarnessKind>,
-    #[serde(default)]
-    pub granted_tool_ids: Option<Vec<ToolId>>,
-    #[serde(default)]
     pub skill_ids: Option<Vec<Uuid>>,
     #[serde(default)]
     pub sub_agent_ids: Option<Vec<Uuid>>,
-    #[serde(default)]
-    pub native_tool_policy: Option<NativeToolPolicy>,
     pub avatar_url: Option<String>,
     #[serde(default)]
     pub memory_enabled: bool,
@@ -337,14 +265,10 @@ impl AgentJsonPayload {
         &mut self,
         stored: &crate::use_cases::skill::StoredAgentCapabilities,
     ) {
-        self.granted_tool_ids
-            .get_or_insert_with(|| stored.agent.granted_tool_ids.clone());
         self.skill_ids
             .get_or_insert_with(|| stored.skills.iter().map(|skill| skill.id).collect());
         self.sub_agent_ids
             .get_or_insert_with(|| stored.sub_agent_scope.allowed_ids().to_vec());
-        self.native_tool_policy
-            .get_or_insert_with(|| stored.agent.native_tool_policy.clone());
     }
 
     /// The avatar this payload means, or why it cannot be stored.
@@ -376,7 +300,6 @@ pub(super) struct ModelOverrides<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct AgentInstructionRequest<'a> {
-    pub harness_kind: Option<HarnessKind>,
     pub user_id: Uuid,
     pub company_id: Uuid,
     pub name: &'a str,
@@ -420,7 +343,8 @@ pub(super) async fn agent_write_from_instructions(
         .map_err(|err| format!("Failed to generate agent prompt: {err}"))?;
 
     Ok(AgentWrite {
-        harness_kind: request.harness_kind,
+        // Workflow tool grants are edited in phase 09; keep the stored list.
+        workflow_tools: None,
         name: request.name.to_string(),
         slug: request.slug.to_string(),
         provider: request.overrides.provider.map(str::to_string),
@@ -472,7 +396,7 @@ async fn create_agent_handler(
         Err(error) => return Html(pages::error_alert(&error)),
     };
     let submitted = form.capabilities().and_then(|capabilities| {
-        parse_config_form(form.config_json.clone(), capabilities.harness_kind)
+        parse_config_form(form.config_json.clone())
             .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
     });
 
@@ -497,6 +421,8 @@ async fn create_agent_handler(
             user.id,
             company_id,
             AgentWrite {
+                // Workflow tool grants are edited in phase 09; keep the stored list.
+                workflow_tools: None,
                 response_contract,
                 name: form.name.clone(),
                 slug: form.slug(),
@@ -505,11 +431,8 @@ async fn create_agent_handler(
                 run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
-                harness_kind: capabilities.harness_kind,
-                granted_tool_ids: capabilities.granted_tool_ids,
                 skill_ids: capabilities.skill_ids,
                 sub_agent_ids: capabilities.sub_agent_ids,
-                native_tool_policy: capabilities.native_tool_policy,
                 config_json,
                 memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
@@ -618,7 +541,7 @@ async fn update_agent_handler(
         Err(error) => return Html(pages::error_alert(&error)),
     };
     let submitted = form.capabilities().and_then(|capabilities| {
-        parse_config_form(form.config_json.clone(), capabilities.harness_kind)
+        parse_config_form(form.config_json.clone())
             .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
     });
 
@@ -633,6 +556,8 @@ async fn update_agent_handler(
             company_id,
             agent_id,
             AgentWrite {
+                // Workflow tool grants are edited in phase 09; keep the stored list.
+                workflow_tools: None,
                 response_contract,
                 name: form.name.clone(),
                 slug: form.slug(),
@@ -641,11 +566,8 @@ async fn update_agent_handler(
                 run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
-                harness_kind: capabilities.harness_kind,
-                granted_tool_ids: capabilities.granted_tool_ids,
                 skill_ids: capabilities.skill_ids,
                 sub_agent_ids: capabilities.sub_agent_ids,
-                native_tool_policy: capabilities.native_tool_policy,
                 config_json,
                 memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
@@ -719,6 +641,8 @@ async fn create_agent_json(
             user.id,
             company_id,
             AgentWrite {
+                // Workflow tool grants are edited in phase 09; keep the stored list.
+                workflow_tools: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
@@ -726,11 +650,8 @@ async fn create_agent_json(
                 run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
-                harness_kind: payload.harness_kind,
-                granted_tool_ids: payload.granted_tool_ids.clone().unwrap_or_default(),
                 skill_ids: payload.skill_ids.clone().unwrap_or_default(),
                 sub_agent_ids: payload.sub_agent_ids.clone().unwrap_or_default(),
-                native_tool_policy: payload.native_tool_policy.clone().unwrap_or_default(),
                 config_json: payload.config_json.clone(),
                 response_contract: payload.response_contract.clone(),
                 memory_enabled: payload.memory_enabled,
@@ -806,6 +727,8 @@ async fn update_agent_json(
             company_id,
             agent_id,
             AgentWrite {
+                // Workflow tool grants are edited in phase 09; keep the stored list.
+                workflow_tools: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
@@ -813,11 +736,8 @@ async fn update_agent_json(
                 run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
-                harness_kind: payload.harness_kind,
-                granted_tool_ids: payload.granted_tool_ids.clone().unwrap_or_default(),
                 skill_ids: payload.skill_ids.clone().unwrap_or_default(),
                 sub_agent_ids: payload.sub_agent_ids.clone().unwrap_or_default(),
-                native_tool_policy: payload.native_tool_policy.clone().unwrap_or_default(),
                 config_json: payload.config_json.clone(),
                 response_contract: payload.response_contract.clone(),
                 memory_enabled: payload.memory_enabled,
@@ -1025,14 +945,13 @@ mod tests {
         let request = Request::post("/ui/agents")
             .header("content-type", "application/x-www-form-urlencoded")
             .body(axum::body::Body::from(
-                "name=Support&harness_kind=ai_agents&granted_tool_ids=&skill_ids=&sub_agent_ids=",
+                "name=Support&skill_ids=&sub_agent_ids=",
             ))
             .unwrap();
         let Form(form) = Form::<AgentForm>::from_request(request, &())
             .await
             .expect("an empty selection parses");
         let parsed = form.capabilities().expect("empty selections are valid");
-        assert!(parsed.granted_tool_ids.is_empty());
         assert!(parsed.skill_ids.is_empty());
         assert!(parsed.sub_agent_ids.is_empty());
     }
@@ -1051,39 +970,32 @@ mod tests {
             "description": "Answers support mail",
             "config_json": {"version": 1, "disambiguation": {"enabled": true}},
             "avatar_url": null,
-            "harness_kind": "ai_agents",
-            "granted_tool_ids": ["calculator"],
             "skill_ids": [skill_id],
             "sub_agent_ids": [sub_agent_id],
-            "native_tool_policy": {"version": 1},
             "memory_enabled": false
         }))
         .unwrap();
         let encoded = serde_json::to_value(&payload).unwrap();
-        assert_eq!(encoded["harness_kind"], "ai_agents");
-        assert_eq!(encoded["granted_tool_ids"][0], "calculator");
         assert_eq!(encoded["skill_ids"][0], skill_id.to_string());
         assert_eq!(encoded["sub_agent_ids"][0], sub_agent_id.to_string());
-        assert_eq!(encoded["native_tool_policy"]["version"], 1);
     }
 
     #[test]
     fn unknown_or_security_owned_advanced_config_paths_are_rejected_with_the_path_named() {
-        let unknown = parse_config_form(
-            Some(
-                r#"{"version":1,"reasoning":{"mode":"react","max_iterations":4,"surprise":true}}"#
-                    .into(),
-            ),
-            Some(HarnessKind::AiAgents),
-        )
-        .expect_err("an unknown nested field must fail closed");
-        assert!(unknown.contains("reasoning"), "{unknown}");
+        let unknown = parse_config_form(Some(
+            r#"{"version":1,"max_turns":4,"surprise":true}"#.into(),
+        ))
+        .expect_err("an unknown field must fail closed");
         assert!(unknown.contains("surprise"), "{unknown}");
+        let retired = parse_config_form(Some(
+            r#"{"version":1,"reasoning":{"mode":"react","max_iterations":4}}"#.into(),
+        ))
+        .expect_err("retired ai-agents settings must fail closed");
+        assert!(retired.contains("reasoning"), "{retired}");
 
-        let security_owned = parse_config_form(
-            Some(r#"{"version":1,"tool_security":{"allow":["command"]}}"#.into()),
-            Some(HarnessKind::AiAgents),
-        )
+        let security_owned = parse_config_form(Some(
+            r#"{"version":1,"tool_security":{"allow":["command"]}}"#.into(),
+        ))
         .expect_err("security-owned settings cannot enter harness config");
         assert!(security_owned.contains("tool_security"), "{security_owned}");
     }
@@ -1096,7 +1008,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -1117,9 +1028,6 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: Some("You are a helpful agent.".to_string()),
             description: None,
-            harness_kind: crate::entities::harness::HarnessKind::default(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
             config_json: Some(json!({ "temperature": 0.5 })),
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
@@ -1196,37 +1104,25 @@ mod tests {
 mod harness_payload_tests {
     use super::*;
     #[test]
-    fn harness_omission_survives_json_and_forms_until_application_resolution() {
-        let omitted: AgentJsonPayload =
-            serde_json::from_value(serde_json::json!({"name":"test","slug":"test"})).unwrap();
-        assert!(omitted.harness_kind.is_none());
-        for kind in HarnessKind::ALL {
-            let mut value = serde_json::to_value(&omitted).unwrap();
-            value["harness_kind"] = serde_json::to_value(kind).unwrap();
-            let payload: AgentJsonPayload = serde_json::from_value(value).unwrap();
-            assert_eq!(payload.harness_kind, Some(kind));
+    fn retired_capability_fields_are_unknown_and_config_is_canonical_rig() {
+        for retired in ["harness_kind", "granted_tool_ids", "native_tool_policy"] {
+            let mut value = serde_json::json!({"name":"test","slug":"test"});
+            value[retired] = serde_json::json!(null);
+            assert!(
+                serde_json::from_value::<AgentJsonPayload>(value).is_err(),
+                "{retired}"
+            );
         }
-        assert!(
-            serde_json::from_value::<AgentJsonPayload>(
-                serde_json::json!({"name":"test","slug":"test","harness_kind":"unknown"})
-            )
-            .is_err()
-        );
         assert!(serde_json::from_value::<AgentJsonPayload>(serde_json::json!({"name":"test","slug":"test","mcp_connections":[{"endpoint_url":"https://example.com","token":"secret"}]})).is_err());
         assert_eq!(
-            parse_config_form(Some(String::new()), Some(HarnessKind::Rig)).unwrap(),
+            parse_config_form(Some(String::new())).unwrap(),
             Some(serde_json::json!({"version":1}))
         );
+        assert_eq!(parse_config_form(None).unwrap(), None);
         assert_eq!(
-            parse_config_form(None, Some(HarnessKind::Rig)).unwrap(),
-            None
-        );
-        let rig = Some(r#"{"version":1,"max_turns":2}"#.into());
-        assert_eq!(
-            parse_config_form(rig.clone(), None).unwrap(),
+            parse_config_form(Some(r#"{"version":1,"max_turns":2}"#.into())).unwrap(),
             Some(serde_json::json!({"version":1,"max_turns":2}))
         );
-        assert!(parse_config_form(rig, Some(HarnessKind::AiAgents)).is_err());
     }
 }
 

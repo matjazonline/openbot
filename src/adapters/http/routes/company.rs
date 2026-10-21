@@ -50,7 +50,6 @@ pub fn router() -> Router<AppState> {
 pub struct CompanyForm {
     pub name: String,
     pub slug: String,
-    pub enable_llm_spam_guardrail: Option<bool>,
     pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     /// The company's reply-handling default. Omitted preserves the stored value, exactly like
     /// [`CompanyForm::external_response_review`] — this struct is both the HTML form and the JSON
@@ -94,7 +93,6 @@ impl CompanyForm {
         Ok(CompanyWrite {
             name: self.name.clone(),
             slug: self.slug.clone(),
-            enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
             external_response_review: self.external_response_review,
             external_reply_handling: self.external_reply_handling,
             memory_provider: None,
@@ -472,7 +470,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
             slug: "test-corp".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -506,7 +503,6 @@ mod tests {
         let form = |avatar_url: Option<&str>| CompanyForm {
             name: "Test Corp".to_string(),
             slug: "test-corp".to_string(),
-            enable_llm_spam_guardrail: None,
             avatar_url: avatar_url.map(str::to_string),
             memory_provider: None,
             ..CompanyForm::default()
@@ -537,7 +533,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
             slug: "test-corp".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
             memory_provider: None,
             created_at: Utc::now(),
@@ -569,7 +564,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme-corp".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),

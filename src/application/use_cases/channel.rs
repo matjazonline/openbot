@@ -357,7 +357,6 @@ impl ChannelUseCases {
         let provenance = CreationProvenance::user(user_id);
         agent.created_by = Some(provenance.clone());
         channel.created_by = Some(provenance);
-        agent.resolve_harness(self.config.default_agent_harness);
         agent.normalize()?;
 
         channel.normalize_with(ActiveAgent::SuppliedByCaller)?;
@@ -1177,7 +1176,6 @@ mod tests {
 
     fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
         Arc::new(AppConfig {
-            default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1203,7 +1201,6 @@ mod tests {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -1224,7 +1221,6 @@ mod tests {
             user_id: owner_id,
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),
@@ -1331,7 +1327,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".into(),
                 slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -1430,7 +1425,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -1790,7 +1784,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),
@@ -1897,7 +1890,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
                 created_at: Utc::now(),

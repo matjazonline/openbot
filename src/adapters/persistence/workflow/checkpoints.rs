@@ -204,6 +204,47 @@ impl WorkflowCheckpointStore for PostgresPersistence {
             }
         }
     }
+
+    async fn blocked_workflow_model(
+        &self,
+        fence: WorkflowFence,
+        policy: LeasePolicy,
+    ) -> AppResult<Option<crate::services::harness::runs::ModelReservation>> {
+        let bound = WriteBound::read_only("checkpoint.blocked", policy);
+        bound
+            .read(Box::pin(async {
+                let mut conn = bound.acquire(&self.pool).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                let result = async {
+                    if !lock_owner(&mut tx, fence, &bound).await? {
+                        return Err(AppError::Execution(
+                            crate::app_error::ExecutionFailure::OwnershipLost,
+                        ));
+                    }
+                    let saved: Option<Value> = sqlx::query_scalar(
+                        "SELECT decision.token_proposal->'request'->'reservation' FROM task_harness_runs AS checkpoint
+                         JOIN workflow_decisions AS decision ON decision.company_id=checkpoint.company_id
+                          AND decision.id=checkpoint.model_blocked_decision AND decision.token_stage='reservation'
+                         WHERE checkpoint.owner_kind='workflow' AND checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2
+                           AND checkpoint.workflow_execution_id=$3 AND checkpoint.task_id=$4",
+                    )
+                    .bind(fence.scope.company.as_uuid())
+                    .bind(fence.scope.run.as_uuid())
+                    .bind(fence.scope.execution.as_uuid())
+                    .bind(fence.scope.job.0)
+                    .fetch_optional(&mut *tx)
+                    .await?
+                    .flatten();
+                    live(&mut tx, fence, &bound).await?;
+                    saved
+                        .map(|value| serde_json::from_value(value).map_err(|_| invalid()))
+                        .transpose()
+                }
+                .await;
+                bound.roll_back(tx, result).await
+            }))
+            .await
+    }
 }
 
 fn validate_spec(fence: WorkflowFence, spec: &WorkflowCheckpointSpec) -> AppResult<()> {
@@ -263,6 +304,23 @@ async fn live(tx: &mut PgConnection, fence: WorkflowFence, bound: &WriteBound) -
     Ok(())
 }
 
+/// Current agent/model authority for the immutable prepared selection, taken in the
+/// authority class before any local workflow lock. Missing preparation fails closed.
+async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+    let prepared: Value = sqlx::query_scalar(
+        "SELECT workflow_prepared FROM task_harness_runs WHERE owner_kind='workflow' AND company_id=$1
+          AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
+    )
+    .bind(fence.scope.company.as_uuid())
+    .bind(fence.scope.run.as_uuid())
+    .bind(fence.scope.execution.as_uuid())
+    .bind(fence.scope.job.0)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(missing)?;
+    super::agent_preparation::current_on(tx, fence.scope.company, &prepared).await
+}
+
 async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {
     sqlx::query_as(
         "SELECT checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
@@ -288,7 +346,9 @@ fn matching(saved: Saved, spec: &WorkflowCheckpointSpec) -> AppResult<RunCheckpo
                 text: spec.initial_prompt.clone(),
             })
     {
-        return Err(AppError::Conflict(
+        // Terminal: the saved checkpoint's preparation is immutable, so a changed frozen
+        // input or a rebound tool target can never be followed by a retry (D4).
+        return Err(AppError::BadRequest(
             "Workflow checkpoint preparation changed".into(),
         ));
     }

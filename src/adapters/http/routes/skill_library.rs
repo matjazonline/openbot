@@ -20,8 +20,7 @@ use crate::{
         skill::{
             MAX_SKILL_INSTRUCTIONS, MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction,
         },
-        tool_catalogue::CatalogueTool,
-        value_objects::{EmailAddress, ToolId},
+        value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     use_cases::{
@@ -215,32 +214,9 @@ fn parse_draft(form: &SkillForm, id: Option<Uuid>) -> Result<pages::SkillDraft, 
     let mut instructions = Vec::with_capacity(form.instruction_count);
     for index in 0..form.instruction_count {
         let key = |suffix: &str| format!("instruction_{index}_{suffix}");
-        match form.fields.get(&key("kind")).map(String::as_str) {
-            Some("prompt") => instructions.push(pages::DraftInstruction::Prompt {
-                text: form.fields.get(&key("text")).cloned().unwrap_or_default(),
-            }),
-            Some("tool") => {
-                let args = form.fields.get(&key("args")).cloned().unwrap_or_default();
-                let args_error = parse_args(&args).err();
-                instructions.push(pages::DraftInstruction::Tool {
-                    tool: form.fields.get(&key("tool")).cloned().unwrap_or_default(),
-                    args,
-                    output_as: form
-                        .fields
-                        .get(&key("output_as"))
-                        .cloned()
-                        .unwrap_or_default(),
-                    args_error,
-                });
-            }
-            Some(other) => {
-                return Err(format!(
-                    "Instruction {} has unknown kind '{other}'.",
-                    index + 1
-                ));
-            }
-            None => return Err(format!("Instruction {} is missing its kind.", index + 1)),
-        }
+        instructions.push(pages::DraftInstruction::Prompt {
+            text: form.fields.get(&key("text")).cloned().unwrap_or_default(),
+        });
     }
     Ok(pages::SkillDraft {
         id,
@@ -252,44 +228,18 @@ fn parse_draft(form: &SkillForm, id: Option<Uuid>) -> Result<pages::SkillDraft, 
     })
 }
 
-fn parse_args(value: &str) -> Result<Option<serde_json::Value>, String> {
-    if value.trim().is_empty() {
-        return Ok(None);
-    }
-    let parsed: serde_json::Value = serde_json::from_str(value)
-        .map_err(|error| format!("Arguments must be valid JSON: {error}"))?;
-    if !parsed.is_object() {
-        return Err("Arguments must be a JSON object.".to_string());
-    }
-    Ok(Some(parsed))
-}
-
 fn write_from_draft(draft: &pages::SkillDraft) -> Result<SkillWrite, String> {
-    let mut instructions = Vec::with_capacity(draft.instructions.len());
-    for instruction in &draft.instructions {
-        match instruction {
-            pages::DraftInstruction::Prompt { text } => {
-                instructions.push(SkillInstruction::Prompt { text: text.clone() });
-            }
-            pages::DraftInstruction::Tool {
-                tool,
-                args,
-                output_as,
-                ..
-            } => {
-                let id = ToolId::from(tool.as_str());
-                if CatalogueTool::get(&id).is_none() {
-                    return Err(format!("Tool '{tool}' is not available for skills."));
-                }
-                instructions.push(SkillInstruction::Tool {
-                    tool: id,
-                    args: parse_args(args)?,
-                    output_as: (!output_as.trim().is_empty()).then(|| output_as.clone()),
-                });
-            }
-        }
-    }
+    let instructions = draft
+        .instructions
+        .iter()
+        .map(
+            |pages::DraftInstruction::Prompt { text }| SkillInstruction::Prompt {
+                text: text.clone(),
+            },
+        )
+        .collect();
     Ok(SkillWrite {
+        required_tools: None,
         slug: draft.slug.clone(),
         name: draft.name.clone(),
         description: draft.description.clone(),
@@ -330,9 +280,6 @@ fn apply_action(draft: &mut pages::SkillDraft, action: Option<&str>) -> Result<(
         }
         "up" if index > 0 => draft.instructions.swap(index, index - 1),
         "down" if index + 1 < draft.instructions.len() => draft.instructions.swap(index, index + 1),
-        // The selected kind has already been parsed from the complete submitted form. The suffix
-        // is bounded here so a crafted action cannot smuggle another operation through.
-        "kind" if matches!(parts.next(), Some("prompt" | "tool" | "__selected__")) => {}
         "up" | "down" => {}
         _ => return Err("The instruction action is invalid.".to_string()),
     }
@@ -623,6 +570,8 @@ impl From<SkillPayload> for SkillWrite {
             description: payload.description,
             trigger: payload.trigger,
             instructions: payload.instructions,
+            // Required workflow tools are edited in phase 09; keep the stored list.
+            required_tools: None,
             created_by: None,
         }
     }
@@ -900,10 +849,9 @@ async fn library_instruction_row(
 mod tests {
     use super::*;
 
-    fn form(rows: &[(&str, &str)]) -> SkillForm {
+    fn form(rows: &[&str]) -> SkillForm {
         let mut fields = HashMap::new();
-        for (index, (kind, value)) in rows.iter().enumerate() {
-            fields.insert(format!("instruction_{index}_kind"), (*kind).to_string());
+        for (index, value) in rows.iter().enumerate() {
             fields.insert(format!("instruction_{index}_text"), (*value).to_string());
         }
         SkillForm {
@@ -915,7 +863,7 @@ mod tests {
 
     #[test]
     fn removing_a_middle_instruction_row_reindexes_the_rest() {
-        let mut submitted = form(&[("prompt", "one"), ("prompt", "two"), ("prompt", "three")]);
+        let mut submitted = form(&["one", "two", "three"]);
         submitted.action = Some("remove:1".into());
         let mut draft = parse_draft(&submitted, None).unwrap();
         apply_action(&mut draft, submitted.action.as_deref()).unwrap();
@@ -934,56 +882,32 @@ mod tests {
     }
 
     #[test]
-    fn moving_and_changing_a_row_round_trips_the_complete_draft() {
-        let mut submitted = form(&[("prompt", "first"), ("tool", "")]);
-        submitted
-            .fields
-            .insert("instruction_1_tool".into(), "datetime".into());
-        submitted
-            .fields
-            .insert("instruction_1_args".into(), "{}".into());
+    fn moving_a_row_round_trips_the_complete_draft() {
+        let mut submitted = form(&["first", "second"]);
         submitted.action = Some("up:1".into());
         let mut draft = parse_draft(&submitted, None).unwrap();
         apply_action(&mut draft, submitted.action.as_deref()).unwrap();
-        assert!(matches!(
-            draft.instructions[0],
-            pages::DraftInstruction::Tool { .. }
-        ));
-        assert!(
-            matches!(draft.instructions[1], pages::DraftInstruction::Prompt { ref text } if text == "first")
+        assert_eq!(
+            draft.instructions,
+            [
+                pages::DraftInstruction::Prompt {
+                    text: "second".into()
+                },
+                pages::DraftInstruction::Prompt {
+                    text: "first".into()
+                }
+            ]
         );
-
-        let mut changed = form(&[("tool", "")]);
-        changed
-            .fields
-            .insert("instruction_0_tool".into(), "json".into());
-        changed.action = Some("kind:0:__selected__".into());
-        let mut changed_draft = parse_draft(&changed, None).unwrap();
-        apply_action(&mut changed_draft, changed.action.as_deref()).unwrap();
-        assert!(
-            matches!(changed_draft.instructions[0], pages::DraftInstruction::Tool { ref tool, .. } if tool == "json")
-        );
-    }
-
-    #[test]
-    fn an_unparseable_args_field_is_a_row_level_message_and_keeps_other_rows() {
-        let mut submitted = form(&[("tool", ""), ("prompt", "keep me")]);
-        submitted
-            .fields
-            .insert("instruction_0_tool".into(), "datetime".into());
-        submitted
-            .fields
-            .insert("instruction_0_args".into(), "{bad".into());
-        let draft = parse_draft(&submitted, None).unwrap();
-        let html = pages::skill_instruction_editor(None, &draft);
-        assert!(html.contains("Arguments must be valid JSON"));
-        assert!(html.contains("keep me"));
+        let mut retired = form(&["only"]);
+        retired.action = Some("kind:0:__selected__".into());
+        let mut draft = parse_draft(&retired, None).unwrap();
+        assert!(apply_action(&mut draft, retired.action.as_deref()).is_err());
     }
 
     #[test]
     fn an_instruction_action_keeps_the_existing_skill_identity() {
         let skill_id = Uuid::new_v4();
-        let mut submitted = form(&[("prompt", "keep editing")]);
+        let mut submitted = form(&["keep editing"]);
         submitted.skill_id = Some(skill_id);
         submitted.action = Some("add".into());
 

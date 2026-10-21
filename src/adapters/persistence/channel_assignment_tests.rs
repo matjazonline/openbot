@@ -138,7 +138,6 @@ async fn agent(persistence: &PostgresPersistence, company_id: Uuid, slug: &str) 
             name: slug.into(),
             slug: slug.into(),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )
@@ -508,7 +507,6 @@ async fn an_owned_channel_cannot_lose_its_owner() {
             name: "Owner".into(),
             slug: "owner".into(),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
         write("owner", &[]),

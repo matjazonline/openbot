@@ -36,13 +36,22 @@ impl McpRuntime {
         client: Arc<dyn McpClient>,
         lease: LeasePolicy,
     ) -> Self {
+        Self::with_approvals(persistence, client, lease, None)
+    }
+    /// `notices` lets a protected tool call park for review; without them it fails closed.
+    pub fn with_approvals(
+        persistence: PostgresPersistence,
+        client: Arc<dyn McpClient>,
+        lease: LeasePolicy,
+        notices: Option<crate::application::workflow::decisions::DecisionNotices>,
+    ) -> Self {
+        let mut dispatch =
+            PostgresActionDispatch::new(persistence.clone(), McpActionAuthority, NoLocal);
+        if let Some(notices) = notices {
+            dispatch = dispatch.with_decision_notices(notices);
+        }
         Self {
-            inner: McpActions::new(
-                persistence.clone(),
-                PostgresActionDispatch::new(persistence, McpActionAuthority, NoLocal),
-                client,
-                lease,
-            ),
+            inner: McpActions::new(persistence, dispatch, client, lease),
         }
     }
     pub async fn call_tool(

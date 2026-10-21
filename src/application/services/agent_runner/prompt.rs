@@ -1,8 +1,8 @@
 //! Assembling what the model sees, and fencing everything in it that somebody else wrote.
 //!
 //! This is the runner's, not a harness's: whichever runtime executes the agent is handed a prompt
-//! that has already been composed, fenced and guardrailed. Moving it behind the port would mean
-//! every new harness re-deciding what an untrusted block looks like.
+//! that has already been composed and fenced. Moving it behind the port would mean every new
+//! harness re-deciding what an untrusted block looks like.
 
 use crate::entities::internal_note::AgentInstructionNote;
 use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};

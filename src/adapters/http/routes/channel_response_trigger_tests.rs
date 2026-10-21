@@ -13,7 +13,6 @@ use axum::{Json, extract::State};
 
 fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -39,7 +38,6 @@ fn test_config() -> Arc<AppConfig> {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -303,7 +301,6 @@ async fn response_trigger_owned_channel_form_saves_and_reopens() {
         AgentWrite {
             name: "Support".into(),
             slug: "support".into(),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
         ChannelWrite {

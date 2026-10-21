@@ -134,7 +134,6 @@ pub enum InvocationState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SavedInvocation {
-    pub mcp: Option<SavedMcpInvocation>,
     pub call: SavedToolCall,
     pub turn: u16,
     pub ordinal: u16,
@@ -167,10 +166,6 @@ pub struct RunWrite {
 /// All operations are mandatory; no success-shaped fallback can drop a checkpoint.
 #[async_trait]
 pub trait HarnessRunStore: Send + Sync {
-    fn mcp_journal(
-        &self,
-        lease: TaskLeaseRef,
-    ) -> std::sync::Arc<dyn crate::services::mcp_runtime::McpInvocationJournal>;
     async fn reserve_execution(
         &self,
         write: &RunWrite,
@@ -279,17 +274,6 @@ pub enum SavedReasoning {
     Summary {
         text: String,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SavedMcpInvocation {
-    pub connection_id: Uuid,
-    pub tool_name: crate::entities::mcp::McpToolName,
-    pub definition_revision: i64,
-    pub credential_revision: i64,
-    pub selection_revision: i64,
-    pub schema_fingerprint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

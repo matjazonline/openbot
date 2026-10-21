@@ -161,14 +161,15 @@ async fn workflow_message_recovery_existing_marker_is_never_republished() {
         Box::pin(tool(&fresh, "same-call", arguments.clone()))
             .await
             .unwrap(),
-        MessageObservation::Pending
+        MessageObservation::DeliveryParked(_)
     ));
-    assert!(matches!(
+    // The delivery parked the attempt (D4): re-entry under it has no fence and publishes
+    // nothing; after continuation the same call reads its receipt (sequential test).
+    assert!(
         Box::pin(tool(&fresh, "same-call", arguments))
             .await
-            .unwrap(),
-        MessageObservation::Pending
-    ));
+            .is_err()
+    );
     let changed = send_arguments(&[("user", fresh.user)], "Changed");
     assert!(
         Box::pin(tool(&fresh, "same-call", changed)).await.is_err(),
@@ -258,13 +259,13 @@ async fn workflow_message_recovery_control_retry_replays_the_failed_receipt() {
     );
 }
 
-/// D4 §L port seam: a model-tool marker with a pending email in an execution parked for
-/// reconciliation. Its receipt is truth only; the run stays parked, the job failed, no
-/// successor; a delivery reopen reopens only the delivery.
+/// D4: a saved model-tool delivery parks the job on its own effect wait. A dead delivery is
+/// received truth for the agent: it continues the job (continuation only, no retry debit),
+/// never completes the step, routes or creates a successor.
 #[tokio::test]
-async fn workflow_message_recovery_model_tool_marker_never_reopens_its_job() {
-    let setup = Box::pin(send(&[To::Channel])).await;
-    let (p, scope, run) = (&setup.fixture.persistence, setup.scope(), setup.scope().run);
+async fn workflow_message_model_tool_failed_delivery_continues_the_agent_job() {
+    let mut setup = Box::pin(send(&[To::Channel])).await;
+    let (scope, run) = (setup.scope(), setup.scope().run);
     let observed = Box::pin(tool(
         &setup,
         "agent-call",
@@ -272,17 +273,7 @@ async fn workflow_message_recovery_model_tool_marker_never_reopens_its_job() {
     ))
     .await
     .unwrap();
-    assert!(matches!(observed, MessageObservation::Pending));
-    // The enclosing execution is interrupted with the pending marker: Reconcile.
-    let released = p
-        .release_io(
-            setup.claim.fence,
-            lease(),
-            LeaseReleaseCause::LocalInterruption,
-        )
-        .await
-        .unwrap();
-    assert!(released);
+    assert!(matches!(observed, MessageObservation::DeliveryParked(_)));
     let parked_state = state(setup.pool(), scope).await;
     assert_eq!(
         (
@@ -290,27 +281,30 @@ async fn workflow_message_recovery_model_tool_marker_never_reopens_its_job() {
             parked_state.waiting.as_deref(),
             parked_state.job.as_str()
         ),
-        ("waiting", Some("reconciliation"), "failed")
+        ("waiting", Some("effect"), "completed")
     );
-    assert_eq!(retry_safe(setup.pool(), scope).await, Some(false));
-    deliver(
-        setup.pool(),
-        delivery(setup.pool(), run, 0).await,
-        "delivered",
-    )
-    .await;
-    assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 1);
+    let dead = delivery(setup.pool(), run, 0).await;
+    Box::pin(continue_delivery(&mut setup, dead, "dead")).await;
     assert_eq!(rows(setup.pool(), run).await.receipts, 1);
-    let after = state(setup.pool(), scope).await;
-    assert_eq!(
-        (
-            after.run.as_str(),
-            after.waiting.as_deref(),
-            after.job.as_str()
-        ),
-        ("waiting", Some("reconciliation"), "failed")
-    );
-    assert_eq!(retry_safe(setup.pool(), scope).await, Some(true));
+    let (failures, continuations): (i32, i16) = sqlx::query_as(
+        "SELECT retry_count,continuation_count FROM background_tasks WHERE workflow_execution_id=$1",
+    )
+    .bind(scope.execution.as_uuid())
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    assert_eq!((failures, continuations), (0, 1));
+    let replay = Box::pin(tool(
+        &setup,
+        "agent-call",
+        send_arguments(&[("user", setup.user)], "From the agent"),
+    ))
+    .await
+    .unwrap();
+    let MessageObservation::Committed(receipt) = replay else {
+        panic!("the continued call reads its failure receipt");
+    };
+    assert_eq!(receipt.result["status"], "failed");
     let executions: i64 =
         sqlx::query_scalar("SELECT count(*) FROM workflow_executions WHERE run_id=$1")
             .bind(run.as_uuid())
@@ -318,5 +312,4 @@ async fn workflow_message_recovery_model_tool_marker_never_reopens_its_job() {
             .await
             .unwrap();
     assert_eq!(executions, 1);
-    assert!(candidates(&setup).await.is_empty());
 }

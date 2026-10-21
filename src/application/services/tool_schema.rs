@@ -27,6 +27,14 @@ fn visit(value: &Value, root: &Value, depth: usize, remaining: &mut usize) -> Ap
     *remaining -= 1;
     match value {
         Value::Object(object) => {
+            // A nested `$id` starts a schema resource whose local references resolve
+            // inside it (JSON Schema 2020-12), as the validator and the workflow compiler
+            // resolve them; the depth and node budgets still bound every traversal.
+            let root = if object.contains_key("$id") {
+                value
+            } else {
+                root
+            };
             for keyword in ["$ref", "$dynamicRef", "$recursiveRef"] {
                 if let Some(reference) = object.get(keyword) {
                     let pointer = reference
@@ -78,5 +86,23 @@ mod tests {
         assert!(validator.is_valid(&json!({"value":3})));
         assert!(!validator.is_valid(&json!({"value":"3"})));
         assert!(!validator.is_valid(&json!({"value":3,"extra":true})));
+    }
+
+    #[test]
+    fn schema_local_references_resolve_inside_their_nested_resource() {
+        let nested = json!({"type":"object","properties":{"data":{
+            "$id":"urn:workflow:contract:decision-data",
+            "$defs":{"note":{"type":"string","maxLength":4}},
+            "$ref":"#/$defs/note"}}});
+        let validator = compile(&nested).unwrap();
+        assert!(validator.is_valid(&json!({"data":"ok"})));
+        assert!(!validator.is_valid(&json!({"data":"too long"})));
+        // Without the resource boundary the same pointer names nothing at the root.
+        let mut unrooted = nested;
+        unrooted["properties"]["data"]
+            .as_object_mut()
+            .unwrap()
+            .remove("$id");
+        assert!(compile(&unrooted).is_err());
     }
 }

@@ -323,7 +323,7 @@ Later04.8–11 and05–10 obligations remain; no production provider/UI integrat
 | 05.3 Assignment/auth/notify | Explicit member reviewers (no groups, no external reviewers), current access, durable precise notifications; action digest subject separate from business review. No eligible reviewer fails. |
 | 05.4 Other waits | Scoped durable event/timer correlation, schemas/deadline/sweeper; duplicate and event-before-park/restart checks; phase05 gate. |
 | 06.1 Rig integration | Refactor agent runner/harness via action/checkpoint contracts; bounded repairs/root budgets, resume saved calls, remove alternate runtime when migrated; no implicit context/memory/delivery. |
-| 06.2 Explicit preparation | Context history cutoff/provenance, scoped memory load/save, bounded classifier/agent-choice handlers; committed result reused, choices not authority. |
+| 06.2 Explicit preparation | Context history cutoff/provenance, scoped memory load/save (out of this release by user decision 2026-10-21, 06-F032), bounded classifier/agent-choice handlers; committed result reused, choices not authority. |
 | 06.3 Skills/profiles | Instructions+requirements only; omitted uses frozen saved ordered defaults, explicit replaces, intersect grants/ceiling/current policy, missing requirements fail; operational tool/skill loading and traces; phase06 tests cover every nested resolution rule. |
 | 07.1 Child calls/tools | Atomic pinned child+parent wait, explicit inputs/resources, inherited ceilings/budgets/cancel, durable completion and saved model call identity. |
 | 07.2 Retry/revision | Same retry identity vs new round/new changed-input run; immutable prior records, no budget replenishment. |

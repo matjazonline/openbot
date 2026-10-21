@@ -469,3 +469,39 @@ async fn workflow_message_sql_effect_wait_must_match_its_run_and_action() {
         );
     }
 }
+
+/// 06-F020: a step execution keeps exactly one effect wait (a saved model tool call may park
+/// many, one per call). The fence-capture trigger is disabled inside the rolled-back
+/// transaction only so that the index itself is what refuses the second step wait.
+#[tokio::test]
+async fn workflow_message_sql_step_execution_keeps_one_effect_wait() {
+    let setup = Box::pin(send(&[To::User])).await;
+    assert!(matches!(
+        setup.runtime().execute(&setup.kind, &setup.claim).await,
+        WorkflowHandlerOutcome::Suspended(_)
+    ));
+    let mut tx = setup.pool().begin().await.unwrap();
+    sqlx::query(
+        "ALTER TABLE workflow_message_actions DISABLE TRIGGER workflow_message_action_capture",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let error = sqlx::query(
+        "INSERT INTO workflow_message_actions (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,origin,wait_id,fence_expires_at,destination_count) \
+         SELECT company_id,run_id,execution_id,gen_random_uuid(),argument_digest,gen_random_uuid(),origin,gen_random_uuid(),fence_expires_at,destination_count \
+         FROM workflow_message_actions WHERE run_id=$1 AND origin='step'",
+    )
+    .bind(setup.scope().run.as_uuid())
+    .execute(&mut *tx)
+    .await
+    .unwrap_err();
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|error| error.constraint()),
+        Some("workflow_message_step_one_wait"),
+        "{error}"
+    );
+    tx.rollback().await.unwrap();
+}

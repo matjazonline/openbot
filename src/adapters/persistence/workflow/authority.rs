@@ -87,9 +87,10 @@ pub(super) fn builtin_message_tool(tool: &ToolSnapshot) -> AppResult<bool> {
     Ok(true)
 }
 
-/// Tools must match a live HTTP registration or MCP approval for their slot kind.
-/// Agents, skills and profiles have no authoritative durable owner yet: persisting
-/// caller-supplied facts would turn frozen content into a grant (phase 06).
+/// Tools must match a live HTTP registration or MCP approval for their slot kind. Agent and
+/// skill snapshots are frozen content verified once, at publish, against their durable
+/// owners (`agent_publication::verify_on`, 06-D5); later agent edits never block stored
+/// versions, their bindings, admission or parents.
 pub(super) async fn supported_publication(
     tx: &mut Transaction<'_, Postgres>,
     bundle: &PublishedBundle,
@@ -102,14 +103,6 @@ pub(super) async fn supported_publication(
             return Err(missing());
         }
         let snapshots = current.snapshots();
-        if !snapshots.agents.is_empty()
-            || !snapshots.skills.is_empty()
-            || !snapshots.profiles.is_empty()
-        {
-            return Err(AppError::BadRequest(
-                "Workflow dependency authority is not available".into(),
-            ));
-        }
         let definition = current.compiled().graph().definition();
         for tool in &snapshots.tools {
             if builtin_message_tool(tool)? {

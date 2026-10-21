@@ -105,7 +105,7 @@ async fn assert_lapsed_backstop(
 
 async fn supported_fixture() -> (AdmissionFixture, ActionDispatchRequest) {
     let mut source: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["input_schema"] = json!({"type":"object","properties":{"value":{"type":"integer","minimum":1,"maximum":1000}},"required":["value"]});
     source["steps"]["start"]["with"]["max_tokens"] = json!({"ref":"/input/value"});
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":132});
@@ -256,7 +256,8 @@ async fn foreign_entry(f: &AdmissionFixture, attempt: usize) -> Option<Uuid> {
         &format!("-high-company-{}", Uuid::new_v4().simple()),
     )
     .await;
-    let source = serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+    let source =
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     let foreign = Box::pin(AdmissionFixture::with_binding(
         BindingFixture::from_fixture(fixture, source).await,
     ))

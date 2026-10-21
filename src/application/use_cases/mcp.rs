@@ -89,13 +89,8 @@ pub trait McpCredentialPersistence: Send + Sync {
 
 #[async_trait]
 pub trait McpPersistence: Send + Sync {
-    async fn mcp_selecting_agents(
-        &self,
-        company_id: Uuid,
-        connection_id: Uuid,
-    ) -> AppResult<Vec<McpSelectingAgent>>;
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>>;
-    /// Runtime projection: at most MAX_MCP_SELECTIONS IDs; missing/deleted rows are omitted.
+    /// At most MAX_MCP_CONNECTIONS IDs; missing/deleted rows are omitted.
     async fn mcp_connections_by_ids(
         &self,
         company_id: Uuid,
@@ -119,17 +114,6 @@ pub trait McpPersistence: Send + Sync {
         connection_id: Uuid,
         expected_revision: i64,
     ) -> AppResult<()>;
-    async fn agent_mcp_selection(
-        &self,
-        company_id: Uuid,
-        agent_id: Uuid,
-    ) -> AppResult<AgentMcpSelection>;
-    /// None preserves the set; Some([]) clears it. Compare-and-swap never silently loses an edit.
-    async fn replace_agent_mcp_selection(
-        &self,
-        selection: AgentMcpSelection,
-        connection_ids: Option<Vec<Uuid>>,
-    ) -> AppResult<AgentMcpSelection>;
 }
 
 /// Authorization belongs to the application boundary; storage adapters never infer an actor.
@@ -202,15 +186,6 @@ impl McpUseCases {
             .replace_mcp_token(current.company_id, current.id, current.revision, token)
             .await
     }
-    pub async fn select(
-        &self,
-        user: Uuid,
-        current: AgentMcpSelection,
-        ids: Option<Vec<Uuid>>,
-    ) -> AppResult<AgentMcpSelection> {
-        super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
-        self.catalog.replace_agent_mcp_selection(current, ids).await
-    }
 }
 
 impl McpUseCases {
@@ -228,24 +203,6 @@ impl McpUseCases {
             .into_iter()
             .find(|c| c.id == id)
             .ok_or_else(|| AppError::NotFound("MCP connection not found".into()))
-    }
-    pub async fn selection(
-        &self,
-        user: Uuid,
-        company: Uuid,
-        agent: Uuid,
-    ) -> AppResult<AgentMcpSelection> {
-        super::company::managed_company(self.companies.as_ref(), user, company).await?;
-        self.catalog.agent_mcp_selection(company, agent).await
-    }
-    pub async fn selecting_agents(
-        &self,
-        user: Uuid,
-        company: Uuid,
-        id: Uuid,
-    ) -> AppResult<Vec<McpSelectingAgent>> {
-        self.get(user, company, id).await?;
-        self.catalog.mcp_selecting_agents(company, id).await
     }
     pub async fn refresh(
         &self,
@@ -291,10 +248,4 @@ impl McpUseCases {
         )
         .await
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct McpSelectingAgent {
-    pub id: Uuid,
-    pub name: String,
 }

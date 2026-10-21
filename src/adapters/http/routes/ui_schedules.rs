@@ -923,7 +923,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Schedule Corp".into(),
             slug: "sched".into(),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: Utc::now(),

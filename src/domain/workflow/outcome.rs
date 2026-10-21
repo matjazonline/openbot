@@ -272,7 +272,6 @@ mod tests {
             parameter_schema: None,
             output_schema: None,
             resources: vec![],
-            capability_ceiling: None,
             entry: id("a"),
             steps: [(id("a"), branch), (id("b"), success)].into(),
             limits: ExecutionLimits {

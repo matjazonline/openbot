@@ -18,16 +18,18 @@ fn documented_rig_configuration_and_response_contracts_pass_application_parsers(
     for block in guide.split("```json\n").skip(1) {
         let source = block.split_once("\n```").expect("closed JSON example").0;
         let example: Value = serde_json::from_str(source).expect("valid documented JSON");
-        if let Some(kind) = example.get("harness_kind") {
-            let kind: HarnessKind = serde_json::from_value(kind.clone()).unwrap();
-            assert_eq!(kind, HarnessKind::Rig);
-            let config = HarnessConfig::parse(kind, example.get("config_json")).unwrap();
+        if example.get("response_contract").is_none() {
+            // An agent request: the API accepts it as written (retired fields are unknown).
+            serde_json::from_value::<crate::adapters::http::routes::agent::AgentJsonPayload>(
+                example.clone(),
+            )
+            .expect("documented agent request");
+            let config =
+                HarnessConfig::parse(HarnessKind::Rig, example.get("config_json")).unwrap();
             assert_eq!(config.rig().unwrap().effective_max_turns(16), 8);
         } else {
             let contract = ResponseContract::parse(&example["response_contract"].to_string())
                 .expect("documented response contract envelope");
-            contract.require_harness(HarnessKind::Rig).unwrap();
-            assert!(contract.require_harness(HarnessKind::AiAgents).is_err());
             JsonResponseValidator.validate_contract(&contract).unwrap();
             let valid = r#"{"status":"done","summary":"The request is complete."}"#;
             let output =
@@ -87,11 +89,6 @@ fn contract_envelope_patch_and_fingerprint_are_stable() {
         assert!(serde_json::from_value::<ResponseContract>(bad).is_err());
     }
     assert!(ResponseContract::parse(&" ".repeat(MAX_CONTRACT_BYTES + 1)).is_err());
-    assert!(
-        parsed
-            .require_harness(crate::entities::harness::HarnessKind::AiAgents)
-            .is_err()
-    );
 }
 #[test]
 fn schemas_are_validated_without_external_or_recursive_resolution() {

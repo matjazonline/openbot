@@ -210,7 +210,7 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
 /// `debit_workflow_budget_receipt`, on a fresh schema. A root run whose stored bundle is not
 /// the current compiler revision, or does not decode, is `sealed_legacy` with no limits, and every positive
 /// debit of it is `exhausted` without touching usage. The admitted current-revision root is
-/// `frozen_v4` and grants: the control.
+/// `frozen_v6` and grants: the control.
 #[tokio::test]
 async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
     let (f, admitted) = limited().await;
@@ -292,7 +292,7 @@ async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
     // The control: the admitted current-revision root carries its frozen limits and grants.
     assert_eq!(
         budget(admitted.run).await.unwrap(),
-        json!({"provenance":"frozen_v4","limits":[2,2,2],"usage":[0,0,0]})
+        json!({"provenance":"frozen_v6","limits":[2,2,2],"usage":[0,0,0]})
     );
     assert_eq!(
         receipt(&mut db, admitted, "model_call", "frozen-call", 1)
@@ -317,7 +317,7 @@ async fn workflow_budget_current_compiler_admission_activates() {
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(
         saved,
-        json!({"compiler":crate::application::workflow::compiler::SEMANTIC_REVISION,"provenance":"frozen_v4","activations":1})
+        json!({"compiler":crate::application::workflow::compiler::SEMANTIC_REVISION,"provenance":"frozen_v6","activations":1})
     );
 }
 

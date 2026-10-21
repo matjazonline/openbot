@@ -4,13 +4,12 @@ fn runtime_and_schema_drafts_are_escaped_without_rewriting_values() {
     let opening = "<script>";
     let schema = format!(r#"{{"const":"</textarea>{opening}alert(1)</script>"}}"#);
     let html = fields(&AgentDraft {
-        harness_kind: Some(HarnessKind::Rig),
         response_format: "json_schema",
         response_schema: schema.clone(),
         config_json: "{broken",
         ..Default::default()
     });
-    assert!(html.contains("value=\"rig\" selected"));
+    assert!(!html.contains("harness_kind"));
     assert!(html.contains("value=\"json_schema\" selected"));
     assert!(html.contains(&escape_html_text(&schema)));
     assert!(!html.contains(opening));

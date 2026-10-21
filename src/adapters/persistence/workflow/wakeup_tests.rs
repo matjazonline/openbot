@@ -164,7 +164,7 @@ async fn workflow_wakeup_real_child_completion_and_parent_cancel_contenders() {
 
 #[tokio::test]
 async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
-    let (f, parent) = fixture(example("context.load")).await;
+    let (f, parent) = fixture(example("context.history")).await;
     let child = admit_child(&f, parent, "start", "child").await;
     let claimed = f
         .persistence()
@@ -183,7 +183,7 @@ async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
             )
             .unwrap(),
             fence: claimed.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap()

@@ -6,6 +6,9 @@ use uuid::Uuid;
 #[path = "capabilities_tests.rs"]
 mod capabilities_tests;
 
+#[path = "../agent_tests.rs"]
+mod agent_tests;
+
 #[path = "diagnostic_tests.rs"]
 mod diagnostic_tests;
 
@@ -62,23 +65,19 @@ fn tool_snapshot(kind: &str) -> ToolSnapshot {
 }
 
 #[test]
-fn workflow_publication_freezes_agents_skills_profiles_and_hashes() {
+fn workflow_publication_freezes_agents_skills_and_hashes() {
     let source = source("agent.run");
     let mut facts = snapshots();
     facts.tools.push(tool_snapshot("tool.call"));
     facts.skills.push(SkillSnapshot {
         company_id: company(),
+        skill_id: Uuid::from_u128(11),
         name: name("support"),
         instructions: "Follow the support policy".into(),
         required_tools: vec![name("lookup")],
     });
     facts.agents[0].tools.push(name("lookup"));
     facts.agents[0].skills.push(name("support"));
-    facts.profiles.push(registry::CapabilityProfile {
-        name: name("none"),
-        tools: vec![],
-        skills: vec![],
-    });
     let original = build(&source, facts.clone()).unwrap();
     let original_manifest = original.manifest().clone();
     let identical = build(&source, facts.clone()).unwrap();
@@ -89,7 +88,7 @@ fn workflow_publication_freezes_agents_skills_profiles_and_hashes() {
             0 => changed.agents[0].instructions.push_str(" updated"),
             1 => changed.skills[0].instructions.push_str(" updated"),
             2 => changed.agents[0].model.max_output_tokens += 1,
-            3 => changed.profiles[0].tools.push(name("lookup")),
+            3 => changed.skills[0].skill_id = Uuid::from_u128(12),
             _ => changed.tools[0].policy.policy_revision += 1,
         }
         let later = build(&source, changed).unwrap();
@@ -125,6 +124,7 @@ fn workflow_publication_validates_skill_requirements_without_granting_tools() {
     facts.tools.push(tool_snapshot("tool.call"));
     facts.skills.push(SkillSnapshot {
         company_id: company(),
+        skill_id: Uuid::from_u128(11),
         name: name("support"),
         instructions: "Help".into(),
         required_tools: vec![name("lookup")],
@@ -132,13 +132,7 @@ fn workflow_publication_validates_skill_requirements_without_granting_tools() {
     facts.agents[0].skills.push(name("support"));
     assert!(build(&source("agent.run"), facts.clone()).is_err());
     facts.agents[0].tools.push(name("lookup"));
-    assert!(build(&source("agent.run"), facts.clone()).is_ok());
-    facts.profiles.push(registry::CapabilityProfile {
-        name: name("broken"),
-        tools: vec![],
-        skills: vec![name("support")],
-    });
-    assert!(build(&source("agent.run"), facts).is_err());
+    assert!(build(&source("agent.run"), facts).is_ok());
 }
 
 #[test]
@@ -354,58 +348,6 @@ fn workflow_publication_rejects_conflicting_transitive_version_content() {
 }
 
 #[test]
-fn workflow_publication_inline_profiles_check_static_and_runtime_dependencies() {
-    let mut facts = snapshots();
-    facts.tools.push(tool_snapshot("tool.call"));
-    facts.skills.push(SkillSnapshot {
-        company_id: company(),
-        name: name("support"),
-        instructions: "Help".into(),
-        required_tools: vec![name("lookup")],
-    });
-    let cases = [
-        (json!({"tools":["missing"],"skills":[]}), "Tool missing"),
-        (json!({"tools":[],"skills":["missing"]}), "Skill missing"),
-        (
-            json!({"tools":[],"skills":["support"]}),
-            "requires unselected tool lookup",
-        ),
-    ];
-    for (profile, reason) in cases {
-        let mut source = source("agent.run");
-        source["steps"]["start"]["with"]["capability_profile"] = json!({"literal":profile});
-        let error = build(&source, facts.clone()).err().unwrap();
-        assert_eq!(error.code, "publication.selection");
-        assert_eq!(&*error.field_path, "/steps/start/with/capability_profile");
-        assert!(error.message.contains(reason));
-        source["parameter_schema"] = json!({"type":"object","required":["profile"],"properties":{"profile":{"type":"object"}}});
-        source["steps"]["start"]["with"]["capability_profile"] = json!({"ref":"/params/profile"});
-        let bundle = build(&source, facts.clone()).unwrap();
-        let params = json!({"profile":profile});
-        let outputs = BTreeMap::new();
-        let context = Context {
-            input: &Value::Null,
-            params: &params,
-            step_outputs: &outputs,
-            run: RunMetadata {
-                run_id: RunId::new(Uuid::nil()),
-                parent_run_id: None,
-            },
-        };
-        let error = bundle
-            .prepare_step_inputs(&StepId::parse("start").unwrap(), &context)
-            .err()
-            .unwrap();
-        assert_eq!(error.code, "publication.selection");
-        assert!(error.message.contains(reason));
-    }
-    let mut source = source("agent.run");
-    source["steps"]["start"]["with"]["capability_profile"] =
-        json!({"object":{"tools":{"literal":["lookup"]},"skills":{"literal":["support"]}}});
-    build(&source, facts).unwrap();
-}
-
-#[test]
 fn workflow_publication_dependency_errors_name_the_problem_and_source_field() {
     let mut facts = snapshots();
     facts.agents[0].company_id = CompanyId::new(Uuid::nil());
@@ -439,36 +381,13 @@ fn workflow_publication_dependency_errors_name_the_problem_and_source_field() {
 }
 
 #[test]
-fn workflow_publication_inline_ambiguous_tools_fail_static_and_dynamic() {
+fn workflow_publication_ambiguous_agent_tool_fails_publication() {
     let mut facts = snapshots();
     facts.tools = vec![tool_snapshot("tool.call"), tool_snapshot("mcp.call")];
+    facts.agents[0].tools = vec![name("lookup")];
     let mut source = source("agent.run");
     source["resources"] = json!([{"slot":"service","kind":"mcp"}]);
-    let profile = json!({"tools":["lookup"],"skills":[]});
-    source["steps"]["start"]["with"]["capability_profile"] = json!({"literal":profile});
-    assert_eq!(
-        build(&source, facts.clone()).err().unwrap().code,
-        "publication.selection"
-    );
-    source["parameter_schema"] =
-        json!({"type":"object","required":["profile"],"properties":{"profile":{"type":"object"}}});
-    source["steps"]["start"]["with"]["capability_profile"] = json!({"ref":"/params/profile"});
-    let bundle = build(&source, facts).unwrap();
-    let params = json!({"profile":profile});
-    let outputs = BTreeMap::new();
-    let context = Context {
-        input: &Value::Null,
-        params: &params,
-        step_outputs: &outputs,
-        run: RunMetadata {
-            run_id: RunId::new(Uuid::nil()),
-            parent_run_id: None,
-        },
-    };
-    let error = bundle
-        .prepare_step_inputs(&StepId::parse("start").unwrap(), &context)
-        .err()
-        .unwrap();
+    let error = build(&source, facts).err().unwrap();
     assert_eq!(error.code, "publication.selection");
     assert!(error.message.contains("lookup is missing or ambiguous"));
 }

@@ -54,7 +54,7 @@ async fn workflow_control_revision_material_transitions_and_heartbeat_noops() {
             )
             .unwrap(),
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap()

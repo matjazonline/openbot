@@ -26,25 +26,19 @@ use std::sync::Arc;
 pub struct RigHarness {
     providers: ProviderRegistry,
     pub(super) capabilities: Arc<dyn AgentCapabilityReader>,
-    mcp: Arc<crate::services::mcp_runtime::McpRuntime>,
 }
 impl RigHarness {
-    pub fn new(
-        capabilities: Arc<dyn AgentCapabilityReader>,
-        mcp: Arc<crate::services::mcp_runtime::McpRuntime>,
-    ) -> AppResult<Self> {
+    pub fn new(capabilities: Arc<dyn AgentCapabilityReader>) -> AppResult<Self> {
         Self::with_providers(
             ProviderRegistry::standard()
                 .map_err(|_| AppError::Internal("Rig provider transport unavailable".into()))?,
             capabilities,
-            mcp,
         )
     }
 
     pub fn with_providers(
         providers: ProviderRegistry,
         capabilities: Arc<dyn AgentCapabilityReader>,
-        mcp: Arc<crate::services::mcp_runtime::McpRuntime>,
     ) -> AppResult<Self> {
         providers
             .validate_coverage()
@@ -53,7 +47,6 @@ impl RigHarness {
         Ok(Self {
             providers,
             capabilities,
-            mcp,
         })
     }
 }
@@ -83,12 +76,7 @@ impl AgentHarness for RigHarness {
 }
 
 impl RigHarness {
-    fn compile(
-        &self,
-        run: &AgentRun<'_>,
-        scope: &RunExecution,
-        mcp: Arc<dyn crate::services::harness::mcp::HarnessMcpToolHost>,
-    ) -> AppResult<CompiledRun> {
+    fn compile(&self, run: &AgentRun<'_>, scope: &RunExecution) -> AppResult<CompiledRun> {
         let mut compiled = CompiledRun::compile(
             &run.spec,
             CompileContext {
@@ -101,25 +89,8 @@ impl RigHarness {
                 clock: Arc::new(SystemClock),
                 capabilities: self.capabilities.clone(),
                 token_budget: 1_048_576,
-                approvals: run.approvals.clone(),
-                mcp: Some(mcp),
             },
-            run.tool_host.clone(),
         )?;
-        if !compiled.tools.diagnostics.missing_context.is_empty() {
-            return Err(invalid(
-                "Rig tool grants require unavailable execution context",
-            ));
-        }
-        if run
-            .spec
-            .required_tool_ids()
-            .iter()
-            .any(|id| id.as_str() == "request_approval")
-            && run.approvals.is_none()
-        {
-            return Err(invalid("Human checkpoint requires approval context"));
-        }
         let tools = Arc::get_mut(&mut compiled.tools)
             .ok_or_else(|| invalid("Rig tool state was shared before execution"))?;
         tools.restrict_deadline(run.deadline);
@@ -192,22 +163,7 @@ impl RigHarness {
             .max(1) as u64;
         let checkpoint = applied(scope.store.reserve_execution(&write, allowance_ms).await?)?;
         run.deadline = execution_deadline(&checkpoint, scope, run.deadline)?;
-        let mcp = tokio::time::timeout_at(
-            run.deadline,
-            self.mcp.prepare(
-                crate::services::mcp_runtime::McpRunScope {
-                    company_id: scope.company_id,
-                    agent_id: run.agent_id,
-                    task_id: scope.lease.task_id,
-                    run_id: checkpoint.run_id.0,
-                },
-                HarnessKind::Rig,
-                scope.store.mcp_journal(scope.lease),
-            ),
-        )
-        .await
-        .map_err(|_| AppError::Timeout("Rig preparation deadline exceeded".into()))??;
-        let compiled = self.compile(&run, scope, mcp)?;
+        let compiled = self.compile(&run, scope)?;
         let write = RunWrite {
             company_id: scope.company_id,
             run_id: checkpoint.run_id,
@@ -225,20 +181,23 @@ impl RigHarness {
         let inputs = super::diagnostics::InputCounts::from(&run);
         let execution = Execution {
             inputs,
-            scope,
-            compiled,
+            binding: Binding::Legacy(Box::new(LegacyBinding {
+                scope,
+                compiled,
+                capabilities: self.capabilities.clone(),
+                authorization,
+                spec: run.spec,
+            })),
             checkpoint,
             model,
             deadline: run.deadline,
             secret: run.api_key,
-            capabilities: self.capabilities.clone(),
-            authorization,
-            spec: run.spec,
         };
         // Keep the external runtime state out of the worker/dispatch poll frame. No detached work.
-        tokio::time::timeout_at(run.deadline, Box::pin(execution.drive()))
+        let driven = tokio::time::timeout_at(run.deadline, Box::pin(execution.drive_legacy()))
             .await
-            .map_err(|_| AppError::Timeout("Rig deadline exceeded".into()))?
+            .map_err(|_| AppError::Timeout("Rig deadline exceeded".into()))??;
+        Ok(driven)
     }
 }
 
@@ -284,7 +243,7 @@ fn identity(
         .map_err(AppError::BadRequest)?;
     let content = serde_json::json!({ "name":run.spec.name, "instructions":run.spec.system_prompt,"authorization":authorization,
         "provider":run.spec.provider, "model":run.spec.model,"endpoint":run.spec.provider_base_url, "skills":run.spec.skills,
-        "grants":run.spec.required_tool_ids(), "sub_agents":match &run.spec.sub_agents { crate::entities::harness::SubAgentScope::AllCompanySiblings => serde_json::json!({"scope":"all_company_siblings"}), crate::entities::harness::SubAgentScope::Restricted(ids) => serde_json::json!({"scope":"restricted","ids":ids}) }, "config":config, "response_contract":run.spec.response_contract });
+        "sub_agents":match &run.spec.sub_agents { crate::entities::harness::SubAgentScope::AllCompanySiblings => serde_json::json!({"scope":"all_company_siblings"}), crate::entities::harness::SubAgentScope::Restricted(ids) => serde_json::json!({"scope":"restricted","ids":ids}) }, "config":config, "response_contract":run.spec.response_contract });
     Ok(RunIdentity {
         company_id: scope.company_id,
         task_id: scope.lease.task_id,
@@ -306,14 +265,10 @@ async fn authorization(
         .load_for_execution(company, agent)
         .await?
         .ok_or_else(|| invalid("Agent is unavailable"))?;
-    if current.agent.id != agent
-        || current.agent.company_id.is_some_and(|id| id != company)
-        || current.agent.harness_kind != HarnessKind::Rig
-    {
+    if current.agent.id != agent || current.agent.company_id.is_some_and(|id| id != company) {
         return Err(invalid("Agent scope changed"));
     }
     if current.agent.response_contract != spec.response_contract
-        || current.agent.granted_tool_ids != spec.granted_tools
         || serde_json::to_value(&current.skills)
             .map_err(|_| invalid("Invalid capability snapshot"))?
             != serde_json::to_value(&spec.skills)
@@ -324,7 +279,7 @@ async fn authorization(
     }
     let identity = serde_json::json!({"name":current.agent.name,"instructions":current.agent.system_prompt,
         "provider":current.agent.provider,"model":current.agent.model,"config":current.agent.config_json,
-        "grants":current.agent.granted_tool_ids,"policy":current.agent.native_tool_policy,"skills":current.skills,
+        "skills":current.skills,
         "sub_agents":current.sub_agent_scope.allowed_ids(), "response_contract":current.agent.response_contract});
     Ok(format!(
         "{:x}",
@@ -332,10 +287,10 @@ async fn authorization(
     ))
 }
 
-fn invalid(message: &str) -> AppError {
+pub(super) fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
-fn applied(outcome: WriteOutcome<RunCheckpoint>) -> AppResult<RunCheckpoint> {
+pub(super) fn applied(outcome: WriteOutcome<RunCheckpoint>) -> AppResult<RunCheckpoint> {
     match outcome {
         WriteOutcome::Applied(run) | WriteOutcome::AlreadyApplied(run) => Ok(run),
         WriteOutcome::OwnershipLost => Err(AppError::Execution(
@@ -347,197 +302,189 @@ fn applied(outcome: WriteOutcome<RunCheckpoint>) -> AppResult<RunCheckpoint> {
     }
 }
 
-struct Execution<'a> {
-    inputs: super::diagnostics::InputCounts,
+/// The closed set of durable owners of one checkpoint. Each binding supplies its own
+/// authority, checkpoint writes and tool dispatch; the drive loop below is shared, so a
+/// workflow run never constructs legacy task ownership or enters the legacy tool bridge.
+pub(super) enum Binding<'a> {
+    Legacy(Box<LegacyBinding<'a>>),
+    Workflow(Box<super::workflow::WorkflowBinding<'a>>),
+}
+
+pub(super) struct LegacyBinding<'a> {
     scope: &'a RunExecution,
     compiled: CompiledRun,
-    checkpoint: RunCheckpoint,
-    model: ModelHandle,
-    deadline: tokio::time::Instant,
-    secret: &'a str,
     capabilities: Arc<dyn AgentCapabilityReader>,
     authorization: String,
     spec: Box<crate::entities::harness::AgentCapabilitySpec>,
 }
-impl Execution<'_> {
-    fn write(&self) -> RunWrite {
+
+/// A durable admission either enters the provider or parks the execution before I/O.
+pub(super) enum Admitted {
+    Enter(Box<RunCheckpoint>),
+    Suspend(crate::domain::workflow::WaitId),
+}
+
+/// The next state after a durable write: keep driving, or stop because the owner parked.
+/// Legacy suspension has no workflow wait identity.
+pub(super) enum Progress {
+    Continue(RunCheckpoint),
+    Suspend(RunCheckpoint, Option<crate::domain::workflow::WaitId>),
+}
+
+pub(super) enum Driven {
+    Completed(AgentExecutionOutput),
+    Suspended(Option<crate::domain::workflow::WaitId>),
+}
+
+impl Binding<'_> {
+    async fn authorize(&self, checkpoint: &RunCheckpoint) -> AppResult<()> {
+        match self {
+            Self::Legacy(legacy) => legacy.authorize(checkpoint).await,
+            // The workflow store rechecks current authority inside admission/preparation.
+            Self::Workflow(_) => Ok(()),
+        }
+    }
+
+    fn preamble(&self) -> AppResult<String> {
+        match self {
+            Self::Legacy(legacy) => legacy.compiled.render_preamble(),
+            Self::Workflow(workflow) => Ok(workflow.preamble()),
+        }
+    }
+
+    fn definitions(&self) -> Vec<rig::completion::ToolDefinition> {
+        match self {
+            Self::Legacy(legacy) => legacy.compiled.tools.definitions(),
+            Self::Workflow(workflow) => workflow.definitions(),
+        }
+    }
+
+    pub(super) fn supported_ids(&self) -> Vec<crate::entities::value_objects::ToolId> {
+        match self {
+            Self::Legacy(legacy) => legacy.compiled.tools.supported_ids(),
+            Self::Workflow(workflow) => workflow.supported_ids(),
+        }
+    }
+
+    /// A workflow request parked before I/O keeps its saved identity until one fresh
+    /// admission consumes it; every other request gets a new identity.
+    fn reservation(&mut self, computed: ModelReservation) -> AppResult<ModelReservation> {
+        match self {
+            Self::Legacy(_) => Ok(computed),
+            Self::Workflow(workflow) => workflow.reservation(computed),
+        }
+    }
+
+    async fn admit(
+        &mut self,
+        checkpoint: &RunCheckpoint,
+        reservation: ModelReservation,
+        fingerprint: [u8; 32],
+    ) -> AppResult<Admitted> {
+        match self {
+            Self::Legacy(legacy) => Ok(Admitted::Enter(Box::new(applied(
+                legacy
+                    .scope
+                    .store
+                    .reserve_model(&legacy.write(checkpoint), reservation)
+                    .await?,
+            )?))),
+            Self::Workflow(workflow) => workflow.admit(checkpoint, reservation, fingerprint).await,
+        }
+    }
+
+    async fn settle(
+        &self,
+        checkpoint: &RunCheckpoint,
+        turn: SavedModelTurn,
+    ) -> AppResult<Progress> {
+        match self {
+            Self::Legacy(legacy) => Ok(Progress::Continue(applied(
+                legacy
+                    .scope
+                    .store
+                    .commit_model_turn(&legacy.write(checkpoint), turn)
+                    .await?,
+            )?)),
+            Self::Workflow(workflow) => workflow.settle(checkpoint, turn).await,
+        }
+    }
+
+    async fn tool(&self, checkpoint: &RunCheckpoint, call: SavedToolCall) -> AppResult<Progress> {
+        match self {
+            Self::Legacy(legacy) => legacy.tool(checkpoint, call).await,
+            Self::Workflow(workflow) => workflow.tool(checkpoint, call).await,
+        }
+    }
+
+    async fn final_output(
+        &self,
+        checkpoint: &RunCheckpoint,
+        output: AgentExecutionOutput,
+    ) -> AppResult<RunCheckpoint> {
+        match self {
+            Self::Legacy(legacy) => applied(
+                legacy
+                    .scope
+                    .store
+                    .save_final_output(&legacy.write(checkpoint), output)
+                    .await?,
+            ),
+            Self::Workflow(workflow) => workflow.final_output(checkpoint, output).await,
+        }
+    }
+
+    async fn invalid_output(&self, checkpoint: &RunCheckpoint) -> AppResult<RunCheckpoint> {
+        match self {
+            Self::Legacy(legacy) => applied(
+                legacy
+                    .scope
+                    .store
+                    .fail_invalid_output(&legacy.write(checkpoint))
+                    .await?,
+            ),
+            Self::Workflow(workflow) => workflow.invalid_output(checkpoint).await,
+        }
+    }
+}
+
+impl LegacyBinding<'_> {
+    fn write(&self, checkpoint: &RunCheckpoint) -> RunWrite {
         RunWrite {
             company_id: self.scope.company_id,
-            run_id: self.checkpoint.run_id,
+            run_id: checkpoint.run_id,
             lease: self.scope.lease,
-            expected_revision: self.checkpoint.revision,
+            expected_revision: checkpoint.revision,
         }
     }
 
-    async fn drive(mut self) -> AppResult<AgentExecutionOutput> {
-        loop {
-            if tokio::time::Instant::now() >= self.deadline {
-                return Err(AppError::Timeout("Rig deadline exceeded".into()));
-            }
-            if let Some(output) = &self.checkpoint.final_output {
-                return Ok(output.clone());
-            }
-            if self.checkpoint.state == RunState::BudgetExceeded {
-                return Err(AppError::Execution(
-                    crate::app_error::ExecutionFailure::Budget,
-                ));
-            }
-            if self.checkpoint.state == RunState::InvalidOutput {
-                return Err(crate::services::response_contract::invalid_output());
-            }
-            if self.checkpoint.state != RunState::Active {
-                return Err(invalid("Rig continuation is not executable"));
-            }
-            if authorization(
-                self.capabilities.as_ref(),
-                self.scope.company_id,
-                self.checkpoint.identity.agent_id,
-                &self.spec,
-            )
-            .await?
-                != self.authorization
-            {
-                return Err(invalid("Execution authorization changed"));
-            }
-            if let Some(call) = self.checkpoint.pending_call().cloned() {
-                if self.tool(call).await? {
-                    return Ok(self.output(String::new(), AgentExecutionDisposition::Suspended));
-                }
-                continue;
-            }
-            if let Some(turn) = self.checkpoint.turns.last()
-                && turn.calls.is_empty()
-            {
-                if turn.invalid_response.is_some() {
-                    if self.checkpoint.repair_count()
-                        >= crate::services::response_contract::MAX_REPAIR_CALLS
-                    {
-                        self.checkpoint =
-                            applied(self.scope.store.fail_invalid_output(&self.write()).await?)?;
-                        return Err(crate::services::response_contract::invalid_output());
-                    }
-                    self.model_turn().await?;
-                    continue;
-                }
-                let mut output = self.output(
-                    sanitize_text(&turn.text, Some(self.secret)),
-                    AgentExecutionDisposition::Completed,
-                );
-                if let Some(contract) = &self.checkpoint.identity.response_contract {
-                    let structured = StructuredResponse::validate(
-                        contract,
-                        &turn.text,
-                        Some(self.secret),
-                        &JsonResponseValidator,
-                    )?
-                    .map_err(|_| crate::services::response_contract::invalid_output())?;
-                    output = self.output(
-                        structured.body().into(),
-                        AgentExecutionDisposition::Completed,
-                    );
-                    output.structured = Some(structured);
-                }
-                self.checkpoint = applied(
-                    self.scope
-                        .store
-                        .save_final_output(&self.write(), output.clone())
-                        .await?,
-                )?;
-                return Ok(output);
-            }
-            self.model_turn().await?;
+    async fn authorize(&self, checkpoint: &RunCheckpoint) -> AppResult<()> {
+        if authorization(
+            self.capabilities.as_ref(),
+            self.scope.company_id,
+            checkpoint.identity.agent_id,
+            &self.spec,
+        )
+        .await?
+            != self.authorization
+        {
+            return Err(invalid("Execution authorization changed"));
         }
-    }
-
-    async fn model_turn(&mut self) -> AppResult<()> {
-        let repair = super::final_response::repair_reservation(&self.checkpoint)?;
-        let request = CompletionRequest {
-            model: None,
-            preamble: Some(super::final_response::response_preamble(
-                &self.checkpoint,
-                &self.compiled,
-                repair.as_ref(),
-            )?),
-            chat_history: super::protocol::history(&self.checkpoint)?,
-            documents: vec![],
-            tools: if repair.is_some() {
-                vec![]
-            } else {
-                self.compiled.tools.definitions()
-            },
-            temperature: None,
-            max_tokens: Some(self.checkpoint.policy.request_output_tokens),
-            tool_choice: None,
-            additional_params: None,
-            output_schema: None,
-            record_telemetry_content: false,
-        };
-        request
-            .validate_message_content()
-            .map_err(|_| invalid("Invalid Rig model history"))?;
-        // One UTF-8 byte per token is a conservative fallback, covering schemas and metadata too.
-        let input_tokens = serde_json::to_vec(&request)
-            .map_err(|_| invalid("Invalid Rig request"))?
-            .len() as u64;
-        let reservation = ModelReservation {
-            repair,
-            request_id: ModelRequestId(uuid::Uuid::new_v4()),
-            input_tokens,
-            output_tokens: self.checkpoint.policy.request_output_tokens,
-        };
-        self.checkpoint = applied(
-            self.scope
-                .store
-                .reserve_model(&self.write(), reservation.clone())
-                .await?,
-        )?;
-        let response = super::providers::complete(&self.model, request).await?;
-        let mut turn =
-            super::protocol::capture(&self.checkpoint.identity.provider, &reservation, response)?;
-        super::final_response::assess_candidate(
-            &self.checkpoint,
-            self.secret,
-            &mut turn,
-            reservation.repair.as_ref(),
-            super::diagnostics::OutputContext {
-                inputs: self.inputs,
-                supported_tools: self.compiled.tools.supported_ids(),
-            },
-        )?;
-        self.checkpoint = applied(
-            self.scope
-                .store
-                .commit_model_turn(&self.write(), turn)
-                .await?,
-        )?;
         Ok(())
     }
 
-    async fn tool(&mut self, call: SavedToolCall) -> AppResult<bool> {
-        if self.checkpoint.invocations.iter().any(|inv| {
-            inv.call.invocation_id == call.invocation_id
-                && inv.state == InvocationState::Indeterminate
-        }) {
-            return Err(AppError::Execution(
-                crate::app_error::ExecutionFailure::IndeterminateEffect,
-            ));
-        }
-        self.checkpoint = applied(
+    async fn tool(&self, checkpoint: &RunCheckpoint, call: SavedToolCall) -> AppResult<Progress> {
+        let prepared = applied(
             self.scope
                 .store
-                .prepare_invocation(&self.write(), call.invocation_id)
+                .prepare_invocation(&self.write(checkpoint), call.invocation_id)
                 .await?,
         )?;
-        let reference = InvocationRef {
-            run_id: self.checkpoint.run_id,
-            invocation_id: call.invocation_id,
-            expected_revision: self.checkpoint.revision,
-        };
         let correlation = ToolCorrelationId::parse(&call.invocation_id.0.to_string())?;
         let invocation = self
             .compiled
             .tools
-            .invoke_saved(&call.tool_id, &correlation, call.arguments, Some(reference))
+            .invoke(&call.tool_id, &correlation, call.arguments)
             .await?;
         let stored = self
             .scope
@@ -545,7 +492,7 @@ impl Execution<'_> {
             .load_run(
                 self.scope.company_id,
                 self.scope.lease.task_id,
-                self.checkpoint.run_id,
+                prepared.run_id,
             )
             .await?
             .ok_or_else(|| invalid("Tool continuation disappeared"))?;
@@ -563,13 +510,12 @@ impl Execution<'_> {
                             | InvocationState::Failed
                     )
                 });
-            if stored.revision.0 <= self.checkpoint.revision.0 || !settled {
+            if stored.revision.0 <= prepared.revision.0 || !settled {
                 return Err(invalid(
                     "Tool suspension has no matching durable transition",
                 ));
             }
-            self.checkpoint = stored;
-            return Ok(true);
+            return Ok(Progress::Suspend(stored, None));
         }
         if let Some(receipt) = stored.invocations.iter().find(|saved| {
             saved.call.invocation_id == call.invocation_id
@@ -578,19 +524,216 @@ impl Execution<'_> {
             if receipt.result.as_ref() != Some(&invocation.output) {
                 return Err(invalid("Tool receipt does not match its committed output"));
             }
-            self.checkpoint = stored;
-        } else {
-            self.checkpoint = applied(
-                self.scope
-                    .store
-                    .record_result(&self.write(), call.invocation_id, invocation.output)
-                    .await?,
-            )?;
+            return Ok(Progress::Continue(stored));
         }
-        Ok(false)
+        Ok(Progress::Continue(applied(
+            self.scope
+                .store
+                .record_result(
+                    &self.write(&prepared),
+                    call.invocation_id,
+                    invocation.output,
+                )
+                .await?,
+        )?))
+    }
+}
+
+/// Canonical provider request identity: provider, model and the complete completion
+/// request (frozen preamble, saved history, tool declarations, repair, limits). The
+/// model handle carries credentials; they never enter this digest.
+pub(super) fn request_fingerprint(
+    identity: &RunIdentity,
+    request: &CompletionRequest,
+) -> AppResult<[u8; 32]> {
+    let canonical = serde_json::to_vec(&serde_json::json!({
+        "provider": identity.provider,
+        "model": identity.model,
+        "request": request,
+    }))
+    .map_err(|_| invalid("Invalid Rig request"))?;
+    Ok(Sha256::digest(canonical).into())
+}
+
+pub(super) struct Execution<'a> {
+    pub(super) inputs: super::diagnostics::InputCounts,
+    pub(super) binding: Binding<'a>,
+    pub(super) checkpoint: RunCheckpoint,
+    pub(super) model: ModelHandle,
+    pub(super) deadline: tokio::time::Instant,
+    pub(super) secret: &'a str,
+}
+impl Execution<'_> {
+    async fn drive_legacy(mut self) -> AppResult<AgentExecutionOutput> {
+        match self.drive().await? {
+            Driven::Completed(output) => Ok(output),
+            Driven::Suspended(_) => {
+                Ok(self.output(String::new(), AgentExecutionDisposition::Suspended))
+            }
+        }
     }
 
-    fn output(
+    pub(super) async fn drive(&mut self) -> AppResult<Driven> {
+        loop {
+            if tokio::time::Instant::now() >= self.deadline {
+                return Err(AppError::Timeout("Rig deadline exceeded".into()));
+            }
+            if let Some(output) = &self.checkpoint.final_output {
+                return Ok(Driven::Completed(output.clone()));
+            }
+            if self.checkpoint.state == RunState::BudgetExceeded {
+                return Err(AppError::Execution(
+                    crate::app_error::ExecutionFailure::Budget,
+                ));
+            }
+            if self.checkpoint.state == RunState::InvalidOutput {
+                return Err(crate::services::response_contract::invalid_output());
+            }
+            if self.checkpoint.state != RunState::Active {
+                return Err(invalid("Rig continuation is not executable"));
+            }
+            self.binding.authorize(&self.checkpoint).await?;
+            if let Some(call) = self.checkpoint.pending_call().cloned() {
+                if self.checkpoint.invocations.iter().any(|inv| {
+                    inv.call.invocation_id == call.invocation_id
+                        && inv.state == InvocationState::Indeterminate
+                }) {
+                    return Err(AppError::Execution(
+                        crate::app_error::ExecutionFailure::IndeterminateEffect,
+                    ));
+                }
+                match self.binding.tool(&self.checkpoint, call).await? {
+                    Progress::Continue(checkpoint) => self.checkpoint = checkpoint,
+                    Progress::Suspend(checkpoint, wait) => {
+                        self.checkpoint = checkpoint;
+                        return Ok(Driven::Suspended(wait));
+                    }
+                }
+                continue;
+            }
+            if let Some(turn) = self.checkpoint.turns.last()
+                && turn.calls.is_empty()
+            {
+                if turn.invalid_response.is_some() {
+                    if self.checkpoint.repair_count()
+                        >= crate::services::response_contract::MAX_REPAIR_CALLS
+                    {
+                        self.checkpoint = self.binding.invalid_output(&self.checkpoint).await?;
+                        return Err(crate::services::response_contract::invalid_output());
+                    }
+                    if let Some(stop) = self.model_turn().await? {
+                        return Ok(stop);
+                    }
+                    continue;
+                }
+                let output = self.final_candidate(&turn.text)?;
+                self.checkpoint = self
+                    .binding
+                    .final_output(&self.checkpoint, output.clone())
+                    .await?;
+                return Ok(Driven::Completed(output));
+            }
+            if let Some(stop) = self.model_turn().await? {
+                return Ok(stop);
+            }
+        }
+    }
+
+    fn final_candidate(&self, text: &str) -> AppResult<AgentExecutionOutput> {
+        let mut output = self.output(
+            sanitize_text(text, Some(self.secret)),
+            AgentExecutionDisposition::Completed,
+        );
+        if let Some(contract) = &self.checkpoint.identity.response_contract {
+            let structured = StructuredResponse::validate(
+                contract,
+                text,
+                Some(self.secret),
+                &JsonResponseValidator,
+            )?
+            .map_err(|_| crate::services::response_contract::invalid_output())?;
+            output = self.output(
+                structured.body().into(),
+                AgentExecutionDisposition::Completed,
+            );
+            output.structured = Some(structured);
+        }
+        Ok(output)
+    }
+
+    /// Some when the owner parked instead of entering the provider, or instead of
+    /// progressing past a settled response.
+    async fn model_turn(&mut self) -> AppResult<Option<Driven>> {
+        let repair = super::final_response::repair_reservation(&self.checkpoint)?;
+        let request = CompletionRequest {
+            model: None,
+            preamble: Some(super::final_response::response_preamble(
+                &self.checkpoint,
+                self.binding.preamble()?,
+                repair.as_ref(),
+            )?),
+            chat_history: super::protocol::history(&self.checkpoint)?,
+            documents: vec![],
+            tools: if repair.is_some() {
+                vec![]
+            } else {
+                self.binding.definitions()
+            },
+            temperature: None,
+            max_tokens: Some(self.checkpoint.policy.request_output_tokens),
+            tool_choice: None,
+            additional_params: None,
+            output_schema: None,
+            record_telemetry_content: false,
+        };
+        request
+            .validate_message_content()
+            .map_err(|_| invalid("Invalid Rig model history"))?;
+        // One UTF-8 byte per token is a conservative fallback, covering schemas and metadata too.
+        let input_tokens = serde_json::to_vec(&request)
+            .map_err(|_| invalid("Invalid Rig request"))?
+            .len() as u64;
+        let fingerprint = request_fingerprint(&self.checkpoint.identity, &request)?;
+        let reservation = self.binding.reservation(ModelReservation {
+            repair,
+            request_id: ModelRequestId(uuid::Uuid::new_v4()),
+            input_tokens,
+            output_tokens: self.checkpoint.policy.request_output_tokens,
+        })?;
+        match self
+            .binding
+            .admit(&self.checkpoint, reservation.clone(), fingerprint)
+            .await?
+        {
+            Admitted::Enter(checkpoint) => self.checkpoint = *checkpoint,
+            Admitted::Suspend(wait) => return Ok(Some(Driven::Suspended(Some(wait)))),
+        }
+        let response = super::providers::complete(&self.model, request).await?;
+        let mut turn =
+            super::protocol::capture(&self.checkpoint.identity.provider, &reservation, response)?;
+        super::final_response::assess_candidate(
+            &self.checkpoint,
+            self.secret,
+            &mut turn,
+            reservation.repair.as_ref(),
+            super::diagnostics::OutputContext {
+                inputs: self.inputs,
+                supported_tools: self.binding.supported_ids(),
+            },
+        )?;
+        match self.binding.settle(&self.checkpoint, turn).await? {
+            Progress::Continue(checkpoint) => {
+                self.checkpoint = checkpoint;
+                Ok(None)
+            }
+            Progress::Suspend(checkpoint, wait) => {
+                self.checkpoint = checkpoint;
+                Ok(Some(Driven::Suspended(wait)))
+            }
+        }
+    }
+
+    pub(super) fn output(
         &self,
         content: String,
         disposition: AgentExecutionDisposition,
@@ -598,7 +741,7 @@ impl Execution<'_> {
         super::diagnostics::output(
             &self.checkpoint,
             self.inputs,
-            self.compiled.tools.supported_ids(),
+            self.binding.supported_ids(),
             content,
             disposition,
         )

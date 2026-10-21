@@ -316,8 +316,9 @@ async fn workflow_message_reconcile_wrong_association_actor_is_refused() {
     );
 }
 
-/// D4 §L port seam: a `MessageDelivery` reconciliation of a model-tool marker's unknown delivery
-/// in an execution parked for reconciliation reopens only the delivery, never the job.
+/// D4 §L port seam: a `MessageDelivery` reconciliation of a saved model-tool call's unknown
+/// delivery reopens only the delivery. The agent job stays parked on its own effect wait
+/// until a settled receipt continues it (D4 delivery continuation).
 #[tokio::test]
 async fn workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job() {
     let setup = Box::pin(send(&[To::Channel])).await;
@@ -329,16 +330,7 @@ async fn workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the
     ))
     .await
     .unwrap();
-    assert!(matches!(observed, MessageObservation::Pending));
-    assert!(
-        p.release_io(
-            setup.claim.fence,
-            lease(),
-            LeaseReleaseCause::LocalInterruption
-        )
-        .await
-        .unwrap()
-    );
+    assert!(matches!(observed, MessageObservation::DeliveryParked(_)));
     let parked_state = |state: State| {
         (
             state.run,
@@ -356,7 +348,7 @@ async fn workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the
             before.2.as_str(),
             before.4.as_deref()
         ),
-        ("waiting", Some("reconciliation"), "failed", None)
+        ("waiting", Some("effect"), "completed", Some("waiting"))
     );
     let unknown = delivery(setup.pool(), run, 0).await;
     send_unknown(&setup, unknown).await;
@@ -411,6 +403,17 @@ async fn workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the
     assert_eq!(p.consume_message_receipts(scope, lease()).await.unwrap(), 1);
     assert_eq!(action_state(setup.pool(), run).await, "accepted");
     assert_eq!(parked_state(state(setup.pool(), scope).await), before);
-    assert_eq!(retry_safe(setup.pool(), scope).await, Some(true));
-    assert!(candidates(&setup).await.is_empty());
+    // The settled receipt now continues the parked agent job, exactly once.
+    assert!(matches!(
+        p.resume_wait(scope).await.unwrap(),
+        crate::application::workflow::waits::WaitProgress::Continued
+    ));
+    let job: (i32, i16, String) = sqlx::query_as(
+        "SELECT retry_count, continuation_count, status FROM background_tasks WHERE id=$1",
+    )
+    .bind(scope.job.0)
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    assert_eq!(job, (job_before.0, 1, "pending".to_string()));
 }

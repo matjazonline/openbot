@@ -33,10 +33,6 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{company}/mcp-connections/{id}/refresh",
             post(refresh),
         )
-        .route(
-            "/api/companies/{company}/agents/{agent}/mcp-selection",
-            get(selection).put(select),
-        )
         .layer(DefaultBodyLimit::max(128 * 1024))
 }
 #[derive(Clone, Deserialize)]
@@ -98,12 +94,6 @@ pub struct Credential {
     pub expected_revision: i64,
     pub token: Option<SecretString>,
 }
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Selection {
-    pub expected_revision: i64,
-    pub mcp_connection_ids: Option<Vec<Uuid>>,
-}
 
 pub fn revision(current: &CompanyMcpConnection, expected: i64) -> AppResult<()> {
     if current.revision != expected {
@@ -117,7 +107,7 @@ pub fn projection(c: &CompanyMcpConnection) -> serde_json::Value {
     serde_json::json!({"id":c.id,"slug":c.slug,"endpoint_url":c.endpoint,"transport":"streamable_http","enabled":c.enabled,
         "auth":{"type":c.auth,"secret_set":c.secret_set},"revision":c.revision,
         "tool_grants":c.tool_grants.iter().map(|name| Grant{name:name.clone()}).collect::<Vec<_>>(),
-        "discovered_tools":c.discovered_tools.iter().map(|tool| serde_json::json!({"name":tool.name,"description":tool.description,"input_schema":tool.input_schema,"schema_fingerprint":crate::services::mcp_runtime::fingerprint(&tool.input_schema)})).collect::<Vec<_>>()})
+        "discovered_tools":c.discovered_tools.iter().map(|tool| serde_json::json!({"name":tool.name,"description":tool.description,"input_schema":tool.input_schema,"schema_fingerprint":schema_fingerprint(&tool.input_schema)})).collect::<Vec<_>>()})
 }
 async fn list(
     State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
@@ -135,9 +125,7 @@ async fn detail(
     Path((company, id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<serde_json::Value>> {
     let current = s.get(user.id, company, id).await?;
-    Ok(Json(
-        serde_json::json!({"connection":projection(&current),"selected_by":s.selecting_agents(user.id,company,id).await?}),
-    ))
+    Ok(Json(serde_json::json!({"connection":projection(&current)})))
 }
 async fn create(
     State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
@@ -197,56 +185,24 @@ async fn refresh(
     revision(&current, body.expected_revision)?;
     Ok(Json(projection(&s.refresh(user.id, &current).await?)))
 }
-async fn selection(
-    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
-    user: AuthenticatedUser,
-    Path((company, agent)): Path<(Uuid, Uuid)>,
-) -> AppResult<Json<AgentMcpSelection>> {
-    Ok(Json(s.selection(user.id, company, agent).await?))
-}
-async fn select(
-    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
-    user: AuthenticatedUser,
-    Path((company, agent)): Path<(Uuid, Uuid)>,
-    Json(body): Json<Selection>,
-) -> AppResult<Json<AgentMcpSelection>> {
-    let mut current = s.selection(user.id, company, agent).await?;
-    current.revision = body.expected_revision;
-    Ok(Json(
-        s.select(user.id, current, body.mcp_connection_ids).await?,
-    ))
-}
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn public_writes_cannot_supply_discovery_or_inline_selection_authority() {
+    fn public_writes_cannot_supply_discovery_authority() {
         let mut definition = serde_json::json!({"slug":"crm","endpoint_url":"https://example.com/mcp","transport":"streamable_http","enabled":true,"auth":{"type":"none"}});
         assert!(serde_json::from_value::<Definition>(definition.clone()).is_ok());
         definition["discovered_tools"] = serde_json::json!([]);
         assert!(serde_json::from_value::<Definition>(definition).is_err());
-        for field in ["endpoint_url", "token", "tool_grants", "requires_approval"] {
-            let mut selection = serde_json::json!({"expected_revision":1,"mcp_connection_ids":[]});
-            selection[field] = serde_json::json!("forbidden");
-            assert!(serde_json::from_value::<Selection>(selection).is_err());
-        }
-        assert!(
-            serde_json::from_value::<Selection>(serde_json::json!({"expected_revision":1}))
-                .unwrap()
-                .mcp_connection_ids
-                .is_none()
-        );
-        assert_eq!(
-            serde_json::from_value::<Selection>(
-                serde_json::json!({"expected_revision":1,"mcp_connection_ids":[]})
-            )
-            .unwrap()
-            .mcp_connection_ids,
-            Some(vec![])
-        );
     }
 }
 
 #[cfg(test)]
 #[path = "mcp_api_tests.rs"]
 mod api_tests;
+
+/// Display identity of a discovered tool schema.
+fn schema_fingerprint(schema: &serde_json::Value) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(schema.to_string().as_bytes()))
+}

@@ -303,9 +303,9 @@ async fn withdraw_removed_agents_work_on(
         ..AssignmentRemoval::default()
     };
 
-    // Every agent a task update's `lock_task_agent_harnesses` trigger may share-lock, taken first
-    // and in the trigger's order, so an agent lifecycle change holding one of them cannot deadlock
-    // this edit halfway through its task locks.
+    // Every agent this edit touches, share-locked first and in id order, so an agent lifecycle
+    // change (deletion cascades into these tasks' owners) cannot interleave with this edit's
+    // task locks.
     let mut agents: Vec<Uuid> = current.iter().chain(requested).copied().collect();
     agents.sort_unstable();
     agents.dedup();

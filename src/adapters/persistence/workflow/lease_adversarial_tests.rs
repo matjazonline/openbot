@@ -131,7 +131,7 @@ async fn workflow_io_pure_boundary_claim_freeze_supervised_result_integration() 
     let mut source: Value =
         serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
     let io: Value =
-        serde_json::from_str(&registry::example("context.load").unwrap().source).unwrap();
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["steps"]["start"]["routes"] = json!({"success":"load"});
     source["steps"]["load"] = io["steps"]["start"].clone();
     source["output_schema"] = json!(true);

@@ -4,11 +4,10 @@
 //! to B creates a *new* B thread and a normal B task; B's answer creates **no** second A task but
 //! resumes A's original one; and the answer lands in A's thread as context.
 //!
-//! The LLM is the only thing left out. A real run reaches `create_outreach_and_pause` because a
-//! model chose to call the outreach tool; here the test calls it directly with the arguments the
-//! tool would have built, so everything downstream — the delivery queue, the real email sender and
-//! the trusted internal transport it reaches first, reply correlation, and the resume — is the
-//! production code path.
+//! The LLM is the only thing left out. The test calls `create_outreach_and_pause` directly with
+//! the arguments an outreach request carries, so everything downstream — the delivery queue, the
+//! real email sender and the trusted internal transport it reaches first, reply correlation, and
+//! the resume — is the production code path.
 
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
@@ -20,20 +19,18 @@ use crate::application::transport::{
     EmailDeliveryContext, EmailRelayTrace, NewDelivery, ProviderSendOutcome, TransportSender,
     ports::TransportRenderers,
 };
-use crate::entities::harness::OutreachTargetScope;
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskStatus;
 use crate::entities::transport::{DeliveryId, DeliveryPurpose, TransportKind};
 use crate::infra::config::ResendApiConfig;
 use crate::services::test_support::{
-    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url, scripted_llm,
+    LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url,
 };
 use crate::task_queue::{CollaborationReadScope, CreateOutreachRequest, OutreachTargetRequest};
 use crate::transport::EmailThreading;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
-use crate::use_cases::thread::test_support::{harness_registry, text_classifier};
 use crate::use_cases::user::UserPersistence;
 use chrono::Utc;
 
@@ -41,7 +38,6 @@ const APP_DOMAIN: &str = "mailagents.test";
 
 fn loop_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
@@ -67,7 +63,6 @@ fn loop_test_config() -> Arc<AppConfig> {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),
@@ -145,20 +140,8 @@ impl Fixture {
     }
 }
 
+/// The real Rig harness, not a stub.
 async fn fixture(pool: sqlx::PgPool, agent_llm: Option<&str>) -> Fixture {
-    fixture_for_harness(
-        pool,
-        agent_llm,
-        crate::entities::harness::HarnessKind::AiAgents,
-    )
-    .await
-}
-
-async fn fixture_for_harness(
-    pool: sqlx::PgPool,
-    agent_llm: Option<&str>,
-    harness: crate::entities::harness::HarnessKind,
-) -> Fixture {
     let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
     let suffix = Uuid::new_v4().simple().to_string();
     let owner_email = format!("loop_owner_{suffix}@example.com");
@@ -212,31 +195,14 @@ async fn fixture_for_harness(
             "Answers supplier capacity and delivery-date questions.",
         ),
     ] {
-        let mut write = AgentWrite {
+        let write = AgentWrite {
             name: name.to_string(),
             slug: format!("{slug}-agent"),
             description: Some(description.to_string()),
             provider: agent_llm.map(|_| SCRIPTED_PROVIDER.to_string()),
             model: agent_llm.map(|_| SCRIPTED_MODEL.to_string()),
-            harness_kind: Some(harness),
             ..Default::default()
         };
-        if agent_llm.is_some() {
-            write.granted_tool_ids = vec![
-                crate::entities::tool_catalogue::AGENT_DIRECTORY_TOOL_ID.into(),
-                crate::entities::tool_catalogue::OUTREACH_TOOL_ID.into(),
-            ];
-            if harness == crate::entities::harness::HarnessKind::Rig {
-                write.granted_tool_ids.extend([
-                    "request_approval".into(),
-                    "echo".into(),
-                    "todo".into(),
-                ]);
-            }
-            write.native_tool_policy.outreach.max_targets = 1;
-            write.native_tool_policy.outreach.allowed_target_scope =
-                OutreachTargetScope::SameCompanyChannels;
-        }
         let agent = AgentPersistence::create(persistence.as_ref(), company.id, write)
             .await
             .expect("the agent is created");
@@ -274,11 +240,10 @@ async fn fixture_for_harness(
         deliveries.clone(),
         config.clone(),
     ));
-    let harnesses = if harness == crate::entities::harness::HarnessKind::Rig {
-        rig_test_registry(persistence.clone())
-    } else {
-        harness_registry()
-    };
+    let harnesses = Arc::new(
+        crate::adapters::harness::deployment_registry(persistence.clone())
+            .expect("the Rig harness registers"),
+    );
     let threads = Arc::new(
         ThreadUseCases::new(
             ThreadStores {
@@ -305,7 +270,7 @@ async fn fixture_for_harness(
         .with_agent_capability_reader(persistence.clone())
         .with_harness_run_store(persistence.clone())
         .with_approval_use_cases(approvals)
-        .with_harnesses(harnesses, text_classifier()),
+        .with_harnesses(harnesses),
     );
     // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
     // to be recognised as internal and relayed, or the send fails visibly.
@@ -770,108 +735,6 @@ impl Fixture {
 /// A typed grant can expose internal outreach, but agent-controlled policy cannot bypass the
 /// server-owned approval gate. The separately tested approved loop above covers execution after a
 /// human decision; this regression pins the security boundary before that decision.
-#[tokio::test]
-async fn an_agent_cannot_disable_internal_outreach_approval() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let mut llm = scripted_llm(vec![LlmTurn::tool_call(
-        crate::services::outreach_tool::OUTREACH_TOOL_ID,
-        serde_json::json!({
-            "target_channels": ["supplier"],
-            "subject": "Acquire supplier capacity data",
-            "body": "Return the earliest delivery date.",
-        }),
-    )])
-    .await;
-    let fx = fixture(pool, Some(&llm.base_url)).await;
-    let address_a = fx.address(&fx.channel_a);
-
-    // M0: the human writes to A.
-    let m0 = fx
-        .threads
-        .ingest_test_email(inbound(
-            &fx.owner_email,
-            &address_a,
-            "<m0-agent@example.com>",
-            "Delivery date?",
-        ))
-        .await
-        .expect("the inbound message is ingested");
-    assert!(m0.accepted, "M0 rejected: {:?}", m0.reason());
-    let task_a = m0
-        .task_ids
-        .first()
-        .copied()
-        .expect("M0 enqueues a dispatch task for A");
-
-    // A's agent runs and chooses to delegate. Everything from the tool call onward is production.
-    let lease = fx.claim(task_a).await;
-    let outcome = fx
-        .threads
-        .execute_claimed_agent_task_and_dispatch(
-            &m0,
-            ReplyDelivery::Send,
-            lease,
-            m0.correlation_id().expect("an accepted ingest has a chain"),
-        )
-        .await
-        .expect("the scripted agent delegates");
-    let requests = llm.observed();
-    assert!(
-        matches!(outcome, DispatchOutcome::Suspended),
-        "delegating must park A's task rather than answer, got {outcome:?}"
-    );
-    assert_eq!(requests.len(), 1, "approval suspends before tool execution");
-    assert_eq!(fx.status_of(task_a).await, TaskStatus::PendingApproval);
-
-    let outreaches: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM task_outreaches WHERE task_id = $1")
-            .bind(task_a)
-            .fetch_one(&fx.pool)
-            .await
-            .expect("the outreach rows are readable");
-    assert_eq!(
-        outreaches, 0,
-        "unapproved outreach must have no durable effect"
-    );
-    let approvals: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM human_approvals WHERE task_id = $1")
-            .bind(task_a)
-            .fetch_one(&fx.pool)
-            .await
-            .expect("the approval row is readable");
-    assert_eq!(approvals, 1);
-
-    CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
-        .await
-        .expect("the fixture company is removed");
-    assert_eq!(llm.finish().await, Ok(1));
-}
-
-fn rig_test_registry(
-    persistence: Arc<PostgresPersistence>,
-) -> Arc<crate::services::harness::HarnessRegistry> {
-    let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
-        crate::adapters::mcp::policy::EndpointPolicy::new(std::iter::empty::<String>()).unwrap(),
-    ));
-    let runtime = Arc::new(crate::services::mcp_runtime::McpRuntime::new(
-        persistence.clone(),
-        persistence.clone(),
-        client,
-    ));
-    Arc::new(
-        crate::services::harness::HarnessRegistry::new()
-            .register(
-                crate::entities::harness::HarnessKind::Rig,
-                Arc::new(
-                    crate::adapters::harness::rig::RigHarness::new(persistence, runtime).unwrap(),
-                ),
-            )
-            .unwrap(),
-    )
-}
-
 #[cfg(test)]
 #[path = "rig_execution_tests.rs"]
 mod rig_execution_tests;
@@ -882,5 +745,5 @@ mod structured_response_tests;
 #[path = "simulation_tests.rs"]
 mod simulation_tests;
 
-#[path = "model_usage_assertions.rs"]
+#[path = "model_usage_tests.rs"]
 mod model_usage_assertions;

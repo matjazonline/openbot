@@ -1,5 +1,58 @@
 # Workflow foundation resume
 
+## PHASE06 ACCEPTED — 2026-10-21
+
+Phase06 complete: 06A/06B/06C accepted; final gate PASS; combined review 06-R024 corrections
+(spam guardrail removed, prompt generator unmetered, no memory in this release — user decisions
+2026-10-21) accepted by 06-R025 PASS, digest 0d8bba5d…9b00. Next phase (07) not started; await
+user instruction. No commits/deployments. Phase-08 obligations: see "Phase-08 obligations (from
+06C)" below, plus: decide delete-or-dormant for memory-provider infrastructure; ToolId comment
+wording (value_objects.rs) vs workflow tool diagnostics. Fixtures: always 127.0.0.1 (localhost
+self-connect flakes on port 55450).
+
+## RESUMED — 2026-10-20 (user: "continue"): final phase06 gate rerunning
+
+Final gate rerun started (docs/logs/06/06-final-gate.sh); then freeze, B combined integration
+review, report. The stop note below is superseded.
+
+## USER-REQUESTED STOP — 2026-10-20: after 06C acceptance
+
+User explicitly requested "write handoff and stop". The stop is intentional; resume only on new
+user instruction (implement-opus-reviewed-2.1; root authors; Reviewer B `a9387720a47e21d5f`).
+06B2b, 06B3 and 06C are accepted (06C: 06-R023 PASS, digest dbeb4953…b4d5). The final phase06
+gate (docs/logs/06/06-final-gate.sh) was STOPPED on request after fmt/diff/check/clippy/
+migrate/sqlx-check passed. The all-target suite, stack budget and lease budget have NOT run, so
+rerun the whole script. Then freeze, run the combined phase06 integration review with B, and
+report. **Read next:** docs/logs/06/HANDOFF-20261020-06C.md. No checks or agents are running.
+All disposable workflow06* DBs were dropped, and the retained cluster and workflow0410_* DBs are
+untouched. No commits or deployments; preserve all WIP, including assets/app.css.
+
+## RESUMED — 2026-10-19/20 under implement-opus-reviewed-2.1 (current)
+
+Root authors (user confirmed xhigh; no developer sub-agent). HEAD 76fe99c + uncommitted
+06B2b WIP: shared Rig driver bindings, native agent.run preparation/handler/ActionService
+tools (R1–R4), message delivery-wait continuations (R5), and accepted gate 06-D5 rev2
+(agent-owned workflow capabilities; 06-R015 PASS) implemented with focused proofs (agent
+e2e incl. HTTP tool, approval cycle, message delivery continuation, revocation races).
+06B2b ROOT ACCEPTED 2026-10-20 (06-R017 PASS, digest d9ea9e59…2ef3). 06B3 ROOT ACCEPTED
+2026-10-20 (gate 06-D6 rev2; 06-R021 PASS, digest afbb5ffb…2c3717): context.history,
+ai.classify/decision.agent on the shared driver; memory deferred by user decision. 06C
+(user decisions 2026-10-20: remove ai-agents, legacy catalogue, skill tool steps,
+granted_tool_ids, agent MCP selections; worker wiring + create_agent_channel/
+list_company_agents in phase 08) IMPLEMENTED; static/migration/SQLx gates pass
+(logs/06/06C-gates.sh). 06C ROOT ACCEPTED 2026-10-20 (06-R022 docs-only F028 fixed; 06-R023
+PASS, digest dbeb4953…b4d5; B full lib suite 2701/0). Next: final phase06 gate
+(logs/06/06-final-gate.sh) and combined integration review.
+Phase-08 obligations (from 06C): create_agent_channel + list_company_agents as workflow tools and
+Agent Builder creation (revise its prompt: workflow tools, explicit provider/model); production
+workflow worker wiring + refusal of unhandled step kinds; replace scheduled legacy runs with
+workflows (no test drives a scheduled run through real Rig today); remove single-value
+HarnessKind/HarnessRegistry, legacy AgentRunner, outreach/quorum/ApprovalUseCases machinery and
+mcp_connections_by_ids (test-support only) with the legacy binding. Reviewer B handle
+`a9387720a47e21d5f`. Read latest docs/TASK.md sections ("06C implementation complete").
+No commits/deployments. Legacy Binding is temporary (user: legacy behaviour not needed
+after workflows) and is removed with its callers in 06C/08.
+
 ## USER-REQUESTED STOP — 2026-10-19: native checkpoint updates
 
 User explicitly requested “write handoff and stop”. Stop is intentional; resume only on

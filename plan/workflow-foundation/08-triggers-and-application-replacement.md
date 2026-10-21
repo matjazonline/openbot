@@ -19,6 +19,11 @@ Keep channel identity, provider bindings, access policy, participants, and messa
 Replace channel-owned agent lists, automatic agent ownership, memory toggles, and embedded response
 orchestration with an explicit workflow binding and validated parameters/resources.
 
+*Memory is out of this release by user decision 2026-10-21 (06-R024, 06-F032). Removing the memory
+toggles with the legacy dispatch removes the runner's automatic recall and persistence, and no
+workflow memory step replaces them; agent memory is absent from this release. This phase decides
+whether the memory-provider infrastructure is deleted or left dormant.*
+
 Retain transport authentication, spam/abuse controls, hop limits, sender authorization, canonical
 message deduplication, and thread resolution before workflow admission. Company workflows cannot
 turn off these boundaries. Trigger eligibility such as direct-address versus CC selection belongs

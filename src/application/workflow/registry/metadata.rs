@@ -36,13 +36,6 @@ pub enum CapabilityRequirement {
     TimerWait,
     ChildInvoke,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ProfileSelection {
-    AgentDefaults,
-    ExplicitSelection,
-    NotApplicable,
-}
 #[derive(Debug, Clone, Serialize)]
 pub struct ExecutionConstraints {
     pub effect: EffectClass,
@@ -54,15 +47,14 @@ pub struct ExecutionConstraints {
     pub inherited_run_budgets: bool,
     pub frozen_inputs_required: bool,
     pub runtime_deadline_required: bool,
-    pub profile_selection: ProfileSelection,
 }
 
-pub(super) fn constraints(name: &str, profile_selection: ProfileSelection) -> ExecutionConstraints {
+pub(super) fn constraints(name: &str) -> ExecutionConstraints {
     use CapabilityRequirement::*;
     use EffectClass::*;
     let (effect, capabilities) = match name {
         "data.map" | "decision.rule" => (Pure, vec![]),
-        "context.load" => (BoundedRead, vec![ContextRead]),
+        "context.history" => (BoundedRead, vec![ContextRead]),
         "memory.load" => (BoundedRead, vec![MemoryRead]),
         "memory.save" => (DurableWrite, vec![MemoryWrite]),
         "ai.classify" | "decision.agent" => (ModelInvocation, vec![ModelInvoke]),
@@ -106,6 +98,5 @@ pub(super) fn constraints(name: &str, profile_selection: ProfileSelection) -> Ex
         inherited_run_budgets: true,
         frozen_inputs_required: true,
         runtime_deadline_required: effect != Pure,
-        profile_selection,
     }
 }

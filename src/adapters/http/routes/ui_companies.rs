@@ -28,7 +28,7 @@ use crate::{
     adapters::http::{
         app_state::AppState,
         auth::{AuthError, AuthenticatedUser},
-        pages::{self, CompanyCounts, CompanyTab, SpamGuardrail},
+        pages::{self, CompanyCounts, CompanyTab},
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -97,15 +97,10 @@ pub struct WorkspaceQuery {
 }
 
 /// A submitted company, before it is a [`Company`].
-///
-/// The guardrail arrives as text rather than the `Option<bool>` the classic form takes: a checkbox
-/// can only say "on" or "absent", and absent already means "leave it to the server", so the third
-/// state needs a `<select>` — see [`SpamGuardrail`].
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CompanyForm {
     pub name: String,
     pub slug: Option<String>,
-    pub enable_llm_spam_guardrail: Option<String>,
     pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
     /// The company's reply-handling default. Absent preserves the stored value.
     pub external_reply_handling: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
@@ -831,12 +826,11 @@ async fn delete_company(workspace: Workspace, Path(company_id): Path<Uuid>) -> A
 
 /// A submitted company form, kept whole so a rejected save can be re-rendered with what was typed.
 ///
-/// It also owns the two derivations every write needs — the slug the name falls back to, and the
-/// parsed guardrail choice — so neither is re-derived at a call site.
+/// It also owns the derivation every write needs — the slug the name falls back to — so it is not
+/// re-derived at a call site.
 struct SubmittedCompany {
     form: CompanyForm,
     slug: String,
-    spam_guardrail: SpamGuardrail,
 }
 
 impl SubmittedCompany {
@@ -848,20 +842,14 @@ impl SubmittedCompany {
             .filter(|slug| !slug.is_empty())
             .map(String::from)
             .unwrap_or_else(|| slugify(&form.name));
-        let spam_guardrail = SpamGuardrail::from_form(form.enable_llm_spam_guardrail.as_deref());
 
-        Self {
-            form,
-            slug,
-            spam_guardrail,
-        }
+        Self { form, slug }
     }
 
     fn draft(&self) -> pages::CompanyDraft<'_> {
         pages::CompanyDraft {
             name: &self.form.name,
             slug: &self.slug,
-            spam_guardrail: self.spam_guardrail,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
             default_add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),
@@ -945,7 +933,6 @@ impl SubmittedCompany {
         Ok(CompanyWrite {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
-            enable_llm_spam_guardrail: self.spam_guardrail.stored(),
             external_response_review: self.form.external_response_review,
             external_reply_handling: self.form.external_reply_handling,
             memory_provider: None,
@@ -1096,7 +1083,6 @@ mod tests {
         CompanyForm {
             name: "Acme".into(),
             slug: Some("acme".into()),
-            enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             default_model_provider,

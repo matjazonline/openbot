@@ -139,7 +139,7 @@ async fn workflow_maintenance_live_expired_and_spent_attempts_debit_once() {
                     )
                     .unwrap(),
                     fence: claim.fence,
-                    output: json!({"items":[],"token_count":0})
+                    output: json!({"items":[],"token_count":0,"omitted":0})
                 })
                 .await
                 .unwrap()
@@ -195,7 +195,7 @@ async fn workflow_maintenance_competes_with_expiry_completion_and_heartbeat() {
                 )
                 .unwrap(),
                 fence: claim.fence,
-                output: json!({"items":[],"token_count":0}),
+                output: json!({"items":[],"token_count":0,"omitted":0}),
             })
             .await
             .unwrap()

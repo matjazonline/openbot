@@ -225,7 +225,7 @@ async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_an
                     )
                     .unwrap(),
                     fence: claim.fence,
-                    output: json!({"items":[],"token_count":0}),
+                    output: json!({"items":[],"token_count":0,"omitted":0}),
                 })
                 .await
                 .unwrap()
@@ -325,7 +325,7 @@ async fn workflow_control_cancel_completion_competitors_preserve_winning_result(
                     )
                     .unwrap(),
                     fence: claim.fence,
-                    output: json!({"items":[],"token_count":0}),
+                    output: json!({"items":[],"token_count":0,"omitted":0}),
                 })
                 .await
                 .unwrap()

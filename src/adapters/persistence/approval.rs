@@ -644,7 +644,6 @@ mod tests {
                 name: format!("{label} agent"),
                 slug: format!("{label}-agent-{suffix}"),
                 created_by: Some(CreationProvenance::system()),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )

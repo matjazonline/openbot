@@ -1118,7 +1118,6 @@ async fn renaming_an_agent_moves_its_owned_channel_binding_too() {
         AgentWrite {
             name: "Scout".into(),
             slug: format!("scout-{suffix}"),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
         ChannelWrite {
@@ -1143,7 +1142,6 @@ async fn renaming_an_agent_moves_its_owned_channel_binding_too() {
         AgentWrite {
             name: "Ranger".into(),
             slug: renamed.clone(),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )
@@ -1155,7 +1153,6 @@ async fn renaming_an_agent_moves_its_owned_channel_binding_too() {
         AgentWrite {
             name: "Ranger".into(),
             slug: renamed.clone(),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )

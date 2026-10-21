@@ -39,14 +39,23 @@ impl MessageRuntime {
         app_domain_name: String,
         lease: LeasePolicy,
     ) -> Self {
+        Self::with_approvals(persistence, composer, app_domain_name, lease, None)
+    }
+    /// `notices` lets a protected publication park for review; without them it fails closed.
+    pub fn with_approvals(
+        persistence: PostgresPersistence,
+        composer: DeliveryComposer,
+        app_domain_name: String,
+        lease: LeasePolicy,
+        notices: Option<crate::application::workflow::decisions::DecisionNotices>,
+    ) -> Self {
+        let mut dispatch =
+            PostgresActionDispatch::new(persistence.clone(), MessageActionAuthority, NoLocal);
+        if let Some(notices) = notices {
+            dispatch = dispatch.with_decision_notices(notices);
+        }
         Self {
-            inner: MessageActions::new(
-                persistence.clone(),
-                PostgresActionDispatch::new(persistence, MessageActionAuthority, NoLocal),
-                composer,
-                app_domain_name,
-                lease,
-            ),
+            inner: MessageActions::new(persistence, dispatch, composer, app_domain_name, lease),
         }
     }
     /// Direct tool entry; Pending never claims provider acceptance (phase 06 resumes saved calls).

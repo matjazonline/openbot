@@ -36,7 +36,7 @@ pub(super) fn context<'a>(
 }
 #[test]
 fn workflow_registry_exact_catalogue_and_help_examples_compile() {
-    let expected = "agent.run ai.classify context.load data.map decision.agent decision.human decision.rule flow.repeat http.request mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
+    let expected = "agent.run ai.classify context.history data.map decision.agent decision.human decision.rule flow.repeat http.request mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
     assert_eq!(
         TYPES.iter().copied().collect::<BTreeSet<_>>(),
         expected.split_whitespace().collect()
@@ -55,7 +55,18 @@ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
         )
         .unwrap();
         assert_eq!(help.type_name.as_str(), name);
-        assert!(help.notes.contains("Execution unavailable"));
+        // 06-D6: notes of the kinds this phase executes describe behaviour, not unavailability.
+        let runnable = [
+            "context.history",
+            "ai.classify",
+            "agent.run",
+            "decision.agent",
+        ];
+        assert_eq!(
+            help.notes.contains("Execution unavailable"),
+            !runnable.contains(&name),
+            "{name}"
+        );
         assert!(help.input_schema.is_object());
         assert!(help.constraints["recovery"].is_string());
         assert!(
@@ -147,4 +158,25 @@ fn workflow_registry_agent_action_approval_uses_shared_static_policy() {
         compile_example(&sample).err().unwrap().code,
         "registry.static_reviewers"
     );
+}
+
+/// 06-D6 A: `context.load` is gone (no alias) and `context.history` takes only `max_tokens`.
+#[test]
+fn workflow_registry_context_history_replaces_context_load() {
+    let mut renamed = example("context.history").unwrap();
+    changed(&mut renamed, |source| {
+        source["steps"]["start"]["type"] = json!("context.load");
+    });
+    assert!(compile_example(&renamed).is_err());
+    let mut sources = example("context.history").unwrap();
+    changed(&mut sources, |source| {
+        source["steps"]["start"]["with"]["sources"] = json!({"literal":["conversation"]});
+    });
+    assert!(compile_example(&sources).is_err());
+    let mut limit = example("context.history").unwrap();
+    changed(&mut limit, |source| {
+        source["steps"]["start"]["with"]["max_tokens"] = json!({"literal":131_073});
+    });
+    assert!(compile_example(&limit).is_err());
+    assert!(compile_example(&example("context.history").unwrap()).is_ok());
 }

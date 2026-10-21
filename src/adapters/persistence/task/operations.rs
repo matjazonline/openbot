@@ -678,7 +678,7 @@ impl TaskPersistence for PostgresPersistence {
         let progress =
             outreach_progress(&outreach, status, target_count, response_count, suspended);
         if !suspended && let Some(reference) = request.invocation {
-            let output = crate::services::outreach_tool::outreach_output(&progress)?;
+            let output = outreach_output(&progress);
             super::record_harness_result_on(
                 &mut tx,
                 request.company_id,
@@ -2539,4 +2539,21 @@ impl TaskPersistence for PostgresPersistence {
             .map(TryInto::try_into)
             .collect()
     }
+}
+
+/// The harness result an outreach-waiting invocation resumes with. The outreach tool itself was
+/// removed in 06C; existing outreach records still settle their waiting invocation this way until
+/// the legacy outreach loop is replaced (phases 07/08).
+fn outreach_output(progress: &crate::entities::outreach::OutreachProgress) -> serde_json::Value {
+    serde_json::json!({
+        "accepted": true,
+        "status": progress.status.as_str(),
+        "outreach_id": progress.id,
+        "target_count": progress.target_count,
+        "response_count": progress.response_count,
+        "required_threshold_percent": progress.required_threshold_percent,
+        "required_response_count": progress.required_response_count,
+        "queued_message_count": if progress.suspended { progress.target_count } else { 0 },
+        "expires_at": progress.expires_at.to_rfc3339(),
+    })
 }

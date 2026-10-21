@@ -27,7 +27,7 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
             )
             .unwrap(),
             fence: claim.fence,
-            output: json!({"items":[],"token_count":0}),
+            output: json!({"items":[],"token_count":0,"omitted":0}),
         })
         .await
         .unwrap();

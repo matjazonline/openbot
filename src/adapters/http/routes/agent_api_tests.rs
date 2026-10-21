@@ -27,7 +27,7 @@ struct Fixture {
     company: Uuid,
 }
 impl Fixture {
-    async fn new(default: HarnessKind) -> Option<Self> {
+    async fn new() -> Option<Self> {
         let persistence = Arc::new(PostgresPersistence::new(test_pool().await?));
         let suffix = Uuid::new_v4().simple().to_string();
         let user = persistence
@@ -59,7 +59,6 @@ impl Fixture {
                 persistence.clone(),
                 SpamScanning::Unavailable,
             )
-            .with_default_agent_harness(default)
             .with_response_validator(Arc::new(JsonResponseValidator)),
         );
         Some(Self {
@@ -109,72 +108,53 @@ impl Fixture {
 }
 
 #[tokio::test]
-async fn api_defaults_explicit_harness_contracts_and_unrelated_edits_round_trip() {
-    for default in HarnessKind::ALL {
-        let Some(f) = Fixture::new(default).await else {
-            return;
-        };
-        let saved = f
-            .create(json!({"name":"Default", "slug":"default-agent"}))
-            .await;
-        assert_eq!(saved["agent"]["harness_kind"], default.as_str());
-        let saved = f
-            .create(
-                json!({"name":"Structured", "slug":"structured", "harness_kind":"rig",
-            "config_json":{"version":1,"max_turns":3}, "granted_tool_ids":["calculator"],
-            "response_contract":{"version":1,"format":"json_schema","schema":{"type":"object"}}}),
-            )
-            .await;
-        let id = serde_json::from_value(saved["agent"]["id"].clone()).unwrap();
-        let edited = f.update(id, json!({})).await.unwrap();
-        for field in [
-            "harness_kind",
-            "config_json",
-            "response_contract",
-            "granted_tool_ids",
-        ] {
-            assert_eq!(edited["agent"][field], saved["agent"][field], "{field}");
-        }
-        let defaults = f
-            .update(id, json!({"config_json":{"version":1}}))
-            .await
-            .unwrap();
-        assert!(defaults["agent"]["config_json"].is_null());
-        assert!(
-            f.update(id, json!({"harness_kind":"ai_agents"}))
-                .await
-                .is_err()
-        );
-        assert!(
-            f.update(
-                id,
-                json!({"harness_kind":"ai_agents","config_json":{"version":1}})
-            )
-            .await
-            .is_err()
-        );
-        assert!(f.update(id,json!({"response_contract":{"version":1,"format":"json_schema","schema":{"$ref":"https://example.test/schema"}}})).await.is_err());
-        assert_eq!(
-            AgentPersistence::get_by_id(f.persistence.as_ref(), id)
-                .await
-                .unwrap()
-                .unwrap()
-                .response_contract
-                .unwrap()
-                .schema(),
-            &json!({"type":"object"})
-        );
-        let cleared = f.update(id,json!({"harness_kind":"ai_agents","config_json":{"version":1},"response_contract":null})).await.unwrap();
-        assert_eq!(cleared["agent"]["harness_kind"], "ai_agents");
-        assert!(cleared["agent"]["response_contract"].is_null());
-        assert_eq!(cleared["agent"]["granted_tool_ids"], json!(["calculator"]));
-        f.cleanup().await;
+async fn api_config_contracts_and_unrelated_edits_round_trip() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let saved = f
+        .create(json!({"name":"Default", "slug":"default-agent"}))
+        .await;
+    for retired in ["harness_kind", "granted_tool_ids", "native_tool_policy"] {
+        assert!(saved["agent"].get(retired).is_none(), "{retired}");
     }
+    let saved = f
+        .create(json!({"name":"Structured", "slug":"structured",
+            "config_json":{"version":1,"max_turns":3},
+            "response_contract":{"version":1,"format":"json_schema","schema":{"type":"object"}}}))
+        .await;
+    let id = serde_json::from_value(saved["agent"]["id"].clone()).unwrap();
+    let edited = f.update(id, json!({})).await.unwrap();
+    for field in ["config_json", "response_contract"] {
+        assert_eq!(edited["agent"][field], saved["agent"][field], "{field}");
+    }
+    let defaults = f
+        .update(id, json!({"config_json":{"version":1}}))
+        .await
+        .unwrap();
+    assert!(defaults["agent"]["config_json"].is_null());
+    assert!(f.update(id,json!({"response_contract":{"version":1,"format":"json_schema","schema":{"$ref":"https://example.test/schema"}}})).await.is_err());
+    assert_eq!(
+        AgentPersistence::get_by_id(f.persistence.as_ref(), id)
+            .await
+            .unwrap()
+            .unwrap()
+            .response_contract
+            .unwrap()
+            .schema(),
+        &json!({"type":"object"})
+    );
+    let cleared = f
+        .update(id, json!({"response_contract":null}))
+        .await
+        .unwrap();
+    assert!(cleared["agent"]["response_contract"].is_null());
+    f.cleanup().await;
 }
 
 #[tokio::test]
-async fn library_copy_keeps_its_rig_contract_even_when_the_deployment_prefers_ai_agents() {
-    let Some(f) = Fixture::new(HarnessKind::AiAgents).await else {
+async fn library_copy_keeps_its_contract_and_config() {
+    let Some(f) = Fixture::new().await else {
         return;
     };
     let contract = serde_json::from_value(
@@ -186,7 +166,6 @@ async fn library_copy_keeps_its_rig_contract_even_when_the_deployment_prefers_ai
         .create_library_agent(AgentWrite {
             name: "Structured library".into(),
             slug: format!("library-{}", Uuid::new_v4().simple()),
-            harness_kind: Some(HarnessKind::Rig),
             config_json: Some(json!({"version":1,"max_turns":4})),
             response_contract: crate::entities::response_contract::ContractUpdate(Some(Some(
                 contract,
@@ -201,7 +180,6 @@ async fn library_copy_keeps_its_rig_contract_even_when_the_deployment_prefers_ai
         .await
         .unwrap()
         .agent;
-    assert_eq!(copy.harness_kind, HarnessKind::Rig);
     assert_eq!(copy.response_contract, definition.response_contract);
     assert_eq!(copy.config_json, definition.config_json);
     assert_ne!(copy.id, definition.id);

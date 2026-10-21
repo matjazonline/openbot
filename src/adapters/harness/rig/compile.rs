@@ -15,11 +15,7 @@ use super::{
 use crate::{
     app_error::{AppError, AppResult},
     entities::harness::AgentCapabilitySpec,
-    services::harness::{
-        HarnessApprovals, HarnessToolHost,
-        context::{RuntimeClock, RuntimeContext},
-        mcp::HarnessMcpToolHost,
-    },
+    services::harness::context::{RuntimeClock, RuntimeContext},
     use_cases::skill::AgentCapabilityReader,
 };
 
@@ -28,8 +24,6 @@ pub struct CompileContext {
     pub clock: Arc<dyn RuntimeClock>,
     pub capabilities: Arc<dyn AgentCapabilityReader>,
     pub token_budget: usize,
-    pub approvals: Option<Arc<dyn HarnessApprovals>>,
-    pub mcp: Option<Arc<dyn HarnessMcpToolHost>>,
 }
 
 pub struct CompiledRun {
@@ -40,11 +34,7 @@ pub struct CompiledRun {
 }
 
 impl CompiledRun {
-    pub fn compile(
-        spec: &AgentCapabilitySpec,
-        context: CompileContext,
-        host: Option<Arc<dyn HarnessToolHost>>,
-    ) -> AppResult<Self> {
+    pub fn compile(spec: &AgentCapabilitySpec, context: CompileContext) -> AppResult<Self> {
         if spec.name.trim().is_empty() || spec.name.chars().count() > 120 {
             return Err(invalid("Missing or oversized runtime agent name"));
         }
@@ -58,13 +48,11 @@ impl CompiledRun {
             spec,
             crate::entities::harness::MAX_RIG_MAX_TURNS,
         )?);
-        let mut tools = ToolBridge::compile_with_approvals(spec, host, context.approvals)?
-            .with_resources(catalog.clone())?
-            .with_budget(budget.clone());
-        if let Some(mcp) = context.mcp {
-            tools = tools.with_mcp(mcp)?;
-        }
-        let tools = Arc::new(tools);
+        let tools = Arc::new(
+            ToolBridge::new()
+                .with_resources(catalog.clone())?
+                .with_budget(budget.clone()),
+        );
         let preamble = Preamble {
             instructions: spec.system_prompt.clone(),
             name: spec.name.clone(),

@@ -9,17 +9,15 @@ use crate::{
     entities::{
         agent::{
             Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS,
-            MAX_EFFECTIVE_AGENT_TOOLS, MAX_GRANTED_TOOLS, MIN_AGENT_RUN_TIMEOUT_SECS,
+            MIN_AGENT_RUN_TIMEOUT_SECS,
         },
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyChannelDefaults},
         creation::CreationProvenance,
-        harness::{HarnessConfig, HarnessKind, NativeToolPolicy},
+        harness::{HarnessConfig, HarnessKind},
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
-        skill::Skill,
-        tool_catalogue::{CREATE_AGENT_CHANNEL_TOOL_ID, CatalogueTool},
         user::Viewer,
-        value_objects::{AvatarUrl, ModelName, ModelProvider, ToolId},
+        value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     services::harness::{ClassificationRequest, TextClassifier},
     use_cases::{
@@ -49,9 +47,8 @@ pub struct AgentWrite {
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
-    pub harness_kind: Option<HarnessKind>,
-    pub granted_tool_ids: Vec<ToolId>,
-    pub native_tool_policy: NativeToolPolicy,
+    /// Ordered workflow tool grants (06-D5). `None` keeps the stored list on update.
+    pub workflow_tools: Option<Vec<crate::domain::workflow::TypeName>>,
     pub config_json: Option<serde_json::Value>,
     pub response_contract: crate::entities::response_contract::ContractUpdate,
     pub skill_ids: Vec<Uuid>,
@@ -74,9 +71,7 @@ impl Default for AgentWrite {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
-            harness_kind: None,
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: NativeToolPolicy::default(),
+            workflow_tools: None,
             response_contract: Default::default(),
             config_json: None,
             skill_ids: Vec::new(),
@@ -92,15 +87,9 @@ impl Default for AgentWrite {
 }
 
 impl AgentWrite {
-    pub fn resolve_harness(&mut self, fallback: HarnessKind) {
-        self.harness_kind.get_or_insert(fallback);
-    }
-
-    fn validate_update_harness(&mut self, stored: &Agent) -> AppResult<()> {
-        let submitted = self.harness_kind;
-        if submitted.is_some_and(|kind| kind != stored.harness_kind) && self.config_json.is_none() {
-            return Err(AppError::BadRequest("config_json: submit explicit settings for the target harness (use {\"version\":1} for defaults). Attached response contracts, MCP servers, tools and skills must also be supported.".into()));
-        }
+    /// Validate an update together with the stored settings it leaves unchanged, then restore
+    /// the submitted omissions so persistence keeps the stored values.
+    fn validate_update(&mut self, stored: &Agent) -> AppResult<()> {
         let supplied_config = self.config_json.is_some();
         if !supplied_config {
             self.config_json = stored.config_json.clone();
@@ -109,13 +98,8 @@ impl AgentWrite {
         if self.response_contract.0.is_none() {
             self.response_contract.0 = Some(stored.response_contract.clone());
         }
-        self.resolve_harness(stored.harness_kind);
-        self.normalize().map_err(|error| {
-            AppError::BadRequest(format!(
-                "config_json must match the target harness; submit compatible settings: {error}"
-            ))
-        })?;
-        // Keep an explicit empty target distinguishable from omission until the locked write.
+        self.normalize()?;
+        // Keep an explicit empty config distinguishable from omission until the locked write.
         // Persistence canonicalizes this shared empty representation back to SQL NULL.
         if supplied_config && self.config_json.is_none() {
             self.config_json = Some(serde_json::json!({"version": 1}));
@@ -123,24 +107,13 @@ impl AgentWrite {
         if !supplied_config {
             self.config_json = None;
         }
-        self.harness_kind = submitted;
         self.response_contract = submitted_contract;
         Ok(())
     }
 
-    pub fn resolved_harness(&self) -> AppResult<HarnessKind> {
-        self.harness_kind.ok_or_else(|| {
-            AppError::BadRequest("harness_kind must be resolved before persistence".into())
-        })
-    }
-
     fn normalize_harness_config(&mut self) -> AppResult<()> {
-        self.native_tool_policy
-            .validate()
+        let harness_config = HarnessConfig::parse(HarnessKind::Rig, self.config_json.as_ref())
             .map_err(AppError::BadRequest)?;
-        let harness_config =
-            HarnessConfig::parse(self.resolved_harness()?, self.config_json.as_ref())
-                .map_err(AppError::BadRequest)?;
         let canonical = harness_config.to_json().map_err(AppError::BadRequest)?;
         self.config_json = (canonical != serde_json::json!({"version": 1})).then_some(canonical);
 
@@ -188,13 +161,7 @@ impl AgentWrite {
             ));
         }
         self.normalize_harness_config()?;
-        if let Some(Some(contract)) = &self.response_contract.0 {
-            contract
-                .require_harness(self.resolved_harness()?)
-                .map_err(|e| AppError::BadRequest(e.into()))?;
-        }
-
-        self.normalize_tool_grants()?;
+        validate_workflow_names(self.workflow_tools.as_deref(), "workflow tools")?;
         deduplicate(&mut self.skill_ids);
         if self.skill_ids.len() > MAX_AGENT_SKILLS {
             return Err(AppError::BadRequest(format!(
@@ -210,27 +177,6 @@ impl AgentWrite {
 
         Ok(())
     }
-
-    fn normalize_tool_grants(&mut self) -> AppResult<()> {
-        deduplicate(&mut self.granted_tool_ids);
-        if self.granted_tool_ids.len() > MAX_GRANTED_TOOLS {
-            return Err(AppError::BadRequest(format!(
-                "An agent may be granted at most {MAX_GRANTED_TOOLS} tools."
-            )));
-        }
-        let harness = self.resolved_harness()?;
-        for id in &self.granted_tool_ids {
-            let tool = CatalogueTool::get(id).ok_or_else(|| {
-                AppError::BadRequest(format!("Tool '{id}' is not available for agents."))
-            })?;
-            if !tool.supports_harness(harness) {
-                return Err(AppError::BadRequest(format!(
-                    "Tool '{id}' is unsupported by {harness}."
-                )));
-            }
-        }
-        Ok(())
-    }
 }
 
 fn deduplicate<T: PartialEq>(values: &mut Vec<T>) {
@@ -242,43 +188,6 @@ fn deduplicate<T: PartialEq>(values: &mut Vec<T>) {
             index += 1;
         }
     }
-}
-
-pub(crate) fn validate_effective_capabilities(
-    write: &AgentWrite,
-    skills: &[Skill],
-) -> AppResult<()> {
-    let mut effective = write.granted_tool_ids.clone();
-    for id in skills.iter().flat_map(Skill::referenced_tool_ids) {
-        if !effective.contains(&id) {
-            effective.push(id);
-        }
-    }
-    if let Some(harness) = write.harness_kind {
-        for id in &effective {
-            if CatalogueTool::get(id).is_none_or(|tool| !tool.supports_harness(harness)) {
-                return Err(AppError::BadRequest(format!(
-                    "Tool '{id}' is unsupported by {harness}."
-                )));
-            }
-        }
-    }
-    if effective.len() > MAX_EFFECTIVE_AGENT_TOOLS {
-        return Err(AppError::BadRequest(format!(
-            "The selected grants and skills require {} tools; an agent may use at most {MAX_EFFECTIVE_AGENT_TOOLS}.",
-            effective.len()
-        )));
-    }
-    if !write.sub_agent_ids.is_empty()
-        && effective
-            .iter()
-            .any(|id| id.as_str() == CREATE_AGENT_CHANNEL_TOOL_ID)
-    {
-        return Err(AppError::BadRequest(
-            "A restricted sub-agent list cannot be combined with the create-agent tool.".into(),
-        ));
-    }
-    Ok(())
 }
 
 #[async_trait]
@@ -437,6 +346,7 @@ pub(crate) fn personal_channel_write(
 /// for [`AgentUseCases::create_addressable_agent`] to stamp with whoever picked it.
 fn library_agent_write(definition: &Agent) -> AgentWrite {
     AgentWrite {
+        workflow_tools: None,
         name: definition.name.clone(),
         slug: definition.slug.clone(),
         provider: definition.provider.clone(),
@@ -444,9 +354,6 @@ fn library_agent_write(definition: &Agent) -> AgentWrite {
         run_timeout_secs: definition.run_timeout_secs,
         system_prompt: definition.system_prompt.clone(),
         description: definition.description.clone(),
-        harness_kind: Some(definition.harness_kind),
-        granted_tool_ids: definition.granted_tool_ids.clone(),
-        native_tool_policy: definition.native_tool_policy.clone(),
         config_json: definition.config_json.clone(),
         response_contract: crate::entities::response_contract::ContractUpdate(Some(
             definition.response_contract.clone(),
@@ -472,7 +379,6 @@ pub struct SelectableAgents {
 pub struct AgentUseCases {
     response_validator:
         Option<Arc<dyn crate::services::response_contract::ResponseContractValidator>>,
-    default_agent_harness: HarnessKind,
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
     owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
@@ -499,7 +405,6 @@ impl AgentUseCases {
             spam_scanning,
             prompt_classifier: None,
             response_validator: None,
-            default_agent_harness: HarnessKind::default(),
         }
     }
 
@@ -519,15 +424,6 @@ impl AgentUseCases {
                 .validate_contract(contract)?;
         }
         Ok(())
-    }
-
-    pub fn default_agent_harness(&self) -> HarnessKind {
-        self.default_agent_harness
-    }
-
-    pub fn with_default_agent_harness(mut self, kind: HarnessKind) -> Self {
-        self.default_agent_harness = kind;
-        self
     }
 
     pub fn with_prompt_classifier(mut self, classifier: Arc<dyn TextClassifier>) -> Self {
@@ -697,7 +593,6 @@ impl AgentUseCases {
         let company =
             managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
-        write.resolve_harness(self.default_agent_harness);
         write.normalize()?;
         self.validate_response_contract(&write)?;
         self.validate_model_selection(company_id, &write).await?;
@@ -778,7 +673,6 @@ impl AgentUseCases {
         }
 
         write.created_by = Some(CreationProvenance::user(user_id));
-        write.resolve_harness(self.default_agent_harness);
         write.normalize()?;
         self.validate_response_contract(&write)?;
         self.validate_model_selection(company_id, &write).await?;
@@ -858,7 +752,6 @@ impl AgentUseCases {
 
     pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
         write.created_by = Some(CreationProvenance::system());
-        write.resolve_harness(self.default_agent_harness);
         write.normalize()?;
         self.validate_response_contract(&write)?;
         self.agent_persistence.create_library(write).await
@@ -873,7 +766,7 @@ impl AgentUseCases {
             .get_library_agent(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
-        write.validate_update_harness(&agent)?;
+        write.validate_update(&agent)?;
         self.validate_response_contract(&write)?;
         self.owned_persistence
             .update_agent_and_owned_address(agent_id, write)
@@ -953,7 +846,7 @@ impl AgentUseCases {
             return Err(agent_not_found());
         }
 
-        write.validate_update_harness(&agent)?;
+        write.validate_update(&agent)?;
         self.validate_response_contract(&write)?;
         self.validate_model_selection(company_id, &write).await?;
 
@@ -1070,7 +963,6 @@ async fn generate_prompt_with(
     );
     let response = classifier
         .complete(ClassificationRequest {
-            purpose: "prompt_generator",
             system_prompt: PROMPT_GENERATOR_SYSTEM_PROMPT,
             user_prompt: instructions,
             provider: &llm.provider,
@@ -1166,3 +1058,20 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;
+
+/// Workflow names are already `TypeName`s; bound and de-duplicate like the SQL shape check.
+pub(crate) fn validate_workflow_names(
+    names: Option<&[crate::domain::workflow::TypeName]>,
+    label: &str,
+) -> AppResult<()> {
+    let Some(names) = names else {
+        return Ok(());
+    };
+    let unique: std::collections::BTreeSet<_> = names.iter().collect();
+    if names.len() > 32 || unique.len() != names.len() {
+        return Err(AppError::BadRequest(format!(
+            "At most 32 distinct {label} are allowed."
+        )));
+    }
+    Ok(())
+}

@@ -27,11 +27,10 @@ Most agent platforms expose raw database credentials, Stripe tokens, or CRM API 
 - **Pure Structured Proposals:** BusyBots agents have zero system credentials. An agent can only output a structured proposal (e.g., `propose_credit(account_id: "acct_881", amount: 150)`).
 - **External Handlers:** Once an authorized human approves the proposal, a pure, deterministic Rust handler (`WorkflowActionHandler`) executes the API call securely outside the LLM context.
 
-### 3. 3-Stage Inbound Spam & Injection Shield
-Before an inbound email or attachment ever reaches an AI agent, it passes through three consecutive security checkpoints:
+### 3. 2-Stage Inbound Spam Shield
+Before an inbound email or attachment ever reaches an AI agent, it passes through two consecutive security checkpoints:
 1. **Stage 1 (Local Heuristic Engine):** High-speed Rust-native scanner detects spoofed sender headers, malformed MIME parts, and suspicious URLs.
 2. **Stage 2 (External Daemon Scoring):** Deep integration with Rspamd and SpamAssassin daemons scores sender reputation and content anomalies.
-3. **Stage 3 (Pre-Flight LLM Guardrail):** A dedicated, lightweight classifier intercepts prompt injection attacks, adversarial jailbreak attempts, and toxic inputs before the main agent processes the text.
 
 ### 4. Anti-Loop Defenses & Runaway Prevention
 To permanently prevent AI-to-AI infinite ping-pong storms (e.g., your agent and a vendor’s auto-responder emailing each other endlessly):

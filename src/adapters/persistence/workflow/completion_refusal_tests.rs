@@ -123,7 +123,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
 
 #[tokio::test]
 async fn workflow_completion_unclaimed_pure_and_legacy_refuse() {
-    for kind in ["context.load", "data.map"] {
+    for kind in ["context.history", "data.map"] {
         let source = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
         let (f, scope) = fixture_source(source).await;
         let fence = WorkflowFence {

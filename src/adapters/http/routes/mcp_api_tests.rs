@@ -6,9 +6,7 @@ use crate::{
             PostgresPersistence, credentials::CredentialCipher, test_support::test_pool,
         },
     },
-    entities::harness::HarnessKind,
     use_cases::{
-        agent::{AgentPersistence, AgentWrite},
         company::{CompanyPersistence, CompanyWrite},
         mcp::McpUseCases,
         user::UserPersistence,
@@ -21,7 +19,6 @@ struct Fixture {
     user: Uuid,
     company: Uuid,
     other: Uuid,
-    agent: Uuid,
 }
 async fn fixture() -> Option<Fixture> {
     let pool = test_pool().await?;
@@ -52,19 +49,6 @@ async fn fixture() -> Option<Fixture> {
             .id,
         );
     }
-    let agent = AgentPersistence::create(
-        persistence.as_ref(),
-        companies[0],
-        AgentWrite {
-            name: "API".into(),
-            slug: "api".into(),
-            harness_kind: Some(HarnessKind::Rig),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .id;
     Some(Fixture {
         service: Arc::new(McpUseCases::new(
             persistence.clone(),
@@ -75,7 +59,6 @@ async fn fixture() -> Option<Fixture> {
         user,
         company: companies[0],
         other: companies[1],
-        agent,
     })
 }
 fn definition() -> Definition {
@@ -139,63 +122,10 @@ async fn mcp_api_scopes_objects_even_when_the_actor_manages_both_companies() {
         .is_err()
     );
     assert!(
-        selection(State(f.service.clone()), actor(), Path((f.other, f.agent)))
-            .await
-            .is_err()
-    );
-    assert!(
         list(
             State(f.service.clone()),
             AuthenticatedUser { id: Uuid::new_v4() },
             Path(f.company)
-        )
-        .await
-        .is_err()
-    );
-    let Json(selected) = select(
-        State(f.service.clone()),
-        actor(),
-        Path((f.company, f.agent)),
-        Json(Selection {
-            expected_revision: 1,
-            mcp_connection_ids: Some(vec![id]),
-        }),
-    )
-    .await
-    .unwrap();
-    let Json(unchanged) = select(
-        State(f.service.clone()),
-        actor(),
-        Path((f.company, f.agent)),
-        Json(Selection {
-            expected_revision: selected.revision,
-            mcp_connection_ids: None,
-        }),
-    )
-    .await
-    .unwrap();
-    assert_eq!(unchanged, selected);
-    let Json(cleared) = select(
-        State(f.service.clone()),
-        actor(),
-        Path((f.company, f.agent)),
-        Json(Selection {
-            expected_revision: selected.revision,
-            mcp_connection_ids: Some(vec![]),
-        }),
-    )
-    .await
-    .unwrap();
-    assert!(cleared.connection_ids.is_empty());
-    assert!(
-        select(
-            State(f.service.clone()),
-            actor(),
-            Path((f.company, f.agent)),
-            Json(Selection {
-                expected_revision: selected.revision,
-                mcp_connection_ids: Some(vec![id])
-            })
         )
         .await
         .is_err()

@@ -100,7 +100,6 @@ fn parse_agent_run_timeout(value: Option<&str>) -> StdDuration {
 }
 
 pub struct AppConfig {
-    pub default_agent_harness: crate::entities::harness::HarnessKind,
     pub jwt_secret: String,
     pub refresh_token_ttl: Duration,
     pub app_domain_name: String,
@@ -122,7 +121,6 @@ pub struct AppConfig {
     pub enable_spam_scanner: bool,
     pub spam_scanner_type: String,
     pub spam_scanner_url: String,
-    pub enable_llm_spam_guardrail: bool,
     /// Whether session cookies are marked `Secure`, so a browser never sends one over plain HTTP.
     ///
     /// Derived from [`AppConfig::app_domain_name`] rather than defaulted, because the two
@@ -692,16 +690,11 @@ impl AppConfig {
         let spam_scanner_url = env::var("SPAM_SCANNER_URL")
             .unwrap_or_else(|_| "http://localhost:11333/checkv2".to_string());
 
-        let enable_llm_spam_guardrail: bool = env::var("ENABLE_LLM_SPAM_GUARDRAIL")
-            .unwrap_or_else(|_| "false".to_string())
-            .parse()
-            .unwrap_or(false);
         let gcs = GcsConfig::from_env(&app_domain_name);
         let hydradb = MemoryProviderHttpConfig::from_env("HYDRA_DB");
         let hindsight = MemoryProviderHttpConfig::from_env("HINDSIGHT");
 
         Self {
-            default_agent_harness: default_agent_harness_from_env(),
             jwt_secret,
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
             app_domain_name,
@@ -723,7 +716,6 @@ impl AppConfig {
             enable_spam_scanner,
             spam_scanner_type,
             spam_scanner_url,
-            enable_llm_spam_guardrail,
             secure_cookies,
             gcs,
             operator_emails,
@@ -735,7 +727,7 @@ impl AppConfig {
     }
 
     pub fn is_spam_scan_enabled(&self) -> bool {
-        self.enable_heuristic_scanner || self.enable_spam_scanner || self.enable_llm_spam_guardrail
+        self.enable_heuristic_scanner || self.enable_spam_scanner
     }
 }
 
@@ -747,7 +739,6 @@ impl AppConfig {
     /// twenty-seven-file change; `..AppConfig::for_test()` keeps the next one to this function.
     pub fn for_test() -> Self {
         Self {
-            default_agent_harness: crate::entities::harness::HarnessKind::Rig,
             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
             refresh_token_ttl: Duration::days(30),
             app_domain_name: "localhost".to_string(),
@@ -769,7 +760,6 @@ impl AppConfig {
             enable_spam_scanner: false,
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: String::new(),
-            enable_llm_spam_guardrail: false,
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
@@ -960,50 +950,3 @@ mod tests {
         );
     }
 }
-
-/// Pure startup parser: omission is distinct from a present but invalid value.
-pub fn parse_default_agent_harness(
-    value: Option<&str>,
-) -> Result<crate::entities::harness::HarnessKind, &'static str> {
-    use crate::entities::harness::HarnessKind;
-    match value {
-        None => Ok(HarnessKind::Rig),
-        Some(value) => {
-            HarnessKind::parse(value.trim()).ok_or("DEFAULT_AGENT_HARNESS must be rig or ai_agents")
-        }
-    }
-}
-
-#[cfg(test)]
-mod harness_default_tests {
-    use super::parse_default_agent_harness;
-    use crate::entities::harness::HarnessKind;
-    #[test]
-    fn deployment_harness_parser_preserves_omission_and_rejects_invalid_values() {
-        assert_eq!(parse_default_agent_harness(None), Ok(HarnessKind::Rig));
-        assert_eq!(
-            parse_default_agent_harness(Some(" rig ")),
-            Ok(HarnessKind::Rig)
-        );
-        assert_eq!(
-            parse_default_agent_harness(Some("ai_agents")),
-            Ok(HarnessKind::AiAgents)
-        );
-        for value in ["", "  ", "unknown", "RIG"] {
-            assert!(parse_default_agent_harness(Some(value)).is_err());
-        }
-    }
-}
-
-fn default_agent_harness_from_env() -> crate::entities::harness::HarnessKind {
-    let value = match env::var("DEFAULT_AGENT_HARNESS") {
-        Ok(value) => Some(value),
-        Err(env::VarError::NotPresent) => None,
-        Err(env::VarError::NotUnicode(_)) => panic!("DEFAULT_AGENT_HARNESS must be valid Unicode"),
-    };
-    parse_default_agent_harness(value.as_deref()).unwrap_or_else(|error| panic!("{error}"))
-}
-
-#[cfg(test)]
-#[path = "config_harness_tests.rs"]
-mod bootstrap_tests;

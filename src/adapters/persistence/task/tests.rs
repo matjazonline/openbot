@@ -526,7 +526,6 @@ async fn agent_transfer_revokes_the_old_execution_and_preserves_private_handoff(
             name: "Second Agent".into(),
             slug: format!("second-agent-{}", Uuid::new_v4().simple()),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )
@@ -4282,7 +4281,6 @@ pub(super) async fn seed_channel_agent(
             name: format!("{label} agent"),
             slug: format!("{label}-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )
@@ -4328,7 +4326,6 @@ pub(super) async fn seed_company_and_channel(
             name: "Chain Agent".into(),
             slug: format!("chain-agent-{suffix}"),
             created_by: Some(CreationProvenance::system()),
-            harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
             ..Default::default()
         },
     )

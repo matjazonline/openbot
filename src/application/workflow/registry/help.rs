@@ -53,17 +53,17 @@ pub fn authoring_help(
 }
 fn notes(name: &str) -> &'static str {
     match name {
-        "context.load" => {
-            "Execution unavailable. Context cutoff comes from frozen run facts. At most 128 sources, 256 items and 131072 tokens; provenance is mandatory."
+        "context.history" => {
+            "The run's thread history frozen at admission (internal notes excluded), newest messages that fit both max_tokens (one serialized byte per token) and the run's max_context_bytes, returned oldest first. Each item keeps its role, audience and entry kind; omitted counts older messages left out and truncated marks a body cut at 16384 characters. Runs without a thread return no items."
         }
         "memory.load" | "memory.save" => {
             "Execution unavailable. Scoped capability required; at most 256 items/facts, each text at most 16384 characters. Saves require logical idempotency."
         }
         "ai.classify" => {
-            "Execution unavailable. Finite labels/profile selection only, no tools. Model configuration comes from frozen facts."
+            "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
         }
         "agent.run" => {
-            "Execution unavailable. Omitted profile retains agent_defaults; explicit empty tools/skills selects none. Authorization and saved-agent loading remain future work."
+            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair."
         }
         "decision.rule" => {
             "Execution unavailable. Ordered pure rule with required default; all choices must be explicit routes. Data follows data_schema."
@@ -72,7 +72,7 @@ fn notes(name: &str) -> &'static str {
             "Execution unavailable. Durable review deadline required; never automatically accepts. Reviewers are an explicit static list of company users; first valid authorized submission wins. Timeout fails Terminal decision.timed_out through the declared error route; optional feedback requirements name declared choices."
         }
         "decision.agent" => {
-            "Execution unavailable. Model can select only declared eligible choices; data follows data_schema."
+            "The selected agent's model and instructions choose one declared choice, with no tools or skills; data follows data_schema. The model cannot name another step or add a route."
         }
         "data.map" => {
             "Execution unavailable. Pure typed construction, no scripts; output is value itself and follows output_schema."

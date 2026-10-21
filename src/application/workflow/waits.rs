@@ -55,6 +55,8 @@ pub enum WaitProgress {
         reason: WaitFailureReason,
     },
     Refused,
+    /// A saved model tool call's delivery settled; its parked agent job was reopened.
+    Continued,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitFailureReason {

@@ -142,7 +142,6 @@ impl Frames {
 /// A deployment with no memory providers and no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
-        default_agent_harness: crate::entities::harness::HarnessKind::AiAgents,
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -168,7 +167,6 @@ pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
         enable_spam_scanner: false,
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        enable_llm_spam_guardrail: false,
         secure_cookies: false,
         gcs: None,
         operator_emails: Vec::new(),

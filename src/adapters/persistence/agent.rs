@@ -13,13 +13,13 @@ use crate::{
     entities::{
         agent::Agent,
         creation::CreationProvenance,
-        harness::{HarnessConfig, HarnessKind, NativeToolPolicy, SubAgentScope},
+        harness::{HarnessConfig, HarnessKind, SubAgentScope},
         memory::{MemoryPersistenceMode, MemoryRecallMode},
         skill::Skill,
-        value_objects::{AvatarUrl, ChannelSlug, ToolId},
+        value_objects::{AvatarUrl, ChannelSlug},
     },
     use_cases::{
-        agent::{AgentPersistence, AgentWrite, validate_effective_capabilities},
+        agent::{AgentPersistence, AgentWrite},
         builtin_agent_library::{
             BuiltinAgentDefinition, BuiltinAgentInstallOutcome, BuiltinAgentLibraryPersistence,
         },
@@ -32,7 +32,7 @@ pub(crate) const AGENT_COLUMNS: &str = "\
     agent.system_prompt, agent.description, agent.config_json, agent.avatar_url, agent.created_by, \
     agent.created_at, agent.run_timeout_secs, agent.memory_enabled, \
     agent.memory_persistence_mode, agent.memory_recall_mode, agent.memory_max_results, \
-    agent.harness_kind, agent.granted_tool_ids, agent.native_tool_policy, agent.response_contract";
+    agent.response_contract";
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
@@ -55,31 +55,15 @@ pub struct AgentDb {
     pub avatar_url: Option<String>,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
-    pub harness_kind: String,
-    pub granted_tool_ids: Vec<String>,
-    pub native_tool_policy: serde_json::Value,
 }
 
 impl TryFrom<AgentDb> for Agent {
     type Error = AppError;
 
     fn try_from(db: AgentDb) -> AppResult<Self> {
-        let harness_kind = HarnessKind::parse(&db.harness_kind).ok_or_else(|| {
-            AppError::Internal(format!(
-                "Invalid agents.harness_kind '{}' for agent {}",
-                db.harness_kind, db.id
-            ))
-        })?;
-        HarnessConfig::parse(harness_kind, db.config_json.as_ref()).map_err(|error| {
+        HarnessConfig::parse(HarnessKind::Rig, db.config_json.as_ref()).map_err(|error| {
             AppError::Internal(format!("Invalid agent {} harness config: {error}", db.id))
         })?;
-        let native_tool_policy =
-            NativeToolPolicy::parse(&db.native_tool_policy).map_err(|error| {
-                AppError::Internal(format!(
-                    "Invalid agent {} native tool policy: {error}",
-                    db.id
-                ))
-            })?;
         Ok(Agent {
             id: db.id,
             company_id: db.company_id,
@@ -94,9 +78,6 @@ impl TryFrom<AgentDb> for Agent {
                 .map_err(|_| AppError::Internal("Invalid agents.run_timeout_secs".into()))?,
             system_prompt: db.system_prompt,
             description: db.description,
-            harness_kind,
-            granted_tool_ids: db.granted_tool_ids.into_iter().map(ToolId::from).collect(),
-            native_tool_policy,
             config_json: db.config_json,
             response_contract: db.response_contract.map(|value| value.0),
             memory_enabled: db.memory_enabled,
@@ -121,28 +102,24 @@ impl TryFrom<AgentDb> for Agent {
 
 struct AgentJsonFields {
     harness_config: Option<serde_json::Value>,
-    native_tool_policy: serde_json::Value,
     created_by: serde_json::Value,
 }
 
 fn agent_json_fields(write: &AgentWrite) -> AppResult<AgentJsonFields> {
     // Application use cases normalize first, but persistence is also called by provisioning
     // adapters and maintenance code. Re-run the bounded, fail-closed validation before any SQL so
-    // an alternate caller cannot store a grant or policy the normal write path would reject.
+    // an alternate caller cannot store a value the normal write path would reject.
     let mut validated = write.clone();
     validated.normalize()?;
     if let Some(Some(contract)) = &write.response_contract.0 {
         use crate::services::response_contract::ResponseContractValidator;
         crate::adapters::response_schema::JsonResponseValidator.validate_contract(contract)?;
     }
-    let harness_config =
-        HarnessConfig::parse(write.resolved_harness()?, write.config_json.as_ref())
-            .map_err(AppError::BadRequest)?;
+    let harness_config = HarnessConfig::parse(HarnessKind::Rig, write.config_json.as_ref())
+        .map_err(AppError::BadRequest)?;
     let canonical = harness_config.to_json().map_err(AppError::BadRequest)?;
     Ok(AgentJsonFields {
         harness_config: (canonical != serde_json::json!({"version": 1})).then_some(canonical),
-        native_tool_policy: serde_json::to_value(&write.native_tool_policy)
-            .map_err(|error| AppError::Internal(error.to_string()))?,
         created_by: serde_json::to_value(
             write
                 .created_by
@@ -170,9 +147,9 @@ pub(crate) async fn insert_agent_on(
            (id, company_id, name, slug, provider, model, system_prompt, description,
             config_json, avatar_url, created_by, run_timeout_secs, memory_enabled,
             memory_persistence_mode, memory_recall_mode, memory_max_results,
-            harness_kind, granted_tool_ids, native_tool_policy, response_contract)
+            response_contract, workflow_tools)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                   $15, $16, $17, $18, $19, $20)"#,
+                   $15, $16, $17, COALESCE($18, '{}'::text[]))"#,
     )
     .bind(id)
     .bind(company_id)
@@ -190,15 +167,6 @@ pub(crate) async fn insert_agent_on(
     .bind(write.memory_persistence_mode.as_str())
     .bind(write.memory_recall_mode.as_str())
     .bind(i16::from(write.memory_max_results))
-    .bind(write.resolved_harness()?.as_str())
-    .bind(
-        write
-            .granted_tool_ids
-            .iter()
-            .map(|id| id.as_str())
-            .collect::<Vec<_>>(),
-    )
-    .bind(json.native_tool_policy)
     .bind(
         write
             .response_contract
@@ -207,6 +175,12 @@ pub(crate) async fn insert_agent_on(
             .and_then(|contract| contract.as_ref())
             .map(sqlx::types::Json),
     )
+    .bind(write.workflow_tools.as_ref().map(|names| {
+        names
+            .iter()
+            .map(|name| name.as_str().to_owned())
+            .collect::<Vec<_>>()
+    }))
     .execute(&mut **transaction)
     .await
     .map_err(|error| {
@@ -282,7 +256,6 @@ pub(crate) async fn validate_agent_capabilities_on(
         }
     }
 
-    validate_effective_capabilities(write, &skills)?;
     Ok(skills)
 }
 
@@ -365,7 +338,6 @@ impl BuiltinAgentLibraryPersistence for PostgresPersistence {
         &self,
         mut definition: BuiltinAgentDefinition,
     ) -> AppResult<BuiltinAgentInstallOutcome> {
-        definition.write.resolve_harness(self.default_agent_harness);
         definition.write.normalize()?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let lock_key = format!("builtin-agent-library:{}", definition.write.slug);
@@ -404,10 +376,6 @@ async fn prepare_agent_update_on(
     id: Uuid,
     write: &mut AgentWrite,
 ) -> AppResult<AgentUpdateScope> {
-    // MCP catalog edits lock company before agent. Match that order before taking the agent's
-    // update lock so a harness switch and a catalog/selection edit cannot invert their locks.
-    sqlx::query("SELECT company.id FROM companies AS company JOIN agents AS agent ON agent.company_id = company.id WHERE agent.id = $1 FOR SHARE OF company")
-        .bind(id).fetch_optional(&mut *tx).await?;
     let (company_id, company_slug): (Option<Uuid>, Option<String>) = sqlx::query_as(
         r#"SELECT agent.company_id, company.slug::text
            FROM agents AS agent
@@ -419,18 +387,6 @@ async fn prepare_agent_update_on(
     .fetch_one(&mut *tx)
     .await
     .map_err(AppError::from)?;
-    let stored: String = sqlx::query_scalar("SELECT harness_kind FROM agents WHERE id = $1")
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-    let stored = HarnessKind::parse(&stored)
-        .ok_or_else(|| AppError::BadRequest("Stored harness_kind is invalid".into()))?;
-    if write.harness_kind.is_some_and(|kind| kind != stored) && write.config_json.is_none() {
-        return Err(AppError::BadRequest(
-            "config_json: a harness switch requires explicit target settings".into(),
-        ));
-    }
     if write.config_json.is_none() {
         write.config_json = sqlx::query_scalar("SELECT config_json FROM agents WHERE id = $1")
             .bind(id)
@@ -446,7 +402,6 @@ async fn prepare_agent_update_on(
             .await?;
         write.response_contract.0 = Some(contract.map(|value| value.0));
     }
-    write.resolve_harness(stored);
     let json = agent_json_fields(write)?;
     Ok(AgentUpdateScope {
         company_id,
@@ -487,9 +442,9 @@ pub(crate) async fn update_agent_and_owned_address(
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
                description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9,
                memory_enabled = $10, memory_persistence_mode = $11,
-               memory_recall_mode = $12, memory_max_results = $13, harness_kind = $14,
-               granted_tool_ids = $15, native_tool_policy = $16, response_contract = $18
-           WHERE id = $17
+               memory_recall_mode = $12, memory_max_results = $13, response_contract = $15,
+               workflow_tools = COALESCE($16, agent.workflow_tools)
+           WHERE id = $14
            RETURNING {AGENT_COLUMNS}"#
     ))
     .bind(&write.name)
@@ -505,15 +460,6 @@ pub(crate) async fn update_agent_and_owned_address(
     .bind(write.memory_persistence_mode.as_str())
     .bind(write.memory_recall_mode.as_str())
     .bind(i16::from(write.memory_max_results))
-    .bind(write.resolved_harness()?.as_str())
-    .bind(
-        write
-            .granted_tool_ids
-            .iter()
-            .map(|id| id.as_str())
-            .collect::<Vec<_>>(),
-    )
-    .bind(&json.native_tool_policy)
     .bind(id)
     .bind(
         write
@@ -523,6 +469,12 @@ pub(crate) async fn update_agent_and_owned_address(
             .and_then(|contract| contract.as_ref())
             .map(sqlx::types::Json),
     )
+    .bind(write.workflow_tools.as_ref().map(|names| {
+        names
+            .iter()
+            .map(|name| name.as_str().to_owned())
+            .collect::<Vec<_>>()
+    }))
     .fetch_one(&mut *tx)
     .await
     .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
@@ -595,16 +547,6 @@ pub(crate) async fn update_agent_and_owned_address(
 }
 
 fn address_update_error(error: sqlx::Error, slug: &str, company_slug: Option<&str>) -> AppError {
-    if error.as_database_error().and_then(|db| db.constraint()) == Some("agent_mcp_requires_rig") {
-        return AppError::BadRequest("harness_kind requires Rig while enabled MCP grants are selected; remove those selections first".into());
-    }
-    if error.as_database_error().and_then(|db| db.constraint())
-        == Some("agent_harness_has_unsettled_tasks")
-    {
-        return AppError::Conflict(
-            "Agent harness cannot change while tasks are active or suspended. Finish those tasks first.".into(),
-        );
-    }
     if error
         .as_database_error()
         .and_then(|db| db.code())
@@ -626,8 +568,7 @@ fn address_update_error_message(slug: &str, company_slug: Option<&str>) -> AppEr
 
 #[async_trait]
 impl AgentPersistence for PostgresPersistence {
-    async fn create(&self, company_id: Uuid, mut write: AgentWrite) -> AppResult<Agent> {
-        write.resolve_harness(self.default_agent_harness);
+    async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let id = Uuid::new_v4();
         let mut transaction = self.pool.begin().await?;
         insert_agent_on(&mut transaction, id, Some(company_id), &write).await?;
@@ -642,8 +583,7 @@ impl AgentPersistence for PostgresPersistence {
         db.try_into()
     }
 
-    async fn create_library(&self, mut write: AgentWrite) -> AppResult<Agent> {
-        write.resolve_harness(self.default_agent_harness);
+    async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
         let id = Uuid::new_v4();
         let mut transaction = self.pool.begin().await?;
         insert_agent_on(&mut transaction, id, None, &write).await?;
@@ -836,9 +776,6 @@ mod tests {
             run_timeout_secs: None,
             system_prompt: None,
             description: None,
-            harness_kind: "ai_agents".into(),
-            granted_tool_ids: Vec::new(),
-            native_tool_policy: json!({"version": 1}),
             config_json: None,
             avatar_url: None,
             created_by: json!({}),
@@ -862,7 +799,6 @@ mod tests {
                 name: "Built-in test agent".into(),
                 slug: format!("builtin-{suffix}"),
                 system_prompt: Some("Test the startup installer.".into()),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         };
@@ -937,7 +873,6 @@ mod tests {
                 config_json: Some(config.clone()),
                 avatar_url: Some(AvatarUrl::from("https://example.com/support.png")),
                 created_by: None,
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )
@@ -976,7 +911,6 @@ mod tests {
             AgentWrite {
                 name: "Support Agent V2".to_string(),
                 slug: "support-agent-v2".to_string(),
-                harness_kind: Some(crate::entities::harness::HarnessKind::AiAgents),
                 ..Default::default()
             },
         )

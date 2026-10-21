@@ -11,7 +11,7 @@ use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::company::Company;
 use crate::entities::harness::{HarnessKind, SubAgentScope};
 use crate::entities::skill::{Skill, SkillInstruction};
-use crate::entities::value_objects::{ModelName, ModelProvider, ToolId};
+use crate::entities::value_objects::{ModelName, ModelProvider};
 use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
 
 fn company_named(name: &str) -> Company {
@@ -21,7 +21,6 @@ fn company_named(name: &str) -> Company {
         user_id: Uuid::new_v4(),
         name: name.to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: chrono::Utc::now(),
@@ -84,7 +83,6 @@ fn a_company_without_an_agent_resolves_to_a_spec_that_grants_nothing() {
     assert_eq!(spec.harness, HarnessKind::Rig);
     assert_eq!(spec.name, "Acme Corp");
     assert_eq!(spec.system_prompt, "You are a helpful assistant.");
-    assert!(spec.granted_tools.is_empty());
     assert!(spec.skills.is_empty());
     assert_eq!(spec.sub_agents, SubAgentScope::AllCompanySiblings);
     assert_eq!(
@@ -101,10 +99,7 @@ fn an_agent_supplies_its_own_name_prompt_and_reviewed_configuration() {
     let mut agent = agent_selecting(None, None);
     agent.name = "Support Agent".into();
     agent.system_prompt = Some("You are a helpful triage assistant.".into());
-    agent.config_json = Some(serde_json::json!({
-        "version": 1,
-        "reasoning": {"mode": "react", "max_iterations": 4}
-    }));
+    agent.config_json = Some(serde_json::json!({"version": 1, "max_turns": 4}));
 
     let resolved =
         ResolvedAgentCapabilities::new(Some(&company), Some(&agent)).expect("params resolve");
@@ -116,10 +111,7 @@ fn an_agent_supplies_its_own_name_prompt_and_reviewed_configuration() {
     );
     assert_eq!(
         resolved.config(),
-        serde_json::json!({
-            "version": 1,
-            "reasoning": {"mode": "react", "max_iterations": 4}
-        })
+        serde_json::json!({"version": 1, "max_turns": 4})
     );
 }
 
@@ -285,9 +277,6 @@ fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
         run_timeout_secs: None,
         system_prompt: Some("Answer the question.".into()),
         description: None,
-        harness_kind: HarnessKind::AiAgents,
-        granted_tool_ids: Vec::new(),
-        native_tool_policy: crate::entities::harness::NativeToolPolicy::default(),
         config_json: None,
         memory_persistence_mode: Default::default(),
         memory_recall_mode: Default::default(),
@@ -345,7 +334,6 @@ fn resolving_company() -> Company {
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
-        enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
         created_at: chrono::Utc::now(),
@@ -522,8 +510,7 @@ async fn a_spec_carries_its_agents_skills_in_position_order() {
     let persistence =
         StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
     let company = resolving_company();
-    let mut agent = agent_selecting(None, None);
-    agent.granted_tool_ids = vec![ToolId::from("calculator")];
+    let agent = agent_selecting(None, None);
     let first = skill("first");
     let second = skill("second");
     let reader = StubCapabilityReader {
@@ -541,7 +528,6 @@ async fn a_spec_carries_its_agents_skills_in_position_order() {
 
     assert_eq!(resolved.agent_id, agent.id);
     assert_eq!(resolved.spec.skills, vec![first, second]);
-    assert_eq!(resolved.spec.granted_tools, [ToolId::from("calculator")]);
     assert!(matches!(
         resolved.spec.sub_agents,
         SubAgentScope::Restricted(_)
@@ -585,48 +571,22 @@ async fn an_absent_capability_snapshot_fails_explicitly() {
 }
 
 #[test]
-fn an_unresolved_snapshot_uses_the_injected_harness_override() {
-    let params = ResolvedAgentCapabilities::from_snapshot_connection(
-        None,
-        super::AgentSnapshot {
-            agent: None,
-            skills: vec![],
-            sub_agents: SubAgentScope::AllCompanySiblings,
-            default_harness: HarnessKind::AiAgents,
-        },
-        &ModelProvider::from("openai"),
-        &ModelName::from("model"),
-        "synthetic-key",
-    )
-    .unwrap();
-    assert_eq!(params.spec().harness, HarnessKind::AiAgents);
-    assert!(params.spec().harness_config.ai_agents().is_some());
-}
-
-#[test]
-fn omission_defaults_and_explicit_selections_are_independent_of_provider_selection() {
-    for default in HarnessKind::ALL {
-        for selection in [None, Some(HarnessKind::Rig), Some(HarnessKind::AiAgents)] {
-            let agent = selection.map(|kind| {
-                let mut agent = agent_selecting(Some("openai"), Some("model"));
-                agent.harness_kind = kind;
-                agent
-            });
-            let params = ResolvedAgentCapabilities::from_snapshot_connection(
-                None,
-                super::AgentSnapshot {
-                    agent: agent.as_ref(),
-                    skills: vec![],
-                    sub_agents: SubAgentScope::AllCompanySiblings,
-                    default_harness: default,
-                },
-                &"openai".into(),
-                &"model".into(),
-                "key",
-            )
-            .unwrap();
-            assert_eq!(params.spec().harness, selection.unwrap_or(default));
-            assert_eq!(params.provider().as_str(), "openai");
-        }
+fn every_snapshot_runs_on_rig_independently_of_provider_selection() {
+    for agent in [None, Some(agent_selecting(Some("openai"), Some("model")))] {
+        let params = ResolvedAgentCapabilities::from_snapshot_connection(
+            None,
+            super::AgentSnapshot {
+                agent: agent.as_ref(),
+                skills: vec![],
+                sub_agents: SubAgentScope::AllCompanySiblings,
+            },
+            &"openai".into(),
+            &"model".into(),
+            "key",
+        )
+        .unwrap();
+        assert_eq!(params.spec().harness, HarnessKind::Rig);
+        assert!(params.spec().harness_config.rig().is_some());
+        assert_eq!(params.provider().as_str(), "openai");
     }
 }
