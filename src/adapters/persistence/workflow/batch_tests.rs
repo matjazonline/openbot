@@ -1,4 +1,16 @@
 use super::*;
+#[path = "child_configuration_tests.rs"]
+mod child_configuration_tests;
+#[path = "child_decision_round_tests.rs"]
+mod child_decision_round_tests;
+#[path = "child_output_tests.rs"]
+mod child_output_tests;
+#[path = "child_repeat_tests.rs"]
+mod child_repeat_tests;
+#[path = "child_runtime_tests.rs"]
+mod child_runtime_tests;
+#[path = "child_schema_tests.rs"]
+mod child_schema_tests;
 #[path = "batch_recovery_tests.rs"]
 mod recovery_tests;
 #[path = "wakeup_tests.rs"]

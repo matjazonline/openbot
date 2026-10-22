@@ -290,8 +290,12 @@ fn check_descriptor(
     let control = parsed.controls.get(id);
     let valid_control = match descriptor.control {
         ControlKind::None => control.is_none(),
-        ControlKind::ChildCall => control.is_some_and(|c| c.max_iterations.is_none()),
-        ControlKind::Repeat => control.is_some_and(|c| c.max_iterations.is_some()),
+        ControlKind::ChildCall => {
+            control.is_some_and(|c| c.max_iterations.is_none() && c.repeat.is_none())
+        }
+        ControlKind::Repeat => {
+            control.is_some_and(|c| c.max_iterations.is_some() && c.repeat.is_some())
+        }
     };
     if !valid_control {
         return Err(Diagnostic::at(
@@ -514,6 +518,7 @@ fn compile_steps(
         )?;
         check_inputs(id, step, &input_schema, parsed)?;
         check_rule_predicates(id, parsed)?;
+        check_repeat_bindings(id, &input_schema, parsed)?;
         result.inputs.insert(id.clone(), input_schema);
         result.outputs.insert(id.clone(), output_schema);
         result.facts.insert(
@@ -557,6 +562,59 @@ fn check_rule_predicates(id: &StepId, parsed: &ParsedWorkflow) -> Result<(), Dia
     Ok(())
 }
 
+/// `next_input` must fit the child input exactly as `with.input` does, and `exit_when` must be a
+/// boolean predicate. Both resolve only after a round, never at activation (07-D1 §D1.1).
+fn check_repeat_bindings(
+    id: &StepId,
+    input: &Schema,
+    parsed: &ParsedWorkflow,
+) -> Result<(), Diagnostic> {
+    let Some(repeat) = parsed.controls.get(id).and_then(|c| c.repeat.as_ref()) else {
+        return Ok(());
+    };
+    let boolean = json!({"type":"boolean"});
+    let next = format!("/steps/{id}/repeat/next_input");
+    let exit = format!("/steps/{id}/repeat/exit_when");
+    for (binding, path) in [(&repeat.next_input, &next), (&repeat.exit_when, &exit)] {
+        preflight_binding(
+            binding,
+            crate::domain::workflow::ContextLimits {
+                output_bytes: parsed.definition.limits.max_context_bytes,
+                work_nodes: 65_536,
+            },
+        )
+        .map_err(|_| {
+            Diagnostic::at(
+                "binding.limit",
+                "Repeat binding exceeds depth, node or byte limits",
+                path,
+                located(parsed, path),
+            )
+        })?;
+    }
+    for constraint in input.root_constraints() {
+        if let Some(expected) = constraint
+            .get("properties")
+            .and_then(|properties| properties.get("input"))
+        {
+            check_binding_shape(
+                &repeat.next_input,
+                expected,
+                input.raw(),
+                &next,
+                located(parsed, &next),
+            )?;
+        }
+    }
+    check_binding_shape(
+        &repeat.exit_when,
+        &boolean,
+        &boolean,
+        &exit,
+        located(parsed, &exit),
+    )
+}
+
 pub fn compile(
     decoded: DecodedSource,
     version_id: VersionId,
@@ -566,7 +624,11 @@ pub fn compile(
     let mut budget = FactBudget::new(located(&parsed, "/steps"));
     let mut exact = FactBudget::new(located(&parsed, "/steps"));
     exact.punctuation(5)?;
-    exact.charge(&dependency_facts(&parsed, facts.dependencies)?)?;
+    exact.charge(&dependency_facts(
+        &parsed,
+        facts.dependencies,
+        &BTreeSet::new(),
+    )?)?;
     for (index, (id, step)) in parsed.definition.steps.iter().enumerate() {
         if let Some(descriptor) = facts.descriptors.get(&step.step_type) {
             budget.schema(&descriptor.input_schema)?;
@@ -592,7 +654,13 @@ pub fn compile(
             })
         })
         .collect();
-    compile_resolved(decoded, parsed, &descriptors, facts.dependencies)
+    compile_resolved(
+        decoded,
+        parsed,
+        &descriptors,
+        facts.dependencies,
+        &BTreeSet::new(),
+    )
 }
 
 pub(crate) struct SpecializedDescriptor {
@@ -606,8 +674,9 @@ pub(crate) fn compile_resolved(
     parsed: ParsedWorkflow,
     descriptors: &BTreeMap<StepId, SpecializedDescriptor>,
     dependencies: &BTreeMap<WorkflowId, BTreeSet<WorkflowId>>,
+    tool_workflows: &BTreeSet<WorkflowId>,
 ) -> Result<CompiledWorkflow, Diagnostic> {
-    let dependencies = dependency_facts(&parsed, dependencies)?;
+    let dependencies = dependency_facts(&parsed, dependencies, tool_workflows)?;
     check_expanded_facts(descriptors, &dependencies, located(&parsed, "/steps"))?;
     let graph = validate(parsed.definition.clone()).map_err(|error| graph_error(error, &parsed))?;
     let input = Schema::compile(
@@ -689,14 +758,17 @@ mod validation_tests;
 #[path = "review1_tests.rs"]
 mod review1_tests;
 
+/// The declared children are the child steps' and the workflow tools' pinned workflows.
 fn dependency_facts(
     parsed: &ParsedWorkflow,
     dependencies: &BTreeMap<WorkflowId, BTreeSet<WorkflowId>>,
+    tool_workflows: &BTreeSet<WorkflowId>,
 ) -> Result<BTreeMap<String, Vec<String>>, Diagnostic> {
     let children = parsed
         .controls
         .values()
         .map(|c| c.child_workflow_id)
+        .chain(tool_workflows.iter().copied())
         .collect();
     let dependency_closure = check_dependencies(
         parsed.definition.workflow_id,
@@ -768,10 +840,11 @@ pub(crate) fn check_resolved_budget(
     parsed: &ParsedWorkflow,
     descriptors: &BTreeMap<StepId, SpecializedDescriptor>,
     dependencies: &BTreeMap<WorkflowId, BTreeSet<WorkflowId>>,
+    tool_workflows: &BTreeSet<WorkflowId>,
 ) -> Result<(), Diagnostic> {
     check_expanded_facts(
         descriptors,
-        &dependency_facts(parsed, dependencies)?,
+        &dependency_facts(parsed, dependencies, tool_workflows)?,
         located(parsed, "/steps"),
     )
 }

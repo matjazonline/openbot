@@ -161,32 +161,63 @@ async fn audit(
 }
 
 async fn cancel_on(db: &mut PgConnection, command: &CancelCommand) -> AppResult<()> {
-    sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
-        .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
-        .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
-    maintenance::retire_jobs(
+    cancel_tree_on(
         db,
         command.company_id,
         command.run_id,
-        maintenance::RetirementCause::Cancel,
+        command.actor.user_id(),
     )
-    .await?;
+    .await
+}
+
+/// Cancel a run and every live descendant (07-D1 §D1.5). A live runtime child is always named
+/// by its parent's waiting `child_run` wait (or expires with its parent's deadline), so the
+/// indexed wait lookup finds the whole cascade. Parents are locked before children, as park and
+/// round transitions do; a child transition never locks its parent.
+async fn cancel_tree_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    actor: Uuid,
+) -> AppResult<()> {
+    let children: Vec<Uuid> = sqlx::query_scalar("SELECT child_run_id FROM workflow_waits WHERE company_id=$1 AND run_id=$2 AND state='waiting' AND reason='child_run' ORDER BY child_run_id")
+        .bind(company.as_uuid()).bind(run.as_uuid()).fetch_all(&mut *db).await?;
+    cancel_run_on(db, company, run).await?;
+    for child in children {
+        let live: Option<bool> = sqlx::query_scalar("SELECT state IN ('queued','running','waiting') FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
+            .bind(company.as_uuid()).bind(child).fetch_optional(&mut *db).await?;
+        if live != Some(true) {
+            continue;
+        }
+        // Boxed recursion: bounded by the 32-level publication depth.
+        Box::pin(cancel_tree_on(db, company, RunId::new(child), actor)).await?;
+        sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id) SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'cancelled_by_parent',$3 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2")
+            .bind(company.as_uuid()).bind(child).bind(actor).execute(&mut *db).await?;
+    }
+    Ok(())
+}
+
+async fn cancel_run_on(db: &mut PgConnection, company: CompanyId, run: RunId) -> AppResult<()> {
+    sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
+        .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
+        .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+    maintenance::retire_jobs(db, company, run, maintenance::RetirementCause::Cancel).await?;
     sqlx::query("UPDATE workflow_waits SET state='cancelled',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
-        .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
+        .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
     // Unsent message deliveries are superseded; in-flight ones keep only the intent (04.11-D2 §6).
     message::receipts::cancel_message_deliveries_on(
         db,
-        command.company_id,
-        command.run_id,
+        company,
+        run,
         None,
         crate::entities::transport::DeliveryCancellationReason::WorkflowCancelled,
     )
     .await?;
     sqlx::query("UPDATE workflow_runs SET state='cancelled',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
-        .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).execute(&mut *db).await?;
+        .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
     let code =
         crate::domain::workflow::FailureCode::parse("workflow.cancelled").map_err(|_| invalid())?;
-    action_uncertainty::record(db, command.company_id, command.run_id, None, &code).await?;
+    action_uncertainty::record(db, company, run, None, &code).await?;
     Ok(())
 }

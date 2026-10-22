@@ -11,6 +11,8 @@ mod admission_source_tests;
 mod admission_token_tests;
 #[path = "batch_tests.rs"]
 mod batch_tests;
+#[path = "child_test_support.rs"]
+mod child_support;
 #[path = "decision_tests.rs"]
 mod decision_tests;
 #[path = "history_reader_tests.rs"]
@@ -90,6 +92,7 @@ impl AdmissionFixture {
             binding_id: self.binding.target.binding,
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({"value":1}),
+            rerun_of: None,
         }
     }
     fn manual(&self) -> TriggerRef {

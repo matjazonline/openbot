@@ -51,6 +51,8 @@ pub(super) struct BindingFixture {
     pub(super) target: BindingTarget,
     version: VersionId,
     resources: std::collections::BTreeMap<ResourceName, RuntimeResourceId>,
+    /// The binding parameters `request` configures (`{}` unless a test sets them).
+    pub(super) params: serde_json::Value,
 }
 impl BindingFixture {
     pub(super) async fn new(requirements: serde_json::Value) -> Self {
@@ -73,15 +75,20 @@ impl BindingFixture {
             .publish(publication.clone())
             .await
             .unwrap();
+        Self::from_version(fixture, publication.version)
+    }
+    /// A new binding of an already published `version` of the fixture's company.
+    pub(super) fn from_version(fixture: Fixture, version: VersionId) -> Self {
         Self {
             target: BindingTarget {
                 company: fixture.target.company,
                 actor: fixture.target.actor,
                 binding: WorkflowBindingId::new(Uuid::new_v4()),
             },
-            version: publication.version,
+            version,
             fixture,
             resources: Default::default(),
+            params: json!({}),
         }
     }
     pub(super) fn request(&self, expected: Option<BindingStateRevision>) -> ConfigureBinding {
@@ -90,7 +97,7 @@ impl BindingFixture {
             expected,
             association: RelatedAssociation::Company,
             version: self.version,
-            params: json!({}),
+            params: self.params.clone(),
             resources: self.resources.clone(),
         }
     }
@@ -127,22 +134,26 @@ impl BindingFixture {
             .unwrap()
     }
     pub(super) async fn mcp(&mut self) -> Uuid {
+        self.mcp_slot("service").await
+    }
+    /// Bind `slot` to a new MCP connection of the same slug.
+    pub(super) async fn mcp_slot(&mut self, slot: &str) -> Uuid {
         let connection = self
             .fixture
             .persistence
-            .create_mcp_connection(self.target.company.as_uuid(), mcp_write())
+            .create_mcp_connection(self.target.company.as_uuid(), mcp_write(slot))
             .await
             .unwrap();
         self.resources.insert(
-            ResourceName::parse("service").unwrap(),
+            ResourceName::parse(slot).unwrap(),
             RuntimeResourceId::new(connection.id),
         );
         connection.id
     }
 }
-fn mcp_write() -> McpConnectionWrite {
+fn mcp_write(slug: &str) -> McpConnectionWrite {
     McpConnectionWrite {
-        slug: "service".into(),
+        slug: slug.into(),
         endpoint: "https://example.test/mcp".to_owned().try_into().unwrap(),
         enabled: true,
         auth: McpAuth::None,
@@ -362,7 +373,7 @@ async fn workflow_binding_sql_mcp_revocation_readiness_and_contract_scope() {
         .unwrap();
     assert_eq!(status.readiness, ResourceReadiness::Revoked);
     assert!(status.supported_contracts.is_empty());
-    let mut write = mcp_write();
+    let mut write = mcp_write("service");
     write.auth = McpAuth::Bearer;
     p.update_mcp_connection(f.target.company.as_uuid(), id, 1, write)
         .await
@@ -428,7 +439,7 @@ async fn workflow_binding_sql_changed_configuration_roundtrips_without_mutating_
         .await
         .unwrap();
     let p = &f.fixture.persistence;
-    let mut write = mcp_write();
+    let mut write = mcp_write("service");
     write.slug = "replacement".into();
     let replacement = p
         .create_mcp_connection(f.target.company.as_uuid(), write)

@@ -131,6 +131,10 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
                             WHERE event.company_id = wait.company_id AND event.run_id = wait.run_id
                               AND event.consumed_execution_id IS NULL
                               AND event.event_name = wait.event_name AND event.correlation = wait.correlation))
+                        -- A child_run wait wakes on its child's terminal fact (07-D1 §D1.4).
+                        OR (wait.reason = 'child_run' AND EXISTS (SELECT 1 FROM workflow_runs AS child
+                            WHERE child.company_id = wait.company_id AND child.id = wait.child_run_id
+                              AND child.terminal_wakeup_sequence IS NOT NULL))
                         -- An effect wait wakes on its action's receipt or on a finality breach
                         -- (04.11-D2 §4.4, D4 §M); otherwise only at the run deadline.
                         OR (wait.reason = 'effect' AND (

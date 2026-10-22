@@ -187,42 +187,13 @@ async fn workflow_budget_runtime_reservation_competes_with_cancel_and_completion
     }
 }
 
-async fn child(f: &AdmissionFixture, parent: ActivationRequest) -> ActivationRequest {
-    let trigger = TriggerRef::new(
-        parent.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                parent.company,
-                parent.run,
-                parent.execution,
-                StepId::parse("start").unwrap(),
-            )),
-        },
-    )
-    .unwrap();
-    let command = f
-        .prepare(f.request(&format!("budget-child-{}", parent.run.as_uuid()), trigger))
-        .await;
-    f.persistence().admit(&command).await.unwrap();
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(command.first_execution_id().as_uuid())
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    ActivationRequest {
-        company: parent.company,
-        run: command.proposed_run_id(),
-        execution: command.first_execution_id(),
-        job: WorkflowJobId(job),
-    }
-}
-
 #[tokio::test]
 async fn workflow_budget_runtime_descendants_share_without_locking_root_or_parent() {
+    // Category B: a child holding its own claim while its descendant runs is a state the
+    // runtime never produces (ancestors are parked); it guards the shared usage-row locking.
     let (f, root) = limited().await;
-    let parent = child(&f, root).await;
-    let descendant = child(&f, parent).await;
+    let parent = f.lineage_child(root).await;
+    let descendant = f.lineage_child(parent).await;
     let parent_fence = claim(&f, parent).await;
     let fence = claim(&f, descendant).await;
     f.persistence()

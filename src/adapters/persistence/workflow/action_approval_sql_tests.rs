@@ -206,7 +206,7 @@ async fn workflow_action_approval_reopen_checks_transaction_choice_and_accountin
             assert_eq!(database.code().as_deref(), Some("23514"), "{case:?}");
             assert_eq!(
                 database.message(),
-                "workflow job reopen requires an approval or delivery continuation",
+                "workflow job reopen requires an approval, delivery or child continuation",
                 "{case:?}"
             );
             let job: serde_json::Value = sqlx::query_scalar("SELECT jsonb_build_object('status',status,'retry_count',retry_count) FROM background_tasks WHERE id=$1")

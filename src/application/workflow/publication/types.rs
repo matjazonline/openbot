@@ -1,5 +1,5 @@
 use super::registry::ToolContract;
-use crate::domain::workflow::{CompanyId, TypeName};
+use crate::domain::workflow::{CompanyId, ResourceName, TypeName, VersionId, WorkflowId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -99,6 +99,50 @@ pub struct ToolSnapshot {
     pub company_id: CompanyId,
     pub contract: ToolContract,
     pub policy: ApprovedActionPolicy,
+    /// Present only for a workflow tool (07-D2 §D2.2), so every other kind serializes as before
+    /// and keeps comparing equal to its stored registration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<WorkflowToolPin>,
+}
+
+/// A workflow tool's frozen target: the registration's workflow version and static child
+/// parameters at publication (07-D2 §D2.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowToolPin {
+    pub workflow_id: WorkflowId,
+    pub version_id: VersionId,
+    pub params: Value,
+}
+
+/// How a snapshot is dispatched (07-D2 §D2.2a). This is the only classifier: every site that
+/// verifies or dispatches a tool matches it exhaustively.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolKind<'a> {
+    /// A trusted built-in `message.*` tool.
+    Message,
+    /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
+    Slot(&'a ResourceName),
+    /// A company HTTP operation registered by name.
+    Http,
+    /// A pinned child workflow registered by name.
+    Workflow(&'a WorkflowToolPin),
+}
+
+impl ToolSnapshot {
+    pub fn kind(&self) -> ToolKind<'_> {
+        if let Some(pin) = &self.workflow {
+            return ToolKind::Workflow(pin);
+        }
+        if crate::application::workflow::message::is_builtin_message_tool(
+            self.contract.name.as_str(),
+        ) {
+            return ToolKind::Message;
+        }
+        match &self.contract.connection {
+            Some(slot) => ToolKind::Slot(slot),
+            None => ToolKind::Http,
+        }
+    }
 }
 
 /// The complete finite selection universe for this version. Agent/profile names

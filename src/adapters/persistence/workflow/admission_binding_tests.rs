@@ -245,23 +245,38 @@ fn workflow_admission_source_key_has_stable_versioned_identity() {
             schedule_id: ScheduleId::new(id),
             occurrence_id: ScheduleOccurrenceId::new(id),
         },
+        // The longest step child: the runtime key of the last permitted round (07-D1 §D1.2).
         TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                company,
-                RunId::new(id),
-                ExecutionId::new(id),
-                StepId::parse("a".repeat(128)).unwrap(),
+            parent: ChildCause::Step(ChildStepRef::new(
+                ExecutionRef::new(
+                    company,
+                    RunId::new(id),
+                    ExecutionId::new(id),
+                    StepId::parse("a".repeat(128)).unwrap(),
+                ),
+                ChildOrdinal::new(1000).unwrap(),
             )),
         },
         TriggerSource::Child {
-            parent: ChildCause::Action(ActionRef::new(
+            parent: ChildCause::Step(ChildStepRef::new(
+                ExecutionRef::new(
+                    company,
+                    RunId::new(id),
+                    ExecutionId::new(id),
+                    StepId::parse("a".repeat(128)).unwrap(),
+                ),
+                ChildOrdinal::FIRST,
+            )),
+        },
+        TriggerSource::Child {
+            parent: ChildCause::ToolCall(ChildToolCallRef::new(
                 ExecutionRef::new(
                     company,
                     RunId::new(id),
                     ExecutionId::new(id),
                     StepId::parse("entry").unwrap(),
                 ),
-                ActionInvocationId::new(id),
+                ToolCallId::new(id),
             )),
         },
     ];

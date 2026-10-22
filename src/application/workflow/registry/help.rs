@@ -54,7 +54,7 @@ pub fn authoring_help(
 fn notes(name: &str) -> &'static str {
     match name {
         "context.history" => {
-            "The run's thread history frozen at admission (internal notes excluded), newest messages that fit both max_tokens (one serialized byte per token) and the run's max_context_bytes, returned oldest first. Each item keeps its role, audience and entry kind; omitted counts older messages left out and truncated marks a body cut at 16384 characters. Runs without a thread return no items."
+            "The run's thread history frozen at admission (internal notes excluded), newest messages that fit both max_tokens (one serialized byte per token) and the run's max_context_bytes, returned oldest first. Each item keeps its role, audience and entry kind; omitted counts older messages left out and truncated marks a body cut at 16384 characters. Runs without a thread return no items, and a child run's history is always empty: map history into its input explicitly."
         }
         "memory.load" | "memory.save" => {
             "Execution unavailable. Scoped capability required; at most 256 items/facts, each text at most 16384 characters. Saves require logical idempotency."
@@ -87,10 +87,10 @@ fn notes(name: &str) -> &'static str {
             "Execution unavailable. Canonical content up to 16384 characters, at most 128 scoped destinations. Accepted means provider acceptance/local commit, never read receipt. Replies require an explicit source message."
         }
         "workflow.call" => {
-            "Execution unavailable. Pinned child contracts, inherited budgets/authorization requirements and durable continuation identity are mandatory."
+            "Runs the pinned child version with explicit with.input and static with.params (literals or /params). The child gets only those, the parent's same-named resources, its deadline and root budget; never its history. Output is the child's output; child failure or cancellation takes the error route."
         }
         "flow.repeat" => {
-            "Execution unavailable. Sequential pinned child, inherited budgets; 1..10000 rounds. Next-round mapping, exit predicate and exhaustion control belong to phase07."
+            "Runs the pinned child in sequential rounds, 1..1000 (max_iterations). After each round repeat.exit_when decides with /steps/<self>/output = {result, rounds}; otherwise repeat.next_input is the next round's input. Routes: done (exit true, also on the last round) and exhausted (bound reached, never approval). One repetition is charged per round."
         }
         "wait.event" | "wait.timer" => {
             "Execution unavailable. RFC3339 deadline required; future-relative validation needs runtime clock. Durable suspension, no sleeping worker. Events are run-scoped by literal name and correlation, consumed once and atomically; repeated waits must carry the iteration in the correlation."

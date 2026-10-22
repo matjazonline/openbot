@@ -6,9 +6,9 @@ use crate::domain::entities::{
     message::CanonicalMessageId, participant::PrincipalAccessContext, thread::Thread,
 };
 use crate::domain::workflow::{
-    ActionInvocationId, ActionRef, BindingRevision, ChildCause, ExecutionId, ExecutionRef,
-    RunCausality, RunId, RunState, ScheduleId, ScheduleOccurrenceId, StepCausality, TriggerId,
-    TriggerRef, TriggerSource, VersionId, WorkflowBindingId, WorkflowId,
+    BindingRevision, ChildCause, ChildOrdinal, ChildStepRef, ChildToolCallRef, ExecutionId,
+    ExecutionRef, RunCausality, RunId, RunState, ScheduleId, ScheduleOccurrenceId, StepCausality,
+    ToolCallId, TriggerId, TriggerRef, TriggerSource, VersionId, WorkflowBindingId, WorkflowId,
 };
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -121,6 +121,7 @@ fn request(
         binding_id: WorkflowBindingId::new(version_id.as_uuid()),
         idempotency_key: IdempotencyKey::parse(key).unwrap(),
         input,
+        rerun_of: None,
     }
 }
 
@@ -142,8 +143,6 @@ struct State {
     source_messages: BTreeMap<(CompanyId, CanonicalMessageId), RelatedAssociation>,
     schedule_occurrences:
         BTreeMap<(CompanyId, ScheduleId, ScheduleOccurrenceId), RelatedAssociation>,
-    parent_executions: BTreeMap<(CompanyId, ExecutionId), ExecutionRef>,
-    parent_actions: BTreeMap<(CompanyId, ActionInvocationId), ActionRef>,
     fail_source: bool,
     fail_access: bool,
     fail_channel: bool,
@@ -385,6 +384,7 @@ impl WorkflowInspection for MemoryStore {
                 association: run.association,
                 state: run.state,
                 revision: run.revision,
+                rerun_of: None,
             })
         }))
     }

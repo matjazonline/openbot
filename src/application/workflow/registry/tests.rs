@@ -55,12 +55,14 @@ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
         )
         .unwrap();
         assert_eq!(help.type_name.as_str(), name);
-        // 06-D6: notes of the kinds this phase executes describe behaviour, not unavailability.
+        // 06-D6, 07-D1: notes of the kinds that execute describe behaviour, not unavailability.
         let runnable = [
             "context.history",
             "ai.classify",
             "agent.run",
             "decision.agent",
+            "workflow.call",
+            "flow.repeat",
         ];
         assert_eq!(
             help.notes.contains("Execution unavailable"),

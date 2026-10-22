@@ -274,25 +274,48 @@ async fn inspect_finished_owners(
     .unwrap();
     // The retained gate backend is distinct from both owners and the observer.
     // A fresh pool acquire could reuse an owner PID and observe its own query.
-    sqlx::query("SELECT pg_stat_clear_snapshot()")
-        .execute(&mut *backends.gate)
-        .await
-        .unwrap();
-    let clean: bool = sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1) AND (activity.state='active' OR activity.xact_start IS NOT NULL))")
-        .bind([pids.first, pids.second, backends.observer_pid].as_slice())
-        .fetch_one(&mut *backends.gate).await.unwrap();
+    // An owner's pooled connection is released after its future returns: sqlx's release task
+    // pings the backend, which is when a transaction the owner dropped has its queued ROLLBACK
+    // flushed. So the owners must drain within the hang guard, not at this exact instant; under
+    // load the release task can run after this inspection starts.
+    let watched = [pids.first, pids.second, backends.observer_pid];
+    let started = Instant::now();
+    let mut busy = Value::Null;
+    let mut first_busy = Value::Null;
+    let drained = tokio::time::timeout(LOCK_WAIT_HANG_GUARD, async {
+        loop {
+            sqlx::query("SELECT pg_stat_clear_snapshot()")
+                .execute(&mut *backends.gate)
+                .await
+                .unwrap();
+            busy = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(jsonb_build_object('pid',activity.pid,'state',activity.state,'xact_start',activity.xact_start,'query',activity.query)),'[]'::jsonb) FROM pg_stat_activity AS activity WHERE activity.pid=ANY($1) AND (activity.state='active' OR activity.xact_start IS NOT NULL)")
+                .bind(watched.as_slice())
+                .fetch_one(&mut *backends.gate)
+                .await
+                .unwrap();
+            if busy == json!([]) {
+                break;
+            }
+            if first_busy.is_null() {
+                first_busy = busy.clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await;
     assert!(
-        clean,
-        "both owners and observer drained without active transactions or queries"
+        drained.is_ok(),
+        "both owners and observer drained without active transactions or queries within {LOCK_WAIT_HANG_GUARD:?}: {busy}"
     );
     eprintln!(
-        "probe run={} company={} phase=quiescent first_pid={} second_pid={} observer_pid={} inspector_pid={} clean={clean}",
+        "probe run={} company={} phase=quiescent first_pid={} second_pid={} observer_pid={} inspector_pid={} drain_ms={} first_busy={first_busy}",
         command.scope.run.as_uuid(),
         command.scope.company.as_uuid(),
         pids.first,
         pids.second,
         backends.observer_pid,
-        backends.gate_pid
+        backends.gate_pid,
+        started.elapsed().as_millis()
     );
 }
 

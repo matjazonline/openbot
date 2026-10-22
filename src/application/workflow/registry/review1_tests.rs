@@ -199,7 +199,14 @@ fn repeat_steps(example: &mut AuthoringExample, count: usize) {
                 format!("step{}", i + 1)
             };
             let mut step = template.clone();
-            step["routes"]["success"] = json!(target);
+            match step["routes"]
+                .get_mut("choices")
+                .and_then(Value::as_object_mut)
+            {
+                // flow.repeat leaves through its done/exhausted choices.
+                Some(choices) => choices.values_mut().for_each(|to| *to = json!(target)),
+                None => step["routes"]["success"] = json!(target),
+            }
             steps.insert(id, step);
         }
         v["steps"] = Value::Object(steps);

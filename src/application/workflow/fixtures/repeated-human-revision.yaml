@@ -1,4 +1,5 @@
-# Compiler fixture only: phase07 adds next-input/exit/exhaustion scheduling.
+# Shipped support template (07-D1 §D1.8): load context once, repeat the draft-and-review round
+# with explicit feedback, then route the final choice. Only this parent delivers, once.
 format_version: 1
 workflow_id: 00000000-0000-0000-0000-000000000004
 input_schema:
@@ -17,25 +18,45 @@ parameter_schema:
   additionalProperties: false
 output_schema: true
 resources: []
-entry: revisions
+entry: context
 steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 4000}
+    routes: {success: revisions}
   revisions:
     type: flow.repeat
     child_workflow_id: 00000000-0000-0000-0000-000000000005
     child_version_id: 00000000-0000-0000-0000-000000000069
+    # The default bound; authors may lower it. Every round spends one root repetition.
     max_iterations: 3
     with:
       input:
         object:
           message: {ref: /input/message}
+          context: {ref: /steps/context/output}
           previous_body: {literal: ""}
           feedback: {literal: ""}
           deadline: {ref: /params/deadline}
-    routes: {success: outcome}
+      params:
+        object:
+          reviewer: {ref: /params/reviewer}
+    repeat:
+      # A revision request starts a new round with the prior artifact and explicit feedback.
+      next_input:
+        object:
+          message: {ref: /input/message}
+          context: {ref: /steps/context/output}
+          previous_body: {ref: /steps/revisions/output/result/artifact/body}
+          feedback: {ref: /steps/revisions/output/result/feedback}
+          deadline: {ref: /params/deadline}
+      exit_when: {ne: [{ref: /steps/revisions/output/result/choice}, {literal: revise}]}
+    routes: {choices: {done: outcome, exhausted: escalate}}
   outcome:
     type: decision.rule
     with:
-      data: {ref: /steps/revisions/output/result/data}
+      data: {ref: /steps/revisions/output/result/artifact}
       data_schema:
         literal:
           type: object
@@ -46,14 +67,38 @@ steps:
       cases:
         - when: {eq: [{ref: /steps/revisions/output/result/choice}, {literal: accept}]}
           choice: accepted
-      default: exhausted
-    routes: {choices: {accepted: reply, exhausted: escalate}}
+        - when: {eq: [{ref: /steps/revisions/output/result/choice}, {literal: cancel}]}
+          choice: cancelled
+        - when: {eq: [{ref: /steps/revisions/output/result/choice}, {literal: timeout}]}
+          choice: timed_out
+      default: escalated
+    routes: {choices: {accepted: reply, cancelled: $end, timed_out: escalate, escalated: specialist}}
   reply:
     type: message.reply
     with:
       source_message: {ref: /input/source_message}
-      content: {ref: /steps/revisions/output/result/data}
+      content: {ref: /steps/revisions/output/result/artifact}
     routes: {success: $end}
+  # A reviewer's escalation goes to a specialist with the request, the reviewed artifact and the
+  # reviewer's feedback, mapped explicitly (07-D1 §D1.8). The specialist's agent is pinned here.
+  specialist:
+    type: agent.run
+    with:
+      agent: {literal: assistant}
+      context:
+        object:
+          untrusted_request: {ref: /input/message}
+          artifact: {ref: /steps/revisions/output/result/artifact}
+          feedback: {ref: /steps/revisions/output/result/feedback}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: $end}
+  # Exhausted revisions and a timed-out review go to a person; never approval. The notice body
+  # cannot also hold an artifact and feedback of up to 16 KiB each, so it names the outcome.
   escalate:
     type: message.send
     with:

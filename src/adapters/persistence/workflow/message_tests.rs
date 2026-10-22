@@ -27,6 +27,16 @@ mod recovery_tests;
 mod sql_tests;
 #[path = "message_thread_tests.rs"]
 mod thread_tests;
+#[path = "workflow_tool_race_tests.rs"]
+mod workflow_tool_race_tests;
+#[path = "workflow_tool_registration_tests.rs"]
+mod workflow_tool_registration_tests;
+#[path = "workflow_tool_revocation_tests.rs"]
+mod workflow_tool_revocation_tests;
+#[path = "workflow_tool_support.rs"]
+mod workflow_tool_support;
+#[path = "workflow_tool_tests.rs"]
+mod workflow_tool_tests;
 
 #[path = "action_approval_message_tests.rs"]
 mod approval_tests;

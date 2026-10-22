@@ -74,7 +74,7 @@ impl WorkflowWaits for PostgresPersistence {
             };
             let changed = match self.resume_wait(scope).await? {
                 WaitProgress::Completed(saved) => saved.disposition == CommitDisposition::Committed,
-                WaitProgress::Continued => true,
+                WaitProgress::Continued | WaitProgress::NextRound => true,
                 WaitProgress::Expired(disposition) | WaitProgress::Failed { disposition, .. } => {
                     disposition == CommitDisposition::Committed
                 }
@@ -142,9 +142,10 @@ pub(super) async fn row(
         WaitSelection::Execution => "execution",
         WaitSelection::Decision => "decision",
     };
-    // A completed approval or model-tool delivery does not complete its execution. Only the active wait or
-    // the actual terminal step wait can answer execution resume/replay.
-    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR (NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval') AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=wait.company_id AND action.wait_id=wait.id AND action.origin='model_tool'))))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
+    // A completed approval, model-tool delivery or workflow tool call (07-D2 §D2.5) does not
+    // complete its execution. Only the active wait or the actual terminal step wait can answer
+    // execution resume/replay; a workflow tool call's failed or cancelled wait is terminal.
+    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR (NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval') AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=wait.company_id AND action.wait_id=wait.id AND action.origin='model_tool') AND (wait.child_tool_call_id IS NULL OR wait.state<>'completed'))))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(selection).fetch_optional(db).await?)
 }
 pub(super) async fn now(db: &mut PgConnection) -> AppResult<DateTime<Utc>> {

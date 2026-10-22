@@ -2,8 +2,11 @@ use super::*;
 
 #[tokio::test]
 async fn workflow_wakeup_parent_link_is_immutable_and_owner_cascades() {
+    // Category B: the lineage guard of a parent execution that never activated, a state the
+    // runtime never produces (park activates first); otherwise its activation receipt's own
+    // guard would mask the cross-tree foreign key under test.
     let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let child = f.lineage_child(parent).await;
     let pool = f.persistence().pool();
     for query in [
         "UPDATE workflow_run_parents SET parent_execution_id=child_run_id WHERE child_run_id=$1",
@@ -30,10 +33,17 @@ async fn workflow_wakeup_parent_link_is_immutable_and_owner_cascades() {
         .unwrap_err();
     assert_eq!(
         error.as_database_error().unwrap().constraint(),
-        Some("workflow_parent_execution_fk")
+        Some("workflow_parent_execution_fk"),
+        "{error:?}"
     );
     sqlx::query("DELETE FROM background_tasks WHERE id=$1")
         .bind(child.job.0)
+        .execute(pool)
+        .await
+        .unwrap();
+    // The parent's child_run wait references the lineage link (07-D1 §D1.3).
+    sqlx::query("DELETE FROM workflow_waits WHERE child_run_id=$1")
+        .bind(child.run.as_uuid())
         .execute(pool)
         .await
         .unwrap();
@@ -47,7 +57,9 @@ async fn workflow_wakeup_parent_link_is_immutable_and_owner_cascades() {
         .await
         .unwrap();
     assert_eq!(links, 0);
-    let child = admit_child(&f, parent, "start", "another-child").await;
+    // A parked parent has exactly one child per round, so the cascade uses a fresh tree.
+    let (f, parent, child) = chained(example("data.map")).await;
+    let pool = f.persistence().pool();
     assert_ne!(child.run, parent.run);
     sqlx::query("DELETE FROM background_tasks WHERE id=$1")
         .bind(child.job.0)

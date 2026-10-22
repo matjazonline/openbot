@@ -117,9 +117,15 @@ pub fn compile(
         compiler::charge_descriptor(&mut budget, id, &descriptor.descriptor, &descriptor.facts)?;
         descriptors.insert(id.clone(), descriptor);
     }
-    compiler::check_resolved_budget(&parsed, &descriptors, dependencies)?;
+    compiler::check_resolved_budget(&parsed, &descriptors, dependencies, &facts.tool_workflows)?;
     validate_declarations(&parsed)?;
-    compiler::compile_resolved(decoded, parsed, &descriptors, dependencies)
+    compiler::compile_resolved(
+        decoded,
+        parsed,
+        &descriptors,
+        dependencies,
+        &facts.tool_workflows,
+    )
 }
 
 struct Registration<'a> {
@@ -174,7 +180,8 @@ impl<'a> Registration<'a> {
     }
     /// Reviewer assignment is deterministic: only literals and admin-configured binding
     /// parameters may supply it, never run input, step output or run context (05-D2 §4.2).
-    fn static_roots(&self, field: &'static str) -> Result<(), Diagnostic> {
+    /// A child's parameters follow the same rule, since they are its reviewers' source.
+    fn static_roots(&self, field: &'static str, refusal: StaticRefusal) -> Result<(), Diagnostic> {
         let Some(binding) = self.parsed.definition.steps[self.id].inputs.get(field) else {
             return Ok(());
         };
@@ -185,11 +192,7 @@ impl<'a> Registration<'a> {
         {
             Ok(())
         } else {
-            Err(self.error(
-                "registry.static_reviewers",
-                "Reviewers must be literal or come from binding parameters",
-                field,
-            ))
+            Err(self.error(refusal.code, refusal.message, field))
         }
     }
     /// A run-scoped event is identified by its literal name; every `wait.event` declaring that
@@ -276,6 +279,11 @@ impl<'a> Registration<'a> {
         } else {
             None
         };
+        let choices = if name == "flow.repeat" {
+            Some(vec!["done".to_owned(), "exhausted".to_owned()])
+        } else {
+            choices
+        };
         let routes = choices.map_or(RouteContract::Success, |names| {
             RouteContract::Choices(
                 names
@@ -304,6 +312,21 @@ impl<'a> Registration<'a> {
         })
     }
 }
+/// The diagnostic for a field that must be literal or come from binding parameters.
+#[derive(Clone, Copy)]
+pub(super) struct StaticRefusal {
+    code: &'static str,
+    message: &'static str,
+}
+pub(super) const STATIC_REVIEWERS: StaticRefusal = StaticRefusal {
+    code: "registry.static_reviewers",
+    message: "Reviewers must be literal or come from binding parameters",
+};
+pub(super) const STATIC_PARAMS: StaticRefusal = StaticRefusal {
+    code: "registry.static_params",
+    message: "Child parameters must be literal or come from binding parameters",
+};
+
 struct Contract {
     input: Value,
     output: Value,

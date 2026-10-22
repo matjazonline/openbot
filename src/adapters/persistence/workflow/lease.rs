@@ -172,6 +172,9 @@ impl WorkflowLeases for PostgresPersistence {
         if message::receipts::confirm_suspension(self, fence, wait.as_uuid()).await? {
             return Ok(true);
         }
+        if workflow_tool_calls::confirm_suspension(self, fence, wait.as_uuid()).await? {
+            return Ok(true);
+        }
         tokio::time::timeout(
             std::time::Duration::from_secs(1),
             decisions::approvals::confirm(self, fence, wait),

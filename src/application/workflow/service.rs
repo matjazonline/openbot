@@ -43,6 +43,7 @@ where
     /// Resource readiness is checked on activation; effects recheck current access,
     /// revocation and secrets at use time. A frozen snapshot is never an access grant.
     pub async fn admit(&self, request: AdmitWorkflowRequest) -> AppResult<AdmissionResult> {
+        admissible_trigger(&request)?;
         self.authorization
             .authorize(
                 request.company_id,
@@ -167,6 +168,20 @@ fn verify_binding(binding: &ConfiguredBinding, request: &AdmitWorkflowRequest) -
     Ok(())
 }
 
+/// Children are created only by their parent's runtime step (07-D1 §D1.2a), and only a manual
+/// start can link a rerun original. Both are request-shape rules, checked before any lookup.
+fn admissible_trigger(request: &AdmitWorkflowRequest) -> AppResult<()> {
+    match (request.trigger.source(), request.rerun_of) {
+        (TriggerSource::Child { .. }, _) => Err(AppError::BadRequest(
+            "Child workflow runs are created only by their parent's workflow step".into(),
+        )),
+        (TriggerSource::Manual, _) | (_, None) => Ok(()),
+        (_, Some(_)) => Err(AppError::BadRequest(
+            "Only a manual start can rerun a workflow run".into(),
+        )),
+    }
+}
+
 /// The definition's context-byte ceiling is aggregate across both snapshots.
 /// Each snapshot also consumes its own domain work/depth budget before cloning.
 fn bounded_snapshots(
@@ -181,10 +196,7 @@ fn bounded_snapshots(
         step_outputs: &outputs,
         run: RunMetadata {
             run_id,
-            parent_run_id: match request.trigger.source() {
-                TriggerSource::Child { parent } => Some(parent.execution().run_id()),
-                _ => None,
-            },
+            parent_run_id: None,
         },
     };
     let limits = binding.bundle().compiled().graph().context_limits();

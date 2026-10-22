@@ -8,7 +8,7 @@ use super::{
     checkpoints::WorkflowCheckpointSpec,
     lease::{ClaimedWorkflow, WorkflowFence},
     message::MessageKind,
-    publication::{ResolvedAgent, ToolSnapshot},
+    publication::{ResolvedAgent, ToolKind, ToolSnapshot, WorkflowToolPin},
     registry::ModelStep,
 };
 use crate::{
@@ -33,9 +33,19 @@ const MAX_DECLARED_NAME: usize = 64;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AgentToolTarget {
-    Http { connection: Uuid },
-    Mcp { slot: ResourceName },
-    Message { name: TypeName },
+    Http {
+        connection: Uuid,
+    },
+    Mcp {
+        slot: ResourceName,
+    },
+    Message {
+        name: TypeName,
+    },
+    /// A pinned child workflow (07-D2 §D2.3); dispatched without ActionService.
+    Workflow {
+        pin: WorkflowToolPin,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -204,12 +214,14 @@ pub trait AgentPreparation: Send + Sync {
     async fn prepare_agent(&self, claim: &ClaimedWorkflow) -> AppResult<AgentLaunch>;
 }
 
-/// What a saved model tool call observed at the ActionService boundary.
+/// What a saved model tool call observed at its dispatch boundary: ActionService for HTTP, MCP
+/// and message tools, the workflow tool runtime for workflow tools.
 #[derive(Debug)]
 pub enum AgentToolObservation {
-    /// A committed receipt's output: the only value saved as the invocation result.
+    /// A committed receipt's output, or a workflow tool's child result or typed error: the only
+    /// value saved as the invocation result.
     Completed(Value),
-    /// The execution parked in the same commit (approval or delivery wait).
+    /// The execution parked in the same commit (approval, delivery or child wait).
     Parked(WaitId),
     /// A possible dispatch without a receipt. Never sent again by the agent.
     Uncertain,
@@ -217,8 +229,10 @@ pub enum AgentToolObservation {
 
 #[async_trait]
 pub trait AgentToolDispatch: Send + Sync {
-    /// Sequential, marker-first dispatch of one saved call through ActionService. The
-    /// call identity is the saved invocation, so a resumed call reuses its operation.
+    /// Sequential dispatch of one saved call. HTTP, MCP and message tools go marker-first
+    /// through ActionService; a workflow tool starts its child and parks in one commit, so it is
+    /// never uncertain and needs no marker (07-D2 §D2.3a). The call identity is the saved
+    /// invocation, so a resumed call reuses its operation or finds its child.
     async fn dispatch(
         &self,
         fence: WorkflowFence,
@@ -230,12 +244,12 @@ pub trait AgentToolDispatch: Send + Sync {
 
 fn prepared_tool(snapshot: &ToolSnapshot, target: AgentToolTarget) -> AppResult<PreparedTool> {
     let name = snapshot.contract.name.clone();
-    let consistent = match &target {
-        AgentToolTarget::Message { name: target } => {
-            target == &name && snapshot.contract.connection.is_none()
-        }
-        AgentToolTarget::Mcp { slot } => snapshot.contract.connection.as_ref() == Some(slot),
-        AgentToolTarget::Http { .. } => snapshot.contract.connection.is_none(),
+    let consistent = match (&target, snapshot.kind()) {
+        (AgentToolTarget::Message { name: target }, ToolKind::Message) => target == &name,
+        (AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,
+        (AgentToolTarget::Http { .. }, ToolKind::Http) => true,
+        (AgentToolTarget::Workflow { pin }, ToolKind::Workflow(frozen)) => frozen == pin,
+        _ => false,
     };
     let declared = name.as_str().replace('.', "__");
     if !consistent || declared.len() > MAX_DECLARED_NAME {

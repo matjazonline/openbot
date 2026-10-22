@@ -14,6 +14,7 @@ struct SavedInput {
     input: Value,
     channel_id: Option<Uuid>,
     thread_id: Option<Uuid>,
+    rerun_of_run_id: Option<Uuid>,
 }
 
 /// Command identity is stricter than canonical source identity. A source alias
@@ -65,7 +66,7 @@ async fn replay(
     run: Uuid,
 ) -> AppResult<AdmissionResult> {
     let saved = sqlx::query_as::<_, SavedInput>(
-        "SELECT input, channel_id, thread_id FROM workflow_runs \
+        "SELECT input, channel_id, thread_id, rerun_of_run_id FROM workflow_runs \
          WHERE company_id = $1 AND id = $2 FOR SHARE",
     )
     .bind(command.company_id().as_uuid())
@@ -73,7 +74,10 @@ async fn replay(
     .fetch_one(&mut **tx)
     .await?;
     let association = binding_rows::association_columns(command.association());
-    if saved.input != *command.input() || (saved.channel_id, saved.thread_id) != association {
+    if saved.input != *command.input()
+        || (saved.channel_id, saved.thread_id) != association
+        || saved.rerun_of_run_id != command.rerun_of().map(|original| original.as_uuid())
+    {
         return Ok(AdmissionResult::Conflict);
     }
     // Always restore the committed configuration: the caller may have prepared
@@ -85,7 +89,8 @@ async fn replay(
         run,
     )
     .await?;
-    authority::supported_publication(tx, configuration.bundle()).await?;
+    authority::supported_publication(tx, configuration.bundle(), workflow_tools::ToolCheck::Run)
+        .await?;
     resources::check_readiness(tx, &configuration).await?;
     Ok(AdmissionResult::Replayed(RunId::new(run)))
 }

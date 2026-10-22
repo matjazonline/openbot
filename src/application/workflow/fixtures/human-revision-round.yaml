@@ -1,17 +1,19 @@
-# Phase07 will bind each new round's feedback and prior draft from its parent.
+# Shipped support template, one round (07-D1 §D1.8): agent draft, human review, declared output.
+# The round completes after the decision; its parent owns repetition and the final delivery.
 format_version: 1
 workflow_id: 00000000-0000-0000-0000-000000000005
 input_schema:
   type: object
   properties:
     message: {type: string}
+    context: true
     previous_body: {type: string}
     feedback: {type: string}
     deadline: {type: string, maxLength: 64}
-  required: [message, previous_body, feedback, deadline]
+  required: [message, context, previous_body, feedback, deadline]
   additionalProperties: false
-# Reviewers are static (05-D2 §4.2): a round reads them from its binding parameters, never from
-# run input. Phase07 owns how a child round receives those parameters.
+# Reviewers are static (05-D2 §4.2): a round reads them from its own parameters, which the
+# parent's flow.repeat step supplies from its binding parameters.
 parameter_schema:
   type: object
   properties:
@@ -21,14 +23,19 @@ parameter_schema:
 output_schema:
   type: object
   properties:
-    choice: {type: string, enum: [accept, revise]}
-    data:
+    choice: {type: string, enum: [accept, revise, escalate, cancel, timeout]}
+    artifact:
       type: object
       properties: {body: {type: string, maxLength: 16384}}
       required: [body]
       additionalProperties: false
     feedback: {type: string, maxLength: 16384}
-  required: [choice, data, feedback]
+    data:
+      type: object
+      properties: {body: {type: string, maxLength: 16384}}
+      required: [body]
+      additionalProperties: false
+  required: [choice, artifact, feedback, data]
   additionalProperties: false
 resources: []
 entry: draft
@@ -40,6 +47,7 @@ steps:
       context:
         object:
           untrusted_message: {ref: /input/message}
+          untrusted_context: {ref: /input/context}
           previous_body: {ref: /input/previous_body}
           feedback: {ref: /input/feedback}
       output_schema:
@@ -61,6 +69,48 @@ steps:
           properties: {body: {type: string, maxLength: 16384}}
           required: [body]
           additionalProperties: false
-      feedback_required: {literal: [revise]}
-    routes: {choices: {accept: $end, revise: $end}}
+      feedback_required: {literal: [revise, escalate]}
+    # A review past its deadline takes the error route, whose successor receives null.
+    routes: {choices: {accept: outcome, revise: outcome, escalate: outcome, cancel: outcome}, error: timeout}
+  outcome:
+    type: data.map
+    with:
+      # The artifact is exactly the reviewed (possibly edited) draft.
+      value:
+        object:
+          choice: {ref: /steps/review/output/choice}
+          artifact: {ref: /steps/review/output/data}
+          feedback: {ref: /steps/review/output/feedback}
+          data: {ref: /steps/review/output/data}
+      output_schema:
+        literal:
+          type: object
+          properties:
+            choice: {type: string, enum: [accept, revise, escalate, cancel]}
+            artifact: {type: object, properties: {body: {type: string, maxLength: 16384}}, required: [body], additionalProperties: false}
+            feedback: {type: string, maxLength: 16384}
+            data: {type: object, properties: {body: {type: string, maxLength: 16384}}, required: [body], additionalProperties: false}
+          required: [choice, artifact, feedback, data]
+          additionalProperties: false
+    routes: {success: $end}
+  timeout:
+    type: data.map
+    with:
+      value:
+        object:
+          choice: {literal: timeout}
+          artifact: {ref: /steps/draft/output}
+          feedback: {literal: ""}
+          data: {ref: /steps/draft/output}
+      output_schema:
+        literal:
+          type: object
+          properties:
+            choice: {const: timeout}
+            artifact: {type: object, properties: {body: {type: string, maxLength: 16384}}, required: [body], additionalProperties: false}
+            feedback: {type: string, maxLength: 0}
+            data: {type: object, properties: {body: {type: string, maxLength: 16384}}, required: [body], additionalProperties: false}
+          required: [choice, artifact, feedback, data]
+          additionalProperties: false
+    routes: {success: $end}
 limits: {max_steps: 10, max_context_bytes: 65536}

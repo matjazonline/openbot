@@ -96,10 +96,18 @@ pub fn freeze(
 ) -> Result<PublishedBundle, Diagnostic> {
     let parsed = compiler::parse_workflow(&decoded, version_id)?;
     preflight::validate(&snapshots, &children, &parsed)?;
-    let child_facts = dependencies::capture(company_id, &parsed, children)?;
+    let child_facts = dependencies::capture(company_id, &parsed, children, &snapshots.tools)?;
     let facts = CatalogueFacts {
         tools: snapshots.tools.iter().map(|t| t.contract.clone()).collect(),
         children: child_facts.contracts,
+        tool_workflows: snapshots
+            .tools
+            .iter()
+            .filter_map(|tool| match tool.kind() {
+                ToolKind::Workflow(pin) => Some(pin.workflow_id),
+                _ => None,
+            })
+            .collect(),
     };
     let compiled = registry::compile(decoded, version_id, &facts, &child_facts.graph)?;
     validation::validate(company_id, &snapshots, &compiled)?;

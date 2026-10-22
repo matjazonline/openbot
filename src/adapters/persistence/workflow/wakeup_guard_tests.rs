@@ -12,8 +12,10 @@ async fn siblings() -> Siblings {
     let mut source = example("data.map");
     source["steps"]["finish"] = source["steps"]["start"].clone();
     source["steps"]["start"]["routes"]["success"] = json!("finish");
+    // Category B: children of consecutive executions while their parent keeps progressing is a
+    // state the runtime never produces (a parent parks on its child); it guards fact scoping.
     let (fixture, parent) = fixture(source).await;
-    let first = admit_child(&fixture, parent, "start", "first").await;
+    let first = fixture.lineage_child(parent).await;
     let next_parent = fixture
         .persistence()
         .advance_pure(parent, budget(1))
@@ -21,7 +23,7 @@ async fn siblings() -> Siblings {
         .unwrap()
         .continuation
         .unwrap();
-    let second = admit_child(&fixture, next_parent, "finish", "second").await;
+    let second = fixture.lineage_child(next_parent).await;
     Siblings {
         fixture,
         parent,
@@ -71,8 +73,7 @@ async fn workflow_wakeup_actual_wait_expiry_produces_failed_fact() {
     let mut source = example("wait.event");
     source["steps"]["start"]["with"]["deadline"] =
         json!({"literal":(chrono::Utc::now()+chrono::Duration::minutes(1)).to_rfc3339()});
-    let (f, parent) = fixture(source).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(source).await;
     f.persistence().park_wait(child).await.unwrap().unwrap();
     sqlx::query("UPDATE workflow_waits SET created_at=clock_timestamp()-interval '2 seconds',deadline=clock_timestamp()-interval '1 second' WHERE run_id=$1")
         .bind(child.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
@@ -96,8 +97,7 @@ async fn forged(
 
 #[tokio::test]
 async fn workflow_wakeup_rejects_forged_duplicate_and_overridden_transition_facts() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     assert_eq!(
         forged(&f, child, 99, None)
             .await
@@ -163,8 +163,7 @@ async fn workflow_wakeup_rejects_forged_duplicate_and_overridden_transition_fact
 
 #[tokio::test]
 async fn workflow_wakeup_parent_composite_fk_rejects_wrong_run_execution_pair() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     let error = sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(run)||jsonb_build_object('id',$2::uuid,'parent_run_id',$3::uuid,'parent_execution_id',$4::uuid))).* FROM workflow_runs AS run WHERE run.id=$1")
         .bind(child.run.as_uuid()).bind(Uuid::new_v4()).bind(parent.run.as_uuid()).bind(child.execution.as_uuid())
         .execute(f.persistence().pool()).await.unwrap_err();
@@ -176,8 +175,7 @@ async fn workflow_wakeup_parent_composite_fk_rejects_wrong_run_execution_pair() 
 
 #[tokio::test]
 async fn workflow_wakeup_parent_composite_fk_rejects_valid_foreign_parent() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, _parent, child) = chained(example("data.map")).await;
     let foreign = admission_source_tests::ForeignSource::new(&f).await;
     let foreign = admission_source_tests::foreign_parent(&f, foreign.company).await;
     let error = sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(run)||jsonb_build_object('id',$2::uuid,'parent_run_id',$3::uuid,'parent_execution_id',$4::uuid))).* FROM workflow_runs AS run WHERE run.id=$1")

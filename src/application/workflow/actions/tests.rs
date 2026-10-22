@@ -16,6 +16,7 @@ pub(crate) fn request(scope: ActionScope) -> ActionRequest {
             resource_kind: TypeName::parse("fixture").unwrap(),
         },
         contract: ToolSnapshot {
+            workflow: None,
             company_id: scope.company,
             contract: ToolContract {
                 name: TypeName::parse("fixture.write").unwrap(),

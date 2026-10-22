@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::workflow::children::WorkflowChildren;
 
 #[tokio::test]
 async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation() {
@@ -90,48 +91,52 @@ async fn workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes(
 }
 
 #[tokio::test]
-async fn workflow_control_child_admission_competes_and_existing_child_replays() {
-    let (f, scope) = fixture().await;
-    let parent = ExecutionRef::new(
-        scope.company,
-        scope.run,
-        scope.execution,
-        StepId::parse("start").unwrap(),
-    );
-    let trigger = TriggerRef::new(
-        scope.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(parent),
-        },
-    )
-    .unwrap();
-    let child = f.prepare(f.request("child", trigger)).await;
-    let cancel = command(&f, scope, "cancel").await;
-    let barrier = Barrier::new(2);
-    let admission = async {
-        barrier.wait().await;
-        f.persistence().admit(&child).await
-    };
-    let control = async {
-        barrier.wait().await;
-        f.persistence().cancel(cancel).await.unwrap()
-    };
-    let (admitted, cancelled) = tokio::time::timeout(Duration::from_secs(3), async {
-        tokio::join!(admission, control)
-    })
-    .await
-    .unwrap();
-    assert!(matches!(cancelled, CancelResult::Applied { .. }));
-    match admitted {
-        Ok(AdmissionResult::Created(id)) => assert_eq!(
-            f.persistence().admit(&child).await.unwrap(),
-            AdmissionResult::Replayed(id)
-        ),
-        Err(AppError::Conflict(_)) => assert!(matches!(
-            f.persistence().admit(&child).await,
-            Err(AppError::Conflict(_))
-        )),
-        other => panic!("unexpected admission {other:?}"),
+async fn workflow_control_cancel_competes_with_child_creation() {
+    // Competing claimants on the parent run lock (07-D1 §D1.5): whichever commits first, no live
+    // child remains under a cancelled parent.
+    let source: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    for _ in 0..4 {
+        let (f, scope) = AdmissionFixture::caller(source.clone()).await;
+        let cancel = command(&f, scope, "cancel").await;
+        let barrier = Barrier::new(2);
+        let park = async {
+            barrier.wait().await;
+            f.persistence().park_child(scope).await.unwrap()
+        };
+        let control = async {
+            barrier.wait().await;
+            f.persistence().cancel(cancel).await.unwrap()
+        };
+        let (parked, cancelled) = tokio::time::timeout(Duration::from_secs(3), async {
+            tokio::join!(park, control)
+        })
+        .await
+        .unwrap();
+        // A park that commits first advances the parent's revision, so a cancel prepared
+        // before it conflicts and the operator retries with the current revision.
+        if !matches!(cancelled, CancelResult::Applied { .. }) {
+            assert!(parked.is_some(), "{cancelled:?}");
+            assert!(matches!(cancelled, CancelResult::RevisionConflict { .. }));
+            let retried = f
+                .persistence()
+                .cancel(command(&f, scope, "cancel-current").await)
+                .await
+                .unwrap();
+            assert!(
+                matches!(retried, CancelResult::Applied { .. }),
+                "{retried:?}"
+            );
+        }
+        let live: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE parent_run_id=$1 AND state IN ('queued','running','waiting')")
+            .bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+        assert_eq!(live, 0);
+        let children: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE parent_run_id=$1")
+                .bind(scope.run.as_uuid())
+                .fetch_one(f.persistence().pool())
+                .await
+                .unwrap();
+        assert_eq!(children, i64::from(parked.is_some()));
     }
 }

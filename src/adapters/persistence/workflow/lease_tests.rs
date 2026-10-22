@@ -329,12 +329,20 @@ mod settle_tests {
     }
 }
 
-async fn fixture() -> (AdmissionFixture, ActivationRequest) {
+fn lease_source() -> Value {
     let mut source: Value =
         serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
     source["input_schema"] = json!({"type":"object","properties":{"value":{"type":"integer","minimum":1,"maximum":1000}},"required":["value"]});
     source["steps"]["start"]["with"]["max_tokens"] = json!({"ref":"/input/value"});
-    fixture_source(source).await
+    source
+}
+async fn fixture() -> (AdmissionFixture, ActivationRequest) {
+    fixture_source(lease_source()).await
+}
+/// Category A (07-D1 §D1.2a): the same I/O step as `fixture`, run as a parked root's child.
+async fn child_fixture() -> (AdmissionFixture, ActivationRequest) {
+    let (f, scopes) = AdmissionFixture::chain(lease_source(), 1).await;
+    (f, scopes[1])
 }
 async fn fixture_source(source: Value) -> (AdmissionFixture, ActivationRequest) {
     let f = AdmissionFixture::with_binding(BindingFixture::from_source(source).await).await;

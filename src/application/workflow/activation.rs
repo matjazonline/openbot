@@ -67,6 +67,14 @@ pub fn input_dependencies(bundle: &PublishedBundle, step: &StepId) -> AppResult<
     if let Some(rule) = bundle.compiled().rule(step) {
         pending.extend(rule.cases.iter().map(|case| &case.when));
     }
+    // A repeat round reads its deferred bindings against the same earlier outputs (07-D1 §D1.1).
+    if let Some(repeat) = bundle
+        .compiled()
+        .child_control(step)
+        .and_then(|control| control.repeat.as_ref())
+    {
+        pending.extend([&repeat.next_input, &repeat.exit_when]);
+    }
     let mut references = BTreeSet::new();
     while let Some(binding) = pending.pop() {
         let reference = match binding {

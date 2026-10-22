@@ -13,6 +13,7 @@ pub mod budget;
 mod canonical;
 pub mod capacity;
 pub mod checkpoints;
+pub mod children;
 pub mod compiler;
 pub mod completion;
 mod contracts;
@@ -30,6 +31,7 @@ pub mod registry;
 mod service;
 pub mod supervise;
 pub mod templates;
+pub mod tools;
 pub mod waits;
 pub mod wakeups;
 

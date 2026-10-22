@@ -46,38 +46,11 @@ async fn debit(f: &AdmissionFixture, fence: WorkflowFence) {
     );
 }
 
+/// Category B (07-D1 §D1.2a): a descendant running beside an ancestor that is in
+/// reconciliation or holds a claim is a state the runtime never produces (a parent parks on its
+/// child); these cases guard reconciliation's shared root budget checks against it.
 async fn child(f: &AdmissionFixture, parent: ActivationRequest) -> ActivationRequest {
-    let trigger = TriggerRef::new(
-        parent.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                parent.company,
-                parent.run,
-                parent.execution,
-                StepId::parse("start").unwrap(),
-            )),
-        },
-    )
-    .unwrap();
-    let c = f
-        .prepare(f.request("eligibility-budget-child", trigger))
-        .await;
-    assert!(matches!(
-        f.persistence().admit(&c).await.unwrap(),
-        AdmissionResult::Created(_)
-    ));
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(c.first_execution_id().as_uuid())
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    ActivationRequest {
-        company: parent.company,
-        run: c.proposed_run_id(),
-        execution: c.first_execution_id(),
-        job: WorkflowJobId(job),
-    }
+    f.lineage_child(parent).await
 }
 
 #[tokio::test]

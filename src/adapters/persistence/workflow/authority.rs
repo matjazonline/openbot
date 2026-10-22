@@ -91,13 +91,17 @@ pub(super) fn builtin_message_tool(tool: &ToolSnapshot) -> AppResult<bool> {
 /// skill snapshots are frozen content verified once, at publish, against their durable
 /// owners (`agent_publication::verify_on`, 06-D5); later agent edits never block stored
 /// versions, their bindings, admission or parents.
+///
+/// Workflow tools (07-D2 §D2.2): `check` applies to the root's own snapshots only; stored child
+/// bundles were verified at their own publication and are held to the run rule.
 pub(super) async fn supported_publication(
     tx: &mut Transaction<'_, Postgres>,
     bundle: &PublishedBundle,
+    check: workflow_tools::ToolCheck,
 ) -> AppResult<()> {
-    let mut pending = vec![bundle];
+    let mut pending = vec![(bundle, check)];
     let mut seen = 0;
-    while let Some(current) = pending.pop() {
+    while let Some((current, check)) = pending.pop() {
         seen += 1;
         if seen > 256 || current.company_id() != bundle.company_id() {
             return Err(missing());
@@ -105,24 +109,33 @@ pub(super) async fn supported_publication(
         let snapshots = current.snapshots();
         let definition = current.compiled().graph().definition();
         for tool in &snapshots.tools {
-            if builtin_message_tool(tool)? {
-                continue;
-            }
-            let kind = match &tool.contract.connection {
-                Some(slot) => resources::slot_kind(definition, slot),
-                None => Some("http"),
-            };
-            match kind {
-                Some("http") => {
+            match tool.kind() {
+                ToolKind::Message => {
+                    builtin_message_tool(tool)?;
+                }
+                ToolKind::Http => {
                     http::registered_on(tx, current.company_id(), tool).await?;
                 }
-                Some("mcp") => {
-                    mcp::registered_on(tx, current.company_id(), tool).await?;
+                ToolKind::Slot(slot) => match resources::slot_kind(definition, slot) {
+                    Some("http") => {
+                        http::registered_on(tx, current.company_id(), tool).await?;
+                    }
+                    Some("mcp") => {
+                        mcp::registered_on(tx, current.company_id(), tool).await?;
+                    }
+                    _ => return Err(missing()),
+                },
+                ToolKind::Workflow(_) => {
+                    workflow_tools::registered_on(tx, current.company_id(), tool, check).await?;
                 }
-                _ => return Err(missing()),
             }
         }
-        pending.extend(current.children().values().map(AsRef::as_ref));
+        pending.extend(
+            current
+                .children()
+                .values()
+                .map(|child| (child.as_ref(), workflow_tools::ToolCheck::Run)),
+        );
     }
     Ok(())
 }

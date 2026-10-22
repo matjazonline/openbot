@@ -24,6 +24,16 @@ pub struct StepControl {
     pub child_workflow_id: WorkflowId,
     pub child_version_id: VersionId,
     pub max_iterations: Option<u32>,
+    /// `flow.repeat` only: evaluated after each successful round, never frozen at activation.
+    pub repeat: Option<RepeatBindings>,
+}
+
+/// Deferred `flow.repeat` bindings (07-D1 §D1.1). Inside them `/steps/<self>/output` is the
+/// provisional `{result, rounds}` of the round that just completed.
+#[derive(Debug, Clone)]
+pub struct RepeatBindings {
+    pub next_input: crate::domain::workflow::Binding,
+    pub exit_when: crate::domain::workflow::Binding,
 }
 
 fn name<T>(
@@ -165,13 +175,23 @@ fn control(
     let child_id = map.get("child_workflow_id");
     let version_id = map.get("child_version_id");
     let iterations = map.get("max_iterations");
+    let repeat = map.get("repeat");
     match (child_id, version_id) {
-        (None, None) if iterations.is_none() => Ok(None),
+        (None, None) if iterations.is_none() && repeat.is_none() => Ok(None),
         (Some(workflow), Some(version)) => Ok(Some(StepControl {
             child_workflow_id: WorkflowId::new(uuid(workflow, &child(path, "child_workflow_id"))?),
             child_version_id: VersionId::new(uuid(version, &child(path, "child_version_id"))?),
             max_iterations: iterations
-                .map(|node| positive_u32(node, &child(path, "max_iterations"), 10_000))
+                .map(|node| {
+                    positive_u32(
+                        node,
+                        &child(path, "max_iterations"),
+                        crate::domain::workflow::MAX_ROOT_REPETITIONS,
+                    )
+                })
+                .transpose()?,
+            repeat: repeat
+                .map(|node| repeat_bindings(node, &child(path, "repeat")))
                 .transpose()?,
         })),
         _ => Err(Diagnostic::at(
@@ -181,6 +201,20 @@ fn control(
             step.span,
         )),
     }
+}
+
+fn repeat_bindings(node: &LocatedNode, path: &str) -> Result<RepeatBindings, Diagnostic> {
+    let map = fields(node, path, &["next_input", "exit_when"])?;
+    Ok(RepeatBindings {
+        next_input: parse_binding(
+            required(&map, "next_input", path, node)?,
+            &child(path, "next_input"),
+        )?,
+        exit_when: parse_binding(
+            required(&map, "exit_when", path, node)?,
+            &child(path, "exit_when"),
+        )?,
+    })
 }
 
 struct ParsedSteps {
@@ -208,6 +242,7 @@ fn steps(node: &LocatedNode, path: &str) -> Result<ParsedSteps, Diagnostic> {
                 "child_workflow_id",
                 "child_version_id",
                 "max_iterations",
+                "repeat",
             ],
         )?;
         let kind = name(

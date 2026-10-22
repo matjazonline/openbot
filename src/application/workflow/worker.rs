@@ -1,8 +1,8 @@
 //! Reusable single-slot worker. Production handler wiring belongs to the owning
 //! action/agent subsystems; notification delivery is never a prerequisite.
 use super::{
-    activation::*, batch::*, completion::*, decisions::*, lease::*, polling::*, supervise::*,
-    waits::*,
+    activation::*, batch::*, children::*, completion::*, decisions::*, lease::*, polling::*,
+    supervise::*, waits::*,
 };
 use crate::application::app_error::AppResult;
 use async_trait::async_trait;
@@ -44,6 +44,7 @@ where
         + WorkflowFairPolling
         + WorkflowBatch
         + WorkflowWaits
+        + WorkflowChildren
         + WorkflowDecisions
         + WorkflowLeases
         + WorkflowLeaseRecovery
@@ -142,6 +143,12 @@ where
             }
             "wait.event" | "wait.timer" => {
                 if self.port.park_wait(scope).await?.is_some() {
+                    self.port.resume_wait(scope).await?;
+                }
+            }
+            // The parent parks on its child; no worker waits for the child (07-D1 §D1.2).
+            "workflow.call" | "flow.repeat" => {
+                if self.port.park_child(scope).await?.is_some() {
                     self.port.resume_wait(scope).await?;
                 }
             }

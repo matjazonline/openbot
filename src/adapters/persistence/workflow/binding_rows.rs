@@ -33,15 +33,7 @@ pub(super) async fn read_binding(
     ).bind(company.as_uuid()).bind(id.as_uuid()).fetch_optional(&mut *db).await?;
     let Some(row) = row else { return Ok(None) };
     let bundle = read_version(db, company, VersionId::new(row.version_id)).await?;
-    let association = match (row.channel_id, row.thread_id) {
-        (None, None) => RelatedAssociation::Company,
-        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
-            thread_id: RelatedThreadId::new(thread),
-        },
-        _ => return Err(invalid()),
-    };
+    let association = association_from_columns(row.channel_id, row.thread_id)?;
     let configuration = ConfiguredBinding::new(
         BindingConfiguration {
             company_id: CompanyId::new(row.company_id),
@@ -93,4 +85,20 @@ pub(super) fn association_columns(association: RelatedAssociation) -> (Option<Uu
             thread_id,
         } => (Some(channel_id.as_uuid()), Some(thread_id.as_uuid())),
     }
+}
+
+/// The inverse of `association_columns`; a thread without its channel is corrupt.
+pub(super) fn association_from_columns(
+    channel: Option<Uuid>,
+    thread: Option<Uuid>,
+) -> AppResult<RelatedAssociation> {
+    Ok(match (channel, thread) {
+        (None, None) => RelatedAssociation::Company,
+        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
+        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
+            channel_id: RelatedChannelId::new(channel),
+            thread_id: RelatedThreadId::new(thread),
+        },
+        (None, Some(_)) => return Err(invalid()),
+    })
 }

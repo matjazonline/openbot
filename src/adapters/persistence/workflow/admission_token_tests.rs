@@ -86,63 +86,64 @@ async fn workflow_admit_token_reviewer_requires_current_person_identity() {
 }
 
 #[tokio::test]
-async fn workflow_admit_token_child_inherits_root_reviewers_and_rechecks_them() {
-    let (f, reviewer) = configured().await;
+async fn workflow_admit_token_child_admission_refused_and_runtime_child_shares_root_policy() {
+    // Category C (07-D1 §D1.2a): a child is never admitted, so its reviewers are never checked
+    // at admission. A runtime child spends under the root's token policy through its budget link.
+    let (f, _) = configured().await;
     let root = f.prepare(f.request("root", f.manual())).await;
     f.persistence().admit(&root).await.unwrap();
-    let parent = ExecutionRef::new(
-        root.company_id(),
-        root.proposed_run_id(),
-        root.first_execution_id(),
-        root.entry().clone(),
-    );
     let trigger = TriggerRef::new(
         root.company_id(),
         TriggerId::new(Uuid::new_v4()),
         TriggerSource::Child {
-            parent: ChildCause::Execution(parent),
-        },
-    )
-    .unwrap();
-    let child = f.prepare(f.request("child", trigger.clone())).await;
-    f.persistence().admit(&child).await.unwrap();
-    let root_id: Uuid = sqlx::query_scalar(
-        "SELECT root_run_id FROM workflow_run_budgets WHERE company_id=$1 AND run_id=$2",
-    )
-    .bind(child.company_id().as_uuid())
-    .bind(child.proposed_run_id().as_uuid())
-    .fetch_one(f.persistence().pool())
-    .await
-    .unwrap();
-    assert_eq!(root_id, root.proposed_run_id().as_uuid());
-    let next_trigger = TriggerRef::new(
-        root.company_id(),
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                child.company_id(),
-                child.proposed_run_id(),
-                child.first_execution_id(),
-                child.entry().clone(),
+            parent: ChildCause::Step(ChildStepRef::new(
+                ExecutionRef::new(
+                    root.company_id(),
+                    root.proposed_run_id(),
+                    root.first_execution_id(),
+                    root.entry().clone(),
+                ),
+                ChildOrdinal::FIRST,
             )),
         },
     )
     .unwrap();
-    let next = f.prepare(f.request("next-child", next_trigger)).await;
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
-        .bind(root.company_id().as_uuid())
-        .bind(reviewer)
-        .execute(f.persistence().pool())
+    let before = f.counts().await;
+    let p = f.persistence().clone();
+    let refused = WorkflowService::new(p.clone(), p, NoRuntime, NoRuntime, Preflight)
+        .admit(f.request("child", trigger))
+        .await;
+    assert!(
+        matches!(refused, Err(AppError::BadRequest(_))),
+        "{refused:?}"
+    );
+    assert_eq!(f.counts().await, before);
+
+    let fixture = Fixture::new().await;
+    let reviewer = member(&fixture, "admin").await;
+    let mut source: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    source["limits"]["root_budget"] = json!({
+        "activations": 10, "model_calls": 10, "repetitions": 10,
+        "tokens": {"max_tokens": 2000, "reviewers": [{"kind":"user","id":reviewer}]}
+    });
+    let (f, scopes) = AdmissionFixture::chain_in(fixture, source, 1).await;
+    let (root, child) = (scopes[0], scopes[1]);
+    let (root_id, reviewers): (Uuid, Value) = sqlx::query_as(
+        "SELECT link.root_run_id, budget.token_policy->'reviewers' FROM workflow_run_budgets AS link \
+         JOIN workflow_root_budgets AS budget ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id \
+         WHERE link.company_id=$1 AND link.run_id=$2",
+    )
+    .bind(child.company.as_uuid())
+    .bind(child.run.as_uuid())
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    assert_eq!(root_id, root.run.as_uuid());
+    assert_eq!(reviewers, json!([{"kind":"user","id":reviewer}]));
+    let budgets: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_root_budgets")
+        .fetch_one(f.persistence().pool())
         .await
         .unwrap();
-    let before = f.counts().await;
-    assert!(matches!(
-        f.persistence().admit(&next).await,
-        Err(AppError::NotFound(_))
-    ));
-    assert_eq!(f.counts().await, before);
-    assert_eq!(
-        f.persistence().admit(&child).await.unwrap(),
-        AdmissionResult::Replayed(child.proposed_run_id())
-    );
+    assert_eq!(budgets, 1);
 }

@@ -79,6 +79,7 @@ impl HttpOperation {
             publication::ActionRecovery,
         };
         if self.tool.company_id != company
+            || self.tool.workflow.is_some()
             || self.tool.contract.connection.is_some()
             || self.tool.policy.recovery != ActionRecovery::Reconcile
             || self.tool.policy.policy_revision == 0

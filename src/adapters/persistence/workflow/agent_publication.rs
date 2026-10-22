@@ -256,8 +256,10 @@ impl<D: PublicationDirectory> PublicationDirectory for AgentPublicationDirectory
 }
 
 /// Resolve one agent grant with the SQL owner's rules: an already captured snapshot of that
-/// name (step-direct HTTP or a selected MCP slot) is reused when unique; a built-in message
-/// tool is its trusted snapshot; otherwise the company's single ready HTTP registration.
+/// name (step-direct HTTP, a selected MCP slot, or the same workflow tool) is reused when
+/// unique; a built-in message tool is its trusted snapshot; then the company's workflow tool
+/// registration of that name (07-D2 §D2.2); otherwise the company's single ready HTTP
+/// registration. A name that two of these could answer is refused as ambiguous.
 async fn granted_tool(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -265,27 +267,43 @@ async fn granted_tool(
     captured: &[ToolSnapshot],
     definition: &crate::domain::workflow::WorkflowDefinition,
 ) -> AppResult<Option<ToolSnapshot>> {
+    let ambiguous = || {
+        refused(format!(
+            "Agent tool {name} conflicts with another tool of the same name in this workflow"
+        ))
+    };
+    let workflow = super::workflow_tools::workflow_tool_snapshot(tx, company, name).await?;
     let known: Vec<&ToolSnapshot> = captured
         .iter()
         .filter(|tool| &tool.contract.name == name)
         .collect();
-    match known.as_slice() {
-        [] => {}
-        // A registration (no slot) or a selected MCP slot is a usable agent tool as captured.
-        [tool]
-            if tool.contract.connection.as_ref().is_none_or(|slot| {
-                super::resources::slot_kind(definition, slot) == Some("mcp")
-            }) =>
+    match (known.as_slice(), &workflow) {
+        ([], _) => {}
+        // Another agent of this workflow already captured the same workflow tool.
+        ([tool], Some(registered)) => {
+            return match (tool.kind(), registered.kind()) {
+                (ToolKind::Workflow(frozen), ToolKind::Workflow(current)) if frozen == current => {
+                    Ok(None)
+                }
+                _ => Err(ambiguous()),
+            };
+        }
+        // A built-in message tool, a registration (no slot) or a selected MCP slot is a usable
+        // agent tool as captured.
+        ([tool], None)
+            if match tool.kind() {
+                ToolKind::Message | ToolKind::Http => true,
+                ToolKind::Slot(slot) => {
+                    super::resources::slot_kind(definition, slot) == Some("mcp")
+                }
+                ToolKind::Workflow(_) => false,
+            } =>
         {
             return Ok(None);
         }
         // A slot-bound HTTP step selection is not an agent tool, and a second snapshot of
         // the same name would make the agent's selection ambiguous (06-R016 F017).
-        _ => {
-            return Err(refused(format!(
-                "Agent tool {name} conflicts with another tool of the same name in this workflow"
-            )));
-        }
+        _ => return Err(ambiguous()),
     }
     if let Some(kind) = MessageKind::parse(name.as_str()) {
         return Ok(Some(builtin_message_snapshot(company, kind)?));
@@ -295,12 +313,20 @@ async fn granted_tool(
         .bind(name.as_str())
         .fetch_all(&mut **tx)
         .await?;
+    if let Some(workflow) = workflow {
+        if !snapshots.is_empty() {
+            return Err(refused(format!(
+                "Agent tool {name} is registered both as a workflow and as an HTTP operation"
+            )));
+        }
+        return Ok(Some(workflow));
+    }
     match snapshots.as_slice() {
         [snapshot] => Ok(Some(
             serde_json::from_value(snapshot.clone()).map_err(|_| invalid())?,
         )),
         [] => Err(refused(format!(
-            "Agent tool {name} has no ready HTTP registration or selected MCP slot"
+            "Agent tool {name} has no ready HTTP registration, workflow registration or selected MCP slot"
         ))),
         _ => Err(refused(format!(
             "Agent tool {name} is registered on several connections"

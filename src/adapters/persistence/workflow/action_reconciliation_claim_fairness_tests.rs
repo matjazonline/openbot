@@ -8,38 +8,11 @@ struct Descendant {
     descendant: ActivationRequest,
 }
 
+/// Category B (07-D1 §D1.2a): the child-policy cases keep each ancestor in its own I/O state
+/// rather than parked on its child, a state the runtime never produces; they guard the
+/// reconciliation claim policy for descendants against it.
 async fn unique_child(f: &AdmissionFixture, parent: ActivationRequest) -> ActivationRequest {
-    let trigger = TriggerRef::new(
-        parent.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                parent.company,
-                parent.run,
-                parent.execution,
-                StepId::parse("start").unwrap(),
-            )),
-        },
-    )
-    .unwrap();
-    // Each genuine admission has a distinct logical idempotency key.
-    let key = format!("held-ancestor-child-{}", Uuid::new_v4().simple());
-    let c = f.prepare(f.request(&key, trigger)).await;
-    assert!(matches!(
-        f.persistence().admit(&c).await.unwrap(),
-        AdmissionResult::Created(_)
-    ));
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(c.first_execution_id().as_uuid())
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    ActivationRequest {
-        company: parent.company,
-        run: c.proposed_run_id(),
-        execution: c.first_execution_id(),
-        job: WorkflowJobId(job),
-    }
+    f.lineage_child(parent).await
 }
 
 async fn descendant_fixture() -> Descendant {

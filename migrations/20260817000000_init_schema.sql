@@ -244,7 +244,16 @@ BEGIN
                                 WHERE decision.company_id=execution.company_id AND decision.execution_id=execution.id
                                     AND decision.subject_kind IN ('action_approval','token_allowance') AND decision.submitted_at IS NULL
                                     AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
-                                    AND wait.reason='decision' AND wait.state='waiting')))
+                                    AND wait.reason='decision' AND wait.state='waiting'))
+                        -- A workflow tool call parks its agent job on the call's child (07-D2 §D2.5).
+                        OR (attempt.stop_reason='child_parked' AND execution.completed_at IS NULL
+                            AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='child_run'
+                            AND OLD.continuation_count < 63
+                            AND EXISTS (SELECT 1 FROM workflow_waits AS wait
+                                WHERE wait.company_id=execution.company_id AND wait.execution_id=execution.id
+                                    AND wait.reason='child_run' AND wait.state='waiting'
+                                    AND wait.child_tool_call_id IS NOT NULL
+                                    AND wait.parked_attempt_number=OLD.attempt_ordinal)))
             ) THEN
             RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514';
         END IF;
@@ -289,8 +298,23 @@ BEGIN
                     AND decision.job_id=OLD.id AND decision.parked_attempt_number=OLD.attempt_ordinal
                     AND decision.submitted_xact=pg_current_xact_id()
                     AND wait.reason='decision' AND wait.state='completed'
+            ) OR EXISTS (
+                -- A workflow tool call continues its parked agent job once the call's child is
+                -- terminal and its wait completed (07-D2 §D2.4).
+                SELECT 1 FROM workflow_executions AS execution
+                JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+                JOIN workflow_waits AS wait ON wait.company_id=execution.company_id AND wait.execution_id=execution.id
+                JOIN workflow_runs AS child ON child.company_id=wait.company_id AND child.id=wait.child_run_id
+                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
+                WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
+                    AND execution.completed_at IS NULL AND execution.committed_route IS NULL
+                    AND run.state='running' AND run.deadline>clock_timestamp()
+                    AND attempt.status='completed' AND attempt.stop_reason='child_parked'
+                    AND wait.reason='child_run' AND wait.state='completed'
+                    AND wait.child_tool_call_id IS NOT NULL AND wait.parked_attempt_number=OLD.attempt_ordinal
+                    AND child.terminal_wakeup_sequence IS NOT NULL
             )) THEN
-            RAISE EXCEPTION 'workflow job reopen requires an approval or delivery continuation' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow job reopen requires an approval, delivery or child continuation' USING ERRCODE='23514';
         END IF;
     END IF;
     RETURN NULL;
@@ -371,7 +395,7 @@ END $$;
 CREATE FUNCTION public.check_workflow_parent_source() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE source jsonb; parent_run uuid; parent_execution uuid;
+DECLARE source jsonb; parent_run uuid; parent_execution uuid; ordinal numeric; call uuid;
 BEGIN
     IF TG_OP='UPDATE' AND NEW IS DISTINCT FROM OLD THEN
         RAISE EXCEPTION 'Workflow admission identity is immutable' USING ERRCODE='23514';
@@ -380,7 +404,19 @@ BEGIN
     SELECT run.parent_run_id,run.parent_execution_id INTO parent_run,parent_execution
       FROM workflow_runs AS run WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id;
     IF source->>0='child' THEN
-        IF jsonb_array_length(source)<>5 OR source->4<>'null'::jsonb
+        -- Runtime children: a step round [child, run, execution, step, null, ordinal] (07-D1
+        -- §D1.2) or a workflow tool call [child, run, execution, step, call, null] (07-D2 §D2.3).
+        IF jsonb_typeof(source->5)='number' THEN
+            ordinal := (source->>5)::numeric;
+        END IF;
+        IF jsonb_typeof(source->4)='string'
+           AND source->>4 ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+            call := (source->>4)::uuid;
+        END IF;
+        IF jsonb_array_length(source)<>6
+           OR NOT ((ordinal IS NOT NULL AND source->4='null'::jsonb)
+               OR (call IS NOT NULL AND source->5='null'::jsonb))
+           OR (ordinal IS NOT NULL AND (ordinal<1 OR ordinal>1000 OR ordinal<>trunc(ordinal)))
            OR parent_run IS DISTINCT FROM (source->>1)::uuid
            OR parent_execution IS DISTINCT FROM (source->>2)::uuid
            OR NOT EXISTS (SELECT 1 FROM workflow_executions AS execution
@@ -1924,6 +1960,51 @@ $$;
 
 
 --
+-- Name: check_workflow_child_parent_wait(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_workflow_child_parent_wait() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- One creation path (07-D1 §D1.2a, §D1.3): a child run exists only with the child_run wait
+    -- of its parent execution, written in the same transaction by the runtime child writer.
+    -- The wait names the same round or saved call as the child's admission (07-D2 §D2.5).
+    IF NOT EXISTS (SELECT 1 FROM workflow_waits AS wait
+        JOIN workflow_admissions AS admission ON admission.company_id=wait.company_id
+          AND admission.run_id=wait.child_run_id
+        WHERE wait.company_id=NEW.company_id AND wait.child_run_id=NEW.id
+          AND wait.run_id=NEW.parent_run_id AND wait.execution_id=NEW.parent_execution_id
+          AND wait.reason='child_run'
+          AND substring(admission.source_key FROM 4)::jsonb->4
+              = COALESCE(to_jsonb(wait.child_tool_call_id::text),'null'::jsonb)
+          AND substring(admission.source_key FROM 4)::jsonb->5
+              = COALESCE(to_jsonb(wait.child_ordinal),'null'::jsonb)) THEN
+        RAISE EXCEPTION 'Workflow child run has no parent child_run wait' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+
+
+--
+-- Name: check_workflow_rerun_original(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_workflow_rerun_original() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- A rerun links a top-level original (07-D1 §D1.7). Lineage is immutable, so insert suffices.
+    IF NEW.rerun_of_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM workflow_runs AS original
+        WHERE original.company_id=NEW.company_id AND original.id=NEW.rerun_of_run_id
+          AND original.parent_run_id IS NOT NULL) THEN
+        RAISE EXCEPTION 'Workflow rerun original is not a top-level run' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
 -- Name: preserve_workflow_parent(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1931,8 +2012,8 @@ CREATE FUNCTION public.preserve_workflow_parent() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    IF (NEW.parent_run_id,NEW.parent_execution_id) IS DISTINCT FROM
-       (OLD.parent_run_id,OLD.parent_execution_id) THEN
+    IF (NEW.parent_run_id,NEW.parent_execution_id,NEW.rerun_of_run_id) IS DISTINCT FROM
+       (OLD.parent_run_id,OLD.parent_execution_id,OLD.rerun_of_run_id) THEN
         RAISE EXCEPTION 'Admitted workflow parent is immutable' USING ERRCODE='23514';
     END IF;
     RETURN NEW;
@@ -4210,6 +4291,23 @@ $$;
 -- Name: workflow_message_effect_wait_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
+CREATE FUNCTION public.workflow_tool_child_wait_continuation_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- 07-D2 §D2.5: a workflow tool call's child wait only continues its agent job; at commit the
+    -- execution is still open and its job is pending again.
+    IF NOT EXISTS(SELECT 1 FROM workflow_executions AS execution
+            JOIN background_tasks AS job ON job.company_id=execution.company_id
+                AND job.workflow_execution_id=execution.id
+            WHERE execution.company_id=NEW.company_id AND execution.id=NEW.execution_id
+              AND execution.completed_at IS NULL AND execution.committed_route IS NULL
+              AND job.status='pending')
+    THEN RAISE EXCEPTION 'workflow tool child wait only continues its agent job' USING ERRCODE='23514'; END IF;
+    RETURN NULL;
+END $$;
+
+
 CREATE FUNCTION public.workflow_model_tool_wait_continuation_guard() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -5712,7 +5810,7 @@ CREATE TABLE public.task_attempts (
     workflow_retirement text,
     CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
-    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text, 'effect_parked'::text, 'approval_parked'::text]))),
+    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text, 'effect_parked'::text, 'approval_parked'::text, 'child_parked'::text]))),
     CONSTRAINT task_attempts_token_check CHECK ((((prompt_tokens IS NULL) OR (prompt_tokens >= 0)) AND ((completion_tokens IS NULL) OR (completion_tokens >= 0)))),
     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text])))))
 );
@@ -6992,6 +7090,26 @@ CREATE TABLE public.workflow_http_credentials (
 
 
 --
+-- Name: workflow_tool_registrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_tool_registrations (
+    company_id uuid NOT NULL,
+    name text NOT NULL,
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    params jsonb DEFAULT '{}'::jsonb NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- 07-D2 §D2.1: a granted tool name; `message.*` names are the built-in message tools.
+    CONSTRAINT workflow_tool_registration_name CHECK ((public.valid_workflow_type_names(ARRAY[name]) AND (name !~ '^message[.]'::text))),
+    CONSTRAINT workflow_tool_registration_params CHECK (((jsonb_typeof(params) = 'object'::text) AND (octet_length((params)::text) <= 65536))),
+    CONSTRAINT workflow_tool_registration_revision CHECK ((revision >= 1))
+);
+
+
+--
 -- Name: workflow_http_operations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -7292,6 +7410,8 @@ CREATE TABLE public.workflow_runs (
     parent_execution_id uuid,
     terminal_wakeup_sequence bigint,
     revision bigint DEFAULT 1 NOT NULL,
+    rerun_of_run_id uuid,
+    CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
     CONSTRAINT workflow_parent_shape CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id)))),
     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
     CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
@@ -7376,10 +7496,15 @@ CREATE TABLE public.workflow_waits (
     settled_at timestamp with time zone,
     consumed_event_id uuid,
     failure_code text,
+    child_run_id uuid,
+    child_ordinal integer,
+    child_tool_call_id uuid,
+    parked_attempt_number integer,
+    CONSTRAINT workflow_wait_child CHECK ((((reason = 'child_run'::text) = (child_run_id IS NOT NULL)) AND ((reason = 'child_run'::text) = ((child_ordinal IS NOT NULL) <> (child_tool_call_id IS NOT NULL))) AND ((reason = 'child_run'::text) OR ((child_ordinal IS NULL) AND (child_tool_call_id IS NULL))) AND ((child_ordinal IS NULL) OR ((child_ordinal >= 1) AND (child_ordinal <= 1000))) AND ((parked_attempt_number IS NOT NULL) = (child_tool_call_id IS NOT NULL)) AND ((parked_attempt_number IS NULL) OR (parked_attempt_number >= 1)))),
     CONSTRAINT workflow_wait_correlation CHECK (((correlation IS NULL) OR ((octet_length(correlation) >= 1) AND (octet_length(correlation) <= 256)))),
     CONSTRAINT workflow_wait_deadline CHECK (((reason = 'timer'::text) OR (deadline > created_at))),
     CONSTRAINT workflow_wait_event_name CHECK (((event_name IS NULL) OR ((octet_length(event_name) >= 1) AND (octet_length(event_name) <= 128)))),
-    CONSTRAINT workflow_wait_failure CHECK ((((state = 'failed'::text) = (failure_code IS NOT NULL)) AND ((failure_code IS NULL) OR (failure_code = ANY (ARRAY['activation_limit'::text, 'invalid_output'::text, 'evidence_conflict'::text]))))),
+    CONSTRAINT workflow_wait_failure CHECK ((((state = 'failed'::text) = (failure_code IS NOT NULL)) AND ((failure_code IS NULL) OR (failure_code = ANY (ARRAY['activation_limit'::text, 'invalid_output'::text, 'evidence_conflict'::text, 'root_budget_exhausted'::text]))))),
     CONSTRAINT workflow_wait_intent CHECK (((notification_intent IS NULL) OR ((jsonb_typeof(notification_intent) = 'object'::text) AND ((notification_intent ->> 'version'::text) = '1'::text) AND ((notification_intent ->> 'wait_id'::text) = (id)::text) AND (octet_length((notification_intent)::text) <= 2048)))),
     CONSTRAINT workflow_wait_settlement CHECK (((state = 'waiting'::text) = (settled_at IS NULL))),
     CONSTRAINT workflow_wait_state CHECK ((state = ANY (ARRAY['waiting'::text, 'completed'::text, 'expired'::text, 'failed'::text, 'cancelled'::text]))),
@@ -9356,6 +9481,14 @@ ALTER TABLE ONLY public.workflow_http_operations
 
 
 --
+-- Name: workflow_tool_registrations workflow_tool_registrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_tool_registrations
+    ADD CONSTRAINT workflow_tool_registrations_pkey PRIMARY KEY (company_id, name);
+
+
+--
 -- Name: workflow_mcp_operations workflow_mcp_operations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9564,6 +9697,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_runs workflow_run_workflow_identity; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_run_workflow_identity UNIQUE (company_id, id, workflow_id);
+
+
+--
 -- Name: workflow_versions workflow_versions_company_id_command_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9609,7 +9750,12 @@ ALTER TABLE ONLY public.workflow_wait_events
 
 -- Effect waits are per message action (unique wait_id per action); an agent execution may
 -- park on several sequential deliveries, while workflow_wait_one_active keeps one active wait.
-CREATE UNIQUE INDEX workflow_wait_execution ON public.workflow_waits(company_id,run_id,execution_id,reason) WHERE reason NOT IN ('decision','effect');
+-- Each flow.repeat round has its own child_run wait; one execution holds one wait per ordinal.
+CREATE UNIQUE INDEX workflow_wait_execution ON public.workflow_waits(company_id,run_id,execution_id,reason) WHERE reason NOT IN ('decision','effect','child_run');
+
+CREATE UNIQUE INDEX workflow_wait_child_ordinal ON public.workflow_waits(company_id,run_id,execution_id,child_ordinal) WHERE reason='child_run';
+-- One child per saved model tool call of an agent execution (07-D2 §D2.3).
+CREATE UNIQUE INDEX workflow_wait_child_tool_call ON public.workflow_waits(company_id,run_id,execution_id,child_tool_call_id) WHERE child_tool_call_id IS NOT NULL;
 
 CREATE UNIQUE INDEX workflow_wait_one_active ON public.workflow_waits(company_id,run_id,execution_id) WHERE state='waiting';
 
@@ -9628,6 +9774,14 @@ ALTER TABLE ONLY public.workflow_waits
 
 ALTER TABLE ONLY public.workflow_waits
     ADD CONSTRAINT workflow_waits_pkey PRIMARY KEY (company_id, id);
+
+
+--
+-- Name: workflow_waits workflow_wait_child_run_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_waits
+    ADD CONSTRAINT workflow_wait_child_run_key UNIQUE (company_id, child_run_id);
 
 
 --
@@ -11582,6 +11736,8 @@ CREATE TRIGGER workflow_message_destination_immutable BEFORE DELETE OR UPDATE ON
 -- Name: workflow_waits workflow_message_effect_wait_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
+CREATE CONSTRAINT TRIGGER workflow_tool_child_wait_continuation AFTER UPDATE ON public.workflow_waits DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (((old.state = 'waiting'::text) AND (new.state = 'completed'::text) AND (new.reason = 'child_run'::text) AND (new.child_tool_call_id IS NOT NULL))) EXECUTE FUNCTION public.workflow_tool_child_wait_continuation_guard();
+
 CREATE CONSTRAINT TRIGGER workflow_model_tool_wait_continuation AFTER UPDATE ON public.workflow_waits DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (((old.state = 'waiting'::text) AND (new.state = 'completed'::text) AND (new.reason = 'effect'::text))) EXECUTE FUNCTION public.workflow_model_tool_wait_continuation_guard();
 
 CREATE TRIGGER workflow_message_effect_wait_guard BEFORE INSERT ON public.workflow_waits FOR EACH ROW WHEN ((new.reason = 'effect'::text)) EXECUTE FUNCTION public.workflow_message_effect_wait_guard();
@@ -11626,7 +11782,7 @@ CREATE TRIGGER workflow_message_reopen_immutable BEFORE DELETE OR UPDATE ON publ
 -- Name: workflow_runs workflow_parent_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER workflow_parent_immutable BEFORE UPDATE OF parent_run_id, parent_execution_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_parent();
+CREATE TRIGGER workflow_parent_immutable BEFORE UPDATE OF parent_run_id, parent_execution_id, rerun_of_run_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_parent();
 
 
 --
@@ -11634,6 +11790,20 @@ CREATE TRIGGER workflow_parent_immutable BEFORE UPDATE OF parent_run_id, parent_
 --
 
 CREATE TRIGGER workflow_parent_link BEFORE INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.insert_workflow_parent_link();
+
+
+--
+-- Name: workflow_runs workflow_child_parent_wait; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER workflow_child_parent_wait AFTER INSERT ON public.workflow_runs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((new.parent_run_id IS NOT NULL)) EXECUTE FUNCTION public.check_workflow_child_parent_wait();
+
+
+--
+-- Name: workflow_runs workflow_rerun_original; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_rerun_original BEFORE INSERT ON public.workflow_runs FOR EACH ROW WHEN ((new.rerun_of_run_id IS NOT NULL)) EXECUTE FUNCTION public.check_workflow_rerun_original();
 
 
 --
@@ -13883,6 +14053,23 @@ ALTER TABLE ONLY public.workflow_http_operations
 
 
 --
+-- Name: workflow_tool_registrations workflow_tool_registrations_company_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_tool_registrations
+    ADD CONSTRAINT workflow_tool_registrations_company_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_tool_registrations workflow_tool_registration_pin; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- A registration pins a version of its own company only (07-D2 §D2.1).
+--
+
+ALTER TABLE ONLY public.workflow_tool_registrations
+    ADD CONSTRAINT workflow_tool_registration_pin FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+
+
+--
 -- Name: workflow_mcp_operations workflow_mcp_operations_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -14107,6 +14294,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_runs workflow_rerun_original_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_rerun_original_fk FOREIGN KEY (company_id, rerun_of_run_id, workflow_id) REFERENCES public.workflow_runs(company_id, id, workflow_id);
+
+
+--
 -- Name: workflow_runs workflow_run_terminal_execution_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -14160,6 +14355,16 @@ ALTER TABLE ONLY public.workflow_executions
 
 ALTER TABLE ONLY public.workflow_versions
     ADD CONSTRAINT workflow_versions_company_id_workflow_id_fkey FOREIGN KEY (company_id, workflow_id) REFERENCES public.workflow_definitions(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_waits workflow_wait_child_link; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+-- A child_run wait can name only a child of its own run and execution (07-D1 §D1.3). Checked at
+-- commit, so a company cascade that removes the lineage before the wait still completes.
+ALTER TABLE ONLY public.workflow_waits
+    ADD CONSTRAINT workflow_wait_child_link FOREIGN KEY (company_id, child_run_id, run_id, execution_id) REFERENCES public.workflow_run_parents(company_id, child_run_id, parent_run_id, parent_execution_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --

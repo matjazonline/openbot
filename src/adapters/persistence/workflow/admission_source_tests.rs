@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::domain::entities::message::CanonicalMessageId;
-use crate::domain::workflow::{ActionInvocationId, ActionRef, ScheduleId, ScheduleOccurrenceId};
+use crate::domain::workflow::{ScheduleId, ScheduleOccurrenceId};
 use admission_history_tests::Conversation;
 
 fn source_request(f: &AdmissionFixture, key: &str, source: TriggerSource) -> AdmitWorkflowRequest {
@@ -261,89 +261,98 @@ pub(super) async fn foreign_parent(f: &AdmissionFixture, company: CompanyId) -> 
 }
 
 #[tokio::test]
-async fn workflow_admit_sql_parent_source_checks_run_execution_step_and_action_is_unsupported() {
+async fn workflow_admit_refuses_every_child_trigger_and_schema_checks_runtime_child_keys() {
+    // Category C (07-D1 §D1.2a): no admission creates a child, whatever its parent cause.
     let f = AdmissionFixture::new().await;
     let parent = f.prepare(f.request("parent", f.manual())).await;
     f.persistence().admit(&parent).await.unwrap();
     let valid = execution(&f, &parent).await;
-    let other = f.prepare(f.request("other-parent", f.manual())).await;
-    f.persistence().admit(&other).await.unwrap();
-    let foreign = ForeignSource::new(&f).await;
-    let foreign = foreign_parent(&f, foreign.company).await;
-    for (key, run, execution, step) in [
+    let missing = ExecutionRef::new(
+        f.binding.target.company,
+        RunId::new(Uuid::new_v4()),
+        ExecutionId::new(Uuid::new_v4()),
+        valid.step_id().clone(),
+    );
+    let call = ChildToolCallRef::new(valid.clone(), ToolCallId::new(Uuid::new_v4()));
+    let p = f.persistence().clone();
+    let service = WorkflowService::new(p.clone(), p, NoRuntime, NoRuntime, Preflight);
+    for (key, cause) in [
         (
-            "missing-run",
-            RunId::new(Uuid::new_v4()),
-            valid.execution_id(),
-            valid.step_id().clone(),
+            "valid",
+            ChildCause::Step(ChildStepRef::new(valid.clone(), ChildOrdinal::FIRST)),
         ),
         (
-            "missing-execution",
-            valid.run_id(),
-            ExecutionId::new(Uuid::new_v4()),
-            valid.step_id().clone(),
+            "missing",
+            ChildCause::Step(ChildStepRef::new(missing, ChildOrdinal::FIRST)),
         ),
-        (
-            "wrong-run",
-            other.proposed_run_id(),
-            valid.execution_id(),
-            valid.step_id().clone(),
-        ),
-        (
-            "wrong-step",
-            valid.run_id(),
-            valid.execution_id(),
-            StepId::parse("other").unwrap(),
-        ),
-        (
-            "foreign",
-            foreign.run_id(),
-            foreign.execution_id(),
-            foreign.step_id().clone(),
-        ),
+        ("tool-call", ChildCause::ToolCall(call)),
     ] {
-        let parent = ExecutionRef::new(f.binding.target.company, run, execution, step);
-        rejected(
-            &f,
-            source_request(
+        let before = f.counts().await;
+        let result = service
+            .admit(source_request(
                 &f,
                 key,
-                TriggerSource::Child {
-                    parent: ChildCause::Execution(parent),
-                },
-            ),
-        )
-        .await;
+                TriggerSource::Child { parent: cause },
+            ))
+            .await;
+        assert!(
+            matches!(result, Err(AppError::BadRequest(_))),
+            "{key}: {result:?}"
+        );
+        assert_eq!(f.counts().await, before);
     }
-    let action = ActionRef::new(valid.clone(), ActionInvocationId::new(Uuid::new_v4()));
-    let command = f
-        .prepare(source_request(
-            &f,
-            "action",
-            TriggerSource::Child {
-                parent: ChildCause::Action(action),
-            },
-        ))
-        .await;
-    let before = f.counts().await;
-    assert!(matches!(
-        f.persistence().admit(&command).await,
-        Err(AppError::BadRequest(_))
-    ));
-    assert_eq!(f.counts().await, before);
-    let command = f
-        .prepare(source_request(
-            &f,
+
+    // The schema accepts only the runtime child key of the child's own parent execution.
+    let (f, scopes) = AdmissionFixture::chain(
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap(),
+        1,
+    )
+    .await;
+    let (root, child) = (scopes[0], scopes[1]);
+    let key = |step: &str, action: Value, ordinal: Value| {
+        format!(
+            "v1:{}",
+            json!([
+                "child",
+                root.run.as_uuid(),
+                root.execution.as_uuid(),
+                step,
+                action,
+                ordinal
+            ])
+        )
+    };
+    let five = format!(
+        "v1:{}",
+        json!([
             "child",
-            TriggerSource::Child {
-                parent: ChildCause::Execution(valid),
-            },
-        ))
-        .await;
-    assert_eq!(
-        f.persistence().admit(&command).await.unwrap(),
-        AdmissionResult::Created(command.proposed_run_id())
+            root.run.as_uuid(),
+            root.execution.as_uuid(),
+            "start",
+            null
+        ])
     );
+    let insert = |source: String| {
+        let f = &f;
+        async move {
+            sqlx::query("INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) SELECT company_id, binding_id, $2, id FROM workflow_runs WHERE id=$1")
+                .bind(child.run.as_uuid()).bind(source).execute(f.persistence().pool()).await
+                .unwrap_err().as_database_error().unwrap().code().unwrap().into_owned()
+        }
+    };
+    for source in [
+        five,
+        key("start", json!(null), json!(0)),
+        key("start", json!(null), json!(1001)),
+        key("start", json!(null), json!(1.5)),
+        key("start", json!(null), json!("1")),
+        key("start", json!(Uuid::new_v4()), json!(1)),
+        key("other", json!(null), json!(1)),
+    ] {
+        assert_eq!(insert(source.clone()).await, "23514", "{source}");
+    }
+    // The real key passes the trigger and meets the child's existing admission.
+    assert_eq!(insert(key("start", json!(null), json!(1))).await, "23505");
 }
 
 #[tokio::test]

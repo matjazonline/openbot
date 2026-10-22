@@ -118,27 +118,34 @@ async fn targets(
 ) -> AppResult<Vec<AgentToolTarget>> {
     let mut targets = Vec::with_capacity(tools.len());
     for tool in tools {
-        let target = if MessageKind::parse(tool.contract.name.as_str()).is_some() {
-            if !is_trusted_message_snapshot(tool)? {
-                return Err(unsupported());
+        let target = match tool.kind() {
+            ToolKind::Message => {
+                if MessageKind::parse(tool.contract.name.as_str()).is_none()
+                    || !is_trusted_message_snapshot(tool)?
+                {
+                    return Err(unsupported());
+                }
+                AgentToolTarget::Message {
+                    name: tool.contract.name.clone(),
+                }
             }
-            AgentToolTarget::Message {
-                name: tool.contract.name.clone(),
-            }
-        } else if let Some(slot) = &tool.contract.connection {
             // Only an MCP slot is a direct agent tool; a slot-bound HTTP selection belongs to
             // its `http.request` step and is unsupported here (06-R016 F017).
-            let definition = facts.bundle.compiled().graph().definition();
-            if super::resources::slot_kind(definition, slot) != Some("mcp")
-                || !facts.resources.contains_key(slot)
-            {
-                return Err(unsupported());
+            ToolKind::Slot(slot) => {
+                let definition = facts.bundle.compiled().graph().definition();
+                if super::resources::slot_kind(definition, slot) != Some("mcp")
+                    || !facts.resources.contains_key(slot)
+                {
+                    return Err(unsupported());
+                }
+                AgentToolTarget::Mcp { slot: slot.clone() }
             }
-            AgentToolTarget::Mcp { slot: slot.clone() }
-        } else {
-            AgentToolTarget::Http {
+            ToolKind::Http => AgentToolTarget::Http {
                 connection: registered_on(tx, company, tool).await?,
-            }
+            },
+            // Its registration is checked at each call, so a revocation refuses the call rather
+            // than the whole agent step (07-D2 §D2.3).
+            ToolKind::Workflow(pin) => AgentToolTarget::Workflow { pin: pin.clone() },
         };
         targets.push(target);
     }

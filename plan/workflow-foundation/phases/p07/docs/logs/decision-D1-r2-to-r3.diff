@@ -1,0 +1,159 @@
+1c1
+< # P07-D1 — Batch B1 architecture: runtime child calls and bounded repeat (revision 2)
+---
+> # P07-D1 — Batch B1 architecture: runtime child calls and bounded repeat (revision 3)
+3,4c3,18
+< Author: p07 root (A), 2026-10-22. Status: proposed for B correction recheck of WF-P07-R001.
+< Supersedes revision 1 (`logs/decision-D1.md`, immutable). This revision is complete on its own.
+---
+> Author: p07 root (A), 2026-10-22. Status: proposed for B correction recheck of WF-P07-R002.
+> Supersedes revision 2 (`logs/decision-D1-r2.md`) and revision 1 (`logs/decision-D1.md`), both
+> immutable. This revision is complete on its own.
+> 
+> ## D1.0a Changes from revision 2
+> 
+> | Item | Resolution | Section |
+> | --- | --- | --- |
+> | WF-P07-F008 | Move list completed (`budget_activation`, `budget_schema`, `wakeup_guard`, `wakeup_parent_link`, all via `wakeup_tests::admit_child`); nested (grandchild) fixture specified; focused filters extended (TASK). | D1.2a, D1.10 |
+> | WF-P07-F009 | Test: a same-company original in an inaccessible channel is refused exactly like an unknown original, and nothing is persisted. | D1.10 |
+> | F010.1 | Child terminal fact found through the child row's `terminal_wakeup_sequence` (primary-key lookup), not an event scan. | D1.4 |
+> | F010.2 | Cascade handles every waiting `child_run` wait of the run. | D1.5 |
+> | F010.3 | Deferred constraint: every child run is named by a `child_run` wait of its parent execution. | D1.3 |
+> | F010.4 | Publication directory caps distinct children at 256 before querying and reads them in batched queries. | D1.1 |
+> | F010.5 | Child configuration validated before the `round:1` repetition receipt. | D1.2 |
+> | A refinement | Rerun-original checks live only in the admission transaction (one decision, one place); the service checks only `rerun_of` ⇒ `Manual`. | D1.7 |
+63,69c77,86
+<   decode and parse the draft; for each distinct declared `(child_workflow_id, child_version_id)`,
+<   inside one transaction that first runs `authority::authorize_company(actor)`:
+<   1. read `id, octet_length(bundle)` from `workflow_versions` joined to an unarchived
+<      `workflow_definitions`, scoped by company and both IDs (same predicate as
+<      `verify_children`); reject when the summed size exceeds the 4 MiB bundle bound
+<      (`publication.limit`) before any bundle is fetched;
+<   2. fetch and `restore_bundle` each; append to `PublicationDependencies.children`.
+---
+>   decode and parse the draft; collect the distinct declared
+>   `(child_workflow_id, child_version_id)` pairs and reject more than 256 (`MAX_DEPENDENCIES`,
+>   `publication.limit`) before any query. Then, inside one transaction that first runs
+>   `authority::authorize_company(actor)`:
+>   1. one batched query (`unnest` of the pairs) reads `id, octet_length(bundle)` from
+>      `workflow_versions` joined to an unarchived `workflow_definitions`, scoped by company and
+>      both IDs (same predicate as `verify_children`); reject when the summed size exceeds the
+>      4 MiB bundle bound (`publication.limit`) before any bundle is fetched;
+>   2. one batched query fetches those bundles; `restore_bundle` each; append to
+>      `PublicationDependencies.children`.
+90,91c107
+< 3. `flow.repeat`: repetition receipt `round:1` (D1.6).
+< 4. Child configuration: bundle = `parent_bundle.children()[control.child_version_id]`; params =
+---
+> 3. Child configuration: bundle = `parent_bundle.children()[control.child_version_id]`; params =
+94c110,111
+<    resources against the child bundle.
+---
+>    resources against the child bundle. Validated before any repetition receipt (F010.5).
+> 4. `flow.repeat`: repetition receipt `round:1` (D1.6).
+132,138c149,166
+< parent wait that consumes its wakeup). Tests that admitted children through bindings
+< (`admission_token`, `admission_source`, `admission_binding`, `activation`, `budget_race`,
+< `wakeup`, `control`, `control_acceptance`, `control_guard`, `harness_token_refusal`,
+< `action_reconciliation_eligibility`, `action_reconciliation_claim_fairness`; application
+< `causality_cases`, `source_validation`) move to a shared runtime-child fixture: publish a child,
+< then a parent with `workflow.call` pinning it, bind and admit the parent, and run `park_child`.
+< Cases whose subject was the removed branch become refusal tests.
+---
+> parent wait that consumes its wakeup). The deferred constraint in D1.3 enforces the single
+> path in the schema. Tests that admitted children through bindings move to a shared
+> runtime-child fixture. The inventory (every `TriggerSource::Child`/`ChildCause::Execution`
+> construction and every `admit_child` caller) is `admission_token`, `admission_source`,
+> `admission_binding`, `activation`, `budget_race`, `budget_activation`, `budget_schema`, `wakeup`,
+> `wakeup_guard`, `wakeup_parent_link`, `control`, `control_acceptance`, `control_guard`,
+> `harness_token_refusal`, `action_reconciliation_eligibility` and
+> `action_reconciliation_claim_fairness`, plus application `causality_cases` and
+> `source_validation`.
+> - **Fixture.** Publish the leaf child workflow the test needs, then publish each ancestor with a
+>   `workflow.call` entry step pinning the level below. Bind and admit the root, then run
+>   `park_child` on each level's entry job in turn. Two levels give parent → child. Three give
+>   root → child → grandchild for the descendant-budget and nested-wakeup cases in
+>   `budget_activation`, `budget_schema` and `wakeup`, which are bounded by publication depth.
+>   The fixture returns every level's `ActivationRequest`.
+> - Raw-SQL negative inserts (`wakeup_guard_tests.rs:168,183`, `wakeup_parent_link_tests.rs:99`)
+>   keep asserting their immediate errors; the deferred constraint fires only at commit.
+> - Cases whose subject was the removed branch become refusal tests.
+159a188,195
+> Single creation path (F010.3): deferred constraint trigger `workflow_child_parent_wait`,
+> `AFTER INSERT ON workflow_runs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN
+> (NEW.parent_run_id IS NOT NULL)`. At commit it raises 23514 unless a `workflow_waits` row
+> exists with `(company_id, child_run_id, run_id, execution_id, reason) = (NEW.company_id, NEW.id,
+> NEW.parent_run_id, NEW.parent_execution_id, 'child_run')`, found through the unique
+> `(company_id, child_run_id)` key. A wait row is never deleted, and the run row keeps the link,
+> so the condition holds for the rest of the run's life.
+> 
+163,165c199,203
+< before the generic event lookup. Locks only the parent (run → execution → job → wait); reads
+< the wait's child's `parent_wakeup` fact and terminal execution output without locking the child.
+< A runtime child is never control-retried (D1.7), so it has exactly one terminal fact.
+---
+> before the generic event lookup. Locks only the parent (run → execution → job → wait). Without
+> locking the child, it reads the child row's `terminal_wakeup_sequence`, then the
+> `parent_wakeup` fact by primary key `(company_id, child_run_id, sequence)` (F010.1), and the
+> terminal execution output. The fact is written by the same statement's trigger that sets the
+> sequence. A runtime child is never control-retried (D1.7), so it has exactly one terminal fact.
+189,190c227,228
+< Polling (`CANDIDATES_SQL`): a `child_run` wait is eligible when its child has a `parent_wakeup`
+< event (lookup by the events primary key prefix `(company_id, run_id)`), or by the existing
+---
+> Polling (`CANDIDATES_SQL`): a `child_run` wait is eligible when its child run (primary key
+> `(company_id, child_run_id)`) has `terminal_wakeup_sequence IS NOT NULL`, or by the existing
+197,202c235,241
+< company_id=$1 AND run_id=$2 AND state='waiting' AND reason='child_run'`. The `(company_id,
+< run_id)` prefix of `workflow_wait_one_active` serves it. It returns at most one row, because
+< progression is sequential and an execution has one active wait. After cancelling the run, it
+< locks that child run `FOR UPDATE` and, when non-terminal, cancels it the same way (boxed
+< recursion; depth ≤ 32 by publication depth), with audit `cancelled_by_parent` (actor = the
+< commanding actor).
+---
+> company_id=$1 AND run_id=$2 AND state='waiting' AND reason='child_run' ORDER BY child_run_id`.
+> The `(company_id, run_id)` prefix of `workflow_wait_one_active` serves it. Today it returns at
+> most one row, because progression is sequential and an execution has one active wait. After
+> cancelling the run, it handles every returned child in that order (F010.2, so B2 needs no
+> change here). For each, it locks the child run `FOR UPDATE` and, when non-terminal, cancels it
+> the same way (boxed recursion; depth ≤ 32 by publication depth), with audit
+> `cancelled_by_parent` (actor = the commanding actor).
+235,244c274,287
+<   Option<RunId>`, accepted only with `TriggerSource::Manual` (`BadRequest` otherwise).
+<   `WorkflowService::admit` reads the original's head. The original must exist in the company,
+<   be top-level (not a child), and have the same `workflow_id` as the selected binding's bundle
+<   (the version may differ: a changed definition). The actor must be authorized for the
+<   original's association (`WorkflowOperation::Admit`); otherwise a non-disclosing `NotFound`. The
+<   admission transaction rechecks this under `FOR SHARE` of the original and persists
+<   `workflow_runs.rerun_of_run_id` (D1.3 constraints). Replay equivalence includes `rerun_of`
+<   (a mismatch is `Conflict`). Inspection: `RunHead.rerun_of: Option<RunId>`. The original's state
+<   is not constrained; the link is for inspection only. Entry points are phase 08 (notice
+<   WF-C001).
+---
+>   Option<RunId>`. `WorkflowService::admit` checks only that `rerun_of` comes with
+>   `TriggerSource::Manual` (`BadRequest` otherwise). All original checks happen once, in the
+>   admission transaction's source authorization (`admission_source::authorize`, which also runs on
+>   replay), after company and association authorization of the new run:
+>   1. Lock the original `FOR SHARE` (company-scoped). Missing → non-disclosing `NotFound`.
+>   2. Authorize the actor for the original's association (`association::authorize_association`).
+>      Failure gives the same non-disclosing `NotFound` as a missing original.
+>   3. The original must be top-level (`BadRequest`) and have the same `workflow_id` as the
+>      selected binding's bundle (`BadRequest`; the version may differ, which is the changed
+>      definition).
+>   The run persists `workflow_runs.rerun_of_run_id` (D1.3 constraints back the tenant,
+>   same-workflow and top-level rules). Replay equivalence includes `rerun_of` (a mismatch is
+>   `Conflict`). Inspection: `RunHead.rerun_of: Option<RunId>`. The original's state is not
+>   constrained; the link is for inspection only. Entry points are phase 08 (notice WF-C001).
+319,320c362,370
+< - Rerun (F003): link persisted and inspected; unknown/cross-company/child/different-workflow
+<   original refused; replay with a different `rerun_of` → `Conflict`.
+---
+> - Single path (F010.3): a raw child-run insert without its parent wait fails at commit (23514);
+>   `children::create_on` commits.
+> - Moved fixtures (F008): every file in the D1.2a inventory runs on the runtime-child fixture,
+>   including the three-level descendant-budget and nested-wakeup cases.
+> - Rerun (F003, F009): link persisted and inspected. An unknown or cross-company original and a
+>   same-company original in a channel the actor cannot access give the identical non-disclosing
+>   `NotFound` (same error value), and nothing is persisted (no run, admission, command or event
+>   rows). A child or different-workflow original → `BadRequest`. Replay with a different
+>   `rerun_of` → `Conflict`. A non-`Manual` trigger with `rerun_of` → `BadRequest`.

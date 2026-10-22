@@ -1,0 +1,77 @@
+--- logs/decision-D2-r2.md	2026-10-22 15:24:14
++++ logs/decision-D2-r3.md	2026-10-22 15:28:42
+@@ -1,14 +1,21 @@
+-# P07-D2 — Agent workflow tools (B2 architecture gate), revision 2
++# P07-D2 — Agent workflow tools (B2 architecture gate), revision 3
+ 
+ > **No backward compatibility.** We don't need backward compatibility and will reset the database
+ > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+ > or staged rollouts for existing data.
+ 
+ Author A, 2026-10-22. Builds on B1 as accepted in phase (digest `d82fa028…5c11`, D1 rev 4).
+-Revision 2 answers gate round WF-P07-R007 (revision 1, sha256 `1e11108a…ff27`):
++Revision 3 answers gate round WF-P07-R008 (revision 2, sha256 `46301f5e…3451`):
+ 
+ | Finding | Resolution | Where |
+ | --- | --- | --- |
++| F024 | Publish mode applies only to the root's own freshly captured workflow-tool snapshots; stored child bundles are checked in Run mode; tests for a child whose tool was re-pinned and revoked | D2.2, D2.7 |
++| F025 (optional, adopted) | Run mode matches name **and** `workflow_id`: re-pointing a name to another workflow, or reusing a revoked name for another workflow, does not re-enable old pins | D2.2, D2.7 |
++
++Revision 2 answered gate round WF-P07-R007 (revision 1, sha256 `1e11108a…ff27`):
++
++| Finding | Resolution | Where |
++| --- | --- | --- |
+ | F018 | User decision **P07-Q2**: revoke stops, re-pin and archive don't; two check modes (publish vs run) | D2.0, D2.2, D2.3, D2.7 |
+ | F019 | Competing-claimant and recovery tests for the `child_parked` protocol | D2.7 |
+ | F020 | Registration recheck at dispatch, taken before the run locks; revoked → typed refusal | D2.3 |
+@@ -114,16 +121,27 @@
+   exactly as for `workflow.call`.
+ 
+ **Checks, two modes (P07-Q2).** `workflow_tools::registered_on(tx, company, tool, mode)`:
+-- `Publish` (in `DefinitionPersistence::publish`, `FOR SHARE`): the company's registration of
+-  that name pins exactly the snapshot's workflow, version and params, and the version is still
+-  selectable. A re-pin or an archive between capture and publish refuses the publication (the
+-  caller retries and captures the new pin).
+-- `Run` (admission, admission replay, binding save/activation readiness, and dispatch, D2.3):
+-  a registration of that name exists in the company, whatever it pins now. The frozen pin is
+-  part of the immutable published closure, so a re-pin or an archive does not affect runs of
+-  workflows published before it; they move only on republish. Revocation (deleting the row)
+-  refuses new runs and new tool calls. Re-registering the same name re-enables them (the name is
+-  granted again).
++- `Publish` (`FOR SHARE`): the company's registration of that name pins exactly the snapshot's
++  workflow, version and params, and the version is still selectable. **Scope (F024):** only the
++  workflow-tool snapshots the root bundle captured in this publication. A re-pin or an archive
++  between capture and publish refuses that publication (the caller retries and captures the new
++  pin).
++- `Run` (`FOR SHARE`): a registration of that name **pinning the same `workflow_id`** exists in
++  the company, whatever version and params it pins now (F025). Scope: admission, admission
++  replay, binding save/activation readiness, dispatch (D2.3), and, at publish, the workflow-tool
++  snapshots inside **stored child bundles**. Stored children were verified at their own
++  publication and are not re-derived, consistent with `agent_publication::verify_on`.
++`supported_publication` walks the closure and chooses the mode per bundle: `Publish` for the
++root's own snapshots during a publish, `Run` otherwise.
++
++The frozen pin is part of the immutable published closure, so a re-pin to another version of
++the same workflow, or an archive, does not affect workflows published before it. They move only
++on republish, and a new parent that pins such an existing child publishes and runs the child's
++frozen pin. Revocation (deleting the row) refuses new runs and new tool calls, and a new parent
++pinning a child whose tool was revoked does not publish. Re-registering the name for the
++**same** workflow re-enables those runs. Re-pointing the name to a different workflow, or
++reusing a revoked name for one, does not: old pins of the previous workflow stay refused. The
++name now means a different tool, so for old pins it acts as a revocation.
+ `verify_children` hash-checks the captured tool children like step children at publish.
+ 
+ ## D2.2a One tool-kind classifier (F021)
+@@ -274,7 +292,11 @@
+   - revoking refuses new admissions (and binding activation readiness), and a running agent's
+     next call gets `workflow.tool_revoked` with no child, while a call parked before the
+     revocation still delivers its result;
+-  - re-registering the name re-enables admissions.
++  - re-registering the name for the same workflow re-enables admissions; re-pointing it (or
++    reusing a revoked name) to another workflow keeps old pins refused (F025);
++  - stored children (F024): a new parent that pins an existing child whose own workflow tool
++    was re-pinned publishes and its run calls the child's frozen version; if that tool was
++    revoked, the new parent does not publish.
+ - One classifier (F021): binding save/activation, admission and admission replay succeed for a
+   workflow whose agent grants a workflow tool; an MCP step tool and a workflow registration of
+   the same name refuse publication as ambiguous (F022).

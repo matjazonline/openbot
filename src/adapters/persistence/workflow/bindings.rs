@@ -114,7 +114,7 @@ pub(super) async fn verify_selection(
     if store_bundle(&stored)? != store_bundle(bundle)? {
         return Err(conflict());
     }
-    authority::supported_publication(tx, &stored).await
+    authority::supported_publication(tx, &stored, workflow_tools::ToolCheck::Run).await
 }
 
 async fn write_head(

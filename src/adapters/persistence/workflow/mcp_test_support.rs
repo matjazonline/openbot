@@ -232,6 +232,7 @@ pub(super) fn lease() -> LeasePolicy {
 pub(super) fn operation(company: CompanyId) -> McpOperation {
     McpOperation {
         tool: ToolSnapshot {
+            workflow: None,
             company_id: company,
             contract: registry::ToolContract {
                 name: TypeName::parse(TOOL).unwrap(),
@@ -475,6 +476,7 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
             binding_id: setup.target.binding,
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({"customer_id":"c-42"}),
+            rerun_of: None,
         })
         .await
         .unwrap();

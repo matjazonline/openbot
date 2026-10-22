@@ -143,10 +143,24 @@ fn availability(
     available
 }
 
+/// Whether the current step's own output may be referenced: only inside a `flow.repeat`
+/// block, where it is the provisional output of the round just completed (07-D1 §D1.1).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OwnOutput {
+    Unavailable,
+    Provisional,
+}
+
+/// The step a reference is resolved for, and which step outputs it may read.
+struct ReferenceScope<'a> {
+    current: &'a StepId,
+    available: &'a BTreeSet<StepId>,
+    own: OwnOutput,
+}
+
 fn check_reference(
     use_: ReferenceUse,
-    current: &StepId,
-    available: &BTreeSet<StepId>,
+    scope: ReferenceScope<'_>,
     parsed: &ParsedWorkflow,
     input: &Schema,
     params: &Schema,
@@ -166,7 +180,11 @@ fn check_reference(
                     use_.span,
                 ));
             };
-            if (id == current || !available.contains(id)) && !use_.optional {
+            let own_provisional = id == scope.current && scope.own == OwnOutput::Provisional;
+            if !own_provisional
+                && (id == scope.current || !scope.available.contains(id))
+                && !use_.optional
+            {
                 return Err(Diagnostic::at(
                     "reference.path",
                     "Step output is not available on every incoming route; use an explicit default",
@@ -232,10 +250,53 @@ pub(crate) fn check_availability(
             }
         }
         for reference in uses {
-            check_reference(reference, id, &sets[id], parsed, input, params, outputs)?;
+            check_reference(
+                reference,
+                ReferenceScope {
+                    current: id,
+                    available: &sets[id],
+                    own: OwnOutput::Unavailable,
+                },
+                parsed,
+                input,
+                params,
+                outputs,
+            )?;
+        }
+        for reference in repeat_uses(decoded, parsed, id, &base) {
+            check_reference(
+                reference,
+                ReferenceScope {
+                    current: id,
+                    available: &sets[id],
+                    own: OwnOutput::Provisional,
+                },
+                parsed,
+                input,
+                params,
+                outputs,
+            )?;
         }
     }
     Ok(())
+}
+
+fn repeat_uses(
+    decoded: &DecodedSource,
+    parsed: &ParsedWorkflow,
+    id: &StepId,
+    base: &str,
+) -> Vec<ReferenceUse> {
+    let mut uses = Vec::new();
+    if parsed.controls.get(id).is_some_and(|c| c.repeat.is_some()) {
+        for field in ["next_input", "exit_when"] {
+            let path = child(&child(base, "repeat"), field);
+            if let Some(node) = node_at(&decoded.root, &path) {
+                walk_binding(node, &path, &mut uses);
+            }
+        }
+    }
+    uses
 }
 
 pub(crate) fn check_dependencies(

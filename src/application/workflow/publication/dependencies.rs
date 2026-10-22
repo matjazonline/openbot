@@ -9,10 +9,27 @@ pub(super) struct ChildFacts {
     pub depth: usize,
 }
 
+/// The child versions this definition pins: its child steps' and its workflow tools' (07-D2).
+fn pinned_versions(
+    parsed: &compiler::ParsedWorkflow,
+    tools: &[ToolSnapshot],
+) -> BTreeSet<VersionId> {
+    parsed
+        .controls
+        .values()
+        .map(|c| c.child_version_id)
+        .chain(tools.iter().filter_map(|tool| match tool.kind() {
+            ToolKind::Workflow(pin) => Some(pin.version_id),
+            _ => None,
+        }))
+        .collect()
+}
+
 pub(super) fn capture(
     company_id: CompanyId,
     parsed: &compiler::ParsedWorkflow,
     children: Vec<Arc<PublishedBundle>>,
+    tools: &[ToolSnapshot],
 ) -> Result<ChildFacts, Diagnostic> {
     let fail = |id, code, reason| invalid_child(parsed, id, code, reason);
     if children.len() > MAX_DEPENDENCIES {
@@ -58,14 +75,15 @@ pub(super) fn capture(
             version_id: definition.version_id,
             input_schema: definition.input_schema.clone().expect("compiled schema"),
             output_schema: definition.output_schema.clone().expect("compiled schema"),
+            parameter_schema: definition
+                .parameter_schema
+                .clone()
+                .expect("compiled schema"),
+            resources: definition.resources.clone(),
         });
         result.children.insert(definition.version_id, child);
     }
-    let expected: BTreeSet<_> = parsed
-        .controls
-        .values()
-        .map(|c| c.child_version_id)
-        .collect();
+    let expected = pinned_versions(parsed, tools);
     for id in &expected {
         if !result.children.contains_key(id) {
             return Err(fail(
@@ -84,8 +102,54 @@ pub(super) fn capture(
             ));
         }
     }
-    result.graph = dependency_graph(parsed, &result.children)?;
+    for tool in tools {
+        if let ToolKind::Workflow(pin) = tool.kind() {
+            workflow_tool(parsed, tool, pin, &result.children[&pin.version_id])?;
+        }
+    }
+    result.graph = dependency_graph(parsed, &result.children, tools)?;
     Ok(result)
+}
+
+/// A workflow tool's frozen contract is exactly its pinned child's (07-D2 §D2.2): the child's
+/// input and output schemas, parameters the child accepts, and only resource slots the parent
+/// also declares with the same kind and contract, which the child receives by slot name.
+fn workflow_tool(
+    parsed: &compiler::ParsedWorkflow,
+    tool: &ToolSnapshot,
+    pin: &WorkflowToolPin,
+    child: &PublishedBundle,
+) -> Result<(), Diagnostic> {
+    let fail = |reason: &str| {
+        Diagnostic::at(
+            "publication.workflow_tool",
+            &format!("Workflow tool {}: {reason}", tool.contract.name.as_str()),
+            "/steps",
+            compiler::input_span(&parsed.locations, "/steps"),
+        )
+    };
+    let definition = child.compiled.graph().definition();
+    if definition.workflow_id != pin.workflow_id
+        || tool.contract.connection.is_some()
+        || definition.input_schema.as_ref() != Some(&tool.contract.input_schema)
+        || definition.output_schema.as_ref() != Some(&tool.contract.output_schema)
+    {
+        return Err(fail("its contract is not the pinned workflow's"));
+    }
+    child
+        .compiled
+        .validate_params(&pin.params)
+        .map_err(|_| fail("its parameters do not satisfy the pinned workflow"))?;
+    if definition
+        .resources
+        .iter()
+        .any(|slot| !parsed.definition.resources.contains(slot))
+    {
+        return Err(fail(
+            "declare each of the pinned workflow's resource slots with the same kind and contract",
+        ));
+    }
+    Ok(())
 }
 
 fn invalid_child(
@@ -117,6 +181,7 @@ fn invalid_child(
 fn dependency_graph(
     parsed: &compiler::ParsedWorkflow,
     children: &BTreeMap<VersionId, Arc<PublishedBundle>>,
+    tools: &[ToolSnapshot],
 ) -> Result<BTreeMap<WorkflowId, BTreeSet<WorkflowId>>, Diagnostic> {
     let fail = |id, code, reason| invalid_child(parsed, id, code, reason);
     let mut graph: BTreeMap<WorkflowId, BTreeSet<WorkflowId>> = BTreeMap::new();
@@ -160,12 +225,17 @@ fn dependency_graph(
         );
         pending.extend(bundle.children.values());
     }
+    // Workflow tools are edges like child steps, so recursion through a tool is rejected too.
     graph.insert(
         parsed.definition.workflow_id,
         parsed
             .controls
             .values()
             .map(|c| c.child_workflow_id)
+            .chain(tools.iter().filter_map(|tool| match tool.kind() {
+                ToolKind::Workflow(pin) => Some(pin.workflow_id),
+                _ => None,
+            }))
             .collect(),
     );
     Ok(graph)

@@ -1,6 +1,8 @@
 use super::*;
 use crate::adapters::persistence::test_support::wait_until_backends_are_blocked;
 use admission_history_tests::Conversation;
+#[path = "rerun_tests.rs"]
+mod rerun_tests;
 
 #[derive(Clone, Copy, Debug)]
 enum Delivery {

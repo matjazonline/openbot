@@ -187,17 +187,19 @@ fn workflow_fixtures_revision_contract_pins_rounds_and_accepted_data() {
         child.compiled().source(),
         Fixture::HumanRevisionRound.source()
     );
-    let review = json!({"choice":"accept","data":{"body":"Final edited draft"},"feedback":""});
-    child.compiled().validate_output(&review).unwrap();
-    let result = json!({"rounds":3,"result":review});
+    let edited = json!({"body":"Final edited draft"});
+    let round = json!({"choice":"accept","artifact":edited,"feedback":"","data":edited});
+    child.compiled().validate_output(&round).unwrap();
+    let result = json!({"rounds":3,"result":round});
     parent
         .compiled()
         .validate_step_output(&step("revisions"), &result)
         .unwrap();
     let outputs = BTreeMap::from([(step("revisions"), result.clone())]);
+    // The exact reviewed artifact is what the parent sends.
     assert_eq!(
         prepare(&parent, "reply", &outputs).value()["content"],
-        review["data"]
+        edited
     );
     for rounds in [0, 4] {
         let mut invalid = result.clone();
@@ -209,8 +211,7 @@ fn workflow_fixtures_revision_contract_pins_rounds_and_accepted_data() {
                 .is_err()
         );
     }
-    let mut revision = review;
-    revision["choice"] = json!("revise");
+    let mut revision = json!({"choice":"revise","data":{"body":"Draft"},"feedback":""});
     assert!(
         child
             .compiled()
@@ -222,10 +223,15 @@ fn workflow_fixtures_revision_contract_pins_rounds_and_accepted_data() {
         .compiled()
         .validate_step_output(&step("review"), &revision)
         .unwrap();
-    for (choice, expected) in [("accept", "accepted"), ("revise", "exhausted")] {
+    for (choice, expected) in [
+        ("accept", "accepted"),
+        ("cancel", "cancelled"),
+        ("timeout", "timed_out"),
+        ("escalate", "escalated"),
+    ] {
         let outputs = BTreeMap::from([(
             step("revisions"),
-            json!({"rounds":3,"result":{"choice":choice,"data":{"body":"Final"},"feedback":"Explain"}}),
+            json!({"rounds":3,"result":{"choice":choice,"artifact":{"body":"Final"},"feedback":"Explain","data":{"body":"Final"}}}),
         )]);
         let input = json!({});
         let params = json!({});
@@ -243,6 +249,107 @@ fn workflow_fixtures_revision_contract_pins_rounds_and_accepted_data() {
             expected
         );
     }
+}
+
+#[test]
+fn workflow_fixtures_revision_escalation_reaches_a_specialist_with_artifact_and_feedback() {
+    use crate::domain::workflow::{Routes, TransitionTarget};
+    let parent = bundle(Fixture::RepeatedHumanRevision);
+    let routes = |id: &str| -> BTreeMap<String, TransitionTarget> {
+        let Routes::Choices(choices) =
+            &parent.compiled().graph().definition().steps[&step(id)].routes
+        else {
+            panic!("{id} routes by choice")
+        };
+        choices
+            .iter()
+            .map(|(choice, target)| (choice.as_str().to_owned(), target.clone()))
+            .collect()
+    };
+    let to = |id: &str| TransitionTarget::Step(step(id));
+    // A reviewer's escalation goes to the specialist; exhaustion and a timed-out review go to a
+    // person; nothing but acceptance reaches the reply.
+    assert_eq!(routes("outcome")["escalated"], to("specialist"));
+    assert_eq!(routes("outcome")["timed_out"], to("escalate"));
+    assert_eq!(routes("outcome")["accepted"], to("reply"));
+    assert_eq!(routes("outcome")["cancelled"], TransitionTarget::End);
+    assert_eq!(routes("revisions")["exhausted"], to("escalate"));
+    let outputs = BTreeMap::from([(
+        step("revisions"),
+        json!({"rounds":2,"result":{"choice":"escalate","artifact":{"body":"Reviewed draft"},"feedback":"Needs billing expertise","data":{"body":"Reviewed draft"}}}),
+    )]);
+    let prepared = prepare(&parent, "specialist", &outputs);
+    let context = &prepared.value()["context"];
+    assert_eq!(context["untrusted_request"], "Help");
+    assert_eq!(context["artifact"], json!({"body":"Reviewed draft"}));
+    assert_eq!(context["feedback"], "Needs billing expertise");
+}
+
+#[test]
+fn workflow_fixtures_revision_rounds_carry_feedback_and_never_approve_on_exhaustion() {
+    use crate::application::workflow::children::{
+        RepeatRule, RoundDecision, decide_round, provisional_output,
+    };
+    use crate::domain::workflow::ChildOrdinal;
+    let parent = bundle(Fixture::RepeatedHumanRevision);
+    let child = parent.children().values().next().unwrap();
+    let control = parent.compiled().child_control(&step("revisions")).unwrap();
+    let rule = RepeatRule {
+        bindings: control.repeat.as_ref().unwrap(),
+        max_iterations: control.max_iterations.unwrap(),
+        child,
+    };
+    let input = json!({"message":"Help","source_message":"00000000-0000-0000-0000-0000000000c1"});
+    let params = json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","deadline":"2030-01-01T00:00:00Z"});
+    let history = json!({"items":[],"token_count":0,"omitted":0});
+    let limits = parent.compiled().graph().context_limits();
+    let decide = |choice: &str, round: u32| {
+        let result = json!({"choice":choice,"artifact":{"body":format!("Draft {round}")},"feedback":"Shorter","data":{"body":format!("Draft {round}")}});
+        let outputs = BTreeMap::from([
+            (step("context"), history.clone()),
+            (
+                step("revisions"),
+                provisional_output(result, ChildOrdinal::new(round).unwrap()),
+            ),
+        ]);
+        decide_round(
+            &rule,
+            &context(&input, &params, &outputs),
+            limits,
+            ChildOrdinal::new(round).unwrap(),
+        )
+    };
+    // Revision feedback and the reviewed artifact reach the next round's explicit input.
+    let Ok(RoundDecision::Next(next)) = decide("revise", 1) else {
+        panic!("a revision starts another round")
+    };
+    assert_eq!(
+        next,
+        json!({"message":"Help","context":history,"previous_body":"Draft 1","feedback":"Shorter","deadline":"2030-01-01T00:00:00Z"})
+    );
+    // Acceptance in the last permitted round still leaves through `done`.
+    assert_eq!(decide("accept", 3), Ok(RoundDecision::Done));
+    assert_eq!(decide("escalate", 1), Ok(RoundDecision::Done));
+    // A revision request in the last round is exhausted, never approved.
+    assert_eq!(decide("revise", 3), Ok(RoundDecision::Exhausted));
+}
+
+#[test]
+fn workflow_fixtures_successor_maps_human_feedback_and_data_explicitly() {
+    let bundle = bundle(Fixture::ReviewFeedbackSuccessor);
+    let outputs = BTreeMap::from([
+        (step("draft"), json!({"body":"Proposal"})),
+        (
+            step("review"),
+            json!({"choice":"specialist","data":{"body":"Edited"},"feedback":"Needs a specialist"}),
+        ),
+    ]);
+    let prepared = prepare(&bundle, "specialist", &outputs);
+    let context = &prepared.value()["context"];
+    assert_eq!(context["proposal"], json!({"body":"Proposal"}));
+    assert_eq!(context["feedback"], "Needs a specialist");
+    assert_eq!(context["human_data"], json!({"body":"Edited"}));
+    assert_eq!(context["request"], "Help");
 }
 
 #[test]

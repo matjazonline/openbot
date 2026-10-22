@@ -1,5 +1,6 @@
 //! Production edges of `agent.run` saved tool calls: every effect enters ActionService
-//! through the HTTP, MCP or messaging runtime's direct-tool entry, one call at a time.
+//! through the HTTP, MCP or messaging runtime's direct-tool entry, one call at a time. A workflow
+//! tool starts its pinned child through the workflow tool runtime instead (07-D2 §D2.3a).
 use crate::{
     adapters::{
         workflow_http::HttpRuntime, workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
@@ -12,7 +13,9 @@ use crate::{
         lease::WorkflowFence,
         mcp::McpToolCall,
         message::{MessageObservation, MessageToolCall},
+        tools::{WorkflowToolCall, WorkflowToolDispatch},
     },
+    domain::workflow::ToolCallId,
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -23,10 +26,22 @@ pub struct AgentActionTools {
     http: Arc<HttpRuntime>,
     mcp: Arc<McpRuntime>,
     message: Arc<MessageRuntime>,
+    /// Every production composition includes it (notice WF-C001 r2); without it a frozen
+    /// workflow tool fails closed.
+    workflow: Option<Arc<dyn WorkflowToolDispatch>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
-        Self { http, mcp, message }
+        Self {
+            http,
+            mcp,
+            message,
+            workflow: None,
+        }
+    }
+    pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {
+        self.workflow = Some(workflow);
+        self
     }
 }
 
@@ -68,6 +83,27 @@ impl AgentToolDispatch for AgentActionTools {
                 ))
                 .await?,
             ),
+            // The child, its wait and the park commit together; never uncertain (07-D2 §D2.3a).
+            AgentToolTarget::Workflow { pin } => {
+                let workflow = self.workflow.as_ref().ok_or_else(|| {
+                    AppError::BadRequest("Workflow tools are not available to this worker".into())
+                })?;
+                Box::pin(workflow.call_workflow_tool(
+                    fence,
+                    WorkflowToolCall {
+                        name: tool.name.clone(),
+                        pin: pin.clone(),
+                        call:
+                            ToolCallId::new(
+                                uuid::Uuid::parse_str(call.as_str()).map_err(|_| {
+                                    AppError::BadRequest("Invalid tool call".into())
+                                })?,
+                            ),
+                        arguments,
+                    },
+                ))
+                .await
+            }
             AgentToolTarget::Message { .. } => {
                 let kind = tool
                     .message_kind()

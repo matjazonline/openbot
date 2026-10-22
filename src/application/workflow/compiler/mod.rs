@@ -30,8 +30,8 @@ pub(crate) use schema::{PathGuarantee, Schema};
 pub(crate) use shape::check_binding_shape;
 pub use source::{DecodedSource, Diagnostic, LocatedNode, NodeValue, SourceSpan};
 pub(crate) use syntax::{fields, json_value, required, scalar_string, sequence};
-pub use wire::StepControl;
 pub(crate) use wire::{ParsedWorkflow, parse_workflow};
+pub use wire::{RepeatBindings, StepControl};
 
 pub(crate) use compile::{
     SpecializedDescriptor, charge_descriptor, check_resolved_budget, compile_resolved,

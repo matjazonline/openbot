@@ -256,7 +256,7 @@ fn workflow_compiler_child_dependencies_and_repeat_bounds_are_checked() {
         control: ControlKind::Repeat,
         ordered_rule: false,
     };
-    let child_source = single("{literal: hello}").replace("type: data.map", "type: flow.repeat\n    child_workflow_id: 00000000-0000-0000-0000-000000000002\n    child_version_id: 00000000-0000-0000-0000-000000000003\n    max_iterations: 2");
+    let child_source = single("{literal: hello}").replace("type: data.map", "type: flow.repeat\n    child_workflow_id: 00000000-0000-0000-0000-000000000002\n    child_version_id: 00000000-0000-0000-0000-000000000003\n    max_iterations: 2\n    repeat: {next_input: {literal: hello}, exit_when: {eq: [{ref: /steps/start/output}, {literal: done}]}}");
     assert!(matches!(
         compile_custom(&child_source, vec![repeat.clone()], deps.clone()),
         Err(Diagnostic {
@@ -268,11 +268,58 @@ fn workflow_compiler_child_dependencies_and_repeat_bounds_are_checked() {
     assert!(compile_custom(&child_source, vec![repeat.clone()], deps.clone()).is_ok());
     let zero = child_source.replace("max_iterations: 2", "max_iterations: 0");
     assert!(compile_custom(&zero, vec![repeat.clone()], deps.clone()).is_err());
-    let excessive = child_source.replace("max_iterations: 2", "max_iterations: 10001");
+    // The bound is the root repetition budget's ceiling (07-D1 §D1.1).
+    let last = child_source.replace("max_iterations: 2", "max_iterations: 1000");
+    assert!(compile_custom(&last, vec![repeat.clone()], deps.clone()).is_ok());
+    let excessive = child_source.replace("max_iterations: 2", "max_iterations: 1001");
     assert!(compile_custom(&excessive, vec![repeat.clone()], deps.clone()).is_err());
     let missing = child_source.replace("    max_iterations: 2\n", "");
     assert!(matches!(
-        compile_custom(&missing, vec![repeat], deps),
+        compile_custom(&missing, vec![repeat.clone()], deps.clone()),
+        Err(Diagnostic {
+            code: "step.control",
+            ..
+        })
+    ));
+    let unbound = child_source.replace(
+        "    repeat: {next_input: {literal: hello}, exit_when: {eq: [{ref: /steps/start/output}, {literal: done}]}}\n",
+        "",
+    );
+    assert_ne!(unbound, child_source);
+    assert!(matches!(
+        compile_custom(&unbound, vec![repeat.clone()], deps.clone()),
+        Err(Diagnostic {
+            code: "step.control",
+            ..
+        })
+    ));
+    // Only the repeat block may read the step's own (provisional) output.
+    let own = child_source.replace(
+        "message: {literal: hello}",
+        "message: {ref: /steps/start/output}",
+    );
+    assert!(matches!(
+        compile_custom(&own, vec![repeat.clone()], deps.clone()),
+        Err(Diagnostic {
+            code: "reference.path",
+            ..
+        })
+    ));
+    let not_boolean = child_source.replace(
+        "exit_when: {eq: [{ref: /steps/start/output}, {literal: done}]}",
+        "exit_when: {literal: 1}",
+    );
+    assert!(compile_custom(&not_boolean, vec![repeat.clone()], deps.clone()).is_err());
+    let call = StepDescriptor {
+        type_name: TypeName::parse("workflow.call").unwrap(),
+        control: ControlKind::ChildCall,
+        ..repeat
+    };
+    let call_with_block = child_source
+        .replace("type: flow.repeat", "type: workflow.call")
+        .replace("    max_iterations: 2\n", "");
+    assert!(matches!(
+        compile_custom(&call_with_block, vec![call], deps),
         Err(Diagnostic {
             code: "step.control",
             ..

@@ -5,39 +5,10 @@ fn example(kind: &str) -> Value {
     serde_json::from_str(&registry::example(kind).unwrap().source).unwrap()
 }
 
-async fn admit_child(
-    f: &AdmissionFixture,
-    parent: ActivationRequest,
-    step: &str,
-    key: &str,
-) -> ActivationRequest {
-    let cause = ExecutionRef::new(
-        parent.company,
-        parent.run,
-        parent.execution,
-        StepId::parse(step).unwrap(),
-    );
-    let trigger = TriggerRef::new(
-        parent.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(cause),
-        },
-    )
-    .unwrap();
-    let command = f.prepare(f.request(key, trigger)).await;
-    f.persistence().admit(&command).await.unwrap();
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(command.first_execution_id().as_uuid())
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    ActivationRequest {
-        company: parent.company,
-        run: command.proposed_run_id(),
-        execution: command.first_execution_id(),
-        job: WorkflowJobId(job),
-    }
+/// Category A (07-D1 §D1.2a): a root parked at its `start` workflow.call on a `leaf` child.
+async fn chained(leaf: Value) -> (AdmissionFixture, ActivationRequest, ActivationRequest) {
+    let (f, scopes) = AdmissionFixture::chain(leaf, 1).await;
+    (f, scopes[0], scopes[1])
 }
 
 fn query(parent: ActivationRequest, child: ActivationRequest) -> ParentWakeupQuery {
@@ -75,8 +46,7 @@ async fn parent_state(f: &AdmissionFixture, parent: ActivationRequest) -> Value 
 
 #[tokio::test]
 async fn workflow_wakeup_completion_has_no_parent_run_or_execution_lock() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     let before = parent_state(&f, parent).await;
     let mut held = f.persistence().pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM workflow_runs WHERE id=$1 FOR UPDATE")
@@ -121,8 +91,7 @@ async fn workflow_wakeup_completion_has_no_parent_run_or_execution_lock() {
 
 #[tokio::test]
 async fn workflow_wakeup_real_child_completion_and_parent_cancel_contenders() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     let barrier = Barrier::new(3);
     let complete = || async {
         barrier.wait().await;
@@ -139,7 +108,8 @@ async fn workflow_wakeup_real_child_completion_and_parent_cancel_contenders() {
             .await
             .unwrap();
         barrier.wait().await;
-        sqlx::query("UPDATE workflow_runs SET state='cancelled' WHERE id=$1")
+        // The parent is parked on its child; a cancelled run keeps no waiting reason.
+        sqlx::query("UPDATE workflow_runs SET state='cancelled',waiting_reason=NULL WHERE id=$1")
             .bind(parent.run.as_uuid())
             .execute(&mut *tx)
             .await
@@ -164,8 +134,7 @@ async fn workflow_wakeup_real_child_completion_and_parent_cancel_contenders() {
 
 #[tokio::test]
 async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
-    let (f, parent) = fixture(example("context.history")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("context.history")).await;
     let claimed = f
         .persistence()
         .claim_io(
@@ -196,8 +165,7 @@ async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
     let mut source = example("wait.timer");
     source["steps"]["start"]["with"]["deadline"] =
         json!({"literal":(chrono::Utc::now()-chrono::Duration::seconds(1)).to_rfc3339()});
-    let (f, parent) = fixture(source).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(source).await;
     f.persistence().park_wait(child).await.unwrap().unwrap();
     assert!(wakeups(&f, parent, child).await.is_empty());
     f.persistence().resume_wait(child).await.unwrap();
@@ -210,8 +178,7 @@ async fn workflow_wakeup_fenced_io_and_timer_completion_use_same_fact() {
 #[tokio::test]
 async fn workflow_wakeup_write_and_commit_failures_rollback_progression() {
     for deferred in [false, true] {
-        let (f, parent) = fixture(example("data.map")).await;
-        let child = admit_child(&f, parent, "start", "child").await;
+        let (f, parent, child) = chained(example("data.map")).await;
         sqlx::raw_sql("CREATE FUNCTION reject_wakeup() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event_kind='parent_wakeup' THEN RAISE EXCEPTION 'wakeup injected'; END IF; RETURN NEW; END $$")
             .execute(f.persistence().pool()).await.unwrap();
         let trigger = if deferred {
@@ -245,8 +212,7 @@ async fn workflow_wakeup_write_and_commit_failures_rollback_progression() {
 
 #[tokio::test]
 async fn workflow_wakeup_terminal_transitions_are_immutable_and_noops_do_not_repeat() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     for state in ["failed", "cancelled"] {
         sqlx::query("UPDATE workflow_runs SET state=$2 WHERE id=$1")
             .bind(child.run.as_uuid())
@@ -270,10 +236,9 @@ async fn workflow_wakeup_terminal_transitions_are_immutable_and_noops_do_not_rep
     assert!(sqlx::query("UPDATE workflow_run_events SET terminal_state='succeeded' WHERE run_id=$1 AND event_kind='parent_wakeup'")
         .bind(child.run.as_uuid()).execute(f.persistence().pool()).await.is_err());
     assert_eq!(wakeups(&f, parent, child).await, saved);
-    f.persistence()
-        .advance_pure(parent, budget(4))
-        .await
-        .unwrap();
+    // The parked root consumes its child's last fact and fails; a root writes no wakeup.
+    f.persistence().resume_wait(parent).await.unwrap();
+    assert_eq!(parent_state(&f, parent).await["state"], "failed");
     let total: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM workflow_run_events WHERE event_kind='parent_wakeup'",
     )
@@ -285,8 +250,7 @@ async fn workflow_wakeup_terminal_transitions_are_immutable_and_noops_do_not_rep
 
 #[tokio::test]
 async fn workflow_wakeup_scope_bounds_and_parent_identity_guards() {
-    let (f, parent) = fixture(example("data.map")).await;
-    let child = admit_child(&f, parent, "start", "child").await;
+    let (f, parent, child) = chained(example("data.map")).await;
     f.persistence()
         .advance_pure(child, budget(4))
         .await

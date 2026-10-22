@@ -16,18 +16,21 @@ impl SourceKey {
             } => {
                 json!(["schedule", schedule_id.as_uuid(), occurrence_id.as_uuid()])
             }
+            // A step child is `[.., null, ordinal]` (07-D1 §D1.2); a workflow tool call's child
+            // is `[.., call, null]` (07-D2 §D2.3). Neither is admissible.
             TriggerSource::Child { parent } => {
                 let execution = parent.execution();
-                let action = match parent {
-                    ChildCause::Execution(_) => None,
-                    ChildCause::Action(action) => Some(action.action_id().as_uuid()),
+                let (call, ordinal) = match parent {
+                    ChildCause::Step(step) => (None, Some(step.ordinal().get())),
+                    ChildCause::ToolCall(call) => (Some(call.call().as_uuid()), None),
                 };
                 json!([
                     "child",
                     execution.run_id().as_uuid(),
                     execution.execution_id().as_uuid(),
                     execution.step_id().as_str(),
-                    action
+                    call,
+                    ordinal
                 ])
             }
         };

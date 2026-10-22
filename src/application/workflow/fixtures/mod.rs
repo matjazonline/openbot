@@ -1,5 +1,6 @@
-//! Illustrative phase-two sources and captured facts for later handler tests.
-//! These are not installed templates, company grants, or executable samples.
+//! Illustrative sources and captured facts for handler tests. The revision pair is the shipped
+//! support template (07-D1 §D1.8); production catalogue wiring belongs to phases 08 and 09.
+//! None of these is a company grant.
 
 use super::publication::{
     ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,
@@ -18,15 +19,17 @@ pub enum Fixture {
     RepeatedHumanRevision,
     HumanRevisionRound,
     McpLookup,
+    ReviewFeedbackSuccessor,
 }
 
-pub const ALL: [Fixture; 6] = [
+pub const ALL: [Fixture; 7] = [
     Fixture::ReviewedSupport,
     Fixture::AutonomousResponse,
     Fixture::TriageRouting,
     Fixture::RepeatedHumanRevision,
     Fixture::HumanRevisionRound,
     Fixture::McpLookup,
+    Fixture::ReviewFeedbackSuccessor,
 ];
 
 impl Fixture {
@@ -38,6 +41,7 @@ impl Fixture {
             Self::RepeatedHumanRevision => include_str!("repeated-human-revision.yaml"),
             Self::HumanRevisionRound => include_str!("human-revision-round.yaml"),
             Self::McpLookup => include_str!("mcp-lookup.yaml"),
+            Self::ReviewFeedbackSuccessor => include_str!("review-feedback-successor.yaml"),
         }
     }
 
@@ -49,6 +53,7 @@ impl Fixture {
             Self::RepeatedHumanRevision => 104,
             Self::HumanRevisionRound => 105,
             Self::McpLookup => 106,
+            Self::ReviewFeedbackSuccessor => 107,
         };
         VersionId::new(Uuid::from_u128(suffix))
     }
@@ -62,13 +67,14 @@ impl Fixture {
         match self {
             Self::ReviewedSupport
             | Self::AutonomousResponse
+            | Self::RepeatedHumanRevision
             | Self::HumanRevisionRound
+            | Self::ReviewFeedbackSuccessor
             | Self::TriageRouting => agent_snapshots(company),
             Self::McpLookup => DependencySnapshots {
                 tools: vec![mcp_snapshot(company)],
                 ..Default::default()
             },
-            _ => DependencySnapshots::default(),
         }
     }
 }
@@ -101,6 +107,7 @@ fn agent_snapshots(company: CompanyId) -> DependencySnapshots {
             required_tools: vec![name("knowledge.search")],
         }],
         tools: vec![ToolSnapshot {
+            workflow: None,
             company_id: company,
             contract: ToolContract {
                 name: name("knowledge.search"),
@@ -124,6 +131,7 @@ fn read_policy() -> ApprovedActionPolicy {
 
 fn mcp_snapshot(company: CompanyId) -> ToolSnapshot {
     ToolSnapshot {
+        workflow: None,
         company_id: company,
         contract: ToolContract {
             name: name("lookup_tickets"),

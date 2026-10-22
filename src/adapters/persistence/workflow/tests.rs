@@ -13,6 +13,8 @@ mod binding_association_tests;
 mod binding_schema_tests;
 #[path = "binding_tests.rs"]
 mod binding_tests;
+#[path = "child_publication_tests.rs"]
+mod child_publication_tests;
 #[path = "http_tests.rs"]
 mod http_tests;
 #[path = "mcp_tests.rs"]
@@ -88,7 +90,13 @@ impl PublicationDirectory for Preflight {
         })
     }
 }
-type Service = DefinitionService<Preflight, PostgresPersistence, WorkflowSourceDecoder, Preflight>;
+/// Publication captures pinned children like every production composition must (WF-C001).
+type Service = DefinitionService<
+    Preflight,
+    PostgresPersistence,
+    WorkflowSourceDecoder,
+    child_publication::ChildPublicationDirectory<Preflight>,
+>;
 struct Fixture {
     _db: Arc<OwnDatabase>,
     persistence: PostgresPersistence,
@@ -151,8 +159,49 @@ impl Fixture {
             Preflight,
             self.persistence.clone(),
             WorkflowSourceDecoder,
-            Preflight,
+            child_publication::ChildPublicationDirectory {
+                persistence: self.persistence.clone(),
+                inner: Preflight,
+            },
         )
+    }
+    /// Save and publish `source` as `workflow` (its `workflow_id` is overwritten), returning the
+    /// published version; used to pin children below the fixture's own workflow.
+    async fn publish_workflow(
+        &self,
+        workflow: WorkflowId,
+        mut source: serde_json::Value,
+    ) -> VersionId {
+        source["workflow_id"] = serde_json::json!(workflow.to_string());
+        let version = VersionId::new(Uuid::new_v4());
+        self.publish_source(&self.service(), workflow, source.to_string(), version)
+            .await
+            .unwrap();
+        version
+    }
+    /// Save `source` as the first draft of `workflow` and publish it as `version` through
+    /// `service`, whose directory decides which dependencies the draft captures.
+    async fn publish_source<C: PublicationDirectory>(
+        &self,
+        service: &DefinitionService<Preflight, PostgresPersistence, WorkflowSourceDecoder, C>,
+        workflow: WorkflowId,
+        source: String,
+        version: VersionId,
+    ) -> LifecycleResult<Arc<PublishedBundle>> {
+        let target = DefinitionTarget {
+            workflow,
+            ..self.target
+        };
+        let mut draft = self.save(None);
+        draft.target = target;
+        draft.content.source = source;
+        service.save(draft).await?;
+        let mut publication = self.publish();
+        publication.target = target;
+        publication.version = version;
+        publication.key =
+            IdempotencyKey::parse(format!("publication-{}", workflow.as_uuid().simple())).unwrap();
+        service.publish(publication).await
     }
     fn save(&self, expected: Option<DraftRevision>) -> SaveDraft {
         SaveDraft {

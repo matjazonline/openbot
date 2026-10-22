@@ -57,6 +57,8 @@ pub enum WaitProgress {
     Refused,
     /// A saved model tool call's delivery settled; its parked agent job was reopened.
     Continued,
+    /// A `flow.repeat` round ended without exit: the next round's child and wait now exist.
+    NextRound,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitFailureReason {
@@ -64,6 +66,8 @@ pub enum WaitFailureReason {
     InvalidOutput,
     /// A finality breach vetoed automatic continuation of a message step (04.11-D4 §M).
     EvidenceConflict,
+    /// The shared root budget refused the next `flow.repeat` round (07-D1 §D1.6).
+    RootBudgetExhausted,
 }
 
 #[async_trait]

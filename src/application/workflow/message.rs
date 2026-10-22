@@ -68,6 +68,7 @@ pub fn builtin_message_snapshot(company: CompanyId, kind: MessageKind) -> AppRes
             .ok_or_else(|| AppError::Internal("Unknown built-in message kind".into()))?;
     let name = TypeName::parse(kind.name()).map_err(|_| invalid_message())?;
     Ok(ToolSnapshot {
+        workflow: None,
         company_id: company,
         contract: ToolContract {
             name: name.clone(),
@@ -86,6 +87,9 @@ pub fn builtin_message_snapshot(company: CompanyId, kind: MessageKind) -> AppRes
 
 /// Whether a bundle snapshot is exactly the trusted built-in for its name.
 pub fn is_trusted_message_snapshot(snapshot: &ToolSnapshot) -> AppResult<bool> {
+    if snapshot.kind() != crate::application::workflow::publication::ToolKind::Message {
+        return Ok(false);
+    }
     let Some(kind) = MessageKind::parse(snapshot.contract.name.as_str()) else {
         return Ok(false);
     };

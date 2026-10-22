@@ -7,15 +7,27 @@ async fn limited(kind: &str, limit: u32) -> (AdmissionFixture, ActivationRequest
     source["limits"]["root_budget"] = json!({"activations":limit,"model_calls":2,"repetitions":2});
     fixture(source).await
 }
+/// Category A (07-D1 §D1.2a): `levels` children below a root that states the same limits.
+async fn limited_chain(
+    kind: &str,
+    limit: u32,
+    levels: usize,
+) -> (AdmissionFixture, Vec<ActivationRequest>) {
+    let mut source = example(kind);
+    source["limits"]["root_budget"] = json!({"activations":limit,"model_calls":2,"repetitions":2});
+    AdmissionFixture::chain(source, levels).await
+}
 async fn accounting(f: &AdmissionFixture) -> Value {
     sqlx::query_scalar("SELECT jsonb_build_object('usage',(SELECT jsonb_agg(to_jsonb(usage) ORDER BY root_run_id) FROM workflow_root_budget_usage AS usage),'receipts',(SELECT COALESCE(jsonb_agg(to_jsonb(receipt) ORDER BY run_id,execution_id,resource,reservation_key),'[]') FROM workflow_budget_receipts AS receipt))").fetch_one(f.persistence().pool()).await.unwrap()
 }
 
 #[tokio::test]
 async fn workflow_budget_activation_competing_descendants_replay_and_retirement() {
+    // Category B: three runs of one root activating at once is a state the runtime never
+    // produces (ancestors are parked first); it guards the shared usage-row protocol.
     let (f, root) = limited("data.map", 2).await;
-    let child = admit_child(&f, root, "start", "child").await;
-    let grandchild = admit_child(&f, child, "start", "grandchild").await;
+    let child = f.lineage_child(root).await;
+    let grandchild = f.lineage_child(child).await;
     let barrier = Barrier::new(3);
     let activate = |scope| {
         let f = &f;
@@ -92,8 +104,9 @@ async fn workflow_budget_activation_rollback_and_fresh_handle_replay() {
 #[tokio::test]
 async fn workflow_budget_activation_pure_io_wait_refusal_no_hot_poll() {
     for kind in ["data.map", "context.history", "wait.timer", "wait.event"] {
-        let (f, root) = limited(kind, 1).await;
-        let child = admit_child(&f, root, "start", "child").await;
+        // Category A: parking the root on its child spends the only activation.
+        let (f, scopes) = limited_chain(kind, 1, 1).await;
+        let (root, child) = (scopes[0], scopes[1]);
         f.persistence().activate(root).await.unwrap();
         match kind {
             "data.map" => {
@@ -292,9 +305,12 @@ async fn workflow_budget_activation_successful_io_and_wait_replay_charge_once() 
 
 #[tokio::test]
 async fn workflow_budget_activation_child_ignores_held_ancestor_locks() {
-    let (f, root) = limited("data.map", 2).await;
-    let child = admit_child(&f, root, "start", "child").await;
-    let grandchild = admit_child(&f, child, "start", "grandchild").await;
+    // Category A: root and child are parked on their children; each spent one activation.
+    let (f, scopes) = limited_chain("data.map", 3, 2).await;
+    let (root, child, grandchild) = (scopes[0], scopes[1], scopes[2]);
+    let parked = accounting(&f).await["usage"][0]["activations"]
+        .as_i64()
+        .unwrap();
     let mut held = f.persistence().pool().begin().await.unwrap();
     for ancestor in [root, child] {
         sqlx::query("SELECT id FROM workflow_runs WHERE id=$1 FOR UPDATE")
@@ -316,7 +332,7 @@ async fn workflow_budget_activation_child_ignores_held_ancestor_locks() {
     .unwrap()
     .unwrap();
     let saved = accounting(&f).await;
-    assert_eq!(saved["usage"][0]["activations"], 1);
+    assert_eq!(saved["usage"][0]["activations"], parked + 1);
     held.rollback().await.unwrap();
     f.persistence()
         .advance_pure(grandchild, budget(4))
@@ -350,8 +366,10 @@ async fn workflow_budget_activation_cancelled_owner_never_spends() {
 #[tokio::test]
 async fn workflow_budget_activation_deferred_commit_failure_preserves_freeze_and_refusal() {
     for consumed in [false, true] {
+        // Category B: a child activating before its root (`consumed == false`) is a state the
+        // runtime never produces; it guards the deferred-commit rollback of the shared usage.
         let (f, root) = limited("data.map", 1).await;
-        let child = admit_child(&f, root, "start", "child").await;
+        let child = f.lineage_child(root).await;
         if consumed {
             f.persistence().activate(root).await.unwrap();
         }

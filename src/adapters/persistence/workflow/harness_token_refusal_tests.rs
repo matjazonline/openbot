@@ -1,36 +1,11 @@
 use super::*;
 use crate::application::workflow::waits::WorkflowWaits;
 
+/// Category B (07-D1 §D1.2a): a descendant running beside its agent ancestor, which keeps its
+/// own claim and token state, is a state the runtime never produces (a parent parks on its
+/// child); these cases guard the shared root token budget against it.
 pub(super) async fn child(f: &TokenFixture, parent: ActivationRequest) -> ActivationRequest {
-    let fixture = &f.model.native.fixture;
-    let trigger = TriggerRef::new(
-        parent.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(ExecutionRef::new(
-                parent.company,
-                parent.run,
-                parent.execution,
-                StepId::parse("start").unwrap(),
-            )),
-        },
-    )
-    .unwrap();
-    let admission = fixture
-        .prepare(fixture.request(&format!("child-{}", parent.execution.as_uuid()), trigger))
-        .await;
-    fixture.persistence().admit(&admission).await.unwrap();
-    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
-        .bind(admission.first_execution_id().as_uuid())
-        .fetch_one(fixture.persistence().pool())
-        .await
-        .unwrap();
-    ActivationRequest {
-        company: parent.company,
-        run: admission.proposed_run_id(),
-        execution: admission.first_execution_id(),
-        job: WorkflowJobId(job),
-    }
+    f.model.native.fixture.lineage_child(parent).await
 }
 
 pub(super) async fn park(f: &TokenFixture) {

@@ -177,3 +177,85 @@ fn workflow_registry_human_feedback_and_repeat_output_constraints() {
         );
     }
 }
+
+/// A child's parameters come only from literals or the parent's binding parameters, a missing
+/// `with.params` must satisfy the child, and every child resource slot must exist on the parent
+/// with the same kind and contract (07-D1 §D1.1).
+#[test]
+fn workflow_registry_child_params_are_static_and_resources_match_by_slot() {
+    use crate::domain::workflow::ResourceRequirement;
+    let code = |example: &AuthoringExample| compile_example(example).err().map(|error| error.code);
+    let call = |edit: &dyn Fn(&mut Value), child: &dyn Fn(&mut ChildContract)| {
+        let mut example = example("workflow.call").unwrap();
+        changed(&mut example, |source| {
+            source["parameter_schema"] = json!({"type":"object","properties":{"reviewer":{"type":"string"}},"required":["reviewer"],"additionalProperties":false});
+            edit(source)
+        });
+        child(&mut example.facts.children[0]);
+        example
+    };
+    let requires_reviewer = |child: &mut ChildContract| {
+        child.parameter_schema = json!({"type":"object","properties":{"reviewer":{"type":"string"}},"required":["reviewer"],"additionalProperties":false});
+    };
+    let params = |binding: Value| {
+        move |source: &mut Value| source["steps"]["start"]["with"]["params"] = binding.clone()
+    };
+    // Literal and binding-parameter sources are accepted.
+    assert_eq!(
+        code(&call(
+            &params(json!({"literal":{"reviewer":"r1"}})),
+            &requires_reviewer
+        )),
+        None
+    );
+    assert_eq!(
+        code(&call(
+            &params(json!({"object":{"reviewer":{"ref":"/params/reviewer"}}})),
+            &requires_reviewer
+        )),
+        None
+    );
+    // Run input, step output or run context never choose a child's parameters.
+    for dynamic in [
+        json!({"ref":"/input"}),
+        json!({"object":{"reviewer":{"ref":"/run/id"}}}),
+    ] {
+        assert_eq!(
+            code(&call(&params(dynamic), &requires_reviewer)),
+            Some("registry.static_params")
+        );
+    }
+    // Literal parameters are checked against the child's parameter schema.
+    assert!(
+        code(&call(
+            &params(json!({"literal":{"reviewer":5}})),
+            &requires_reviewer
+        ))
+        .is_some()
+    );
+    // Omitted parameters run the child with `{}`, which this child refuses.
+    assert_eq!(
+        code(&call(&|_| {}, &requires_reviewer)),
+        Some("registry.child_params")
+    );
+    assert_eq!(code(&call(&|_| {}, &|_| {})), None);
+    // Resources pass by slot name only: the parent must declare the same slot, kind and contract.
+    let slot = |kind: &str| ResourceRequirement {
+        slot: ResourceName::parse("knowledge").unwrap(),
+        kind: TypeName::parse(kind).unwrap(),
+        contract: None,
+    };
+    let needs_http = |child: &mut ChildContract| child.resources = vec![slot("http")];
+    let declares = |kind: &'static str| {
+        move |source: &mut Value| source["resources"] = json!([{"slot":"knowledge","kind":kind}])
+    };
+    assert_eq!(code(&call(&declares("http"), &needs_http)), None);
+    assert_eq!(
+        code(&call(&|_| {}, &needs_http)),
+        Some("registry.child_resources")
+    );
+    assert_eq!(
+        code(&call(&declares("mcp"), &needs_http)),
+        Some("registry.child_resources")
+    );
+}

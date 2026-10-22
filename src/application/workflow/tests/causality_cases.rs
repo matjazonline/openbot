@@ -82,34 +82,24 @@ async fn assert_child_source_and_claims(
             .execution()
             .clone()
     };
-    let action = ActionRef::new(parent_step.clone(), ActionInvocationId::new(Uuid::new_v4()));
-    {
-        let mut state = store.state.lock().unwrap();
-        state
-            .parent_executions
-            .insert((company_id, parent_step.execution_id()), parent_step);
-        state
-            .parent_actions
-            .insert((company_id, action.action_id()), action.clone());
-    }
+    let call = ChildToolCallRef::new(parent_step, ToolCallId::new(Uuid::new_v4()));
+    // Category C (07-D1 §D1.2a): no admission creates a child, even for a real parent call.
     let child_source = TriggerSource::Child {
-        parent: ChildCause::Action(action.clone()),
+        parent: ChildCause::ToolCall(call),
     };
-    let AdmissionResult::Created(child_id) = svc
-        .admit(with_source(
+    let runs = store.state.lock().unwrap().runs.len();
+    assert!(matches!(
+        svc.admit(with_source(
             company_id,
             version_id,
             "child",
-            child_source.clone(),
-            trace,
+            child_source,
+            trace
         ))
-        .await
-        .unwrap()
-    else {
-        panic!("child created")
-    };
-    let child = store.head(company_id, child_id).await.unwrap().unwrap();
-    assert_eq!(child.causality.trigger().source(), &child_source);
+        .await,
+        Err(AppError::BadRequest(_))
+    ));
+    assert_eq!(store.state.lock().unwrap().runs.len(), runs);
     let claims = store
         .claim_ready(ClaimRequest {
             worker_id: WorkerId::new(Uuid::new_v4()),
@@ -118,7 +108,7 @@ async fn assert_child_source_and_claims(
         })
         .await
         .unwrap();
-    assert_eq!(claims.len(), 4);
+    assert_eq!(claims.len(), 3);
     for claim in claims {
         assert_eq!(
             claim.causality(),
@@ -324,19 +314,19 @@ async fn assert_missing_parent_and_source_lookup_error(
         ExecutionId::new(Uuid::new_v4()),
         step_id("parent"),
     );
-    let action = ActionRef::new(parent.clone(), ActionInvocationId::new(Uuid::new_v4()));
+    let call = ChildToolCallRef::new(parent.clone(), ToolCallId::new(Uuid::new_v4()));
     assert!(matches!(
         svc.admit(with_source(
             company_id,
             version_id,
             "missing-parent",
             TriggerSource::Child {
-                parent: ChildCause::Action(action)
+                parent: ChildCause::ToolCall(call)
             },
             trace
         ))
         .await,
-        Err(AppError::NotFound(_))
+        Err(AppError::BadRequest(_))
     ));
     assert!(store.state.lock().unwrap().runs.is_empty());
     store.state.lock().unwrap().fail_source = true;
@@ -355,65 +345,13 @@ async fn assert_missing_parent_and_source_lookup_error(
 }
 
 #[tokio::test]
-async fn child_action_must_match_its_authoritative_execution_and_run() {
+async fn child_triggers_are_refused_before_any_lookup() {
+    // Category C (07-D1 §D1.2a): children are created only by their parent's runtime step, so
+    // no cause admits one, real or forged. The failing source reader proves no lookup ran.
     let company_id = company();
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 256));
     let svc = service(&store);
-    let (real_action, forged_action) = seed_parent_actions(&store, company_id, version_id).await;
-    let before = store.state.lock().unwrap().runs.len();
-    assert!(matches!(
-        svc.admit(with_source(
-            company_id,
-            version_id,
-            "forged-child",
-            TriggerSource::Child {
-                parent: ChildCause::Action(forged_action)
-            },
-            CorrelationId::new(),
-        ))
-        .await,
-        Err(AppError::NotFound(_))
-    ));
-    assert_eq!(store.state.lock().unwrap().runs.len(), before);
-    assert!(matches!(
-        svc.admit(with_source(
-            company_id,
-            version_id,
-            "real-child",
-            TriggerSource::Child {
-                parent: ChildCause::Action(real_action.clone())
-            },
-            CorrelationId::new(),
-        ))
-        .await,
-        Ok(AdmissionResult::Created(_))
-    ));
-    assert_eq!(
-        svc.admit(with_source(
-            company_id,
-            version_id,
-            "real-child",
-            TriggerSource::Child {
-                parent: ChildCause::Action(ActionRef::new(
-                    real_action.execution().clone(),
-                    ActionInvocationId::new(Uuid::new_v4()),
-                )),
-            },
-            CorrelationId::new(),
-        ))
-        .await
-        .unwrap(),
-        AdmissionResult::Conflict
-    );
-}
-
-async fn seed_parent_actions(
-    store: &MemoryStore,
-    company_id: CompanyId,
-    version_id: VersionId,
-) -> (ActionRef, ActionRef) {
-    let svc = service(store);
     let AdmissionResult::Created(parent_run) = svc
         .admit(request(company_id, version_id, "parent", json!(1)))
         .await
@@ -421,32 +359,34 @@ async fn seed_parent_actions(
     else {
         panic!("parent created")
     };
-    let actual = {
-        let state = store.state.lock().unwrap();
-        state.jobs[0].step.execution().clone()
-    };
+    let actual = store.state.lock().unwrap().jobs[0].step.execution().clone();
     let other_visit = ExecutionRef::new(
         company_id,
         parent_run,
         ExecutionId::new(Uuid::new_v4()),
         actual.step_id().clone(),
     );
-    let action_id = ActionInvocationId::new(Uuid::new_v4());
-    let real_action = ActionRef::new(actual.clone(), action_id);
-    let forged_action = ActionRef::new(other_visit.clone(), action_id);
-    {
-        let mut state = store.state.lock().unwrap();
-        state
-            .parent_executions
-            .insert((company_id, actual.execution_id()), actual);
-        state
-            .parent_executions
-            .insert((company_id, other_visit.execution_id()), other_visit);
-        state
-            .parent_actions
-            .insert((company_id, action_id), real_action.clone());
+    let call = ToolCallId::new(Uuid::new_v4());
+    store.state.lock().unwrap().fail_source = true;
+    let before = store.state.lock().unwrap().runs.len();
+    let causes = [
+        ChildCause::ToolCall(ChildToolCallRef::new(actual.clone(), call)),
+        ChildCause::ToolCall(ChildToolCallRef::new(other_visit, call)),
+        ChildCause::Step(ChildStepRef::new(actual, ChildOrdinal::FIRST)),
+    ];
+    for (index, parent) in causes.into_iter().enumerate() {
+        let result = svc
+            .admit(with_source(
+                company_id,
+                version_id,
+                &format!("child-{index}"),
+                TriggerSource::Child { parent },
+                CorrelationId::new(),
+            ))
+            .await;
+        assert!(matches!(result, Err(AppError::BadRequest(_))), "{result:?}");
     }
-    (real_action, forged_action)
+    assert_eq!(store.state.lock().unwrap().runs.len(), before);
 }
 
 #[test]

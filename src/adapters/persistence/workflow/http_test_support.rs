@@ -21,6 +21,7 @@ pub(super) async fn action_counts(fixture: &Fixture) -> ActionCounts {
 pub(super) fn operation(company: CompanyId, name: &str) -> HttpOperation {
     HttpOperation {
         tool: ToolSnapshot {
+            workflow: None,
             company_id: company,
             contract: registry::ToolContract {
                 name: TypeName::parse(name).unwrap(),
@@ -257,6 +258,7 @@ pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> Claimed
             binding_id: target.binding,
             idempotency_key: IdempotencyKey::parse("http-run").unwrap(),
             input: json!({}),
+            rerun_of: None,
         })
         .await
         .unwrap();

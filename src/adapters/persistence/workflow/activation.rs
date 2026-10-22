@@ -148,8 +148,9 @@ async fn resolve(
     }
     let dependencies = input_dependencies(bundle, step)?;
     let outputs = outputs(db, request, ordinal, bundle, limits, &dependencies).await?;
-    let source: String = sqlx::query_scalar(
-        "SELECT source_key FROM workflow_admissions WHERE company_id = $1 AND run_id = $2",
+    // One source of truth for lineage: the immutable run column, not the admission key.
+    let parent: Option<Uuid> = sqlx::query_scalar(
+        "SELECT parent_run_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
     )
     .bind(request.company.as_uuid())
     .bind(request.run.as_uuid())
@@ -161,7 +162,7 @@ async fn resolve(
         step_outputs: &outputs,
         run: RunMetadata {
             run_id: request.run,
-            parent_run_id: parent_run(&source)?,
+            parent_run_id: parent.map(RunId::new),
         },
     };
     let inputs = prepare_inputs(bundle, step, &context)?;
@@ -173,6 +174,60 @@ async fn resolve(
         .map_err(|_| AppError::BadRequest("Invalid rule predicate".into()))?
         .map(|choice| choice.as_str().to_owned());
     Ok(FrozenActivation { inputs, choice })
+}
+
+/// The parent context a `flow.repeat` round is decided in (07-D1 §D1.1): the activation's
+/// input, parameters, run metadata and earlier step outputs, with the step's provisional output
+/// in place of any earlier activation of the same step.
+pub(super) struct RoundContext {
+    input: Value,
+    params: Value,
+    outputs: BTreeMap<StepId, Value>,
+    run: RunId,
+    parent: Option<RunId>,
+}
+impl RoundContext {
+    pub(super) fn context(&self) -> Context<'_> {
+        Context {
+            input: &self.input,
+            params: &self.params,
+            step_outputs: &self.outputs,
+            run: RunMetadata {
+                run_id: self.run,
+                parent_run_id: self.parent,
+            },
+        }
+    }
+}
+
+pub(super) async fn round_context(
+    db: &mut PgConnection,
+    request: ActivationRequest,
+    binding: &crate::application::workflow::binding::ConfiguredBinding,
+    activation: &ActivatedExecution,
+    provisional: Value,
+) -> AppResult<RoundContext> {
+    let (input, parent): (Value, Option<Uuid>) = sqlx::query_as(
+        "SELECT input, parent_run_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
+    )
+    .bind(request.company.as_uuid())
+    .bind(request.run.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    let bundle = binding.bundle();
+    let mut dependencies = input_dependencies(bundle, &activation.step)?;
+    dependencies.remove(&activation.step);
+    let ordinal = i64::try_from(activation.ordinal).map_err(|_| invalid())?;
+    let limits = bundle.compiled().graph().context_limits();
+    let mut outputs = outputs(db, request, ordinal, bundle, limits, &dependencies).await?;
+    outputs.insert(activation.step.clone(), provisional);
+    Ok(RoundContext {
+        input,
+        params: binding.params().clone(),
+        outputs,
+        run: request.run,
+        parent: parent.map(RunId::new),
+    })
 }
 
 async fn outputs(
@@ -219,21 +274,4 @@ async fn outputs(
         outputs.insert(step, value);
     }
     Ok(outputs)
-}
-
-fn parent_run(source: &str) -> AppResult<Option<RunId>> {
-    let value: Value = serde_json::from_str(source.strip_prefix("v1:").ok_or_else(invalid)?)
-        .map_err(|_| invalid())?;
-    let fields = value.as_array().ok_or_else(invalid)?;
-    match fields.first().and_then(Value::as_str) {
-        Some("manual" | "message") if fields.len() == 2 => Ok(None),
-        Some("schedule") if fields.len() == 3 => Ok(None),
-        Some("child") if fields.len() == 5 => {
-            let id = fields[1].as_str().ok_or_else(invalid)?;
-            Ok(Some(RunId::new(
-                Uuid::parse_str(id).map_err(|_| invalid())?,
-            )))
-        }
-        _ => Err(invalid()),
-    }
 }

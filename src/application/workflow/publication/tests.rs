@@ -1,6 +1,6 @@
 use super::*;
 use crate::adapters::workflow_source::decode;
-use crate::domain::workflow::{ResourceName, RunId, RunMetadata, TypeName};
+use crate::domain::workflow::{ResourceName, RunId, RunMetadata, TypeName, WorkflowId};
 use uuid::Uuid;
 
 #[path = "capabilities_tests.rs"]
@@ -53,6 +53,7 @@ fn build(source: &Value, snapshots: DependencySnapshots) -> Result<PublishedBund
 }
 fn tool_snapshot(kind: &str) -> ToolSnapshot {
     ToolSnapshot {
+        workflow: None,
         company_id: company(),
         contract: registry::example(kind).unwrap().facts.tools.remove(0),
         policy: ApprovedActionPolicy {
@@ -408,5 +409,110 @@ fn workflow_publication_requires_and_hashes_trusted_agent_identity() {
     assert_eq!(
         build(&source, invalid).err().unwrap().code,
         "publication.agent_identity"
+    );
+}
+
+/// 07-D2 §D2.2: a granted workflow tool pins its child like a child step. The bundle carries the
+/// child; the frozen contract must be the child's own, its parameters must satisfy the child, the
+/// child's resource slots must be the parent's, and a tool cannot reach the root workflow.
+#[test]
+fn workflow_publication_freezes_workflow_tool_pins_like_children() {
+    let version = VersionId::new(Uuid::from_u128(3));
+    let tool = |child: &PublishedBundle| {
+        let definition = child.compiled().graph().definition();
+        ToolSnapshot {
+            company_id: company(),
+            contract: registry::ToolContract {
+                name: name("refund.review"),
+                connection: None,
+                input_schema: definition.input_schema.clone().unwrap(),
+                output_schema: definition.output_schema.clone().unwrap(),
+            },
+            policy: ApprovedActionPolicy {
+                capability: name("workflow.tool"),
+                policy_revision: 1,
+                effect: ActionEffect::Write,
+                recovery: ActionRecovery::SafeRepeat,
+            },
+            workflow: Some(WorkflowToolPin {
+                workflow_id: definition.workflow_id,
+                version_id: definition.version_id,
+                params: json!({}),
+            }),
+        }
+    };
+    let publish = |parent: &Value, tool: Option<ToolSnapshot>, children| {
+        let mut agent = agent();
+        agent.tools = tool.iter().map(|tool| tool.contract.name.clone()).collect();
+        freeze(
+            decode(&parent.to_string()).unwrap(),
+            company(),
+            VersionId::new(Uuid::from_u128(10)),
+            DependencySnapshots {
+                agents: vec![agent],
+                tools: tool.into_iter().collect(),
+                ..Default::default()
+            },
+            children,
+        )
+    };
+    let refused = |result: Result<PublishedBundle, Diagnostic>, code: &str| {
+        assert_eq!(result.err().map(|diagnostic| diagnostic.code), Some(code));
+    };
+    let parent = source("agent.run");
+    let leaf = child(&child_source());
+    let bundle = publish(&parent, Some(tool(&leaf)), vec![leaf.clone()]).unwrap();
+    assert!(Arc::ptr_eq(&bundle.children()[&version], &leaf));
+    assert_eq!(bundle.snapshots().tools[0].workflow, tool(&leaf).workflow);
+    refused(
+        publish(&parent, Some(tool(&leaf)), vec![]),
+        "publication.missing",
+    );
+    refused(
+        publish(&parent, None, vec![leaf.clone()]),
+        "publication.unused",
+    );
+    // A contract that is not the child's, or a pin naming another workflow.
+    let mut changed = tool(&leaf);
+    changed.contract.output_schema = json!({"type":"string"});
+    refused(
+        publish(&parent, Some(changed), vec![leaf.clone()]),
+        "publication.workflow_tool",
+    );
+    let mut changed = tool(&leaf);
+    changed.workflow.as_mut().unwrap().workflow_id = WorkflowId::new(Uuid::from_u128(99));
+    refused(
+        publish(&parent, Some(changed), vec![leaf.clone()]),
+        "publication.workflow_tool",
+    );
+    // Parameters the child refuses.
+    let mut strict = child_source();
+    strict["parameter_schema"] = json!({"type":"object","additionalProperties":false});
+    let strict = child(&strict);
+    let mut changed = tool(&strict);
+    changed.workflow.as_mut().unwrap().params = json!({"reviewer": "someone"});
+    refused(
+        publish(&parent, Some(changed), vec![strict.clone()]),
+        "publication.workflow_tool",
+    );
+    assert!(publish(&parent, Some(tool(&strict)), vec![strict]).is_ok());
+    // The child's slots must be the parent's, by name, kind and contract.
+    let mut slotted = child_source();
+    slotted["resources"] = json!([{"slot":"service","kind":"mcp"}]);
+    let slotted = child(&slotted);
+    refused(
+        publish(&parent, Some(tool(&slotted)), vec![slotted.clone()]),
+        "publication.workflow_tool",
+    );
+    let mut declared = parent.clone();
+    declared["resources"] = json!([{"slot":"service","kind":"mcp"}]);
+    assert!(publish(&declared, Some(tool(&slotted)), vec![slotted]).is_ok());
+    // A tool pinned to a version of the root workflow itself.
+    let mut root = child_source();
+    root["workflow_id"] = parent["workflow_id"].clone();
+    let root = child(&root);
+    refused(
+        publish(&parent, Some(tool(&root)), vec![root]),
+        "publication.recursion",
     );
 }

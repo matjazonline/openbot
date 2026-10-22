@@ -303,43 +303,17 @@ async fn workflow_activation_deadline_ordinal_and_output_bounds() {
 }
 
 #[tokio::test]
-async fn workflow_activation_parent_metadata_comes_from_admitted_cause() {
+async fn workflow_activation_parent_metadata_comes_from_run_lineage() {
+    // Category A (07-D1 §D1.2): `/run/parent_id` is the immutable `parent_run_id` column.
     let mut source: Value =
         serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
     source["steps"]["start"]["with"]["value"] = json!({"ref":"/run/parent_id"});
     source["steps"]["start"]["with"]["output_schema"] = json!({"literal":true});
-    let f = AdmissionFixture::with_binding(BindingFixture::from_source(source).await).await;
-    let parent = f.prepare(f.request("parent", f.manual())).await;
-    f.persistence().admit(&parent).await.unwrap();
-    let cause = ChildCause::Execution(ExecutionRef::new(
-        parent.company_id(),
-        parent.proposed_run_id(),
-        parent.first_execution_id(),
-        parent.entry().clone(),
-    ));
-    let trigger = TriggerRef::new(
-        parent.company_id(),
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child { parent: cause },
-    )
-    .unwrap();
-    let child = f.prepare(f.request("child", trigger)).await;
-    f.persistence().admit(&child).await.unwrap();
-    let job: Uuid =
-        sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id = $1")
-            .bind(child.first_execution_id().as_uuid())
-            .fetch_one(f.persistence().pool())
-            .await
-            .unwrap();
-    let request = ActivationRequest {
-        company: child.company_id(),
-        run: child.proposed_run_id(),
-        execution: child.first_execution_id(),
-        job: WorkflowJobId(job),
-    };
+    let (f, scopes) = AdmissionFixture::chain(source, 1).await;
+    let (parent, child) = (scopes[0], scopes[1]);
     assert_eq!(
-        f.persistence().activate(request).await.unwrap().inputs["value"],
-        json!(parent.proposed_run_id().as_uuid())
+        f.persistence().activate(child).await.unwrap().inputs["value"],
+        json!(parent.run.as_uuid())
     );
 }
 

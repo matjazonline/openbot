@@ -7,6 +7,14 @@ async fn limited() -> (AdmissionFixture, ActivationRequest) {
     fixture(source).await
 }
 
+/// Category A (07-D1 §D1.2a): a root parked on one child, both under the same limits.
+async fn limited_child() -> (AdmissionFixture, ActivationRequest, ActivationRequest) {
+    let mut source = example("data.map");
+    source["limits"]["root_budget"] = json!({"activations": 2, "model_calls": 2, "repetitions": 2});
+    let (f, scopes) = AdmissionFixture::chain(source, 1).await;
+    (f, scopes[0], scopes[1])
+}
+
 async fn receipt(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -53,9 +61,11 @@ async fn workflow_budget_schema_duplicate_first_claim_and_replay_with_remaining_
 
 #[tokio::test]
 async fn workflow_budget_schema_competing_descendants_and_exact_duplicate_receipts() {
+    // Category B: three runs of one root reserving at once is a state the runtime never
+    // produces (ancestors are parked first); it guards the shared usage-row protocol.
     let (f, root) = limited().await;
-    let a = admit_child(&f, root, "start", "a").await;
-    let b = admit_child(&f, a, "start", "b").await;
+    let a = f.lineage_child(root).await;
+    let b = f.lineage_child(a).await;
     for resource in ["activation", "model_call", "repetition"] {
         let key = if resource == "activation" {
             "activation"
@@ -100,8 +110,7 @@ async fn workflow_budget_schema_competing_descendants_and_exact_duplicate_receip
 
 #[tokio::test]
 async fn workflow_budget_schema_rollback_scope_mutation_and_owner_cascade() {
-    let (f, root) = limited().await;
-    let child = admit_child(&f, root, "start", "child").await;
+    let (f, root, child) = limited_child().await;
     let before = accounting(&f).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
     assert_eq!(
@@ -175,8 +184,7 @@ async fn workflow_budget_schema_rollback_scope_mutation_and_owner_cascade() {
 
 #[tokio::test]
 async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() {
-    let (f, root) = limited().await;
-    let child = admit_child(&f, root, "start", "child").await;
+    let (f, root, child) = limited_child().await;
     let mut held = f.persistence().pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM workflow_runs WHERE id=$1 FOR UPDATE")
         .bind(root.run.as_uuid())

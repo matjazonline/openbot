@@ -45,12 +45,27 @@ pub(super) async fn check_readiness(
     let company = configuration.company_id();
     let definition = configuration.bundle().compiled().graph().definition();
     for tool in &configuration.bundle().snapshots().tools {
-        if authority::builtin_message_tool(tool)? {
-            continue;
-        }
-        let Some(slot) = &tool.contract.connection else {
-            http::registered_on(tx, company, tool).await?;
-            continue;
+        let slot = match tool.kind() {
+            ToolKind::Message => {
+                authority::builtin_message_tool(tool)?;
+                continue;
+            }
+            ToolKind::Http => {
+                http::registered_on(tx, company, tool).await?;
+                continue;
+            }
+            // A frozen pin runs while its name is registered for the same workflow (P07-Q2).
+            ToolKind::Workflow(_) => {
+                super::workflow_tools::registered_on(
+                    tx,
+                    company,
+                    tool,
+                    super::workflow_tools::ToolCheck::Run,
+                )
+                .await?;
+                continue;
+            }
+            ToolKind::Slot(slot) => slot,
         };
         let id = configuration
             .resources()

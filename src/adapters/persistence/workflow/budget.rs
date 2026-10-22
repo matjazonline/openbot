@@ -149,6 +149,20 @@ fn resource(value: BudgetResource) -> &'static str {
     }
 }
 
+/// One repetition per `flow.repeat` round (07-D1 §D1.6), on the parent execution and keyed by
+/// round, so a replayed park or round transition returns the saved disposition. The caller holds
+/// the parent run, execution and job; SQL serializes only the shared usage row.
+pub(super) async fn repetition(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::activation::ActivationRequest,
+    round: ChildOrdinal,
+) -> AppResult<BudgetDisposition> {
+    let result: String = sqlx::query_scalar("INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition) SELECT company_id,run_id,$3,root_run_id,'repetition',$4,1,'granted' FROM workflow_run_budgets WHERE company_id=$1 AND run_id=$2 ON CONFLICT(company_id,run_id,execution_id,resource,reservation_key) DO UPDATE SET quantity=EXCLUDED.quantity RETURNING disposition")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
+        .bind(format!("round:{}", round.get())).fetch_one(db).await?;
+    disposition(&result)
+}
+
 /// A first activation has no attempt and cannot have dispatched an effect. The
 /// caller holds its run and execution; SQL serializes only the shared usage row.
 pub(super) async fn activate(

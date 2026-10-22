@@ -161,35 +161,13 @@ async fn workflow_control_competing_retry_preserves_identity_facts_and_remaining
 #[tokio::test]
 async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_and_child() {
     for kind in 0..5 {
-        let (f, mut scope) = fixture().await;
+        // A runtime child is never retried (07-D1 §D1.7): its parent fact may be consumed.
+        let (f, scope) = if kind == 4 {
+            child_fixture().await
+        } else {
+            fixture().await
+        };
         if kind == 4 {
-            let parent = ExecutionRef::new(
-                scope.company,
-                scope.run,
-                scope.execution,
-                StepId::parse("start").unwrap(),
-            );
-            let trigger = TriggerRef::new(
-                scope.company,
-                TriggerId::new(Uuid::new_v4()),
-                TriggerSource::Child {
-                    parent: ChildCause::Execution(parent),
-                },
-            )
-            .unwrap();
-            let child = f.prepare(f.request("child", trigger)).await;
-            f.persistence().admit(&child).await.unwrap();
-            scope.run = child.proposed_run_id();
-            scope.execution = child.first_execution_id();
-            scope.job = WorkflowJobId(
-                sqlx::query_scalar(
-                    "SELECT id FROM background_tasks WHERE workflow_execution_id=$1",
-                )
-                .bind(scope.execution.as_uuid())
-                .fetch_one(f.persistence().pool())
-                .await
-                .unwrap(),
-            );
             assert!(matches!(
                 f.persistence()
                     .head(scope.company, scope.run)

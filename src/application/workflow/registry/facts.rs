@@ -6,6 +6,9 @@ use std::io::{self, Write};
 pub struct CatalogueFacts {
     pub tools: Vec<ToolContract>,
     pub children: Vec<ChildContract>,
+    /// Workflows the definition's workflow tools pin (07-D2 §D2.2): dependency edges like child
+    /// steps, so recursion and depth apply to them too.
+    pub tool_workflows: BTreeSet<WorkflowId>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -22,6 +25,10 @@ pub struct ChildContract {
     pub version_id: VersionId,
     pub input_schema: Value,
     pub output_schema: Value,
+    /// The child's own binding parameters, supplied by the parent step's `with.params`.
+    pub parameter_schema: Value,
+    /// The child's resource slots; the parent must declare each by the same name and contract.
+    pub resources: Vec<crate::domain::workflow::ResourceRequirement>,
 }
 
 struct Budget(usize);

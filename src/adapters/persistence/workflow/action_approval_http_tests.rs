@@ -338,7 +338,7 @@ async fn workflow_action_approval_reopen_without_submission_is_rejected() {
     );
     assert_eq!(
         error.as_database_error().unwrap().message(),
-        "workflow job reopen requires an approval or delivery continuation"
+        "workflow job reopen requires an approval, delivery or child continuation"
     );
     assert_eq!(view(&setup).await.state, "waiting");
 }

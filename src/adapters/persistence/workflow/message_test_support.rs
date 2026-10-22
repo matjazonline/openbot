@@ -236,6 +236,7 @@ pub(super) async fn admitted_as(
             binding_id: target.binding,
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({}),
+            rerun_of: None,
         })
         .await
         .unwrap();

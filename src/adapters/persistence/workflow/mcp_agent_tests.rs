@@ -102,6 +102,7 @@ async fn workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot() {
             binding_id: target.binding,
             idempotency_key: IdempotencyKey::parse("agent-mcp-run").unwrap(),
             input: json!({}),
+            rerun_of: None,
         })
         .await
         .unwrap();

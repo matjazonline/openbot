@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::workflow::children::WorkflowChildren;
 use crate::application::workflow::waits::*;
 
 // Every fixture owns its migrated database, so complete table snapshots also catch
@@ -187,56 +188,62 @@ async fn workflow_control_cancel_resume_competitors_preserve_event_and_notificat
     }
 }
 
-async fn child_command(
-    f: &AdmissionFixture,
-    scope: ActivationRequest,
-    key: &str,
-) -> PreparedAdmission {
-    let parent = ExecutionRef::new(
-        scope.company,
-        scope.run,
-        scope.execution,
-        StepId::parse("start").unwrap(),
-    );
-    let trigger = TriggerRef::new(
-        scope.company,
-        TriggerId::new(Uuid::new_v4()),
-        TriggerSource::Child {
-            parent: ChildCause::Execution(parent),
-        },
-    )
-    .unwrap();
-    f.prepare(f.request(key, trigger)).await
-}
-
 #[tokio::test]
-async fn workflow_control_child_admission_both_deterministic_orders() {
-    let (f, scope) = fixture().await;
-    let existing = child_command(&f, scope, "existing").await;
-    let admitted = f.persistence().admit(&existing).await.unwrap();
-    assert!(matches!(admitted, AdmissionResult::Created(_)));
+async fn workflow_control_cancel_and_child_creation_both_deterministic_orders() {
+    // Replaces binding-based child admission (07-D1 §D1.2a, §D1.5): park then cancel cascades
+    // into the child; cancel then park creates nothing.
+    let source: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    let (f, scope) = AdmissionFixture::caller(source.clone()).await;
+    let parked = f.persistence().park_child(scope).await.unwrap().unwrap();
+    let child = child_support::entry(&f, child_of(&f, parked.wait).await).await;
     f.persistence()
         .cancel(command(&f, scope, "cancel").await)
         .await
         .unwrap();
+    assert_eq!(run_state(&f, child.run).await, "cancelled");
     let before = control_state(&f).await;
     assert_eq!(
-        f.persistence().admit(&existing).await.unwrap(),
-        AdmissionResult::Replayed(existing.proposed_run_id())
+        f.persistence()
+            .park_child(scope)
+            .await
+            .unwrap()
+            .map(|p| p.wait),
+        Some(parked.wait)
     );
     assert_eq!(control_state(&f).await, before);
-    let (f, scope) = fixture().await;
-    let fresh = child_command(&f, scope, "fresh").await;
+    let (f, scope) = AdmissionFixture::caller(source).await;
     f.persistence()
         .cancel(command(&f, scope, "cancel").await)
         .await
         .unwrap();
     let before = control_state(&f).await;
-    assert!(matches!(
-        f.persistence().admit(&fresh).await,
-        Err(AppError::Conflict(_))
-    ));
+    assert!(f.persistence().park_child(scope).await.unwrap().is_none());
     assert_eq!(control_state(&f).await, before);
+    let children: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE parent_run_id IS NOT NULL")
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(children, 0);
+}
+
+async fn child_of(f: &AdmissionFixture, wait: WaitId) -> RunId {
+    RunId::new(
+        sqlx::query_scalar("SELECT child_run_id FROM workflow_waits WHERE id=$1")
+            .bind(wait.as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap(),
+    )
+}
+
+async fn run_state(f: &AdmissionFixture, run: RunId) -> String {
+    sqlx::query_scalar("SELECT state FROM workflow_runs WHERE id=$1")
+        .bind(run.as_uuid())
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap()
 }
 
 async fn install_fault(f: &AdmissionFixture, table: &str, event: &str) {

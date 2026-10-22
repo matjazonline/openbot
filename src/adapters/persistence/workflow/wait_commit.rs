@@ -17,11 +17,13 @@ pub(super) async fn resume_on(
     };
     match wait.state.as_str() {
         "completed" => {
+            // A failed child, like a failed receipt, completes its wait through the final-error
+            // writer, so its execution may have no saved success.
             return saved(
                 db,
                 scope,
                 CommitDisposition::Replayed,
-                wait.reason == "effect",
+                matches!(wait.reason.as_str(), "effect" | "child_run"),
             )
             .await;
         }
@@ -34,6 +36,7 @@ pub(super) async fn resume_on(
                     Some("activation_limit") => WaitFailureReason::ActivationLimit,
                     Some("invalid_output") => WaitFailureReason::InvalidOutput,
                     Some("evidence_conflict") => WaitFailureReason::EvidenceConflict,
+                    Some("root_budget_exhausted") => WaitFailureReason::RootBudgetExhausted,
                     _ => return Err(invalid()),
                 },
             });
@@ -47,6 +50,10 @@ pub(super) async fn resume_on(
     }
     if run.state != "waiting" || (wait.reason == "event" && wait.deadline <= now) {
         return expire(db, scope, &run.state).await;
+    }
+    if wait.reason == "child_run" {
+        // Box the child continuation: it may start the next round's child (07-D1 §D1.4).
+        return Box::pin(child_waits::resume_on(db, scope, run, wait.id)).await;
     }
     if wait.reason == "decision" {
         // Submission settles a decision in its own command; a worker only times it out.
@@ -224,6 +231,19 @@ async fn advance(
         }
         Err(error) => return Err(error),
     };
+    commit_wake(db, scope, &run, &activation, completion, event).await
+}
+
+/// Complete the parked step with its wake output: the activation limit, the consumed event (if
+/// any), the settled wait and the shared progression writer, in the caller's transaction.
+pub(super) async fn commit_wake(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    run: &waits::WaitRun,
+    activation: &ActivatedExecution,
+    completion: crate::application::workflow::batch::PureCompletion,
+    event: Option<Uuid>,
+) -> AppResult<WaitProgress> {
     let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
     if activation.ordinal > max_steps
         || (activation.ordinal >= max_steps
@@ -245,7 +265,7 @@ async fn advance(
     let successor = batch_commit::complete(
         db,
         scope,
-        &activation,
+        activation,
         &completion,
         run.max_steps,
         completion_job::CompletionOwner::Parked,
@@ -287,7 +307,7 @@ struct SavedResult {
 }
 /// The saved completion of a completed wait. Only a message step's failed receipt completes its
 /// wait through the final-error writer; with no declared route that failed the run instead.
-async fn saved(
+pub(super) async fn saved(
     db: &mut PgConnection,
     scope: ActivationRequest,
     disposition: CommitDisposition,
@@ -355,6 +375,7 @@ pub(super) async fn fail(
         WaitFailureReason::ActivationLimit => "activation_limit",
         WaitFailureReason::InvalidOutput => "invalid_output",
         WaitFailureReason::EvidenceConflict => "evidence_conflict",
+        WaitFailureReason::RootBudgetExhausted => "root_budget_exhausted",
     };
     sqlx::query("UPDATE workflow_waits SET state='failed',failure_code=$4,settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(code).execute(&mut *db).await?;

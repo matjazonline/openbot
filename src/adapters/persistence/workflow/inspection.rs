@@ -16,9 +16,10 @@ pub(super) struct HeadRow {
     pub waiting_reason: Option<String>,
     pub revision: i64,
     pub source_key: String,
+    pub rerun_of_run_id: Option<Uuid>,
 }
 
-pub(super) const HEAD: &str = "SELECT run.company_id,run.id,run.workflow_id,run.version_id,run.channel_id,run.thread_id,run.trigger_id,run.correlation_id,run.state,run.waiting_reason,run.revision,admission.source_key FROM workflow_runs AS run JOIN workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id WHERE run.company_id=$1 AND run.id=$2";
+pub(super) const HEAD: &str = "SELECT run.company_id,run.id,run.workflow_id,run.version_id,run.channel_id,run.thread_id,run.trigger_id,run.correlation_id,run.state,run.waiting_reason,run.revision,admission.source_key,run.rerun_of_run_id FROM workflow_runs AS run JOIN workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id WHERE run.company_id=$1 AND run.id=$2";
 
 #[async_trait]
 impl WorkflowInspection for PostgresPersistence {
@@ -59,15 +60,7 @@ impl HeadRow {
             }),
             _ => return Err(invalid()),
         };
-        let association = match (self.channel_id, self.thread_id) {
-            (None, None) => RelatedAssociation::Company,
-            (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-            (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(channel),
-                thread_id: RelatedThreadId::new(thread),
-            },
-            _ => return Err(invalid()),
-        };
+        let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
         Ok(RunHead {
             causality: RunCausality::new(
                 RunId::new(self.id),
@@ -80,6 +73,7 @@ impl HeadRow {
             association,
             state,
             revision: RunRevision(u64::try_from(self.revision).map_err(|_| invalid())?),
+            rerun_of: self.rerun_of_run_id.map(RunId::new),
         })
     }
 }
@@ -106,17 +100,25 @@ fn source(company: CompanyId, trigger: Uuid, source: &str) -> AppResult<TriggerS
             schedule_id: ScheduleId::new(uuid(1)?),
             occurrence_id: ScheduleOccurrenceId::new(uuid(2)?),
         },
-        Some("child") if fields.len() == 5 => {
+        Some("child") if fields.len() == 6 => {
             let execution = ExecutionRef::new(
                 company,
                 RunId::new(uuid(1)?),
                 ExecutionId::new(uuid(2)?),
                 StepId::parse(fields[3].as_str().ok_or_else(invalid)?).map_err(|_| invalid())?,
             );
-            let parent = if fields[4].is_null() {
-                ChildCause::Execution(execution)
-            } else {
-                ChildCause::Action(ActionRef::new(execution, ActionInvocationId::new(uuid(4)?)))
+            let parent = match (fields[4].is_null(), fields[5].as_u64()) {
+                (true, Some(ordinal)) => ChildCause::Step(ChildStepRef::new(
+                    execution,
+                    u32::try_from(ordinal)
+                        .ok()
+                        .and_then(ChildOrdinal::new)
+                        .ok_or_else(invalid)?,
+                )),
+                (false, None) if fields[5].is_null() => ChildCause::ToolCall(
+                    ChildToolCallRef::new(execution, ToolCallId::new(uuid(4)?)),
+                ),
+                _ => return Err(invalid()),
             };
             TriggerSource::Child { parent }
         }

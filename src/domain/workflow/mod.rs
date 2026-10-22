@@ -17,11 +17,12 @@ mod state;
 mod transition;
 
 pub use budget::{
-    BudgetCharge, BudgetLimitError, BudgetResource, RootBudgetLimits, TokenAllowance, TokenRefusal,
+    BudgetCharge, BudgetLimitError, BudgetResource, MAX_ROOT_REPETITIONS, RootBudgetLimits,
+    TokenAllowance, TokenRefusal,
 };
 pub use causality::{
-    ActionRef, CausalError, ChildCause, ExecutionRef, MessageEffectLink, RunCausality,
-    StepCausality, TriggerRef, TriggerSource,
+    ActionRef, CausalError, ChildCause, ChildOrdinal, ChildStepRef, ChildToolCallRef, ExecutionRef,
+    MessageEffectLink, RunCausality, StepCausality, TriggerRef, TriggerSource,
 };
 pub use context::{
     Binding, Comparison, Context, ContextError, ContextLimits, ContextReference, RunMetadata,
@@ -37,7 +38,7 @@ pub use ids::{
     ActionRemoteEntryId, ActionRemoteMarkerId, BindingRevision, BindingStateRevision, ChoiceName,
     CompanyId, DraftRevision, ExecutionId, FailureCode, NameError, ResourceName, RunId,
     RuntimeResourceId, ScheduleId, ScheduleOccurrenceId, StepId, TemplateId, TemplateRevision,
-    TriggerId, TypeName, VersionId, WaitId, WorkflowBindingId, WorkflowId,
+    ToolCallId, TriggerId, TypeName, VersionId, WaitId, WorkflowBindingId, WorkflowId,
 };
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,

@@ -5,8 +5,9 @@ pub(super) async fn retry_on(
     command: &CancelCommand,
     head: &RunHead,
 ) -> AppResult<bool> {
-    // A child has already published an immutable parent terminal fact. Phase07
-    // must define how a retry reconciles that fact before children can reopen.
+    // A runtime child is never retried: its terminal parent fact is immutable and may already be
+    // consumed. Recovery is a new revision round or a rerun (07-D1 §D1.7). A parent failed by a
+    // child outcome closed its parked job without a failed attempt, so it is never retry-safe.
     if head.state != RunState::Failed
         || matches!(
             head.causality.trigger().source(),

@@ -88,6 +88,7 @@ async fn workflow_http_admission_rechecks_bound_operation_after_activation() {
             binding_id: target.binding,
             idempotency_key: IdempotencyKey::parse("revoked-http-admission").unwrap(),
             input: json!({}),
+            rerun_of: None,
         })
         .await;
     assert!(result.is_err());

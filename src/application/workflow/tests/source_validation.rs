@@ -17,26 +17,11 @@ pub(super) fn validate_source(state: &State, command: &PreparedAdmission) -> App
             .schedule_occurrences
             .get(&(company, *schedule_id, *occurrence_id))
             .copied(),
-        TriggerSource::Child { parent } => {
-            let execution = parent.execution();
-            if state
-                .parent_executions
-                .get(&(company, execution.execution_id()))
-                != Some(execution)
-            {
-                return Err(AppError::NotFound("parent execution".into()));
-            }
-            let Some(_run) = state.runs.get(&(company, execution.run_id())) else {
-                return Err(AppError::NotFound("parent run".into()));
-            };
-            if let ChildCause::Action(action) = parent
-                && state.parent_actions.get(&(company, action.action_id())) != Some(action)
-            {
-                return Err(AppError::NotFound("parent action".into()));
-            }
-            // The child target may have a different related resource. Its own
-            // association was checked by lifecycle authorization above.
-            return Ok(());
+        // Like the SQL owner: children are created only by their parent's runtime step.
+        TriggerSource::Child { .. } => {
+            return Err(AppError::BadRequest(
+                "Child workflow runs are created only by their parent's workflow step".into(),
+            ));
         }
     };
     match stored_association {

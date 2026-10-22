@@ -51,12 +51,19 @@ pub fn example(name: &str) -> Option<AuthoringExample> {
         step["child_version_id"] = json!(version.to_string());
         if name == "flow.repeat" {
             step["max_iterations"] = json!(3);
+            step["repeat"] = json!({
+                "next_input": {"object": {"text": {"ref": "/steps/start/output/result"}}},
+                "exit_when": {"ne": [{"ref": "/steps/start/output/result"}, {"literal": "revise"}]}
+            });
+            step["routes"] = json!({"choices": {"done": "$end", "exhausted": "$end"}});
         }
         facts.children.push(ChildContract {
             workflow_id: child,
             version_id: version,
             input_schema: object(json!({"text":text(128)}), &["text"]),
             output_schema: text(128),
+            parameter_schema: json!(true),
+            resources: Vec::new(),
         });
         dependencies.insert(workflow, BTreeSet::from([child]));
         dependencies.insert(child, BTreeSet::new());

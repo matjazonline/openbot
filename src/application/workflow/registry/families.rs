@@ -107,7 +107,7 @@ impl Registration<'_> {
                 output["properties"]["feedback"] = json!({"type":"string","maxLength":MAX_TEXT});
                 output["required"] = json!(["choice", "data", "feedback"]);
                 self.check(InputCheck::Deadline)?;
-                self.static_roots("reviewers")?;
+                self.static_roots("reviewers", STATIC_REVIEWERS)?;
                 contract(
                     json!({"proposal":true,"reviewers":reviewers(),"deadline":text(MAX_DEADLINE),"data_schema":declaration,"feedback_required":feedback}),
                     &["proposal", "reviewers", "deadline", "data_schema"],
@@ -161,9 +161,13 @@ impl Registration<'_> {
                     "input",
                 )
             })?;
-        self.effective = json!({"child_workflow_id":child.workflow_id.to_string(),"child_version_id":child.version_id.to_string(),"input_schema":child.input_schema,"output_schema":child.output_schema});
+        self.static_roots("params", STATIC_PARAMS)?;
+        self.default_params(child)?;
+        self.child_resources(child)?;
+        self.effective = json!({"child_workflow_id":child.workflow_id.to_string(),"child_version_id":child.version_id.to_string(),"input_schema":child.input_schema,"output_schema":child.output_schema,"parameter_schema":child.parameter_schema});
         let input =
             json!({"allOf":[{"type":"object"},embedded(child.input_schema.clone(),"child-input")]});
+        let params = json!({"allOf":[{"type":"object"},embedded(child.parameter_schema.clone(),"child-params")]});
         let output = if self.name() == "flow.repeat" {
             object(
                 json!({"result":embedded(child.output_schema.clone(),"child-output"),"rounds":integer(control.max_iterations.unwrap_or(0) as usize)}),
@@ -172,7 +176,52 @@ impl Registration<'_> {
         } else {
             child.output_schema.clone()
         };
-        Ok(contract(json!({"input":input}), &["input"], output))
+        Ok(contract(
+            json!({"input":input,"params":params}),
+            &["input"],
+            output,
+        ))
+    }
+    /// A step without `with.params` runs its child with `{}`; a child whose parameter schema
+    /// refuses that is reported here rather than failing every run at park (07-D1 §D1.1).
+    fn default_params(&self, child: &ChildContract) -> Result<(), Diagnostic> {
+        if self.parsed.definition.steps[self.id]
+            .inputs
+            .contains_key("params")
+        {
+            return Ok(());
+        }
+        let span = self.parsed.locations[""];
+        let accepted = Schema::compile(child.parameter_schema.clone(), &self.path("params"), span)?
+            .validate(&json!({}), &self.path("params"), span)
+            .is_ok();
+        if accepted {
+            Ok(())
+        } else {
+            Err(self.error(
+                "registry.child_params",
+                "Supply with.params: the child's parameter schema requires parameters",
+                "params",
+            ))
+        }
+    }
+    /// A child receives the parent's bound resources by slot name only, so each slot it declares
+    /// must exist on the parent with the same kind and contract (07-D1 §D1.1).
+    fn child_resources(&self, child: &ChildContract) -> Result<(), Diagnostic> {
+        let parent = &self.parsed.definition.resources;
+        for slot in &child.resources {
+            if !parent.contains(slot) {
+                return Err(self.error(
+                    "registry.child_resources",
+                    &format!(
+                        "Declare the child's resource slot {} with the same kind and contract",
+                        slot.slot
+                    ),
+                    "input",
+                ));
+            }
+        }
+        Ok(())
     }
 }
 fn finite_labels(schema: &Value) -> bool {

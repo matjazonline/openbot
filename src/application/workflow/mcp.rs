@@ -145,6 +145,7 @@ mod tests {
 
     fn snapshot(output: Value) -> ToolSnapshot {
         ToolSnapshot {
+            workflow: None,
             company_id: CompanyId::new(Uuid::nil()),
             contract: ToolContract {
                 name: TypeName::parse("lookup").unwrap(),

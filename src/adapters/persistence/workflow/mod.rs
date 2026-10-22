@@ -1,13 +1,14 @@
 //! PostgreSQL is the sole owner of workflow authoring and runtime records.
 //!
-//! Authorized controls acquire company authority before the run, matching child admission.
+//! Authorized controls acquire company authority before the run.
 //! Runtime transitions lock the run before its executions, jobs/attempts, waits
 //! and events. Discovery reads grant no authority. Reacquiring an already-owned
-//! run is safe. Child admission/replay may lock parent then child, never the
-//! reverse. Runtime transitions own only one run. Child terminal transitions append a
-//! child-owned wakeup fact; parent consumption must use a separate transaction.
+//! run is safe. A parent's park or round transition creates its child run in its own
+//! transaction (07-D1 §D1.2), and a cancel cascade locks parent then child, never the
+//! reverse. Child terminal transitions append a child-owned wakeup fact; parent
+//! consumption must use a separate transaction.
 //! Foreign-key checks count as locks too: never insert a parent reference while
-//! completing the child. Parent linkage is immutable and established at admission.
+//! completing the child. Parent linkage is immutable and established at creation.
 mod action_authority;
 pub mod action_dispatch;
 mod action_receipts;
@@ -32,6 +33,9 @@ mod bindings;
 mod budget;
 mod capacity;
 mod checkpoints;
+pub mod child_publication;
+mod child_waits;
+mod children;
 mod completion;
 mod completion_job;
 mod decisions;
@@ -52,6 +56,8 @@ mod tests;
 mod wait_commit;
 mod waits;
 mod wakeups;
+mod workflow_tool_calls;
+mod workflow_tools;
 
 use super::PostgresPersistence;
 use crate::app_error::{AppError, AppResult};

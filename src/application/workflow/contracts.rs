@@ -65,6 +65,9 @@ pub struct AdmitWorkflowRequest {
     pub binding_id: WorkflowBindingId,
     pub idempotency_key: IdempotencyKey,
     pub input: Value,
+    /// A manual start that reruns this top-level run of the same workflow with changed input or
+    /// definition. The link is for inspection only (07-D1 §D1.7).
+    pub rerun_of: Option<RunId>,
 }
 
 /// Input validated against the pinned bundle and aggregate input/parameter bound.
@@ -86,6 +89,7 @@ pub struct PreparedAdmission {
     binding: Arc<ConfiguredBinding>,
     first_step: StepCausality,
     input: Value,
+    rerun_of: Option<RunId>,
 }
 
 impl PreparedAdmission {
@@ -123,6 +127,7 @@ impl PreparedAdmission {
             binding,
             first_step,
             input: snapshots.input,
+            rerun_of: request.rerun_of,
         })
     }
     pub fn company_id(&self) -> CompanyId {
@@ -182,6 +187,10 @@ impl PreparedAdmission {
     pub fn params(&self) -> &Value {
         self.binding.params()
     }
+    /// Part of replay equivalence; the admission owner authorizes the linked original.
+    pub fn rerun_of(&self) -> Option<RunId> {
+        self.rerun_of
+    }
 }
 
 /// `Replayed` returns the originally committed run; `Conflict` means the same
@@ -207,6 +216,8 @@ pub struct RunHead {
     pub association: RelatedAssociation,
     pub state: RunState,
     pub revision: RunRevision,
+    /// The top-level run this manual start reruns, for inspection (07-D1 §D1.7).
+    pub rerun_of: Option<RunId>,
 }
 impl RunHead {
     pub fn company_id(&self) -> CompanyId {

@@ -189,7 +189,12 @@ impl WorkflowDefinitions for PostgresPersistence {
         {
             return Err(conflict());
         }
-        supported_publication(&mut tx, &command.bundle).await?;
+        supported_publication(
+            &mut tx,
+            &command.bundle,
+            super::workflow_tools::ToolCheck::Publish,
+        )
+        .await?;
         // Agent/skill snapshots are compared with their durable rows at publish only (06-D5).
         super::agent_publication::verify_on(&mut tx, &command.bundle).await?;
         verify_children(&mut tx, &command.bundle).await?;

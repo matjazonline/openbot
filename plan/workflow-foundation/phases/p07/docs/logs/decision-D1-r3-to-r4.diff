@@ -1,0 +1,120 @@
+1c1
+< # P07-D1 — Batch B1 architecture: runtime child calls and bounded repeat (revision 3)
+---
+> # P07-D1 — Batch B1 architecture: runtime child calls and bounded repeat (revision 4)
+3,5c3,5
+< Author: p07 root (A), 2026-10-22. Status: proposed for B correction recheck of WF-P07-R002.
+< Supersedes revision 2 (`logs/decision-D1-r2.md`) and revision 1 (`logs/decision-D1.md`), both
+< immutable. This revision is complete on its own.
+---
+> Author: p07 root (A), 2026-10-22. Status: proposed for B correction recheck of WF-P07-R003.
+> Supersedes revisions 3, 2 and 1 (`logs/decision-D1-r3.md`, `logs/decision-D1-r2.md`,
+> `logs/decision-D1.md`), all immutable. This revision is complete on its own.
+6a7,15
+> ## D1.0b Changes from revision 3
+> 
+> | Item | Resolution | Section |
+> | --- | --- | --- |
+> | WF-P07-F008 (a) | Inventory rebuilt from every child-constructing helper and all its callers; 18 persistence files + 2 application files. | D1.2a |
+> | WF-P07-F008 (c) | Per-case rule: A runtime chain / B lineage-only constructed child (settled `child_run` wait) / C retired and replaced; per-test record in `logs/b1-fixture-moves.md`. | D1.2a, D1.10 |
+> | WF-P07-F008 (b) | TASK focused filters rewritten as real libtest module paths with baseline counts. | TASK |
+> | F011 | Original's top-level rule backed by trigger `workflow_rerun_original`; D1.7 wording corrected. | D1.3, D1.7 |
+> 
+150,163c159,217
+< path in the schema. Tests that admitted children through bindings move to a shared
+< runtime-child fixture. The inventory (every `TriggerSource::Child`/`ChildCause::Execution`
+< construction and every `admit_child` caller) is `admission_token`, `admission_source`,
+< `admission_binding`, `activation`, `budget_race`, `budget_activation`, `budget_schema`, `wakeup`,
+< `wakeup_guard`, `wakeup_parent_link`, `control`, `control_acceptance`, `control_guard`,
+< `harness_token_refusal`, `action_reconciliation_eligibility` and
+< `action_reconciliation_claim_fairness`, plus application `causality_cases` and
+< `source_validation`.
+< - **Fixture.** Publish the leaf child workflow the test needs, then publish each ancestor with a
+<   `workflow.call` entry step pinning the level below. Bind and admit the root, then run
+<   `park_child` on each level's entry job in turn. Two levels give parent → child. Three give
+<   root → child → grandchild for the descendant-budget and nested-wakeup cases in
+<   `budget_activation`, `budget_schema` and `wakeup`, which are bounded by publication depth.
+<   The fixture returns every level's `ActivationRequest`.
+---
+> path in the schema.
+> 
+> **Inventory (F008, complete).** Method: every function that constructs `TriggerSource::Child`
+> or `ChildCause::Execution`, then every caller of those functions in any file, including nested
+> `#[path]` modules. Child-constructing helpers: `wakeup_tests::admit_child`,
+> `action_reconciliation_eligibility_tests::child`, `action_reconciliation_claim_fairness_tests::
+> unique_child`, `budget_race_tests::child`, `control_acceptance_tests::child_command`, and
+> `harness_token_refusal_tests::{child, child_checkpoint}`. Inline constructions:
+> `admission_token`, `admission_source`, `admission_binding`, `activation`, `control`,
+> `control_guard`, and application `causality_cases`, `source_validation`. Files affected (18 in
+> persistence, plus the 2 application files): `admission_token`, `admission_source`,
+> `admission_binding`, `activation`, `control`, `control_guard`, `control_acceptance`,
+> `budget_race`, `budget_activation`, `budget_schema`, `wakeup`, `wakeup_guard`,
+> `wakeup_parent_link`, `harness_token_refusal`, `harness_token_scheduling`,
+> `harness_checkpoint_update`, and the `action_reconciliation_` files `eligibility`,
+> `claim_fairness`, `claim_race`, `claim_sql`, `claim_sql_wrong_execution`, `claim_boundary`,
+> `claim_recovery` and `owner_lifecycle`. No other child-constructing helper has callers outside
+> its file.
+> 
+> **Per-case rule.** Every affected test takes exactly one category, chosen by the state it needs.
+> Implementation records each test's name, category and reason in `logs/b1-fixture-moves.md` for
+> the batch review. No assertion is weakened; only fixture setup and identities change.
+> - **A — runtime chain (default).** The case needs one live line of runs in which every ancestor
+>   is parked at its child step. Publish the leaf child workflow the test needs, then each ancestor
+>   with a `workflow.call` entry step pinning the level below. Bind and admit the root, then run
+>   `park_child` on each level's entry job in turn: two levels give parent → child, three give
+>   root → child → grandchild (bounded by publication depth). The fixture returns every level's
+>   `ActivationRequest`. Expected here: the `wakeup` single-child cases,
+>   `budget_activation::child_ignores_held_ancestor_locks`, its deferred-commit and
+>   pure-I/O-refusal cases, `budget_schema::consumption_never_locks_root_run_or_execution` and
+>   `rollback_scope_mutation_and_owner_cascade`, `wakeup_guard` expiry/forged-fact/composite-FK
+>   cases, `wakeup_parent_link`, `control` retry refusal, and `activation` parent metadata
+>   (now read from `parent_run_id`).
+> - **B — lineage-only child (constructed state).** The case guards a shared SQL protocol for a
+>   state that the B1 and B2 runtimes never produce, because ancestors are always parked while a
+>   descendant runs and parallel branches are NOT_PLANNED. That covers a live descendant beside
+>   an ancestor that is not parked on it: a live I/O claim, reconciliation, or agent/token state.
+>   It also covers several live descendants of one root at once. The test-support helper
+>   `lineage_child(tx, parent_scope, child_bundle)` calls the production `children::create_on`
+>   and inserts the parent's `child_run` wait already settled (`state='cancelled'`, `settled_at`
+>   set) in the same transaction. That satisfies the deferred constraint while leaving the parent
+>   execution's own behavior unchanged: a settled wait is read only by `waits::row` for
+>   wait/child-kind steps, and the poll joins only waiting waits. Each such test carries a
+>   comment naming the unreachable state and the protocol it guards. Expected here:
+>   `budget_activation`/`budget_schema` `competing_descendants`, `wakeup_guard` `siblings`,
+>   `budget_race::descendants_share_without_locking_root_or_parent` when it needs more than one
+>   live descendant, `tokens::{refusal,scheduling,updates}` (child under an agent execution with
+>   token state), and the `action_reconciliation_*` eligibility, claim, recovery, boundary,
+>   owner-lifecycle and fairness cases (descendant beside an ancestor in reconciliation or
+>   holding a claim).
+> - **C — retired and replaced.** The case's subject was the removed binding-based child
+>   admission. `admission_source::parent_source_checks…` is replaced by the `TriggerSource::Child`
+>   refusal and the 6-element source-trigger checks. `control_guard::child_admission_competes_…`
+>   is replaced by competing `park_child`. `control_acceptance::child_admission_both_
+>   deterministic_orders` is replaced by cancel vs `park_child` in both orders (D1.5).
+>   `admission_token::child_inherits_root_reviewers…` is replaced by a chain child's token gate
+>   under the root policy. `admission_binding::source_key_has_stable_versioned_identity` is
+>   updated to the runtime key. The application `causality_cases`/`source_validation` child
+>   admission cases are replaced by the service refusal.
+166d219
+< - Cases whose subject was the removed branch become refusal tests.
+187a241,244
+> Rerun original (F011): BEFORE INSERT trigger `workflow_rerun_original` on `workflow_runs`
+> raises 23514 when `NEW.rerun_of_run_id` names a run whose `parent_run_id IS NOT NULL`.
+> `parent_run_id` is immutable (`preserve_workflow_parent`), so checking at insert suffices.
+> 
+284,285c341,343
+<   The run persists `workflow_runs.rerun_of_run_id` (D1.3 constraints back the tenant,
+<   same-workflow and top-level rules). Replay equivalence includes `rerun_of` (a mismatch is
+---
+>   The run persists `workflow_runs.rerun_of_run_id`. D1.3 backs the tenant and same-workflow
+>   rules (FK), the new run's top-level shape (CHECK) and the original's top-level rule
+>   (`workflow_rerun_original` trigger). Replay equivalence includes `rerun_of` (a mismatch is
+364,365c422,426
+< - Moved fixtures (F008): every file in the D1.2a inventory runs on the runtime-child fixture,
+<   including the three-level descendant-budget and nested-wakeup cases.
+---
+> - Moved fixtures (F008): every test in the D1.2a inventory runs under its recorded category.
+>   Category A uses the runtime chain, including the three-level descendant cases. Category B uses
+>   `lineage_child` with its stated reason, and category C has its named replacement. The
+>   `logs/b1-fixture-moves.md` table accounts for every affected test in the baseline log.
+> - Rerun original (F011): a raw insert naming a child run as `rerun_of` fails (23514).

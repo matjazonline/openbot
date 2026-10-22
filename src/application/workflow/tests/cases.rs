@@ -231,6 +231,7 @@ async fn cancellation_checks_scope_and_expected_revision() {
         association: RelatedAssociation::Company,
         state: RunState::Queued,
         revision: RunRevision(1),
+        rerun_of: None,
     });
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
@@ -250,6 +251,7 @@ async fn cancellation_checks_scope_and_expected_revision() {
         association: RelatedAssociation::Company,
         state: RunState::Queued,
         revision: RunRevision(1),
+        rerun_of: None,
     });
     assert!(matches!(
         svc.cancel(CancelWorkflowRequest {
@@ -278,6 +280,7 @@ async fn cancellation_checks_scope_and_expected_revision() {
         association: RelatedAssociation::Company,
         state: RunState::Queued,
         revision: RunRevision(1),
+        rerun_of: None,
     });
     assert_eq!(
         svc.cancel(CancelWorkflowRequest {
