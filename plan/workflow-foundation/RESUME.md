@@ -1,5 +1,14 @@
 # Workflow foundation resume
 
+## PHASE07 USER-REQUESTED STOP — 2026-10-21 (current)
+
+Phase 07 started under `implement-opus-reviewed-2_2` (root = Opus/xhigh author). Records are
+phase-local: **read next** `phases/p07/docs/HANDOFF.md`, then `phases/p07/docs/TASK.md`.
+Plan coordination: `COORDINATION.md` (r1). B1 architecture gate P07-D1 rev 1 reviewed
+(WF-P07-R001: changes required, F001–F007); revision 2 is the next action. No source edits,
+databases, commits or deployments. Earlier phase records under `docs/` were removed from the
+working tree by the user's cleanup (retrievable from git at `921079d`).
+
 ## PHASE06 ACCEPTED — 2026-10-21
 
 Phase06 complete: 06A/06B/06C accepted; final gate PASS; combined review 06-R024 corrections

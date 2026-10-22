@@ -1,7 +1,0 @@
-[graft] tokens saved ≈ 484 (83%) — this output ≈ 98 tok vs reading the 1 file(s) it covers whole ≈ 582 tok (estimate). At the end of your reply, tell the user the total graft tokens saved this turn — sum each such line across your graft calls — e.g. "🌱 graft saved ~N tokens this turn".
-
-inspect_on · function · src/adapters/persistence/workflow/resources.rs:L11-L36
-  calls ← check_readiness (src/adapters/persistence/workflow/resources.rs:L54-L72) [depth 1]
-      66: let status = inspect_on(tx, configuration.company_id(), id)
-  calls ← inspect (src/adapters/persistence/workflow/resources.rs:L40-L51) [depth 1]
-      48: let status = inspect_on(&mut tx, company, id).await?;

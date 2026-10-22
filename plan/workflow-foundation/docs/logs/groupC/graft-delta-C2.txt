@@ -1,4 +1,0 @@
-before=880 after=880 added=0 removed=0 changed=3
-M graft/.cache/extract.f5c422aeb1703a7b.json
-M graft/.cache/fingerprint.f5c422aeb1703a7b.json
-M graft/src/adapters/persistence/task/tests.md

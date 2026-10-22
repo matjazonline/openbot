@@ -36,7 +36,8 @@ Most AI platforms charge you astronomical token bills because they let raw LLMs 
 │ • BYOK (Bring Your Own) │ • Shared Company Knwldg │ • MicroVM Sandboxes     │
 │ • PostgreSQL Storage    │ • Slack Integration     │ • 99.99% Uptime SLA     │
 │ • Community Support     │ • Priority Workflows    │ • Dedicated Solutions Eng│
-│                         │ • Email & Chat Support  │ • 24/7 Phone Support    │
+│ • Free Agent Builder    │ • Email & Chat Support  │ • 24/7 Phone Support    │
+│                         │                         │ • Process Services      │
 └─────────────────────────┴─────────────────────────┴─────────────────────────┘
 ```
 
@@ -51,6 +52,7 @@ Most AI platforms charge you astronomical token bills because they let raw LLMs 
 - Connect any standard email provider (SendGrid, Postmark, AWS SES, or direct SMTP).
 - Bring Your Own Keys (BYOK) for OpenAI, Anthropic, Gemini, Groq, or local Ollama.
 - Community Discord and GitHub issue support.
+- Free **Agent Builder**: a built-in agent that designs focused company agents with you through a guided conversation. Included on every plan.
 
 ### 2. Team: Collaborative Workspace ($49 / seat / month)
 *Unite your human team and AI agents in one shared workspace.*
@@ -65,6 +67,7 @@ Most AI platforms charge you astronomical token bills because they let raw LLMs 
 *Designed for security-sensitive, high-scale organizations.*
 - Private cloud VPC (AWS, GCP, Azure) or air-gapped on-premise deployment.
 - Hands-on SOP Engineering: our solutions architects help convert your company's training manuals into verified, executable workflows.
+- **Business Process Services:** our team explores your operations, writes the operating procedures, and builds the custom agents for each task (see [Business Process Services](services.md)).
 - Hardware-isolated ephemeral MicroVM sandboxes for untrusted attachments and code analysis.
 - Custom SSO/SAML, audit log streaming, and dedicated enterprise SLA guarantees.
 - Dedicated Solutions Architect and 24/7 emergency escalation line.
