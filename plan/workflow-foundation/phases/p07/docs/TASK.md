@@ -586,11 +586,13 @@ corrected in one round at `16e65cb8…aee9`. **WF-P07-R012: PASS** for B2 at
 root (2026-10-22): digest recomputed and matching, coordination r4 unchanged (sha256
 `89563c7e…0f5b`; WF-C001 r2/WF-C002/WF-C003 target p08/p09, none p07), R011/R012 notes,
 findings and REVIEW rows saved, F001–F028 all fixed/closed/adopted. Not committed. Next: final
-phase gate: **passed** (Checks, "Final phase gate"). Phase p07 implemented and accepted;
-not committed, not integrated. The user then asked for the full suite and to fix any issues: full suite green after a test-only
+phase gate: **passed** (Checks, "Final phase gate"). Phase p07 implemented and accepted.
+The user then asked for the full suite and to fix any issues: full suite green after a test-only
 fix (R013 PASS), including CI's stack- and lease-budget gates (Checks, "Full suite"). Accepted
-tree: `af49b63b765cc6e1d54d0005c805023a3ead87c31ea092aa69ce6809d403f2cb`. Outstanding: commit
-(user); `cargo sqlx prepare --check` unavailable here (no sqlx-cli; CI runs it).
+tree: `af49b63b765cc6e1d54d0005c805023a3ead87c31ea092aa69ce6809d403f2cb`. **Committed** at the
+user's request as `bd2ef36` on `workflows` and pushed to `origin/workflows` (2026-10-22); its
+source is exactly the accepted tree (no edits between R013 and the commit). Not integrated into
+`main`. `cargo sqlx prepare --check` was unavailable here (no sqlx-cli; CI runs it).
 
 
 Session 2: gate P07-D1 passed (R004). B1 batch review R005: changes required (F013–F016,

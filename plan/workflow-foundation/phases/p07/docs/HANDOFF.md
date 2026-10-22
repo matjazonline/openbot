@@ -17,8 +17,9 @@
   `a5e5548971a73e411` (opus/xhigh, fresh context); rounds R002–R004 (gate PASS); idle, continue
   it with `SendMessage` for the B1 batch review. Session-1 B `a46b56e8565db0c84` is unreachable. A fresh root starts a new B
   from `references/reviewer-assignment.md`.
-- Worktree `/Users/mac02/dev/openbot`, branch `workflows`; phase start `921079d`; HEAD/review
-  base `2d608f2` (user commit with session-1 records). B1 source edits uncommitted in the tree.
+- Worktree `/Users/mac02/dev/openbot`, branch `workflows`; phase start `921079d`; review base
+  `2d608f2` (user commit with session-1 records). p07 (B1+B2) committed as `bd2ef36` and pushed
+  to `origin/workflows`.
 - Snapshot exclusions (exact): `plan/workflow-foundation/phases/p07/docs
   plan/workflow-foundation/COORDINATION.md marketing website`. Digest at `2d608f2` without
   edits `31c52a4a…1b21`; **B1 review digest `1e1b0a032b4d93b16d2a09774ab5a13cb925741860d16358f334f2698f5ec9e4`**
@@ -70,4 +71,5 @@ test-only full-suite fix R013 PASS at
 Final phase gate passed; full suite (`--all-targets`, network-isolated) lib 2744/0, bin 5/0;
 stack budget 2744/0 at 2 MiB; lease budget 130/0 (TASK "Checks"). Unavailable here:
 `cargo sqlx prepare --check` and `graft build`. Reviewer B `a5e5548971a73e411` is idle.
-Outstanding: committing (user). Nothing is committed; the tree holds B1+B2 on `workflows`.
+Committed as `bd2ef36` on `workflows` and pushed to `origin/workflows` (2026-10-22); not merged
+into `main`. Nothing outstanding for p07.
